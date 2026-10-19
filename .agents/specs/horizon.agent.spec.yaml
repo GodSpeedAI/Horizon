@@ -1,0 +1,1146 @@
+# Horizon normative specification — derived from AGENT_SPEC_TEMPLATE(1).yml v1.0.
+# Meaning, contracts and proof only. Implementation sequencing belongs to a future plan.
+schema: agent.spec
+schema_version: "1.0"
+
+metadata:
+  id: HORIZON-001
+  title: Horizon — observer-relative operational navigation environment
+  status: draft
+  version: "0.1.0"
+  created: "2026-10-19"
+  scope: >-
+    The Horizon application contract across semantic-world exploration, purposeful
+    cases, affordance-based navigation, governed action, evidence, developmental
+    interpretation, and renderer-neutral deterministic interaction.
+  purpose: >-
+    Enable a bounded human or agent observer to navigate a shared organizational
+    world, discover and evaluate presently spendable moves, take only appropriately
+    governed action, settle against actual evidence, and update future navigation.
+  owner: GodSpeed AI
+  normative_language: RFC 2119
+  normative_keywords: [MUST, MUST_NOT, REQUIRED, SHOULD, SHOULD_NOT, RECOMMENDED, MAY, OPTIONAL]
+  implementation_defined_meaning: >-
+    Where a mechanism is implementation-defined, the implementation MUST document
+    its selection and demonstrate the outcome and safety properties declared here.
+
+sources:
+  primary_brief:
+    role: Normative product intent; this specification supersedes its conversational phrasing when approved.
+    expected_path: README.md
+  evidence_source:
+    role: >-
+      Canonical theory and case semantics. Source files are external project references,
+      not bundled in this repository. Resolve and inspect them before implementation;
+      never imply they have been validated merely by citing their names.
+    path: >-
+      CognitiveOS Manifesto v13.1; CognitiveOS Mathematical Specification v2.3;
+      Purposeful Case Navigation and the Observer–Case–Settlement Model;
+      CognitiveOS Developmental Orientation (context subordinate to canon).
+  existing_implementation:
+    role: >-
+      Donor mechanisms and existing subsystem APIs; source evidence, not authority
+      to override this specification. Inspect actual revisions during planning.
+    location: >-
+      https://github.com/SPRIME01/Product-Actualizer (cockpit);
+      https://github.com/GodSpeedAI/Cognate;
+      https://github.com/GodSpeedAI/DomainForge;
+      https://github.com/GodSpeedAI/SEA-Forge;
+      https://github.com/GodSpeedAI/Gauntlet;
+      https://github.com/GodSpeedAI/RealityTrace;
+      https://github.com/GodSpeedAI/Context-Kernel;
+      https://github.com/GodSpeedAI/GodSpeed-Agent.
+  interface_methodology:
+    role: Normative derivation order; skills in this repository are procedural, not runtime dependencies.
+    path: >-
+      .agents/skills/deriving-interaction-domain-models/SKILL.md;
+      .agents/skills/deriving-behavioral-interaction-proofs/SKILL.md;
+      .agents/skills/deriving-atomic-ui-models/SKILL.md
+  architecture_context:
+    role: Strategic implementation context, not proof of integrated runtime behavior.
+    path: GodSpeed AI Strategic Architecture Dossier v0.2 and Product Actualizer cockpit documentation
+
+spec_frame:
+  quality_gate_questions:
+    - What should be built?
+    - What result should it produce?
+    - How will we know the result is real?
+    - What capability should become reliably available after repeated successful use?
+    - What evidence proves the capability claim?
+    - What fails safely?
+    - What must repeat until reliable?
+    - What changes when evidence disagrees with the design?
+  proof_loop:
+    mermaid: |-
+      flowchart LR
+        Intent["Observer purpose or discovered resource"] --> Frame["Semantic and behavioral navigation frame"]
+        Frame --> Action["Selected inquiry or governed operation"]
+        Action --> Observe["Independent observation and evidence"]
+        Observe --> Settle["Evidence-warranted case status and disposition"]
+        Settle --> Horizon["Reassess present horizon"]
+        Observe -->|contradiction| Revise["Reframe or propose revision; preserve original evidence"]
+        Horizon --> Frame
+
+problem_statement:
+  system_name: Horizon
+  problem_summary: >-
+    Operational information, semantic relationships, execution tools, approvals,
+    evidence, and learning are fragmented into disconnected applications or chat
+    transcripts. The observer cannot reliably determine what is true at a given
+    checkpoint, which path is currently spendable, what happened after acting,
+    or what repeated settlement made reliably possible.
+  job_to_be_done:
+    actor: A human or AI observer operating within an authorized organizational context.
+    trigger: >-
+      A resource, event, discrepancy, objective, investigation, proposed change, or
+      prior case requires orientation, exploration, action, or review.
+    job: >-
+      Navigate the shared world from present context to the next meaningful
+      inspectable or executable move, while preserving authority and evidence.
+    outcome: >-
+      A reproducible, appropriately governed navigation episode with explicit
+      consequences, unresolved questions, and available next moves.
+  current_failure_modes:
+    - Chat-driven planning produces attractive but unpayable or unauthorized destinations.
+    - Disconnected tools lose object focus, checkpoint, provenance, and decision context.
+    - AI-authored UI, untrusted data, or simulation is mistaken for world truth or authority.
+    - An execution acknowledgment is presented as outcome settlement or durable capability.
+    - UI interaction becomes a shadow decision or approval system.
+  why_existing_approaches_fail: >-
+    A dashboard can display disconnected measurements and an assistant can propose
+    actions; neither alone guarantees semantic continuity, hard affordance gates,
+    independent authorization, frozen expectations, observable settlement, or
+    developmental feedback under variation.
+  important_boundary:
+    is: >-
+      A world-first navigation and deterministic interaction application over
+      independently governed GodSpeed semantic, application, execution, context,
+      and evidence systems.
+    is_not: >-
+      A replacement ontology, general agent harness, authorization service,
+      unverified autonomous simulator, evidence ledger, or chat-first app.
+    successful_execution: >-
+      For an applicable journey the observer can discover a source-grounded focus,
+      follow relationships, select an available inquiry or governed operation,
+      inspect evidence and status, and resume with an updated next-horizon view.
+    false_success_boundary: >-
+      Rendering screens, discovering a named action, receiving a tool acknowledgment,
+      recording a RealityTrace receipt, or one passing run does not by itself prove
+      settlement, capability, organizational improvement, or horizon expansion.
+
+requirements:
+  goals:
+    - id: REQ-GOAL-001
+      text: Horizon MUST provide a navigable shared semantic and operational world independent of chat.
+    - id: REQ-GOAL-002
+      text: Horizon MUST derive contextual interactions from source-grounded objects, relationships, cases, and capabilities.
+    - id: REQ-GOAL-003
+      text: Horizon MUST preserve behavioral equivalence between sequential Clack and richer atomic GUI projections.
+    - id: REQ-GOAL-004
+      text: Horizon MUST maintain separate governance, execution, evidence, operational settlement, and developmental claims.
+    - id: REQ-GOAL-005
+      text: Horizon MUST preserve navigation context across focus changes, renderer changes, interruption, and replay.
+  non_goals:
+    - id: NONGOAL-001
+      text: Do not reimplement DomainForge semantic compilation or mint independent world_ref identities.
+    - id: NONGOAL-002
+      text: Do not reimplement SEA-Forge authority or Gauntlet long-horizon execution.
+    - id: NONGOAL-003
+      text: Do not treat speculative organizational simulation, generalized ML policy improvement, or full Foundry feature parity as required initial conformance.
+    - id: NONGOAL-004
+      text: Do not make a 3D graph, giant all-in-one dashboard, or natural-language generation of executable UI mandatory.
+    - id: NONGOAL-005
+      text: Do not prescribe repository scaffolding, rollout phases, donor extraction steps, or implementation task ordering here.
+
+outcome_contract:
+  output_produced:
+    primary_output: >-
+      An inspectable, renderer-neutral navigation frame and durable sequence of typed
+      intents, source/evidence references, status transitions, and recoverable focus.
+    requirements:
+      - id: REQ-OUT-001
+        text: >-
+          Every frame MUST identify observer, pinned semantic world, operational
+          checkpoint or explicit unknown, current focus, view mode, and allowed choices.
+      - id: REQ-OUT-002
+        text: >-
+          Every choice MUST bind a typed semantic operation and its current
+          affordance assessment; it MUST NOT gain authority from UI enablement.
+      - id: REQ-OUT-003
+        text: >-
+          Each consequential attempt MUST preserve predeclared expectations,
+          authorization correlation, execution references, and observation status.
+      - id: REQ-OUT-004
+        text: >-
+          Both renderers MUST project the same behavior without duplicating
+          source-of-truth rules or creating a second approval path.
+  outcome_verified:
+    condition: >-
+      Independent replay and real integration tests demonstrate a complete
+      source-backed navigate/inspect/act-or-defer/evidence/reassess loop,
+      including blocked, unknown, contradicted, interrupted, and recovered paths.
+    signals:
+      - id: REQ-VERIFY-001
+        text: Identical fixture and frame revision produce equivalent typed choices and intents across Clack and GUI.
+      - id: REQ-VERIFY-002
+        text: Invalid, stale, unauthorized, unpayable, or unverifiable operations never produce unauthorized side effects.
+      - id: REQ-VERIFY-003
+        text: A restart reconstructs focus, provenance, committed intentions, and outstanding human decisions.
+      - id: REQ-VERIFY-004
+        text: Operational and developmental conclusions never exceed the strength or scope of their evidence.
+      - id: REQ-VERIFY-005
+        text: Five canonical Foundry-inspired journeys pass recorded happy, blocked, and recovery fixtures.
+    false_completion_conditions:
+      - The GUI looks correct but its buttons produce different intents than the Clack proof.
+      - The test uses static toy rows while claiming live DomainForge/Cognate object graph integration.
+      - An authorization preflight or user confirmation is treated as actual invocation authority.
+      - A submitted request, HTTP 200, trace receipt, or passing simulation is called a settled world outcome.
+  consumer_and_handoff:
+    consumers: [human observer, agent observer, Clack renderer, atomic GUI renderer, GodSpeed subsystems]
+    handoff_complete_when:
+      - Each frame and intent is schema-valid, uniquely correlated, and source-grounded.
+      - Each action result names its owning subsystem and retains cross-system references.
+      - Each interruption has either a safe resume token or a truthful terminal/blocking explanation.
+    unverified_state: incomplete
+    unverified_surface:
+      - Explicit unknown or unavailable data, without invented rows or hidden fallback.
+      - Typed failed or blocked result with reason, evidence links, and recovery when known.
+
+capability_claim:
+  applicability: applicable
+  owner: The observer and organization deploying Horizon.
+  delta: >-
+    The observer can more reliably navigate a changing organizational world,
+    make affordable and governed choices, settle consequences, recover from failure,
+    and transfer successful approaches to changed cases.
+  why_in_scope: >-
+    CognitiveOS requires more than access to information or one successful
+    execution: developmental memory must affect subsequent spendable choices.
+  proven_only_if:
+    - Repeated cases settle under variation in objects, roles, costs, failures, and environments.
+    - Independent evidence shows reduced orchestration burden, successful recovery and justified transfer.
+    - Next-affordance changes are explainable through recorded state/evidence, without fabricated horizon gain.
+  not_proven_by:
+    - The mere existence of a navigation menu, searchable graph, or connected model.
+    - One successful task, an agent explanation, or copying a playbook.
+    - Additional resources, tool availability, or stored transcripts alone.
+  learning_claim: >-
+    Horizon MUST record developmental evidence and MAY propose improved future
+    navigation. Autonomous promotion of patterns or policy changes is NOT
+    established by this spec and MUST require independent, varied settlement proof.
+
+claim_discipline:
+  levels:
+    evidence_backed: Supported by actual implementation, tests, logs, or independently reviewable artifacts.
+    partially_proven: Material pieces exist without required end-to-end or variation proof.
+    assumption: Required condition not yet established by evidence.
+    roadmap: Desired future behavior not required for initial proof.
+  claims:
+    - id: CLAIM-001
+      claim: DomainForge can provide Cognate a canonical composed .sea world identity.
+      level: evidence_backed
+      current_evidence: Cognate PR 57 merge and DomainForge 0.21.1 native parseSourceMap integration tests.
+      required_evidence: Re-run against pinned releases and verify the intended organizational import closure.
+      gap: Target deployment and operational object-set linkage remain separate.
+    - id: CLAIM-002
+      claim: Product Actualizer cockpit provides a reusable deterministic presentation grammar.
+      level: evidence_backed
+      current_evidence: >-
+        SPRIME01/Product-Actualizer cockpit/protocol/spec.ts, actions.ts,
+        server/screens.ts, workspace.ts, web/Surface.tsx, tests/cockpit/grammar.test.ts.
+      required_evidence: Independent reuse, schema tests, renderer equivalence, and no Product Actualizer truth leakage.
+      gap: A Horizon-agnostic extracted contract has not yet been proven.
+    - id: CLAIM-003
+      claim: GodSpeed currently provides a fully integrated Horizon cross-product navigation runtime.
+      level: assumption
+      current_evidence: None; independent subsystem interfaces and partial adapters exist.
+      required_evidence: Real non-mock end-to-end cross-process navigation tests.
+      gap: Cohesive navigation controller, operational object projection, and live product integrations.
+    - id: CLAIM-004
+      claim: General-purpose organizational counterfactual predictions are calibrated.
+      level: roadmap
+      current_evidence: Domain-specific trajectory experiments are not general validation.
+      required_evidence: Preregistered predictions, calibration, uncertainty, and failed-prediction analysis.
+      gap: Validated simulator and transfer across domains.
+
+system_overview:
+  architecture_pattern:
+    primary: Renderer-neutral deterministic navigation over typed source projections and independent authorities.
+    rationale: >-
+      One semantic and behavioral contract can drive progressive Clack decisions and
+      persistent atomic GUI without multiplying truth, authority, or execution logic.
+    intentionally_not_used:
+      - pattern: Agent-generated HTML, JavaScript, or React at runtime
+        reason: Untrusted agents MUST compose only validated declarative surfaces and typed intents.
+      - pattern: UI-owned business state machine or approval service
+        reason: The UI MUST be replaceable without changing authoritative events or permission decisions.
+      - pattern: A mandatory chat-first agent execution loop
+        reason: World resources, relationships, and contextual actions MUST remain independently navigable.
+  main_components:
+    - name: Canonical semantic and operational projections
+      responsibility: Resolve DomainForge meaning, Cognate object instances, event checkpoints, and provenance.
+      inputs: [world_ref, source query, observer scope, checkpoint]
+      outputs: [typed objects and object sets, relationship results, source evidence]
+    - name: Horizon navigation controller
+      responsibility: Derive purpose/focus, narrow candidate choices, evaluate hard affordance gates, and update next horizon.
+      inputs: [observer context, case and direction, projections, authority/evidence references]
+      outputs: [navigation frame, typed operation proposals, developmental interpretations]
+    - name: Deterministic surface and interaction contract
+      responsibility: Validate closed declarative blocks, compose frames, enforce interaction-state guards and role separation.
+      inputs: [navigation frame, source results, role-bound typed intents]
+      outputs: [valid surface, reducer transition or typed rejection]
+    - name: Renderer adapters
+      responsibility: Present exactly the contract through sequential Clack and persistent Atomic GUI without privileged logic.
+      inputs: [surface spec, navigation frame]
+      outputs: [typed intent, accessibility events, presentation state]
+    - name: Governed execution boundary
+      responsibility: Route approved consequential operations through Cognate and SEA-Forge, with Gauntlet when bounded long work is needed.
+      inputs: [frozen intention, scoped authority request, payment and recovery contract]
+      outputs: [decision reference, execution reference, accepted/rejected/escalated status]
+    - name: Observation and developmental boundary
+      responsibility: Correlate RealityTrace expectations/evidence and operational settlement with separate developmental appraisal.
+      inputs: [execution events, expectations, observations, settlement references]
+      outputs: [residuals, case-status revision, developmental evidence]
+  component_diagram:
+    mermaid: |-
+      flowchart TB
+        O["Human or agent observer"] --> UI["Horizon Clack or Atomic GUI"]
+        UI <--> NAV["Horizon navigation controller"]
+        NAV <--> C["Cognate events, projections and capabilities"]
+        D["DomainForge canonical .sea world"] --> C
+        CK["Context Kernel scoped references"] --> NAV
+        C --> S["SEA-Forge authority and operational obligations"]
+        C --> G["Gauntlet bounded long work"]
+        C --> X["Direct external capability"]
+        G --> S
+        G --> X
+        C --> R["RealityTrace expectations, observations and residuals"]
+        G --> R
+        X --> R
+        R --> NAV
+        S --> C
+        NAV --> C
+  external_dependencies:
+    - name: DomainForge
+      purpose: Canonical semantics, compiled imports, and immutable world_ref identity.
+      failure_behavior: Freeze affected semantic traversal; show unresolved world, never substitute a guessed schema.
+    - name: Cognate
+      purpose: Application runtime, scoped capabilities, durable events, continuations and projections.
+      failure_behavior: Read-only cached state only if checkpoint/provenance visible; refuse new commitments.
+    - name: SEA-Forge
+      purpose: Independent runtime policy authority and governed operational settlement.
+      failure_behavior: Fail closed for all consequential commitments; surface denial, escalation or unavailability.
+    - name: RealityTrace
+      purpose: Independent expectation/observation/discrepancy records.
+      failure_behavior: Preserve committed application events; show pending/unknown observation and withhold unproven settlement.
+    - name: Gauntlet
+      purpose: Optional bounded long-horizon executor with frozen Reference and evidence.
+      failure_behavior: Do not substitute an ungoverned executor; allow other validated direct capabilities only when applicable.
+    - name: Context Kernel
+      purpose: Scoped reference retrieval, citations and session context.
+      failure_behavior: Preserve semantic navigation with explicit reference-unavailable status; do not hallucinate context.
+    - name: RuVector
+      purpose: Derived cognitive search and optional graph index.
+      failure_behavior: Fall back to verified canonical source queries without implying vector recall is authoritative.
+
+core_domain_model:
+  scope_rule: >-
+    Define only references and interactions that must survive across renderers,
+    evidence checkpoints, retries and subsystem boundaries. Business entities
+    belong in DomainForge; facts and permissions remain with their owners.
+  entities:
+    - name: NavigationContext
+      purpose: Identifies the observer-relative operating present.
+      used_by: [navigation controller, renderers, replay]
+      required_fields:
+        - { name: id, type: opaque-id, meaning: Stable navigation session identity }
+        - { name: observer_ref, type: scoped-ref, meaning: Authenticated human or agent identity }
+        - { name: world_ref, type: DomainForge-world-ref, meaning: Immutable semantic revision }
+        - { name: checkpoint_ref, type: opaque-ref-or-unknown, meaning: Operational snapshot identity distinct from semantic revision }
+        - { name: focus_ref, type: typed-ref, meaning: Current object, object set, resource or case focus }
+      optional_fields: [workspace_ref, case_ref, direction_ref, presentation_prefs]
+      rules:
+        - No context switch may silently retarget a committed operation.
+        - An absent case is valid for direct world exploration.
+    - name: NavigationFrame
+      purpose: A reproducible question or inspectable state for one observer at one revision.
+      used_by: [navigation controller, Clack, GUI, reducer]
+      required_fields:
+        - { name: id, type: opaque-id, meaning: Stable frame identity }
+        - { name: revision, type: monotonic-integer, meaning: Stale-intent rejection token }
+        - { name: context_ref, type: opaque-id, meaning: Resolved NavigationContext }
+        - { name: responsibility, type: enum, meaning: orient|inspect|choose|commit|observe|review }
+        - { name: choice_refs, type: list-of-typed-refs, meaning: Zero or more derived choices }
+      optional_fields: [surface_ref, evidence_refs, error_ref]
+      rules:
+        - A rendered choice MUST be grounded in the same frame revision as its invocation.
+        - Frames may be read-only and may offer no consequential operation.
+    - name: FocusSet
+      purpose: Carries typed object selections and relationship traversal without losing context.
+      used_by: [world explorer, source resolvers, case navigation]
+      required_fields:
+        - { name: id, type: opaque-id, meaning: Stable focus set identity }
+        - { name: object_type_ref, type: semantic-ref, meaning: DomainForge object type }
+        - { name: selector, type: validated-predicate, meaning: Source-backed filter with deterministic semantics }
+        - { name: checkpoint_ref, type: opaque-ref, meaning: Which operational state was queried }
+      optional_fields: [parent_focus_ref, relationship_ref, page_cursor]
+      rules:
+        - Source changes MUST invalidate affected results explicitly.
+        - Results MUST be access-scoped and provenance-bearing.
+    - name: AffordanceAssessment
+      purpose: Distinguishes a merely represented possibility from an executable, governed present path.
+      used_by: [navigation controller, action review]
+      required_fields:
+        - { name: operation_ref, type: semantic-ref, meaning: Stable meaning of the proposed move }
+        - { name: status, type: enum, meaning: available|blocked|unknown|conflicted }
+        - { name: gates, type: keyed-assessments, meaning: Visibility reach payment authority execution recovery settlement access }
+        - { name: basis_refs, type: list-of-refs, meaning: Evidence or derivation supporting each gate }
+      optional_fields: [first_blocker, next_prerequisite_ref, payment_estimate, consequence_estimate]
+      rules:
+        - A failed or unknown hard gate MUST NOT be treated as availability.
+        - Availability is provisional and does not grant invocation authority.
+    - name: NavigationIntent
+      purpose: Durable renderer-independent user or agent choice.
+      used_by: [reducer, Cognate runtime, governance boundary]
+      required_fields:
+        - { name: id, type: idempotency-id, meaning: Exactly-once logical intent across retries }
+        - { name: frame_id, type: opaque-id, meaning: Originating navigation frame }
+        - { name: frame_revision, type: integer, meaning: Required optimistic concurrency check }
+        - { name: actor_ref, type: scoped-ref, meaning: Who made the choice }
+        - { name: operation_ref, type: semantic-ref, meaning: Inspect, traverse, select, defer or commit }
+        - { name: target_refs, type: list-of-refs, meaning: Explicit action subjects }
+      optional_fields: [commitment_ref, authority_ref, correlation_ref]
+      rules:
+        - A rendered control MUST NOT mutate the world except via a validated intent and authorized capability.
+        - Duplicate intent IDs MUST NOT duplicate external side effects.
+    - name: SurfaceSpec
+      purpose: Closed declarative presentation, never an authority or business record.
+      used_by: [Clack renderer, GUI renderer, composition validator]
+      required_fields:
+        - { name: id, type: opaque-id, meaning: Stable surface reference }
+        - { name: intent, type: enum, meaning: inspect|compare|decide|verify|monitor }
+        - { name: blocks, type: validated-closed-union, meaning: Composable bounded block vocabulary }
+        - { name: source_bindings, type: typed-source-expressions, meaning: Source-grounded data references }
+      optional_fields: [layout_hint, focus_ref, title]
+      rules:
+        - No raw executable UI code or arbitrary DOM operations are allowed.
+        - Inline agent-supplied data MUST be explicitly provenance-marked.
+    - name: SettlementReview
+      purpose: Makes the distinction between operation, observed evidence, settlement and development inspectable.
+      used_by: [navigation controller, review surface, replay]
+      required_fields:
+        - { name: id, type: opaque-id, meaning: Review identity }
+        - { name: intent_ref, type: opaque-ref, meaning: Act or inquiry reviewed }
+        - { name: evidence_refs, type: list-of-refs, meaning: Observations and provenance }
+        - { name: epistemic_status, type: enum, meaning: supported|contradicted|unresolved|inconsistent }
+        - { name: disposition, type: enum, meaning: close|continue|revise|escalate|suspend|defer }
+      optional_fields: [operational_settlement_ref, developmental_assessment_ref, next_affordance_refs]
+      rules:
+        - Operational settlement and developmental capability assessments MUST remain distinct.
+        - A review cannot promote capability merely because a single task succeeded.
+  identifiers_and_normalization:
+    primary_id_rule: Preserve subsystem-native opaque IDs; add stable scoped correlation IDs only.
+    human_readable_rule: UI-friendly aliases MAY change; canonical refs MUST remain available for inspection.
+    normalized_identifier_rule: No implicit case folding or lossy normalization of external semantic IDs.
+    path_or_resource_rule: Resolve typed namespaces through allowlisted adapters; never concatenate untrusted file paths.
+    unsafe_input_rule: Reject unsafe, stale, unauthorized or unknown references at privileged boundaries; escape untrusted text.
+
+configuration_and_input_contract:
+  configuration_sources_precedence:
+    - { order: 1, source: Authenticated request and validated explicit navigation selection }
+    - { order: 2, source: Persisted scoped workspace preferences and case binding }
+    - { order: 3, source: Deployment configuration and adapter registry }
+    - { order: 4, source: Safe documented defaults; secret references resolved out of band }
+  resolution_rules:
+    - id: REQ-CONFIG-001
+      text: Observer identity and service authority MUST come from an authenticated trusted boundary, never from presentation metadata.
+    - id: REQ-CONFIG-002
+      text: Semantic world selection MUST pin a valid DomainForge world_ref, and operations MUST carry a checkpoint reference.
+    - id: REQ-CONFIG-003
+      text: Adapter absence or inability to prove a required hard gate MUST be explicit and fail closed for the affected action.
+    - id: REQ-CONFIG-004
+      text: Configured provider endpoints, credentials, timeouts and scope MUST remain below stable behavior contracts.
+  required_config_fields:
+    - { field: world_source, type: typed-adapter-binding, required: true, default: null, validation: Must resolve a canonical DomainForge world }
+    - { field: runtime_source, type: typed-adapter-binding, required: true, default: null, validation: Must bind scoped Cognate runtime/projections }
+    - { field: authority_source, type: typed-adapter-binding, required: false, default: null, validation: Required before consequential world-directed operation }
+    - { field: evidence_source, type: typed-adapter-binding, required: false, default: null, validation: Required when declared settlement requires independent observations }
+  error_classes:
+    - { code: semantic_world_unavailable, blast_radius: Semantic discovery and affected navigation }
+    - { code: stale_frame, blast_radius: Originating intent only }
+    - { code: source_unavailable, blast_radius: Dependent read and payment/settlement gate }
+    - { code: input_schema_invalid, blast_radius: Submitted surface or intent only }
+    - { code: authority_unavailable, blast_radius: Consequential commitment only }
+    - { code: evidence_unresolved, blast_radius: Settlement assertion only }
+    - { code: execution_uncertain, blast_radius: Retry and affected operation until reconciled }
+  error_surface_requirements:
+    - Errors MUST carry stable code, bounded message, and recovery hint where known.
+    - Errors MUST NOT disclose secrets or pretend stale data is current.
+    - Errors MUST preserve existing world, focus and evidence context for diagnostic recovery.
+  dynamic_reload:
+    status: required
+    requirements:
+      - Changed world and adapter bindings MUST be validated before presentation as active.
+      - Existing committed operations MUST retain original world and expectation pins.
+      - Invalid reload MUST preserve the last valid frame with a visible stale/degraded mark.
+  startup_preflight:
+    requirements:
+      - id: REQ-CONFIG-010
+        text: Read-only startup MUST identify accessible semantic world, observer and supported projection capabilities.
+      - id: REQ-CONFIG-011
+        text: Consequential invocation MUST revalidate target, actor, world revision, authority and settlement prerequisites.
+      - id: REQ-CONFIG-012
+        text: Preflight failure MUST block only dependent operations and retain unrelated read-only affordances.
+  primary_input:
+    type: NavigationIntent or authenticated entry request
+    source: Human or agent through Clack, GUI, CLI or machine adapter
+    required_fields:
+      - { name: observer_scope, type: authenticated-scope, validation: Derived from trusted session }
+      - { name: operation, type: typed-semantic-intent, validation: Must be a declared, currently applicable action }
+    optional_fields: [world_ref, focus_ref, case_ref, direction_ref, checkpoint_ref]
+    invalid_input_behavior:
+      missing_required: Return typed unresolved-context error; ask only discriminating questions.
+      invalid_value: Reject and preserve prior valid frame.
+      duplicate_request: Return the prior correlated logical result without duplicate effect.
+      out_of_scope: Deny with no information leak.
+      unsafe: Reject before any privileged side effect.
+
+operational_flow_and_state_model:
+  flow_summary:
+    primary_flow:
+      - Resolve observer and pinned world, then choose or restore focus.
+      - Discover source-backed objects, relationships, resources and contextual actions.
+      - Narrow candidates through hard affordance gates and observer direction if known.
+      - Perform read-only inquiry or freeze a governed commitment, execute and observe.
+      - Review evidence, operational status and developmental meaning, then reassess.
+  flow_diagram:
+    mermaid: |-
+      flowchart TD
+        A["Resolve observer, world and focus"] --> B["Read semantic and operational projections"]
+        B --> C{"Sufficient context and evidence?"}
+        C -->|no| Q["Ask one discriminating question or inspect source"]
+        Q --> B
+        C -->|yes| D["Discover operations and hard affordance gates"]
+        D --> E{"Available spendable path?"}
+        E -->|no| F["Expose blocker, prerequisite, or reframe"]
+        F --> B
+        E -->|yes| G["Display best-supported move and alternatives"]
+        G --> H{"Observer choice"}
+        H -->|defer| I["Record deferral; preserve focus"]
+        H -->|inspect| J["Perform read-only inquiry"]
+        J --> B
+        H -->|commit| K["Freeze expectation and commitment"]
+        K --> L{"SEA-Forge invocation authority"}
+        L -->|deny or escalate| M["No side effect; show status"]
+        L -->|allow| N["Direct executor or bounded Gauntlet work"]
+        N --> O["Observe independently and review settlement"]
+        O --> P["Reassess developmental evidence and next horizon"]
+        P --> B
+  service_states:
+    stateful_object: Navigation episode; mode selection is a derived presentation state, not the authoritative lifecycle.
+    states:
+      - { name: contextualized, meaning: Observer and world pinned, entry_trigger: Entry or resume, exit_trigger: Focus/inquiry choice }
+      - { name: exploring, meaning: Read-only search/traversal/inspection, entry_trigger: Source-backed focus selection, exit_trigger: New focus, deferral or intent }
+      - { name: deciding, meaning: Choice and hard gates presented, entry_trigger: Candidate assessment, exit_trigger: Inquiry, commitment, block or defer }
+      - { name: awaiting_authority, meaning: Frozen consequential intent awaits independent decision, entry_trigger: Commit request, exit_trigger: Allow/deny/escalate }
+      - { name: executing, meaning: Governed work in flight, entry_trigger: Actual invocation allow, exit_trigger: Result, cancel or failure }
+      - { name: reviewing, meaning: Observations evaluated against frozen criteria, entry_trigger: Evidence/status received, exit_trigger: Decision/disposition }
+      - { name: suspended, meaning: Missing dependency, approval or recovery decision, entry_trigger: Unsatisfied hard gate or uncertain effect, exit_trigger: Explicit remediation and revalidation }
+  transition_rules:
+    - { from: exploring, to: deciding, when: Contextual operation is evaluated }
+    - { from: deciding, to: awaiting_authority, when: Valid world-directed intent is durably frozen }
+    - { from: awaiting_authority, to: executing, when: SEA-Forge invocation allows the exact scoped operation }
+    - { from: awaiting_authority, to: suspended, when: Decision denies, escalates or is unavailable }
+    - { from: executing, to: reviewing, when: Execution result and observation status are recorded }
+    - { from: reviewing, to: exploring, when: Case status and next-affordance interpretation are recorded }
+    - { from: suspended, to: deciding, when: Blocker resolution is evidenced and fresh gates are evaluated }
+  transition_triggers:
+    - { name: focus.selected, behavior: Update typed selection and refresh scoped projections }
+    - { name: relation.traversed, behavior: Derive a new focus from canonical link semantics }
+    - { name: intent.deferred, behavior: Preserve case and chosen deferral without world mutation }
+    - { name: commitment.requested, behavior: Freeze expectation and request invocation authorization }
+    - { name: evidence.recorded, behavior: Correlate observation without granting settlement }
+    - { name: disposition.recorded, behavior: Preserve reviewed status and reveal revised next affordances }
+  idempotency_rule: >-
+    Reprocessing the same action ID MUST return the same logical result or an
+    explicit uncertain state. It MUST NOT issue a second external commitment
+    merely because a client retried or a projection replayed.
+  important_nuances:
+    - Selection/search/traversal do not require creating a Case; Cases are purposeful derived views.
+    - Screen modes ORIENT, DECIDE, EXECUTE, VERIFY, COMPLETE are presentation projections, not substitutes for case-status/disposition.
+    - Semantic world_ref is not an operational checkpoint and not a settlement.
+    - A Clack stage IS1–IS8 is a semantic responsibility, not necessarily a visible prompt or step.
+    - A higher observer may later revise a flawed semantic representation; frozen run criteria do not mutate in place.
+
+core_behavior_requirements:
+  world_navigation:
+    - { id: REQ-WORLD-001, text: Horizon MUST search semantic types, live objects, resources and apps without treating them as one undifferentiated graph. }
+    - { id: REQ-WORLD-002, text: Horizon MUST filter typed operational sets and traverse declared relationships at a known checkpoint. }
+    - { id: REQ-WORLD-003, text: Horizon MUST preserve focus, object-set selection, observer and world across surfaces and journeys. }
+    - { id: REQ-WORLD-004, text: Historical, current and candidate worlds MUST be visibly distinguished with immutable references. }
+    - { id: REQ-WORLD-005, text: The import graph, operational relation graph, and data lineage MUST retain distinct identities and semantics. }
+  navigation_and_affordances:
+    - { id: REQ-NAV-001, text: Horizon MUST distinguish possible, available, blocked, unknown and conflicted paths before ranking. }
+    - { id: REQ-NAV-002, text: Affordance gates MUST cover visibility, reach, payment, governance, capability, recovery and settlement access. }
+    - { id: REQ-NAV-003, text: Only eligible paths MAY be recommended as spendable; blocked paths MUST expose material reasons and reachable prerequisites where known. }
+    - { id: REQ-NAV-004, text: The observer MUST retain discretion to inspect alternatives, defer, reframe or disagree with the representation. }
+    - { id: REQ-NAV-005, text: The navigation controller MUST avoid asking for context it can resolve without user burden. }
+  presentation_and_atomic_ui:
+    - { id: REQ-UI-001, text: A closed versioned declarative surface schema MUST separate agents from executable UI code. }
+    - { id: REQ-UI-002, text: Schema validation MUST reject unknown blocks, unauthorized actions, invalid refs and unsafe source expressions. }
+    - { id: REQ-UI-003, text: Deterministic source-binding and pure composition/reducer behavior MUST define displayed facts and resulting intents. }
+    - { id: REQ-UI-004, text: Clack and GUI MUST consume the same behavioral contract and produce equivalent typed intents for equivalent frames. }
+    - { id: REQ-UI-005, text: Atomic UI MUST derive elements, groups, regions and views from proved behavioral necessities, preserving accessible loading, empty, blocked and recovery states. }
+    - { id: REQ-UI-006, text: Agent-composed content MUST NOT reorder owner-pinned surfaces or seize presentation control; owner choices govern layout. }
+    - { id: REQ-UI-007, text: The source of every substantive value MUST be inspectable, and agent-supplied values MUST be visibly marked as such. }
+    - { id: REQ-UI-008, text: Contextual MCP, WebMCP and CLI tools MUST share the same validation and role boundaries; tool discovery MUST NOT imply authorization. }
+  interactions:
+    - { id: REQ-INT-001, text: Every canonical journey MUST project the IS1–IS8 Behavioral IR responsibilities and identify unresolved bindings explicitly. }
+    - { id: REQ-INT-002, text: The GUI MUST preserve persistent case/world/focus context while Clack presents one next meaningful decision at a time. }
+    - { id: REQ-INT-003, text: Actions MUST use stable semantic IDs, frame revision checks and idempotency keys. }
+    - { id: REQ-INT-004, text: An answer, choice or confirmation MUST NOT be misrepresented as independent approval or a world mutation. }
+  integration:
+    - { id: REQ-STACK-001, text: DomainForge alone MUST own canonical semantic compilation and world_ref identity. }
+    - { id: REQ-STACK-002, text: Cognate MUST own app events/capability invocation/projection state; adapters MUST not create a second authoritative event history. }
+    - { id: REQ-STACK-003, text: SEA-Forge MUST authorize each consequential invocation; preflight MUST NOT substitute for invocation authorization. }
+    - { id: REQ-STACK-004, text: Gauntlet MUST be used only for tasks that require bounded long-horizon work and MUST freeze and preserve its Reference. }
+    - { id: REQ-STACK-005, text: Context Kernel results MUST remain scoped/cited and MUST NOT be interpreted as canonical organizational truth. }
+    - { id: REQ-STACK-006, text: RealityTrace delivery receipts MUST NOT be treated as evidence derivation or settlement. }
+    - { id: REQ-STACK-007, text: Operational obligation settlement and GodSpeed developmental interpretation MUST be separately referenced. }
+    - { id: REQ-STACK-008, text: Every cross-system episode MUST preserve correlation through observer/world/case/intent/authority/execution/evidence/settlement refs. }
+  case_and_development:
+    - { id: REQ-CASE-001, text: A Case MUST remain a purpose-relative derived view anchored in authoritative facts and declared direction, not a competing ontology. }
+    - { id: REQ-CASE-002, text: The next primary move MUST respond to material deviation; no primary recommendation is required when only optional choices remain. }
+    - { id: REQ-CASE-003, text: Settlement reachable and should settle now MUST be separate; the latter requires an authorized judgment. }
+    - { id: REQ-DEV-001, text: Failure, contradictions, recovery, payment and orchestration burden MUST remain available to developmental evaluation. }
+    - { id: REQ-DEV-002, text: Durable capability MUST NOT be claimed without repeated settlement under variation and transfer/recovery evidence. }
+  completion_rules:
+    may_claim_completion_only_when:
+      - All required journeys and authority boundaries have live proof or are explicitly declared incomplete.
+      - Renderer equivalence, restart/replay, failure paths, provenance and fresh-target real integrations pass.
+      - Required tests run without skip and machine-observable evidence links resolve.
+    must_report_incomplete_blocked_or_failed_when:
+      - Required adapter/authority/settlement source is missing or unverified.
+      - A consequential action lacks a passing real governance and evidence path.
+      - A contradiction or missing observation prevents the declared criterion being decided.
+
+navigation_and_presentation_contract:
+  derivation_order:
+    - "R1: canonical Interaction Domain Model in validated .sea, owned by DomainForge"
+    - "R2: Behavioral IR per canonical journey, preserving IS1–IS8 responsibilities"
+    - "R3: runnable Clack-like sequential behavioral proof, fixtures and projection-pressure evidence"
+    - "R4: renderer-neutral Atomic UI IR with traceable elements, groups, regions and views"
+    - "R5: renderer-specific Clack, OpenTUI and React/Astryx projections"
+  behavioral_phases:
+    IS1: Context selection; observer, world, focus and optional case.
+    IS2: Preflight; preconditions, completeness and reachable prerequisites.
+    IS3: Authority resolution; independent governance, prohibitions and escalation.
+    IS4: Capability invocation; implementation binding and actual executor.
+    IS5: State or artifact effect; durable operations and bounded consequences.
+    IS6: Evidence inspection; independent observations, expectations and residuals.
+    IS7: Settlement or decision; evidence-warranted status and authorized disposition.
+    IS8: Next-affordance selection; reassess the current present and new spendability.
+  composition:
+    atomic_levels: [element, group, region, view]
+    cockpit_block_vocabulary: [metric, callout, table, tree, timeline, graph, chart, compare, media, document, entity, progress, preflight, ask, form]
+    surface_intents: [inspect, compare, decide, verify, monitor]
+    user_experience_lenses: [explore, operate, build, monitor, compare, review]
+    continuous_context: [world, observer, focus, checkpoint, optional_case, direction, evidence_state]
+    tool_surfaces: [Clack, OpenTUI, React/Astryx, CLI, MCP, optional_WebMCP]
+    block_growth_rule: A new block is permitted only when a legitimate journey fails the existing closed grammar and a regression fixture documents why.
+  mode_precedence: >-
+    A pure, tested selector MUST resolve simultaneous active execution, pending
+    human choice, unresolved evidence, completed operational work and ordinary
+    exploration. Precedence is implementation-defined but MUST NOT hide a
+    critical approval, contradictory evidence or irreversible hazard.
+  ownership:
+    system_rail: Read-only derived status, not agent-composable content.
+    agent: Compose bounded, source-bound surfaces and ask questions; no human impersonation.
+    human: Answer, annotate, approve only through the actual authority boundary, and control layout.
+    source: Preserve explicit provenance, recorded/derived/agent-proposed/unknown distinctions.
+  invariants:
+    - No runtime-generated executable markup, script or privileged DOM tool.
+    - Rejected surface compositions return typed paths and machine-readable reasons.
+    - User-owned layout, pins and focus survive incoming agent compositions.
+    - Source-bound data is re-evaluated against the pinned world/checkpoint on refresh.
+    - A historical/candidate projection can never masquerade as the active world.
+    - Every persistent rich UI element traces to journey behavior or observed projection pressure.
+
+execution_integration_contract:
+  invocation:
+    method: Typed Cognate capability or transport-agnostic runtime service; renderer-independent intents.
+    required_parameters: [navigation_intent_id, frame_revision, observer_scope, world_ref, checkpoint_ref, operation_ref, target_refs]
+    runtime_context: Scoped Cognate context with optional case, execution and evidence correlations.
+    authentication: Real actor and service identity from trusted session; independent SEA-Forge decision for consequential operations.
+    timeout_policy: Bounded retries, cancellation and parked/uncertain state; no blind external retry.
+  result:
+    type: Typed frame/reducer result, refusal, or correlated execution/settlement record.
+    success_fields: [frame_or_intent_ref, revision, provenance, correlation]
+    failure_fields: [error.code, error.message, error.recoverable, error.reason_refs]
+  external_side_effects:
+    may_change:
+      - Persist approved navigation intent and allowed application events through Cognate.
+      - Invoke independently authorized actions on external systems and record their evidence.
+    must_not_change:
+      - Canonical DomainForge world or frozen Reference during an active run by implication.
+      - External systems on read-only traversal, denied/unknown authority or simulation.
+      - Operational truth through render-only surface changes or human answers before routing.
+  sequence_diagram:
+    mermaid: |-
+      sequenceDiagram
+        autonumber
+        actor O as Observer
+        participant UI as Clack or Atomic GUI
+        participant H as Horizon controller
+        participant C as Cognate
+        participant D as DomainForge
+        participant K as Context Kernel
+        O->>UI: Open or resume world
+        UI->>H: Typed entry intent
+        H->>C: Resolve authenticated observer and checkpoint
+        C->>D: Resolve composed .sea world_ref
+        D-->>C: Canonical semantic graph
+        C-->>H: World and scoped projection context
+        H->>K: Optional citation-bearing references
+        K-->>H: References or explicit unavailable
+        H-->>UI: Validated frame and source-bound surface
+        O->>UI: Select a contextual next move
+        UI->>H: Typed intent plus frame revision
+  journeys:
+    J01_explore:
+      title: Enter, search, filter and traverse a shared world
+      mermaid: |-
+        sequenceDiagram
+          autonumber
+          actor U as Observer
+          participant T as Clack or GUI
+          participant H as Horizon
+          participant C as Cognate
+          participant D as DomainForge
+          participant K as Context Kernel
+          U->>T: Search delayed production orders
+          T->>H: Search intent, scoped focus and checkpoint
+          H->>C: Resolve object types and accessible instances
+          C->>D: Check semantic type and relationship
+          D-->>C: Canonical semantic structure
+          C-->>H: Source-backed matching object set
+          H-->>T: Filterable typed results
+          U->>T: Filter delayed; follow required materials
+          T->>H: Typed filter and traversal intent
+          H->>C: Traverse operational instance links at checkpoint
+          C-->>H: Linked object set and provenance
+          H->>K: Retrieve applicable scoped references
+          K-->>H: Citations or unavailable
+          H-->>T: Updated focus and contextual operations
+    J02_operate:
+      title: Preflight, authorize, execute and review a consequential operation
+      mermaid: |-
+        sequenceDiagram
+          autonumber
+          actor U as Observer
+          participant T as Horizon UI
+          participant H as Horizon
+          participant C as Cognate
+          participant S as SEA-Forge
+          participant G as Gauntlet
+          participant X as External system
+          participant R as RealityTrace
+          U->>T: Select objects and inspect contextual actions
+          T->>H: Candidate operation
+          H->>C: Discover eligible capability binding
+          H->>H: Gate payment, reach, recovery and settlement access
+          H->>S: Explainable preflight request
+          S-->>H: Provisional allow/deny/escalate/unknown
+          alt Blocked or unknown
+            H-->>T: Explain blocker and reachable prerequisite
+          else Proposed path currently spendable
+            H-->>T: Review exact scope, payment and expected evidence
+            U->>T: Commit after review
+            T->>H: Typed idempotent commitment
+            H->>C: Freeze expectation and persist intent
+            C->>S: Authorize actual invocation
+            alt Denied or awaiting approval
+              S-->>C: Decision and reason
+              C-->>T: No side effect; preserve pending/denied status
+            else Allowed
+              S-->>C: Decision reference
+              alt Bounded long-horizon execution
+                C->>G: Execute frozen Reference
+                G->>S: Govern consequential suboperations
+                G->>X: Perform permitted effects
+                G-->>C: Verification results and execution refs
+              else Single bound action
+                C->>X: Execute allowed capability
+                X-->>C: Result and acknowledgment
+              end
+              C->>C: Commit events and observation outbox
+              C->>R: Deliver observations, retrieve derived evidence
+              R-->>C: Receipt and separate evidence references
+              C->>S: Evaluate applicable operational obligations
+              S-->>C: Operational settlement reference
+              C->>H: Events, evidence, cost and status
+              H->>H: Evaluate developmental interpretation separately
+              H-->>T: Evidence review and next affordances
+            end
+          end
+    J03_build:
+      title: Inspect lineage and propose a governed semantic or pipeline revision
+      mermaid: |-
+        sequenceDiagram
+          autonumber
+          actor U as Builder
+          participant T as Horizon UI
+          participant H as Horizon
+          participant C as Cognate
+          participant K as Context Kernel
+          participant D as DomainForge
+          participant S as SEA-Forge
+          participant G as Gauntlet
+          participant R as RealityTrace
+          U->>T: Inspect ingestion pipeline and dependencies
+          T->>H: Focus lineage resource
+          H->>C: Read scoped lineage projection
+          H->>K: Retrieve implementation and policy references
+          C-->>H: Upstream/downstream dependencies
+          K-->>H: Citations
+          H-->>T: Lineage and available modifications
+          U->>T: Propose revision
+          T->>H: Candidate change with acceptance criteria
+          H->>C: Store candidate with parent identity
+          C->>D: Validate candidate .sea closure when semantic
+          D-->>C: Diagnostics and candidate world_ref
+          alt Candidate invalid
+            C-->>T: Show diagnostics; no active world change
+          else Candidate valid
+            C->>S: Govern proposal/execution
+            alt Authorized
+              C->>G: Run frozen bounded Reference
+              G->>S: Govern suboperations
+              G->>R: Publish observational evidence
+              G-->>C: Verified/failed/inconclusive record
+              C->>D: Verify resulting candidate closure
+              D-->>C: Immutable identity
+              C-->>T: Evidence-backed diff for review
+              U->>T: Request promotion
+              T->>C: Governed version transition intent
+              C->>S: Authorize transition
+              S-->>C: Decision
+              opt Allowed and required checks pass
+                C->>C: Activate new pinned world_ref explicitly
+              end
+            else Denied or escalated
+              C-->>T: Blocked; preserve candidate and reason
+            end
+          end
+    J04_monitor:
+      title: Observe changed world state and choose a bounded response
+      mermaid: |-
+        sequenceDiagram
+          autonumber
+          participant X as Source system
+          participant C as Cognate
+          participant R as RealityTrace
+          participant H as Horizon
+          participant K as Context Kernel
+          participant S as SEA-Forge
+          participant G as Gauntlet
+          actor U as Observer
+          X->>C: New source event with unique identity
+          C->>C: Commit event and rebuild projections
+          C->>R: Queue observation intent
+          R-->>C: Recorded receipt, not settlement
+          C->>H: Relevant condition with checkpoint
+          H->>K: Scoped reference context
+          K-->>H: Citations or unavailable
+          H->>H: Reassess case and candidate moves
+          alt Informational or no permissible action
+            H-->>U: Evidence-backed notice or blocker
+          else Consequential response proposed
+            H->>S: Preflight and approval prerequisites
+            alt Approval required
+              S-->>H: Escalate
+              H-->>U: Request authorized decision
+            else Automatic authority exists
+              H->>C: Typed idempotent response intent
+              C->>S: Authorize actual invocation
+              opt Bounded long-horizon work
+                C->>G: Dispatch frozen Reference
+                G-->>C: Results
+              end
+              C->>R: Correlate observed results
+              R-->>C: Evidence and residuals
+              C->>S: Settle declared obligations if applicable
+              S-->>C: Operational status
+              C->>H: Observed result
+              H-->>U: Developmental interpretation and next state
+            end
+          end
+    J05_compare:
+      title: Compare hypothetical alternatives without pretending to change the world
+      mermaid: |-
+        sequenceDiagram
+          autonumber
+          actor U as Observer
+          participant T as Horizon UI
+          participant H as Horizon
+          participant C as Cognate
+          participant K as Context Kernel
+          participant M as Optional scenario model
+          participant S as SEA-Forge
+          U->>T: Compare alternative paths
+          T->>H: Scope and assumptions
+          H->>C: Pin world_ref and operational checkpoint
+          C-->>H: Baseline evidence references
+          H->>K: Retrieve cited assumptions
+          K-->>H: Context and limitations
+          H->>M: Evaluate bounded hypothetical variants
+          M-->>H: Estimates and uncertainty, or unsupported
+          H-->>T: Clearly marked baseline vs hypothetical outcomes
+          U->>T: Request real actionable candidate
+          T->>H: New real-world intent
+          H->>C: Construct scoped capability candidate
+          C->>S: Preflight, not authorization for execution
+          S-->>C: Authority status
+          C-->>T: Governable choice or blocker
+          Note over M,S: Simulation NEVER changes world state or grants authority
+  operational_notes:
+    - Process flows above are intended architecture; they are NOT proof that subsystem endpoints already compose this way.
+    - Direct external actions do not require Gauntlet; bounded long work may use Gauntlet.
+    - RealityTrace receipts, derived evidence, and operational settlement are separate transitions.
+    - DomainForge identity transitions are explicit; frozen active runs keep the old pinned world.
+    - Case evaluation may be epistemic only, with no external-world settlement claimed.
+
+proof_and_observability:
+  required_evidence_artifacts:
+    - Canonical .sea IDM validation and journey-to-semantics translation report.
+    - Behavioral IR and validated sequential proof for J01–J05 with blocked and recovery traces.
+    - Atomic UI IR traceability and two-renderer equivalence fixtures.
+    - Real cross-system authorization, execution, observation and restart receipts.
+    - Non-claim evidence report identifying skipped tests, assumptions and unresolved interfaces.
+  evidence_policy:
+    storage: Implementation-defined Horizon evidence root; must be documented and versioned.
+    retention: Preserve negative and corrective history according to declared policies and external owner requirements.
+    access: Scoped by identity/role and data classification; provenance remains available to authorized reviewers.
+    correction_history: Failures and contradicting evidence MUST remain reconstructable after later success.
+  proof_interface:
+    preferred_commands:
+      - Implementation MUST expose one documented command for schema and ID traceability validation.
+      - Implementation MUST expose one documented command for five-journey fixture and replay conformance.
+      - Implementation MUST expose one documented command for real integration gates and clearly report missing dependencies.
+    pass_condition: >-
+      Commands return success only when corresponding REQUIRED checks ran and their
+      evidence is inspectable; simulated fixtures cannot satisfy real-integration obligations.
+    fail_condition: >-
+      Any skipped REQUIRED test, unverified live authority path, stale criterion,
+      unsupported adapter or unreconciled uncertain side effect prevents full conformance.
+  required_log_context:
+    - navigation_session_id
+    - observer_ref and scoped role
+    - world_ref and checkpoint_ref
+    - frame_id and revision
+    - intent_id and correlation_id
+    - authority_ref, execution_ref and evidence_refs when applicable
+  required_metrics:
+    - { name: unnecessary_prompt_burden, reason: Distinguish useful discrimination from repeated questioning }
+    - { name: renderer_intent_equivalence_rate, reason: Verify Clack and GUI preserve the behavioral contract }
+    - { name: gate_false_allow_count, reason: Safety-critical false affordability and authority signal }
+    - { name: settled_vs_acknowledged_claims, reason: Detect premature success and false developmental promotion }
+    - { name: recovery_success_and_cost, reason: Evaluate sustainable capability under variation }
+  required_events:
+    - navigation.focus_changed
+    - navigation.intent_proposed
+    - navigation.intent_deferred
+    - navigation.commitment_frozen
+    - navigation.authority_decision_correlated
+    - navigation.execution_observed
+    - navigation.evidence_reconciled
+    - navigation.settlement_reviewed
+    - navigation.next_affordance_derived
+
+repeatability_and_variation:
+  required_variations:
+    - { id: VAR-001, case: Same object set under two observer scopes, expected: Authorized object visibility and actions differ without cross-scope leakage }
+    - { id: VAR-002, case: Same journey via Clack and GUI, expected: Same state transitions, typed intents and authority semantics }
+    - { id: VAR-003, case: New DomainForge world revision during an existing navigation episode, expected: Existing pins remain stable and migration is explicit }
+    - { id: VAR-004, case: One materialized world with multiple object types and two links, expected: Filter and traversal match reference queries at checkpoint }
+    - { id: VAR-005, case: One successful, one failed and one contradictory execution, expected: Different status/evidence and next-affordance records }
+    - { id: VAR-006, case: Repeated attempt with new cases, providers and failure conditions, expected: Learning/capability claims do not exceed measured transfer/recovery }
+  required_recovery_cases:
+    - { id: RECOV-001, case: Terminal or browser closes between decision and resume, expected: Replay restores focus, revision and pending approval safely }
+    - { id: RECOV-002, case: SEA-Forge unavailable or approval unknown, expected: No consequential invocation; scoped blocker persists }
+    - { id: RECOV-003, case: External acknowledgment lost during commit, expected: Uncertain state and idempotent reconciliation without duplicate side effect }
+    - { id: RECOV-004, case: Evidence sink unavailable after event commit, expected: Durable outbox/reconciliation; no fabricated settlement }
+  capability_claim_rule: >-
+    Capability is unverified until required variations and recovery cases pass in
+    target environments and varied settled episodes justify transfer and recovery.
+
+failure_model_and_recovery:
+  failure_classes:
+    - name: semantic_or_operational_staleness
+      symptoms: [Unknown or changed world_ref, conflicting checkpoint, unresolved instance link]
+      required_behavior: Preserve existing focus and scope; block affected action; expose freshness/repair.
+    - name: missing_affordance_gate
+      symptoms: [Unpriced payment, missing recovery, unknown capability, unresolved authority, no settlement access]
+      required_behavior: Show blocked/unknown and next prerequisite, never enable by optimism.
+    - name: unauthorized_or_unsafe_commitment
+      symptoms: [Role mismatch, denied invocation, stale approval or escalation]
+      required_behavior: Deny actual effect, log decision ref, preserve safe review state.
+    - name: uncertain_execution_or_evidence
+      symptoms: [Timeout, duplicate event, missing trace receipt, contradictory observation]
+      required_behavior: Preserve uncertainty and correlation; reconcile before retransmission or settlement.
+    - name: presentation_divergence
+      symptoms: [Clack and GUI render different action sets, stale frame submits, generated code in a surface]
+      required_behavior: Reject and report schema/semantic mismatch without privileged effects.
+  safe_failure_requirements:
+    - { id: REQ-SAFE-001, text: Horizon MUST fail closed on unknown runtime authorization, unsafe world revision or unreconciled duplicate commit. }
+    - { id: REQ-SAFE-002, text: Horizon MUST preserve immutable expectation, evidence and error history during recovery and reframing. }
+    - { id: REQ-SAFE-003, text: Horizon MUST distinguish source unavailable, access denied, empty result and no matching object. }
+    - { id: REQ-SAFE-004, text: Horizon MUST permit valid read-only navigation and diagnostics when an unrelated executor is unavailable. }
+    - { id: REQ-SAFE-005, text: Horizon MUST prevent a candidate, historical view or simulated outcome being presented as current observed fact. }
+  unsafe_behaviors:
+    - UI confirmation, agent proposal or simulated scenario authorizes a real side effect.
+    - A failed check is replaced by a model explanation of why work probably succeeded.
+    - A running Gauntlet task changes its frozen Reference or active DomainForge world in place.
+  recoverable_failures:
+    - { failure: Source query temporarily unavailable, recovery: Restore read-only saved view with clear checkpoint and retry safely }
+    - { failure: Stale navigation frame, recovery: Refresh frame and request explicit re-selection if relevant choices changed }
+    - { failure: RealityTrace delivery delayed, recovery: Reconcile durable intent/outbox and retain evidence unknown }
+  nonrecoverable_or_operator_required:
+    - { failure: Irreversible operation prohibited or recovery capacity below hard floor, behavior: Stop or escalate; no local override }
+    - { failure: Conflicting or unresolvable authority decision, behavior: Suspend affected action and route to authorized resolution }
+
+security_safety_trust_boundaries:
+  trusted_inputs:
+    - Authenticated actor/session scope after verification at trusted boundary.
+    - Validated pinned DomainForge model and committed Cognate event references, for their defined claims only.
+  untrusted_inputs:
+    - Agent-composed surfaces, retrieved documents, prompts and text from external systems.
+    - Browser/terminal submissions, raw URLs, source selectors and free-form navigation requests.
+  trusted_actors:
+    - Authority decisions issued by designated SEA-Forge interface; human identity/role proven by session.
+  privileged_operations:
+    - External resource mutation and semantic world promotion.
+    - Human approval, production changes, credential access and Gauntlet task delegation.
+  mandatory_requirements:
+    - { id: REQ-SEC-001, text: Renderer and model-proposed actions MUST NOT bypass Cognate capability and SEA-Forge invocation checks. }
+    - { id: REQ-SEC-002, text: Agent, human and system presentation roles MUST remain separated in transport and reducer enforcement. }
+    - { id: REQ-SEC-003, text: All untrusted source and UI strings MUST be schema-validated, scoped, and escaped; no arbitrary executable markup may be submitted. }
+    - { id: REQ-SEC-004, text: Multi-user or remote deployments MUST NOT reuse Product Actualizer loopback-token trust assumptions unchanged. }
+    - { id: REQ-SEC-005, text: Credential and private reference material MUST never be exposed through shared UI context, logs or evidence. }
+  secret_handling:
+    source: Deployment-managed secret provider, implementation-defined.
+    must_not: [log secrets, persist secrets in evidence artifacts, emit secrets in error messages, expose secrets to render-only agents]
+  authorization_requirements:
+    - Authentication, entitlement and fine-grained action authorization MUST remain independent of contextual tool discovery.
+    - Every consequential dispatch MUST carry an exact actor, operation, targets, world pin and scope.
+  trust_boundary_diagram:
+    mermaid: |-
+      flowchart LR
+        Human["Authenticated human"] --> API["Cognate / Horizon typed intent boundary"]
+        Agent["Agent composition"] --> Validate["Closed schema and role checks"]
+        Validate --> API
+        API --> Pre["Horizon hard affordance gates"]
+        Pre --> Gov["SEA-Forge invocation authority"]
+        Gov --> Exec["Authorized external executor"]
+        Agent -. no raw approval .-> Gov
+        Agent -. no arbitrary code .-> UI["Clack / Atomic GUI renderer"]
+        API --> UI
+
+reference_algorithms:
+  derive_navigation_frame:
+    pseudocode: |-
+      function deriveFrame(context, projection, lastDecisions):
+        require valid observer_scope, world_ref and checkpoint status
+        focus = resolveTypedFocus(context, projection)
+        candidates = deriveApplicableSemanticOperations(focus, projection)
+        assessments = evaluateHardGates(candidates, capacity, authorityPreflight,
+                                        capability, recovery, settlementAccess)
+        separate available, blocked, unknown, conflicted
+        primary = firstAvailableThatAddressesMaterialDeviationOrNone(assessments)
+        mode = deterministicModeSelector(projection, lastDecisions)
+        return validateClosedFrameAndSourceBoundSurface(mode, focus, assessments, primary)
+  reduce_intent:
+    pseudocode: |-
+      function reduceIntent(frame, intent, scopedActor):
+        validate intent schema, actor entitlement, frame ID and revision
+        if duplicate idempotency key: return prior correlated logical result
+        if read_only: record focus change and return fresh projected frame
+        if consequential:
+          freeze scoped intention, criteria and expected evidence
+          ask independent SEA-Forge authority at actual invocation
+          if not allow: return blocked, denied or pending without side effect
+          dispatch only validated capability, correlate result and evidence
+          keep operational settlement separate from developmental evaluation
+          return updated navigational state with explicit unresolved evidence
+
+validation_matrix:
+  core_conformance:
+    - { area: Outcome, test: Navigate source-bound operational set and produce next affordance frame, expected: Reproducible result at pinned context, evidence: J01 fixture and replay }
+    - { area: Input validation, test: Unknown block and stale frame submission, expected: Typed rejection without mutation, evidence: Closed-schema and reducer tests }
+    - { area: Config errors, test: Missing world or authority endpoint, expected: Appropriate read-only degradation and action block, evidence: Dependency failure suite }
+    - { area: Startup/preflight, test: Inaccessible semantic world or unmet payment, expected: No apparent executable affordance, evidence: Startup/affordance gate tests }
+    - { area: State transitions, test: Concurrent pending decision and active run, expected: Tested deterministic priority without hidden blocker, evidence: Selector matrix }
+    - { area: Failure handling, test: Lost acknowledgment and duplicate retry, expected: At most one external effect or explicit uncertain state, evidence: Fault injection and integration trace }
+    - { area: Observability, test: Reconstruct full context and evidence after restart, expected: Stable correlations and history, evidence: Resume/replay artifacts }
+    - { area: Security/safety, test: Agent attempts owner approval and direct external mutation, expected: Denied by trusted boundary, evidence: Adversarial role tests }
+    - { area: Renderer equivalence, test: Execute same golden journey through Clack and GUI, expected: Same typed intents and transitions, evidence: Dual renderer golden test }
+  variation_and_recovery:
+    - { case: Different observer authority scopes, why: Detect permission leaks, expected: Different valid objects/actions without leaking denied data, evidence: VAR-001 }
+    - { case: Evidence sink down during successful external action, why: Prevent premature settlement, expected: Unknown result with durable outbox, evidence: RECOV-004 }
+    - { case: Semantics revision while execution in flight, why: Prevent moving acceptance criteria, expected: Old pin retained; candidate change separately reviewed, evidence: VAR-003 }
+  real_integration_condition: >-
+    Full conformance requires real target deployment with a published DomainForge
+    binding, actual Cognate durable storage, SEA-Forge authority, an authorized
+    direct or Gauntlet executor, and real RealityTrace evidence readback.
+  real_integration_tests:
+    - Real composed-world search/filter/relation traversal from live Cognate projections.
+    - SEA-Forge deny/escalate/allow, side effect, evidence readback and honest settlement.
+    - Gauntlet bounded frozen Reference test for a long-horizon journey.
+    - Context Kernel scoped retrieval and unavailable-corpus handling.
+    - Restart, event replay, stale world and idempotent duplicate delivery.
+  skipped_test_rule: Skipped REQUIRED real integration tests MUST block full conformance and be reported explicitly.
+
+implementation_definition_of_done:
+  - A cold agent can reproduce normative intent and the five journeys without guessing authorizations.
+  - Canonical IDM, Behavioral IRs, Clack sequential proof and Atomic UI IR retain traceable identities.
+  - Closed presentation grammar, pure reducer and dual-renderer intent equivalence are evidenced.
+  - Read-only source-bound navigations work with real semantic and operational data.
+  - Consequential authorization, execution, evidence and settlement fail safely and pass real integrations.
+  - Repeated/recovered developmental claims are appropriately limited and independently reviewable.
+  - Unknown, conflict, staleness, denial and unsatisfied payment remain visible.
+  - No skipped REQUIRED test, fabricated source data or unregistered external side effect is called success.
+
+roadmap_boundaries:
+  rich_graph_and_spatial_workspaces:
+    level: roadmap
+    future_shape: OpenTUI and GUI graph, spatial, temporal and 3D projections where evidence demonstrates benefit.
+    current_requirement: Renderer-neutral UI contract and proof that richer views do not change behavioral meaning.
+  organization_scale_simulation:
+    level: roadmap
+    future_shape: Calibrated operational what-if models with preregistered predictions and uncertainty.
+    current_requirement: Hypothetical outputs are labeled and cannot authorize or settle actual operations.
+  automated_developmental_policy_promotion:
+    level: roadmap
+    future_shape: Controlled policy and capability improvement from independently confirmed repeated settlements.
+    current_requirement: Preserve developmental evidence and never equate successful operation with capability.
+  generalized_federated_world:
+    level: roadmap
+    future_shape: Federation across organizations and heterogeneous authorities.
+    current_requirement: One pinned world and scoped context without implying federation support.
+
+conformance_traceability:
+  high_risk_requirement_groups:
+    - group: Authority and consequential side effects
+      requirements: [REQ-STACK-003, REQ-INT-004, REQ-SEC-001, REQ-SAFE-001]
+      confirmation: independent
+    - group: Reality evidence, operational settlement and developmental truth
+      requirements: [REQ-STACK-006, REQ-STACK-007, REQ-DEV-002, REQ-VERIFY-004]
+      confirmation: adversarial
+    - group: World identity, cross-renderer equivalence and replay
+      requirements: [REQ-WORLD-004, REQ-UI-004, REQ-INT-003, REQ-VERIFY-003]
+      confirmation: fresh_target_reproduction
+  plan_projection_rule: >-
+    Every REQUIRED requirement MUST map to a future plan task and proof. Each
+    settlement-critical task MUST name its requirement IDs, preregistered
+    acceptance, evidence location and independent confirmation mode.
+    A requirement without settled evidence remains open.
