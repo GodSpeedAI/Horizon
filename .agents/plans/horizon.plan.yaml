@@ -27,13 +27,13 @@ source:
       path: "~/projects/project-topology-architect/skills/project-topology-architect/SKILL.md"
       role: "Owner-designated canonical greenfield topology workflow; load FIRST on executing machine"
     -
-      path: "../cognate/.agents/skills/building-with-cognate/SKILL.md"
+      path: "~projects/cognate/.agents/skills/building-with-cognate/SKILL.md"
       role: "Required Cognate implementation skill; resolve from workspace and inspect installed revision"
     -
-      path: "https://github.com/SPRIME01/Product-Actualizer/tree/main/cockpit"
+      path: "~/projects/product-actualizer/cockpit"
       role: "Donor deterministic UI grammar, source binding, world debugger and pure reducer, not source of Horizon runtime truth"
     -
-      path: "../godspeed_agent"
+      path: "~/projects/godspeed_agent"
       role: "Existing GodSpeed observer/developmental implementation and tests to inspect before porting"
     -
       path: ".agents/skills/deriving-interaction-domain-models/SKILL.md"
@@ -481,7 +481,7 @@ tasks:
     hot_context:
       - "~/projects/project-topology-architect/skills/project-topology-architect/SKILL.md"
       - "../cognate/.agents/skills/building-with-cognate/references/cli.md"
-      - "https://github.com/SPRIME01/Product-Actualizer/tree/main/cockpit"
+      - "~/projects/product-actualizer/cockpit"
     steps:
       - "Resume canonical topology skill P2–P8 using validated IDM/Behavioral/Atomic IR and minimum sufficient project topology; create requirement ledger, acceptance contracts and Wayfinder candidate with independent criticism before freezing."
       - "Read ../cognate/.agents/skills/building-with-cognate/SKILL.md plus references/cli.md, cognate-api.md and idm-to-cognate.md; use actual 'cognate create' profile sourced from checkout, adapting the result to current published composed-world loader rather than stale 0.19.0 skill examples."
@@ -537,8 +537,8 @@ tasks:
     proves: "The same validated intent/projection rules reject injected code, forbidden roles, unknown blocks/refs and agent layout theft."
     does_not_prove: "Does not prove that source projections are live, or that a correctly formed command is independently authorized by SEA-Forge."
     hot_context:
-      - "https://github.com/SPRIME01/Product-Actualizer/tree/main/cockpit/protocol"
-      - "https://github.com/SPRIME01/Product-Actualizer/blob/main/tests/cockpit/grammar.test.ts"
+      - "~/projects/product-actualizer/cockpit/protocol"
+      - "~/projects/product-actualizer/cockpit/grammar.test.ts"
     steps:
       - "Inspect cockpit/protocol/spec.ts, actions.ts, catalog.ts, server/workspace.ts, server/sources.ts, web/Surface.tsx and tests/cockpit/grammar.test.ts before extraction."
       - "Preserve fifteen closed blocks unless a failed real fixture justifies a change; keep human/agent/system roles distinct."
@@ -648,7 +648,7 @@ tasks:
     does_not_prove: "Gate evaluation is a provisional representation and not invocation authority or developmental settlement."
     hot_context:
       - "../godspeed_agent"
-      - "https://github.com/SPRIME01/Product-Actualizer/blob/main/docs/case-navigation.md"
+      - "~/projects/product-actualizer/blob/main/docs/case-navigation.md"
     steps:
       - "Derive case and affordance fields from real sources, avoiding a second case database."
       - "Implement a pure mode selector and deterministic narrowing over the eligible set; preserve alternatives and 'not the right problem' reframe."
@@ -735,7 +735,7 @@ tasks:
     does_not_prove: "A working GUI alone does not prove Clack equivalence, live authority or world consequence."
     hot_context:
       - "../cognate/packages/client-react"
-      - "https://github.com/SPRIME01/Product-Actualizer/blob/main/cockpit/web/layoutMap.ts"
+      - "~/projects/product-actualizer/cockpit/web/layoutMap.ts"
     steps:
       - "Use Atomic UI IR with React/Astryx and current Cognate client patterns; adapt Product Actualizer 15 block renderers, Dockview topology and owner-pinning tests only where earned."
       - "Present focus, world/checkpoint, evidence, source/ref inspector, disabled-and-blocked reasons, keyboard/screenreader control, and accessible loading/error/recovery states."
@@ -783,7 +783,7 @@ tasks:
     proves: "Untrusted reference text never becomes canonical semantics, and read-only navigation remains operable when Context Kernel is down."
     does_not_prove: "Retrieval quality does not imply world truth, settlement or agent capability."
     hot_context:
-      - "https://github.com/SPRIME01/Product-Actualizer/blob/main/docs/world-debugger.md"
+      - "~/projects/product-actualizer/blob/main/docs/world-debugger.md"
       - "../Context_Kernel"
     steps:
       - "Adapt Product Actualizer world debugger semantics and explicit recorded/derived/unknown/effect classifications, not its Product Model storage."
@@ -1129,7 +1129,7 @@ tasks:
     does_not_prove: "Does not prove calibrated organizational prediction or full-fledged simulation."
     hot_context:
       - "../godspeed_agent"
-      - "https://github.com/SPRIME01/Product-Actualizer/blob/main/docs/world-debugger.md"
+      - "~/projects/product-actualizer/blob/main/docs/world-debugger.md"
     steps:
       - "Use deterministic what-if effects where source-backed and label heuristic or unavailable predictions."
       - "Preserve candidate parent world and checkpoint; show alternate scenarios in closed compare/graph/table blocks."
