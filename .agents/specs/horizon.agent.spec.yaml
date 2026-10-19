@@ -42,14 +42,14 @@ sources:
       Donor mechanisms and existing subsystem APIs; source evidence, not authority
       to override this specification. Inspect actual revisions during planning.
     location: >-
-      https://github.com/SPRIME01/Product-Actualizer (cockpit);
-      https://github.com/GodSpeedAI/Cognate;
-      https://github.com/GodSpeedAI/DomainForge;
-      https://github.com/GodSpeedAI/SEA-Forge;
-      https://github.com/GodSpeedAI/Gauntlet;
-      https://github.com/GodSpeedAI/RealityTrace;
-      https://github.com/GodSpeedAI/Context-Kernel;
-      https://github.com/GodSpeedAI/GodSpeed-Agent.
+      ~/projects/product-actualizer/cockpit;
+      ~/projects/cognate;
+      ~/projects/domainforge;
+      ~/projects/sea-forge;
+      ~/projects/gauntlet;
+      ~/projects/realitytrace;
+      ~/projects/context-kernel;
+      ~/projects/godspeed-agent;
   interface_methodology:
     role: Normative derivation order; skills in this repository are procedural, not runtime dependencies.
     path: >-
