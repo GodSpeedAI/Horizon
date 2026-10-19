@@ -167,7 +167,7 @@ The debugger does not change the world. Counterfactuals are labeled by what is r
 
 Horizon makes authority and provenance navigable.
 
-A surface may be agent-composed without allowing the agent to approve its own action. A user may answer a prompt without authorizing a deployment. An authority preflight may be favorable without granting future authority. A Real­ityTrace delivery receipt may confirm that an observation was recorded without establishing that the result satisfied the declared criterion.
+A surface may be agent-composed without allowing the agent to approve its own action. A user may answer a prompt without authorizing a deployment. An authority preflight may be favorable without granting future authority. A RealityTrace delivery receipt may confirm that an observation was recorded without establishing that the result satisfied the declared criterion.
 
 Each consequential episode preserves references linking observer, immutable world, operational checkpoint, optional case, intent, authority decision, execution, evidence, operational settlement, and separate developmental review. Failed runs and contradicted expectations remain part of the developmental record.
 
