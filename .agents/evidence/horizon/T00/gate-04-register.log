@@ -1,0 +1,2 @@
+$ test -r .agents/reports/horizon-product-integration-register.yaml
+exit=0

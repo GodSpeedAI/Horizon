@@ -1,0 +1,3 @@
+$ python3 scripts/check-ruler.py
+RULER GATE: OK spec HORIZON-001 1.0.0 frozen, sha256 75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+exit=0

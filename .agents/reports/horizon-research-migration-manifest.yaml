@@ -1,0 +1,88 @@
+# Horizon research migration manifest — operational, non-normative (T00 for T21, REQ-RES-006).
+# Source: ~/projects/godspeed_agent @ 4bfed12 (branch migration/cep-world-required-evidence).
+# tree_sha256 = sha256 over sorted "<relpath>\0<file_sha256>\0" lines, __pycache__/*.pyc excluded.
+# Large data is referenced by hash and location, never committed (REQ-RES-007).
+schema: horizon.research_migration_manifest
+version: 1
+recorded: "2026-10-19"
+source_repo:
+  remote: "git@github.com:GodSpeedAI/GodSpeed-Agent.git"
+  commit: "4bfed12"
+  committed: "2026-10-05T10:16:04-04:00"
+  python: ">=3.11"
+  pyproject: { name: godspeed-agent-harness, version: 0.1.0 }
+
+artifacts:
+  - { path: godspeed_nav, files: 22, bytes: 265766, tree_sha256: afc7bdf748898b19f6a3df6c7eee5f0457e633cbd5736eec1bb20459f7ff902b, role: "developmental controller (REQ-DEV-003 home)" }
+  - { path: mcp, files: 5, bytes: 9639, tree_sha256: 317db4565cdf48ecb1794cf757d0bdbd782cfa0b1cf1867d8dabec18f53e307a, role: "cybernetic_nav MCP server (REQ-RES-006)" }
+  - { path: scripts, files: 55, bytes: 931928, tree_sha256: 31cf1e03f7e9e149a1c201673e948bbb7fb1dc663085e7aef5597ef6e6302fdc, role: "pipelines/adapters" }
+  - { path: configs, files: 10, bytes: 36873, tree_sha256: 415158df6707c41ac6416ab4f34787fa05cd9e318947a46f50e175608abaaea3, role: "typed config" }
+  - { path: schemas, files: 9, bytes: 4242, tree_sha256: cf509c62c50b4685ffdcf0f9c33b2b04e24a6f4b99c79a380e03b558e6a73b8b, role: "artifact schemas" }
+  - { path: agents, files: 6, bytes: 5098, tree_sha256: 8a4980ee45a45e2bd194f5d705ec4df8edfb5315f844273efd74633289295424, role: "agent defs" }
+  - { path: monitors, files: 1, bytes: 284, tree_sha256: 568c7cd75699734d80593bb7d723d10dc0f52ebd0f9030323c2d586a8846ec3c }
+  - { path: evals, files: 9, bytes: 2924, tree_sha256: 0717ebe4a0ef3f9e6347f02328ba41066d91f55b9dd11fea985d634270b7b969, role: "preregistered evaluation" }
+  - { path: ledgers, files: 1, bytes: 210, tree_sha256: 5ca224222fba9da9e48ed34be985f0ce43e9cb379e9b22b929a4969154e66210, role: "append-only ledgers" }
+  - { path: state, files: 5, bytes: 94547, tree_sha256: 9dc42efe6168b824a21d88eacf0f6e1a18e8abfcbadff59dcadb678b8974b395, role: "milestone history" }
+  - { path: policies, files: 3, bytes: 14527, tree_sha256: c5bf30d3df0755a16f86d8307cc22f2ad9d5860c13d9d9fbf273a47fae2650bb }
+  - { path: tools, files: 4513, bytes: 50504843, tree_sha256: 468423c1d9f8b5a45165742f7ab94c2343008b93a3e6d1b774fb9e46de4fc9d4, role: "large vendored tool tree; reference by hash+location" }
+  - { path: agentic_capability_loop, files: 10, bytes: 56533, tree_sha256: 2722a38ab1dcdb7c305f1dc23a5c85ec6e78753942635a33615ea46727018ac3 }
+  - { path: data, files: 412, bytes: 1127860471, tree_sha256: fc023de85d90e93668d4a6cab4cca273ed39cc501663e30ebae52624f9f4e50f, role: "1.1 GB corpora; reference by hash+location, never commit (REQ-RES-007)" }
+  - { path: tests, files: 62, bytes: 967367, tree_sha256: 21ef682bb15a74c0d3c0c6e487fe5a084e29eb17e6191a12f214e611e23d1aec, role: "conformance oracle for REQ-DEV-003" }
+  - { path: bin, files: 1, bytes: 84, tree_sha256: 4309831f843f0a15202a11a7b9a2680d78d4cdd457fe9252a57c661b2099b168, role: "godspeed-nav entrypoint" }
+  - { path: docs, files: 99, bytes: 756926, tree_sha256: 6180e9d5e31115c64237b17f9a0a698bc324842cba74fe738c52b8c5c2b10a5c }
+
+root_files:
+  - { path: pyproject.toml, bytes: 1040, sha256: 701bdc796c78261077f154c5da58ae5ce4cd5ee0318fa4134329930102f9e5fc }
+  - { path: uv.lock, bytes: 371205, sha256: efcc95eac7100eb31e082e30ab4f4821ca05696002fd71cb929fa457403701a4 }
+  - { path: Godspeed_Agent_Harness_SPEC.md, bytes: 52974, sha256: 2d91d321d3ad73e5ec730ed4c80dfc48d0b9117e5ec3aef82b3dabe6b7e77dc5 }
+  - { path: HARNESS.md, bytes: 3156, sha256: 6994dd8e28a6032b525c2dc4365acccc7f118ceb6ea3197dc155669b3c9f23d1 }
+  - { path: README.md, bytes: 55863, sha256: 91d2c4628e51d68ca939f8e256773d05f8f4002d9e5693e95ba0009e164cc1e0 }
+
+# REQ-RES-006: existing surfaces receive an explicit mapping or documented deprecation.
+surface_inventory:
+  cybernetic_nav_mcp_tools:
+    server: "mcp/cybernetic_nav_server/server.py"
+    names:
+      - cybernetic_nav.compute_error
+      - cybernetic_nav.estimate_payment
+      - cybernetic_nav.score_settlement
+      - cybernetic_nav.update_trajectory
+      - cybernetic_nav.compute_metabolization
+      - cybernetic_nav.rank_affordances
+      - cybernetic_nav.review_representational_transition
+      - cybernetic_nav.detect_circular_motion
+      - cybernetic_nav.review_absorbability
+      - cybernetic_nav.review_positive_disintegration
+      - cybernetic_nav.write_ledger_event
+      - cybernetic_nav.read_developmental_memory
+      - cybernetic_nav.search_developmental_memory
+      - cybernetic_nav.start_direction
+      - cybernetic_nav.review_horizon
+      - cybernetic_nav.record_settlement
+      - cybernetic_nav.runtime_snapshot
+      - cybernetic_nav.cognitive_surfaces
+      - cybernetic_nav.developmental_report
+      - cybernetic_nav.predictive_extensions
+      - cybernetic_nav.validate_enterprise_readiness
+  godspeed_nav_cli:
+    entrypoint: "bin/godspeed-nav -> godspeed_nav.cli:main"
+    subcommands:
+      - compute-error
+      - estimate-payment
+      - rank-affordances
+      - review-representational-transition
+      - score-settlement
+      - metabolization
+      - absorbability
+      - runtime-snapshot
+      - cognitive-surfaces
+      - repetition-plan
+      - set-representational-state
+      - start-direction
+      - review-horizon
+      - record-settlement
+      - developmental-report
+      - predictive-extensions
+      - search-developmental-memory
+      - validate
+mapping_status: "pending; T21 records the per-tool Horizon equivalent or documented deprecation."

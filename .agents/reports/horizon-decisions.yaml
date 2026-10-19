@@ -1,0 +1,86 @@
+# Horizon decision log — operational, non-normative.
+# Created at T00 for the first material decisions (plan artifacts.decision_log).
+# Rule: record material, hard-to-reverse or binding choices with evidence.
+schema: horizon.decisions
+version: 1
+updated: "2026-10-19"
+
+decisions:
+  - id: DEC-T00-01
+    date: "2026-10-19"
+    task: T00
+    requirement: REQ-DEV-003
+    decision: >-
+      The single authoritative implementation of developmental settlement scoring and
+      capability-promotion rules is the Python research subsystem (the carried-over
+      godspeed_nav semantics), invoked by Horizon through a typed, versioned Cognate
+      process contract. Horizon (T17) consumes its verdicts for developmental
+      interpretation and MUST NOT re-score in TypeScript. godspeed_agent's golden
+      fixtures and tests are the conformance oracle; inherited thresholds migrate as
+      provenance-bearing configuration, never silently changed.
+    rationale:
+      - "REQ-RES-001 forbids reimplementing ML training/evaluation in TypeScript."
+      - "Plan DAG edge T21 -> T17; REQ-DEV-003 settles at T17 and depends on the T21 subsystem."
+      - "One home per fact: a TS port alongside the Python capability would be two authoritative scorers."
+    reversible: false
+    evidence: [".agents/reports/horizon-research-migration-manifest.yaml", ".agents/specs/horizon.agent.spec.yaml#requirements"]
+
+  - id: DEC-T00-02
+    date: "2026-10-19"
+    task: T00
+    requirement: CLAIM-009
+    decision: >-
+      Product Actualizer cockpit code may be copied into Horizon with attribution and a
+      NOTICE entry, pinned at commit c9df8d2 (the Apache-2.0 relicense commit). Its
+      Product Model, router and authority engine are never Horizon runtime truth.
+    rationale:
+      - "LICENSE at c9df8d2 is the Apache License 2.0 text; commit subject: 'chore(license): relicense from AGPL-3.0 to Apache-2.0'."
+      - "Owner decision 2026-10-19; register disposition 'absorb_concepts'."
+    reversible: false
+    evidence: ["git -C ~/projects/product-actualizer log -1 c9df8d2", "~/projects/product-actualizer/LICENSE"]
+
+  - id: DEC-T00-03
+    date: "2026-10-19"
+    task: T00
+    requirement: REQ-STACK-011
+    decision: >-
+      Sea-rs (GodSpeedAI/SEA-Forge) is the sole authoritative SEA-Forge for Horizon. The
+      SEA / NewSea / XSEA / sentient-enterprise-architecture checkouts own no live
+      behavior Horizon consumes and are excluded from integration; they are not in the
+      spec's authoritative repository map.
+    rationale:
+      - "Spec sources.existing_implementation.repositories lists only GodSpeedAI/SEA-Forge at ~/projects/sea-rs."
+      - "~/projects/SEA is GodSpeedAI/SEA (dev, 2026-07-04, MPL-2.0 0.19.1); NewSea has no remote and a detached HEAD; XSEA has no remote; sentient-enterprise-architecture is GodSpeedAI/SEA main at 2025-10-06."
+    reversible: true
+    evidence: [".agents/reports/horizon-product-integration-register.yaml#unresolved_sea_family_resolved"]
+
+  - id: DEC-T00-04
+    date: "2026-10-19"
+    task: T00
+    requirement: REQ-STACK-010
+    decision: >-
+      Because Cognate ships no adapters for Gauntlet or Context Kernel, Horizon defines
+      the capability interface and implements it as Cognate capabilities registered by
+      the Horizon application, plus upstream requests to Cognate. RealityTrace uses the
+      existing @godspeedai/cognate-realitytrace adapter. No direct product linkage.
+    rationale:
+      - "REQ-STACK-010 permits Cognate capabilities or Cognate-owned adapters; the interface stays Cognate-mediated."
+      - "DEBT D-005 records the missing adapters."
+    reversible: true
+    evidence: ["cognate packages/ (no gauntlet/context-kernel adapter)", "cognate packages/realitytrace/src/sxr-cli.ts"]
+
+  - id: DEC-T00-05
+    date: "2026-10-19"
+    task: T00
+    requirement: REQ-STACK-001
+    decision: >-
+      Pin @godspeedai/cognate-* 0.6.1 (origin/main a477933) and @godspeedai/domainforge
+      0.21.1. Treat the PATH `domainforge` CLI (0.19.0) as stale and do not use it for
+      .sea validation. At T04, scaffold with `cognate create <dir> --profile ... --source
+      <checkout>`; the '--source optional' behavior exists only in commit 61015df, which
+      is not on main at a477933.
+    rationale:
+      - "Cognate main binds @godspeedai/domainforge 0.21.1; local CLI reports 0.19.0."
+      - "packages/cli/src/bin.ts at a477933 exits when --source is absent."
+    reversible: true
+    evidence: [".agents/OPEN_QUESTIONS.md#OQ-01", "cognate packages/cli/src/bin.ts:31-34"]

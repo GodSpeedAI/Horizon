@@ -1,0 +1,8 @@
+Ruler inventory (2026-10-19T21:18:44Z)
+$ sha256sum .agents/specs/horizon.agent.spec.yaml
+75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130  .agents/specs/horizon.agent.spec.yaml
+$ python3 (parse spec)
+metadata.id HORIZON-001 version 1.0.0 status frozen
+unique REQ ids: 98
+main_components: ['Canonical semantic and operational projections', 'Horizon navigation controller', 'Deterministic surface and interaction contract', 'Renderer adapters', 'Governed execution boundary', 'Observation and developmental boundary', 'Operational object layer', 'Product connectors', 'GodSpeed research subsystem']
+diagram nodes: ['O', 'UI', 'NAV', 'C', 'OBJ', 'P', 'RS', 'D', 'CK', 'S', 'G', 'X', 'R']

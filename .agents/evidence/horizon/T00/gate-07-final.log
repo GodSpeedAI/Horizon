@@ -1,0 +1,10 @@
+Post-write re-run of T00 narrow gates (2026-10-19T21:18:23Z)
+$ test -r .agents/specs/horizon.agent.spec.yaml && test -r .agents/plans/horizon.plan.yaml && test -r .agents/reports/horizon-product-integration-register.yaml
+readiness exit=0
+$ sha256sum .agents/specs/horizon.agent.spec.yaml
+75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130  .agents/specs/horizon.agent.spec.yaml
+$ python3 scripts/check-ruler.py
+RULER GATE: OK spec HORIZON-001 1.0.0 frozen, sha256 75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+ruler exit=0
+$ git diff --check
+diff-check exit=0

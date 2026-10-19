@@ -1,0 +1,9 @@
+Formation artifact hashes (2026-10-19T21:18:23Z)
+ab47b00b84c5c4525d0c4122b856d290fec37b5f2f88194cb8f2b4a8945b21b5  requirements/ledger.yaml
+56adeff2f10bffd9f68d7a8dbbb82a050b630d58b67dcaff27e694d42cbbdb87  scripts/gen-requirement-ledger.py
+d87da48d61eedd007dbdf4c7ea7fb354935acc79fd47488168f02060bb8204c2  scripts/check-ruler.py
+32beec086a6485b1b0cd40c03985175cd9af75ca8653a9186ec0de948d1955c8  .agents/reports/horizon-decisions.yaml
+5699e287cb8dcd15753cc87c0a4bbd8c731ae555863a7993001a7d8bf38773d0  .agents/reports/horizon-research-migration-manifest.yaml
+39a67c78ea8fd79822658732769597d725465bc493dbed97c526b88552b601e9  .agents/reports/horizon-topology-formation.md
+23046706ee20f77df66e975a5b712596f0575af2a251ea537ebe506e338c3b35  .agents/reports/horizon-product-integration-register.yaml
+c4ec7d7f329627de97661588911bbf5f1b6599b0de0964d9a4e6ad72120853b1  .agents/prereg/horizon/T00.prereg.yaml

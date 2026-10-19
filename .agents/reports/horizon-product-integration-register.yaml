@@ -76,4 +76,12 @@ product_candidates:   # first two for VAR-007 must include one non-TypeScript pr
 
 ignored: [antigravity-claude-proxy, novels, resume-tailor, youcom-ext, youcom_vscode_extension, my_LLMLingua_project, open-design-tools-recovered, strategy-growth, colab, autoresearch]
 dev_tooling_only: [NeatCode, ponytail, ast-grep-mcp-rs, gitleaks, plugin-orchestrator, skill-dev, project-template, domainforge-lsp, domainforge-vsc-extension, SEA-vsc-extension, SEA-zed-extension, tree-sitter-sea, secret-scanning-scaffold, oh-my-openagent, ideal, actual]
-unresolved_sea_family: "SEA, NewSea, XSEA and sentient-enterprise-architecture overlap with sea-rs/DomainForge; T00 records which, if any, still own live behavior."
+unresolved_sea_family_resolved: "T00 (DEC-T00-03): sea-rs (GodSpeedAI/SEA-Forge) is the sole authoritative SEA-Forge for Horizon. SEA (GodSpeedAI/SEA dev@552ea0a9f, MPL-2.0 0.19.1), NewSea (no remote, detached), XSEA (no remote) and sentient-enterprise-architecture (GodSpeedAI/SEA main@9faacc06, 2025-10-06) own no live behavior Horizon consumes and are excluded from integration."
+
+t00_formation:   # confirmations recorded at T00 (2026-10-19); T20 updates achieved levels
+  confirmed: ["stack owner set unchanged", "predecessor disposition supersede", "Product Actualizer absorb_concepts at Apache-2.0 c9df8d2", "first-wave products: GodSpeed research subsystem (Python) and Strategist (Rust)"]
+  observed_drift:
+    - "cognate/domainforge local checkouts are now on main (drift resolved); no fetch performed"
+    - "PATH domainforge 0.19.0 < required 0.21.1 (OQ-03)"
+    - "RealityTrace sxr CLI not on PATH (OQ-04)"
+    - "cognate create at main a477933 still requires --source; commit 61015df not on main (OQ-01)"

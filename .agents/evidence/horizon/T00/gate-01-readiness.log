@@ -1,0 +1,2 @@
+$ test -r .agents/specs/horizon.agent.spec.yaml && test -r .agents/plans/horizon.plan.yaml
+exit=0

@@ -1,0 +1,12 @@
+Product Actualizer license verification (2026-10-19T21:18:44Z)
+$ git -C ~/projects/product-actualizer log -1 --format='%h %cI %s'
+c9df8d2 2026-10-19T17:03:36-04:00 chore(license): relicense from AGPL-3.0 to Apache-2.0
+$ head -3 ~/projects/product-actualizer/LICENSE
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+$ grep -c 'Apache License' LICENSE
+4
+$ git status --short (working tree)
+ M .agents/skills/manifest.json
+?? .agents/skills/scrollytelling/

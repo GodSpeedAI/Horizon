@@ -1,0 +1,60 @@
+# T00 preregistration — Project Topology Architect formation gate
+# Authored before executing T00 inventory steps (spec hash verified first).
+# Plan ref: .agents/plans/horizon.plan.yaml tasks.T00
+schema: horizon.task_prereg
+task: T00
+title: "Start with Project Topology Architect: inspect, bind ruler, freeze formation constraints"
+recorded: "2026-10-19"
+proof_level: P2
+confirmation: builder_with_adversarial_teeth
+
+ruler:
+  spec_path: .agents/specs/horizon.agent.spec.yaml
+  plan_path: .agents/plans/horizon.plan.yaml
+  expected_spec_sha256: "75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130"
+  expected_spec_version: "1.0.0"
+  expected_spec_status: "frozen"
+  skill_path: "~/projects/project-topology-architect/skills/project-topology-architect/SKILL.md"
+
+claim: >-
+  The authoritative project-topology-architect skill was loaded from the
+  requested local path; spec status/identity, actual repository APIs, donor
+  boundaries and unresolved ambiguities were checked.
+
+positive_expectations:
+  - id: PE-01
+    expectation: "sha256sum of the spec equals the plan's bound sha256 and the spec metadata status is frozen at 1.0.0."
+  - id: PE-02
+    expectation: "Spec parses as YAML; the number of unique REQ-* ids and diagram labels are recorded and match the plan's traceability."
+  - id: PE-03
+    expectation: "Each sibling stack checkout is identified by git remote origin (not directory name) and its branch/commit/drift is recorded without fetching."
+  - id: PE-04
+    expectation: "Product Actualizer carries an Apache-2.0 LICENSE at the revision Horizon will copy from; recorded in the decision log."
+  - id: PE-05
+    expectation: "A machine-readable requirement ledger artifact exists and initializes per-task evidence/prereg roots."
+
+falsifier: "Remove or falsify the requested topology skill path"
+
+negative_expectations:
+  - id: NE-01
+    attack: "Point the topology skill path at a nonexistent location."
+    expected: "Formation MUST block rather than proceed with an unverified different skill."
+  - id: NE-02
+    attack: "Present a preregistration claiming approval while the ruler spec is still draft (or its hash does not match the plan)."
+    expected: "No implementation task unlocks until explicit freeze and a matching spec hash are recorded."
+
+known_confounds:
+  - "Mocks and fixture-only results are not live settlement evidence."
+  - "Pinned external API and skill versions may differ from prose documentation."
+  - "Local sibling checkouts may lag their remotes; API answers read from a stale local tree can be wrong."
+
+confirmation_condition: >-
+  Builder demonstrates preregistered positive and negative checks with stable
+  evidence and documents plausible alternate failures.
+
+evidence_plan:
+  - "Exact commands and observed output retained under .agents/evidence/horizon/T00/."
+  - "Each gate command's stdout/stderr captured to a named file; no fabricated output."
+  - "Negative teeth executed against an isolated fixture/temp path, never by damaging the real ruler."
+
+redesign_trigger: "The canonical topology skill's structural contracts contradict the normative Horizon spec or its requested skill location cannot be read."

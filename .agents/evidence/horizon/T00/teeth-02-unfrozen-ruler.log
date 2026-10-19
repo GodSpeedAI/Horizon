@@ -1,0 +1,11 @@
+NE-02a attack: prereg/plan says approved while ruler spec is draft
+$ python3 scripts/check-ruler.py --spec /tmp/opencode/hzn-t00/spec-draft.yaml --plan /tmp/opencode/hzn-t00/plan-draft-binding.yaml
+RULER GATE: BLOCKED (1 problem(s))
+  - ruler not frozen: metadata.status='draft' (implementation MUST NOT proceed)
+exit=1
+
+NE-02b attack: frozen spec but plan hash does not match
+$ python3 scripts/check-ruler.py --spec .agents/specs/horizon.agent.spec.yaml --plan /tmp/opencode/hzn-t00/plan-wrong-hash.yaml
+RULER GATE: BLOCKED (1 problem(s))
+  - spec sha256 mismatch: plan=0000000000000000000000000000000000000000000000000000000000000000 actual=75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+exit=1

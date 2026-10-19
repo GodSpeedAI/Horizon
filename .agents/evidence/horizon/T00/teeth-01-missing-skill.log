@@ -1,0 +1,6 @@
+NE-01 attack: point the topology skill path at a nonexistent location
+$ test -r /home/sprime01/projects/project-topology-architect/skills/project-topology-architect/SKILL.md
+real-skill-readable exit=0
+$ test -r /tmp/opencode/hzn-t00/DOES-NOT-EXIST/SKILL.md
+falsified-skill-readable exit=1
+VERDICT: exit!=0 means formation blocks (expected).

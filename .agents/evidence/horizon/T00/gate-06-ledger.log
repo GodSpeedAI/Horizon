@@ -1,0 +1,8 @@
+$ python3 scripts/gen-requirement-ledger.py
+wrote requirements/ledger.yaml: 98 requirements, 98 acceptance contracts, spec sha256 75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+exit=0
+
+$ python3 <skill>/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root .
+ledger: 0 error(s) in ledger.yaml
+  ok: 98 requirements, 98 acceptance contracts
+exit=0
