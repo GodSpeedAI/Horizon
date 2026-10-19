@@ -84,3 +84,40 @@ decisions:
       - "packages/cli/src/bin.ts at a477933 exits when --source is absent."
     reversible: true
     evidence: [".agents/OPEN_QUESTIONS.md#OQ-01", "cognate packages/cli/src/bin.ts:31-34"]
+
+  - id: DEC-T01-01
+    date: "2026-10-19"
+    task: T01
+    requirement: REQ-STACK-001
+    decision: >-
+      Author the canonical IDM against DomainForge 0.21.1's Application Contract
+      (typed entities, record/enum/operation), not the stale 0.17-era skill cheatsheet.
+      Pin the locally built `~/projects/domainforge/target/release/domainforge` (0.21.1)
+      and compose `world_ref` only from DomainForge's `semantic_closure_hash`. Use
+      relative-path imports. Model SIX journeys J01-J06 because the frozen spec declares
+      six and the spec is the ruler.
+    rationale:
+      - "REQ-STACK-001: DomainForge alone owns semantic compilation and world_ref identity."
+      - "domainforge-core/grammar/sea.pest and docs/reference/sea-application-contract.md are the current syntax authority."
+      - "Plan T01 prose says five journeys; the frozen spec says six (OQ-06)."
+    reversible: true
+    evidence:
+      - ".agents/skills/domainforge-sea/references/sea-dsl-ai-cheatsheet.yaml:4"
+      - "domainforge docs/reference/sea-application-contract.md"
+      - ".agents/evidence/horizon/T01/gate-01-validate-application.log"
+
+  - id: DEC-T01-02
+    date: "2026-10-19"
+    task: T01
+    requirement: REQ-NAV-006
+    decision: >-
+      Record the authority gate binding as inert (`as: true`) policies plus typed
+      invariants and OpenSemanticQuestion instances, because Horizon does not own
+      authorization; SEA-Forge does. Do not fabricate enforceable authority semantics
+      in the IDM.
+    rationale:
+      - "AGENTS.md §9: Horizon MUST NOT become SEA-Forge policy authority."
+      - "The concrete payment model, authority preview and Gauntlet threshold remain unknown (OQ-IDM-01..04)."
+    reversible: true
+    evidence: [".sea/interaction/validation/limitations.md", ".sea/interaction/assumptions-and-unknowns.md"]
+

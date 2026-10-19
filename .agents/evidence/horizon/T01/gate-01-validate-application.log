@@ -1,0 +1,7 @@
+# T01 gate-01 validate --application (pinned 0.21.1)
+$ $DOMAINFORGE_BIN --version
+domainforge 0.21.1
+$ /home/sprime01/projects/domainforge/target/release/domainforge validate .sea/interaction/interaction-model.sea --application --format human
+Validation succeeded: 0 violations total
+Application contract valid: 4 operation(s), 8 record(s), 16 enum(s), 24 entities
+exit=0

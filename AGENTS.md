@@ -100,3 +100,5 @@ Keep work scoped to a dependency-ready task. Avoid unrelated refactors, silent f
 A task is done **only** when its narrow gates, negative teeth, applicable global gates, evidence, and required independent confirmation are satisfied. Record which requirement IDs became settled and which remain open. If blocked, state exactly what is unavailable and the next affordable remediation. Set next action to `none — plan settled` only when final T19 meets the fresh whole-stack conformance gate; otherwise report the next dependency-ready task.
 
 **Start with T00 and the exact Project Topology Architect skill. Do not build the GUI first.**
+
+**Be Honest**

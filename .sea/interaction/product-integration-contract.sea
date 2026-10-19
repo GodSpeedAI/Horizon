@@ -1,0 +1,50 @@
+@namespace "horizon.contracts"
+@version "1.0.0"
+@owner "GodSpeed AI"
+@profile "default"
+
+// Horizon-side contract vocabulary for joining products into the navigable
+// world. Disposition and ownership are recorded in
+// .agents/reports/horizon-product-integration-register.yaml. A product's own
+// semantics stay owned by that product.
+
+export enum IntegrationDisposition {
+    stack_owner = "stack_owner",
+    supersede = "supersede",
+    host_surface = "host_surface",
+    join_product = "join_product",
+    absorb_concepts = "absorb_concepts",
+    consume_library = "consume_library",
+}
+
+export enum ProductTargetLevel {
+    visible = "visible",
+    queryable = "queryable",
+    actionable = "actionable",
+    evidenced = "evidenced",
+    proven = "proven",
+}
+
+export entity "ProductIntegrationContract" {
+    key product_ref: string (min_length 1)
+    disposition: IntegrationDisposition
+    target_level: ProductTargetLevel
+    wave: string
+    ownership: string
+}
+
+instance contract_research_subsystem of "ProductIntegrationContract" {
+    product_ref: "godspeed-research-subsystem",
+    disposition: "stack_owner",
+    target_level: "evidenced",
+    wave: "first",
+    ownership: "research subsystem"
+}
+
+instance contract_strategist of "ProductIntegrationContract" {
+    product_ref: "strategist",
+    disposition: "join_product",
+    target_level: "queryable",
+    wave: "first",
+    ownership: "Strategist"
+}

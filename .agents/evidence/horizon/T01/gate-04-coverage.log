@@ -1,0 +1,4 @@
+# T01 gate-04 coverage (explicit unrepresented-semantics gate)
+$ python3 scripts/check-idm-coverage.py
+check-idm-coverage: OK (6 journeys, 7 gates, 4 operations, 6 open questions)
+exit=0

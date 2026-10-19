@@ -1,0 +1,2597 @@
+# T01 gate-03 contract identity (DomainForge-owned)
+$ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/interaction/interaction-model.sea
+{
+  "schema_version": "domainforge-application-contract/v1",
+  "producer": {
+    "name": "domainforge-core",
+    "version": "0.21.1"
+  },
+  "inputs": {
+    "source_set_hash": "sha256:675f2db4c1a617e0a6a0945ae6229cffb9eb8658be5d22d136ac7b672163f929",
+    "semantic_pack_set_hash": "sha256:6e5312099a8d89e1d271bd89d9fcb36b031069bd8dad72be397af6b331d85c40",
+    "language_schema_version": "domainforge-ast/v3",
+    "interpretation_version": "domainforge-interpretation/v1"
+  },
+  "self_hash": "sha256:aed724c857a31a309242cec675b88b035f5f49d2bb85f7b1cc33a27723bed056",
+  "semantic_closure_hash": "sha256:b0f31fcc60f49af730ca0b863af8e0eae990924fd0beb1d004f10c602cd24ca1",
+  "contract": {
+    "enums": [
+      {
+        "id": "horizon.contracts.enum.IntegrationDisposition",
+        "name": "IntegrationDisposition",
+        "members": [
+          {
+            "name": "stack_owner",
+            "wire": "stack_owner"
+          },
+          {
+            "name": "supersede",
+            "wire": "supersede"
+          },
+          {
+            "name": "host_surface",
+            "wire": "host_surface"
+          },
+          {
+            "name": "join_product",
+            "wire": "join_product"
+          },
+          {
+            "name": "absorb_concepts",
+            "wire": "absorb_concepts"
+          },
+          {
+            "name": "consume_library",
+            "wire": "consume_library"
+          }
+        ]
+      },
+      {
+        "id": "horizon.contracts.enum.ProductTargetLevel",
+        "name": "ProductTargetLevel",
+        "members": [
+          {
+            "name": "visible",
+            "wire": "visible"
+          },
+          {
+            "name": "queryable",
+            "wire": "queryable"
+          },
+          {
+            "name": "actionable",
+            "wire": "actionable"
+          },
+          {
+            "name": "evidenced",
+            "wire": "evidenced"
+          },
+          {
+            "name": "proven",
+            "wire": "proven"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.AffordanceStatus",
+        "name": "AffordanceStatus",
+        "members": [
+          {
+            "name": "possible",
+            "wire": "possible"
+          },
+          {
+            "name": "available",
+            "wire": "available"
+          },
+          {
+            "name": "blocked",
+            "wire": "blocked"
+          },
+          {
+            "name": "unknown",
+            "wire": "unknown"
+          },
+          {
+            "name": "conflicted",
+            "wire": "conflicted"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.AuthorityOutcome",
+        "name": "AuthorityOutcome",
+        "members": [
+          {
+            "name": "likely_allow",
+            "wire": "likely_allow"
+          },
+          {
+            "name": "requires_approval",
+            "wire": "requires_approval"
+          },
+          {
+            "name": "deferred_to_invocation",
+            "wire": "deferred_to_invocation"
+          },
+          {
+            "name": "denied",
+            "wire": "denied"
+          },
+          {
+            "name": "unreachable",
+            "wire": "unreachable"
+          },
+          {
+            "name": "unknown",
+            "wire": "unknown"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.EpistemicStatus",
+        "name": "EpistemicStatus",
+        "members": [
+          {
+            "name": "supported",
+            "wire": "supported"
+          },
+          {
+            "name": "contradicted",
+            "wire": "contradicted"
+          },
+          {
+            "name": "unresolved",
+            "wire": "unresolved"
+          },
+          {
+            "name": "inconsistent",
+            "wire": "inconsistent"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.EvidenceClass",
+        "name": "EvidenceClass",
+        "members": [
+          {
+            "name": "declared",
+            "wire": "declared"
+          },
+          {
+            "name": "observed",
+            "wire": "observed"
+          },
+          {
+            "name": "inferred",
+            "wire": "inferred"
+          },
+          {
+            "name": "proposed",
+            "wire": "proposed"
+          },
+          {
+            "name": "unknown",
+            "wire": "unknown"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.ExecutionPath",
+        "name": "ExecutionPath",
+        "members": [
+          {
+            "name": "direct_action",
+            "wire": "direct_action"
+          },
+          {
+            "name": "bounded_gauntlet",
+            "wire": "bounded_gauntlet"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.GateKey",
+        "name": "GateKey",
+        "members": [
+          {
+            "name": "visibility",
+            "wire": "visibility"
+          },
+          {
+            "name": "reach",
+            "wire": "reach"
+          },
+          {
+            "name": "payment",
+            "wire": "payment"
+          },
+          {
+            "name": "authority",
+            "wire": "authority"
+          },
+          {
+            "name": "capability",
+            "wire": "capability"
+          },
+          {
+            "name": "recovery",
+            "wire": "recovery"
+          },
+          {
+            "name": "settlement_access",
+            "wire": "settlement_access"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.JourneyStatus",
+        "name": "JourneyStatus",
+        "members": [
+          {
+            "name": "modelled",
+            "wire": "modelled"
+          },
+          {
+            "name": "partially_bound",
+            "wire": "partially_bound"
+          },
+          {
+            "name": "unresolved",
+            "wire": "unresolved"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.NavigationResponsibility",
+        "name": "NavigationResponsibility",
+        "members": [
+          {
+            "name": "orient",
+            "wire": "orient"
+          },
+          {
+            "name": "inspect",
+            "wire": "inspect"
+          },
+          {
+            "name": "choose",
+            "wire": "choose"
+          },
+          {
+            "name": "commit",
+            "wire": "commit"
+          },
+          {
+            "name": "observe",
+            "wire": "observe"
+          },
+          {
+            "name": "review",
+            "wire": "review"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.ReversibilityClass",
+        "name": "ReversibilityClass",
+        "members": [
+          {
+            "name": "read_only",
+            "wire": "read_only"
+          },
+          {
+            "name": "reversible",
+            "wire": "reversible"
+          },
+          {
+            "name": "compensable",
+            "wire": "compensable"
+          },
+          {
+            "name": "irreversible",
+            "wire": "irreversible"
+          },
+          {
+            "name": "unknown",
+            "wire": "unknown"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.ReviewDisposition",
+        "name": "ReviewDisposition",
+        "members": [
+          {
+            "name": "close",
+            "wire": "close"
+          },
+          {
+            "name": "continue",
+            "wire": "continue"
+          },
+          {
+            "name": "revise",
+            "wire": "revise"
+          },
+          {
+            "name": "escalate",
+            "wire": "escalate"
+          },
+          {
+            "name": "suspend",
+            "wire": "suspend"
+          },
+          {
+            "name": "defer",
+            "wire": "defer"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.SurfaceIntent",
+        "name": "SurfaceIntent",
+        "members": [
+          {
+            "name": "inspect",
+            "wire": "inspect"
+          },
+          {
+            "name": "compare",
+            "wire": "compare"
+          },
+          {
+            "name": "decide",
+            "wire": "decide"
+          },
+          {
+            "name": "verify",
+            "wire": "verify"
+          },
+          {
+            "name": "monitor",
+            "wire": "monitor"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.WorldStateKind",
+        "name": "WorldStateKind",
+        "members": [
+          {
+            "name": "historical",
+            "wire": "historical"
+          },
+          {
+            "name": "current",
+            "wire": "current"
+          },
+          {
+            "name": "candidate",
+            "wire": "candidate"
+          }
+        ]
+      },
+      {
+        "id": "horizon.research.artifacts.enum.EstimatorState",
+        "name": "EstimatorState",
+        "members": [
+          {
+            "name": "proposed",
+            "wire": "proposed"
+          },
+          {
+            "name": "inactive",
+            "wire": "inactive"
+          },
+          {
+            "name": "active",
+            "wire": "active"
+          },
+          {
+            "name": "suspended",
+            "wire": "suspended"
+          }
+        ]
+      },
+      {
+        "id": "horizon.research.artifacts.enum.ExperimentOutcome",
+        "name": "ExperimentOutcome",
+        "members": [
+          {
+            "name": "supported",
+            "wire": "supported"
+          },
+          {
+            "name": "contradicted",
+            "wire": "contradicted"
+          },
+          {
+            "name": "inconclusive",
+            "wire": "inconclusive"
+          }
+        ]
+      }
+    ],
+    "records": [
+      {
+        "id": "horizon.interaction.record.AssessAffordanceInput",
+        "name": "AssessAffordanceInput",
+        "fields": [
+          {
+            "name": "assessment_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "uuid"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.record.AssessAffordanceOutput",
+        "name": "AssessAffordanceOutput",
+        "fields": [
+          {
+            "name": "assessment_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "uuid"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "status",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.AffordanceStatus"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "authority_outcome",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.AuthorityOutcome"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "reversibility",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.ReversibilityClass"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.record.CommitIntentInput",
+        "name": "CommitIntentInput",
+        "fields": [
+          {
+            "name": "intent_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "uuid"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "frame_id",
+            "field_type": {
+              "kind": "entity_ref",
+              "data": {
+                "entity": "8087e500-67c7-56c8-a6d2-f75246e912ef"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "frame_revision",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "int"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min",
+                "data": {
+                  "value": "0"
+                }
+              }
+            ]
+          },
+          {
+            "name": "actor_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "operation_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.record.CommitIntentOutput",
+        "name": "CommitIntentOutput",
+        "fields": [
+          {
+            "name": "intent_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "uuid"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "correlation_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.record.ProposeRevisionInput",
+        "name": "ProposeRevisionInput",
+        "fields": [
+          {
+            "name": "candidate_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "parent_world_ref",
+            "field_type": {
+              "kind": "entity_ref",
+              "data": {
+                "entity": "98e156a5-644c-5d5b-a813-21f31eb6db5b"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "acceptance_criteria",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.record.ProposeRevisionOutput",
+        "name": "ProposeRevisionOutput",
+        "fields": [
+          {
+            "name": "candidate_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "validation_state",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "id": "horizon.research.artifacts.record.RunExperimentInput",
+        "name": "RunExperimentInput",
+        "fields": [
+          {
+            "name": "run_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "preregistration_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "criterion_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "verdict_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "executed_at",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "timestamp"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "id": "horizon.research.artifacts.record.RunExperimentOutput",
+        "name": "RunExperimentOutput",
+        "fields": [
+          {
+            "name": "run_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "verdict_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      }
+    ],
+    "entities": [
+      {
+        "concept_id": "052c345b-1120-5339-a526-04d5b3c6f96b",
+        "name": "AffordanceAssessment",
+        "key_field": "assessment_id",
+        "fields": [
+          {
+            "name": "assessment_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "uuid"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "operation_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "status",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.AffordanceStatus"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "reversibility",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.ReversibilityClass"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "authority_outcome",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.AuthorityOutcome"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "first_blocker",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          },
+          {
+            "name": "payment_estimate",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          },
+          {
+            "name": "estimate_provenance",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "06b83863-b4f6-5639-b0f2-9dab9cc78d5d",
+        "name": "PlanEntity",
+        "key_field": "plan_ref",
+        "fields": [
+          {
+            "name": "plan_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "strategy_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "milestone",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "source_custody",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "07629260-edc7-5fba-a39e-92849fee658a",
+        "name": "Verdict",
+        "key_field": "verdict_ref",
+        "fields": [
+          {
+            "name": "verdict_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "outcome",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.research.artifacts.enum.ExperimentOutcome"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "compared_against_criterion",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "retained_failure",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "bool"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "0bd8d6d9-357a-5879-9d7d-0995fc2d6eae",
+        "name": "FocusSet",
+        "key_field": "focus_set_id",
+        "fields": [
+          {
+            "name": "focus_set_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "uuid"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "object_type_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "selector",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "checkpoint_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "relationship_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          },
+          {
+            "name": "page_cursor",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "0be4caeb-9660-518e-bfd0-92a48216731e",
+        "name": "Preregistration",
+        "key_field": "prereg_ref",
+        "fields": [
+          {
+            "name": "prereg_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "hypothesis",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "held_out_criterion",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "frozen_at",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "timestamp"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "dataset_ref",
+            "field_type": {
+              "kind": "entity_ref",
+              "data": {
+                "entity": "bb7be19f-d369-5231-9a36-efaeef7213a1"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "0fb64f81-deff-5a68-90ac-3606a70d3136",
+        "name": "ProductIntegrationContract",
+        "key_field": "product_ref",
+        "fields": [
+          {
+            "name": "product_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "disposition",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.contracts.enum.IntegrationDisposition"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "target_level",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.contracts.enum.ProductTargetLevel"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "wave",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "ownership",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "1d4eb574-371e-5c9a-9bb6-f650e49dec68",
+        "name": "Checkpoint",
+        "key_field": "checkpoint_ref",
+        "fields": [
+          {
+            "name": "checkpoint_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "world_ref",
+            "field_type": {
+              "kind": "entity_ref",
+              "data": {
+                "entity": "98e156a5-644c-5d5b-a813-21f31eb6db5b"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "observed_at",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "timestamp"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "24910b08-aced-5e3b-ab1b-d94366f84c2e",
+        "name": "ResearchCapability",
+        "key_field": "capability_ref",
+        "fields": [
+          {
+            "name": "capability_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "description",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "evidence_status",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "experiment_ref",
+            "field_type": {
+              "kind": "entity_ref",
+              "data": {
+                "entity": "2cb0e4f1-54f3-5ab4-8649-086b3bb76a84"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "278be27f-68a5-5c15-85de-e60a7a22768d",
+        "name": "ResearchSubsystemProduct",
+        "key_field": "product_ref",
+        "fields": [
+          {
+            "name": "product_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "target_level",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.contracts.enum.ProductTargetLevel"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "language",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "owned_by",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "2cb0e4f1-54f3-5ab4-8649-086b3bb76a84",
+        "name": "ExperimentRun",
+        "key_field": "run_ref",
+        "fields": [
+          {
+            "name": "run_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "preregistration_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "criterion_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "verdict_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "executed_at",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "timestamp"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "5bb58ae4-db6c-5304-b189-c96e3b877865",
+        "name": "CandidateRevision",
+        "key_field": "candidate_ref",
+        "fields": [
+          {
+            "name": "candidate_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "parent_world_ref",
+            "field_type": {
+              "kind": "entity_ref",
+              "data": {
+                "entity": "98e156a5-644c-5d5b-a813-21f31eb6db5b"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "acceptance_criteria",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "validation_state",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [],
+            "default": {
+              "kind": "string",
+              "data": "pending"
+            }
+          }
+        ]
+      },
+      {
+        "concept_id": "5f7955e5-a118-5565-a339-3fbe6a6f980a",
+        "name": "NavigationIntentRecord",
+        "key_field": "intent_id",
+        "fields": [
+          {
+            "name": "intent_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "uuid"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "frame_id",
+            "field_type": {
+              "kind": "entity_ref",
+              "data": {
+                "entity": "8087e500-67c7-56c8-a6d2-f75246e912ef"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "frame_revision",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "int"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min",
+                "data": {
+                  "value": "0"
+                }
+              }
+            ]
+          },
+          {
+            "name": "actor_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "operation_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "authority_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          },
+          {
+            "name": "correlation_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "6cb5d220-3a8c-5482-934d-73fda548ff1f",
+        "name": "NavigationContext",
+        "key_field": "context_id",
+        "fields": [
+          {
+            "name": "context_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "uuid"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "observer_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "tenant_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "world_ref",
+            "field_type": {
+              "kind": "entity_ref",
+              "data": {
+                "entity": "98e156a5-644c-5d5b-a813-21f31eb6db5b"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "checkpoint_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "focus_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "case_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "7ada385f-12b7-5cab-b6e9-8d110a8edd92",
+        "name": "Estimator",
+        "key_field": "estimator_ref",
+        "fields": [
+          {
+            "name": "estimator_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "capability_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "state",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.research.artifacts.enum.EstimatorState"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "activated_by",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "7c453940-e556-535b-8ce4-c8ed0706265e",
+        "name": "CaseRecord",
+        "key_field": "case_ref",
+        "fields": [
+          {
+            "name": "case_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "purpose",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "world_ref",
+            "field_type": {
+              "kind": "entity_ref",
+              "data": {
+                "entity": "98e156a5-644c-5d5b-a813-21f31eb6db5b"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "8087e500-67c7-56c8-a6d2-f75246e912ef",
+        "name": "NavigationFrame",
+        "key_field": "frame_id",
+        "fields": [
+          {
+            "name": "frame_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "uuid"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "revision",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "int"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min",
+                "data": {
+                  "value": "0"
+                }
+              }
+            ]
+          },
+          {
+            "name": "context_id",
+            "field_type": {
+              "kind": "entity_ref",
+              "data": {
+                "entity": "6cb5d220-3a8c-5482-934d-73fda548ff1f"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "responsibility",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.NavigationResponsibility"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "surface_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          },
+          {
+            "name": "error_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "954473ab-67ca-5e5e-b0b9-7839bc860d6c",
+        "name": "SettlementReviewRecord",
+        "key_field": "review_id",
+        "fields": [
+          {
+            "name": "review_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "uuid"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "intent_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "epistemic_status",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.EpistemicStatus"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "disposition",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.ReviewDisposition"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "operational_settlement_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          },
+          {
+            "name": "developmental_assessment_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "98e156a5-644c-5d5b-a813-21f31eb6db5b",
+        "name": "WorldRevision",
+        "key_field": "revision_ref",
+        "fields": [
+          {
+            "name": "revision_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "state_kind",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.WorldStateKind"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "world_alias",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "9c60daa3-d58a-527f-9fd9-0ec6816d29a8",
+        "name": "SurfaceSpecRecord",
+        "key_field": "surface_id",
+        "fields": [
+          {
+            "name": "surface_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "uuid"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "intent",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.SurfaceIntent"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "layout_hint",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          },
+          {
+            "name": "title",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          },
+          {
+            "name": "focus_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "a6bbd578-68a8-5621-931a-0ad149f81429",
+        "name": "StrategyEntity",
+        "key_field": "strategy_ref",
+        "fields": [
+          {
+            "name": "strategy_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "title",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "state",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "source_custody",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "b36ffb74-9ab9-53e8-9fe5-25757e73786d",
+        "name": "StrategistProduct",
+        "key_field": "product_ref",
+        "fields": [
+          {
+            "name": "product_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "target_level",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.contracts.enum.ProductTargetLevel"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "language",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "owned_by",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "bb7be19f-d369-5231-9a36-efaeef7213a1",
+        "name": "Dataset",
+        "key_field": "dataset_ref",
+        "fields": [
+          {
+            "name": "dataset_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "scope",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "custody",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "content_hash",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "exported_at",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "timestamp"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "ee34d0d2-026f-5695-9144-93cbfe195cfc",
+        "name": "ExperimentRun",
+        "key_field": "run_ref",
+        "fields": [
+          {
+            "name": "run_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "preregistration_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "criterion_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "verdict_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "executed_at",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "timestamp"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "f4c6a497-6419-5173-b0d5-fcfba0c451f6",
+        "name": "OperationRecord",
+        "key_field": "operation_ref",
+        "fields": [
+          {
+            "name": "operation_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min_length",
+                "data": {
+                  "value": 1
+                }
+              }
+            ]
+          },
+          {
+            "name": "intent",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "reversibility",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.ReversibilityClass"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "execution_path",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.ExecutionPath"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      }
+    ],
+    "operations": [
+      {
+        "id": "horizon.interaction.operation.assess_affordance",
+        "name": "assess_affordance",
+        "intent": "assess whether a proposed move is a reachable, governed, settleable affordance at the current frame revision",
+        "direction": "inbound",
+        "actor": {
+          "kind": "role",
+          "data": {
+            "role": "24ec6d93-7019-56c0-99ca-a7e379c901c2"
+          }
+        },
+        "access": {
+          "kind": "policy_governed",
+          "data": {
+            "bindings": [
+              {
+                "policy": "9628927d-df5a-5e42-a19e-74e346bac1db",
+                "enforcement_point": "precondition",
+                "failure_code": "assessment_blocked"
+              }
+            ]
+          }
+        },
+        "input": "horizon.interaction.record.AssessAffordanceInput",
+        "output": "horizon.interaction.record.AssessAffordanceOutput",
+        "state": "052c345b-1120-5339-a526-04d5b3c6f96b",
+        "effect": "reads",
+        "transaction": "read_only",
+        "failures": [
+          {
+            "code": "invalid_query",
+            "kinds": [
+              "input_validation"
+            ],
+            "meaning": "the assessment reference failed input validation"
+          },
+          {
+            "code": "assessment_blocked",
+            "kinds": [
+              "policy"
+            ],
+            "meaning": "a hard gate is failed, conflicted or unknown and availability must not be granted"
+          },
+          {
+            "code": "frame_stale",
+            "kinds": [
+              "missing_state"
+            ],
+            "meaning": "the referenced navigation frame revision is no longer current"
+          }
+        ],
+        "idempotency": {
+          "kind": "inherent"
+        },
+        "concurrency": {
+          "kind": "read_snapshot"
+        },
+        "evidence": "operation_trace",
+        "lifecycle": "synchronous_request_response"
+      },
+      {
+        "id": "horizon.interaction.operation.commit_navigation_intent",
+        "name": "commit_navigation_intent",
+        "intent": "commit one reviewed renderer-independent navigation intent exactly once, subject to authority",
+        "direction": "inbound",
+        "actor": {
+          "kind": "role",
+          "data": {
+            "role": "21ab6033-225c-5825-a7b7-8089fcce3219"
+          }
+        },
+        "access": {
+          "kind": "policy_governed",
+          "data": {
+            "bindings": [
+              {
+                "policy": "69a4d718-fc80-5dee-9752-d0678b688769",
+                "enforcement_point": "precondition",
+                "failure_code": "intent_rejected"
+              }
+            ]
+          }
+        },
+        "input": "horizon.interaction.record.CommitIntentInput",
+        "output": "horizon.interaction.record.CommitIntentOutput",
+        "state": "5f7955e5-a118-5565-a339-3fbe6a6f980a",
+        "effect": "creates",
+        "transaction": "single_aggregate",
+        "failures": [
+          {
+            "code": "invalid_intent",
+            "kinds": [
+              "input_validation"
+            ],
+            "meaning": "the intent payload failed record validation"
+          },
+          {
+            "code": "intent_rejected",
+            "kinds": [
+              "policy",
+              "missing_state"
+            ],
+            "meaning": "authority denied the commitment or the frame is stale"
+          },
+          {
+            "code": "duplicate_intent",
+            "kinds": [
+              "idempotency_conflict",
+              "concurrency_conflict"
+            ],
+            "meaning": "the intent id was reused with different canonical input"
+          }
+        ],
+        "idempotency": {
+          "kind": "keyed_by",
+          "data": {
+            "field": "intent_id"
+          }
+        },
+        "concurrency": {
+          "kind": "unique_key",
+          "data": {
+            "field": "intent_id"
+          }
+        },
+        "evidence": "operation_trace",
+        "lifecycle": "synchronous_request_response"
+      },
+      {
+        "id": "horizon.interaction.operation.propose_semantic_revision",
+        "name": "propose_semantic_revision",
+        "intent": "propose a governed semantic or pipeline revision with the parent world identity preserved",
+        "direction": "inbound",
+        "actor": {
+          "kind": "role",
+          "data": {
+            "role": "e0b3d410-e7a2-5824-9b34-f0469a10a7c9"
+          }
+        },
+        "access": {
+          "kind": "policy_governed",
+          "data": {
+            "bindings": [
+              {
+                "policy": "58203194-45ea-56d5-844b-cba9cc791a56",
+                "enforcement_point": "precondition",
+                "failure_code": "revision_invalid"
+              }
+            ]
+          }
+        },
+        "input": "horizon.interaction.record.ProposeRevisionInput",
+        "output": "horizon.interaction.record.ProposeRevisionOutput",
+        "state": "5bb58ae4-db6c-5304-b189-c96e3b877865",
+        "effect": "creates",
+        "transaction": "single_aggregate",
+        "failures": [
+          {
+            "code": "revision_invalid",
+            "kinds": [
+              "input_validation",
+              "policy"
+            ],
+            "meaning": "the candidate closure does not validate or the parent identity is missing"
+          },
+          {
+            "code": "duplicate_revision",
+            "kinds": [
+              "idempotency_conflict",
+              "concurrency_conflict"
+            ],
+            "meaning": "the candidate ref was reused with different canonical input"
+          }
+        ],
+        "idempotency": {
+          "kind": "keyed_by",
+          "data": {
+            "field": "candidate_ref"
+          }
+        },
+        "concurrency": {
+          "kind": "unique_key",
+          "data": {
+            "field": "candidate_ref"
+          }
+        },
+        "evidence": "operation_trace",
+        "lifecycle": "synchronous_request_response"
+      },
+      {
+        "id": "horizon.research.artifacts.operation.run_preregistered_experiment",
+        "name": "run_preregistered_experiment",
+        "intent": "run one bounded research experiment against a frozen preregistration and held-out criterion",
+        "direction": "inbound",
+        "actor": {
+          "kind": "role",
+          "data": {
+            "role": "a1e8f733-0c07-57ac-9448-cabe5805cd9f"
+          }
+        },
+        "access": {
+          "kind": "policy_governed",
+          "data": {
+            "bindings": [
+              {
+                "policy": "25f1a9ee-0f36-5386-b2cc-995cdd2a7925",
+                "enforcement_point": "precondition",
+                "failure_code": "experiment_blocked"
+              }
+            ]
+          }
+        },
+        "input": "horizon.research.artifacts.record.RunExperimentInput",
+        "output": "horizon.research.artifacts.record.RunExperimentOutput",
+        "state": "2cb0e4f1-54f3-5ab4-8649-086b3bb76a84",
+        "effect": "creates",
+        "transaction": "single_aggregate",
+        "failures": [
+          {
+            "code": "invalid_run",
+            "kinds": [
+              "input_validation"
+            ],
+            "meaning": "the experiment run payload failed input validation"
+          },
+          {
+            "code": "experiment_blocked",
+            "kinds": [
+              "policy",
+              "missing_state"
+            ],
+            "meaning": "the preregistration is absent or compute and data use were denied"
+          },
+          {
+            "code": "duplicate_run",
+            "kinds": [
+              "idempotency_conflict",
+              "concurrency_conflict"
+            ],
+            "meaning": "the run ref was reused with different canonical input"
+          }
+        ],
+        "idempotency": {
+          "kind": "keyed_by",
+          "data": {
+            "field": "run_ref"
+          }
+        },
+        "concurrency": {
+          "kind": "unique_key",
+          "data": {
+            "field": "run_ref"
+          }
+        },
+        "evidence": "operation_trace",
+        "lifecycle": "synchronous_request_response"
+      }
+    ]
+  }
+}

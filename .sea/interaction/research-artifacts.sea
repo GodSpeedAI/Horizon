@@ -1,0 +1,125 @@
+@namespace "horizon.research.artifacts"
+@version "1.0.0"
+@owner "GodSpeed AI"
+@profile "default"
+
+// Research artifacts for the developmental journey (J06) and the migrated
+// GodSpeed Agent research subsystem (REQ-RES, REQ-DEV). These are semantic
+// contracts; execution and dataset custody remain owned by the research
+// subsystem and RealityTrace.
+
+enum ExperimentOutcome {
+    supported = "supported",
+    contradicted = "contradicted",
+    inconclusive = "inconclusive",
+}
+
+enum EstimatorState {
+    proposed = "proposed",
+    inactive = "inactive",
+    active = "active",
+    suspended = "suspended",
+}
+
+export entity "Dataset" {
+    key dataset_ref: string (min_length 1)
+    scope: string
+    custody: string
+    content_hash: string
+    exported_at: timestamp
+}
+
+export entity "Preregistration" {
+    key prereg_ref: string (min_length 1)
+    hypothesis: string
+    held_out_criterion: string
+    frozen_at: timestamp
+    dataset_ref: ref<Dataset>
+}
+
+export entity "ExperimentRun" {
+    key run_ref: string (min_length 1)
+    preregistration_ref: string
+    criterion_ref: string
+    verdict_ref: string
+    executed_at: timestamp
+}
+
+export entity "Verdict" {
+    key verdict_ref: string (min_length 1)
+    outcome: ExperimentOutcome
+    compared_against_criterion: string
+    retained_failure: bool
+}
+
+export entity "Estimator" {
+    key estimator_ref: string (min_length 1)
+    capability_ref: string
+    state: EstimatorState
+    activated_by: string optional
+}
+
+// Horizon developmental research instances (custody stays with the subsystem).
+
+instance ds_horizon_dev_001 of "Dataset" {
+    dataset_ref: "ds-horizon-dev-001",
+    scope: "horizon developmental research",
+    custody: "research subsystem",
+    content_hash: "unresolved-pending-research-subsystem",
+    exported_at: "2026-10-19T00:00:00Z"
+}
+
+instance pre_horizon_001 of "Preregistration" {
+    prereg_ref: "pre-horizon-001",
+    hypothesis: "A preregistered navigation capability improves transfer over an unpreregistered baseline.",
+    held_out_criterion: "held-out transfer criterion recorded before compute",
+    frozen_at: "2026-10-19T00:00:00Z",
+    dataset_ref: "ds-horizon-dev-001"
+}
+
+instance est_navigation_001 of "Estimator" {
+    estimator_ref: "est-navigation-001",
+    capability_ref: "capability-navigation-001",
+    state: "inactive"
+}
+
+// J06 operation: run a bounded preregistered experiment in the research
+// subsystem. Compute and data-use authorization remain SEA-Forge's.
+
+role "ResearchAuthority"
+
+export record RunExperimentInput {
+    run_ref: string (min_length 1)
+    preregistration_ref: string
+    criterion_ref: string
+    verdict_ref: string
+    executed_at: timestamp
+}
+
+export record RunExperimentOutput {
+    run_ref: string (min_length 1)
+    verdict_ref: string
+}
+
+policy preregistration_integrity per Constraint Obligation priority 2
+    @rationale "A developmental experiment must freeze its preregistration before compute is authorized."
+    as: true
+
+export operation run_preregistered_experiment {
+    intent "run one bounded research experiment against a frozen preregistration and held-out criterion"
+    direction inbound
+    actor ResearchAuthority
+    access policy_governed by preregistration_integrity at precondition fails with experiment_blocked
+    input RunExperimentInput
+    output RunExperimentOutput
+    state ExperimentRun
+    effect creates ExperimentRun
+    transaction single_aggregate
+    failure invalid_run for input_validation "the experiment run payload failed input validation"
+    failure experiment_blocked for policy, missing_state "the preregistration is absent or compute and data use were denied"
+    failure duplicate_run for idempotency_conflict, concurrency_conflict "the run ref was reused with different canonical input"
+    idempotency keyed_by run_ref
+    concurrency unique_key run_ref
+    evidence operation_trace
+    lifecycle synchronous_request_response
+}

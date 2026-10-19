@@ -1,0 +1,791 @@
+@namespace "horizon.interaction"
+@version "1.0.0"
+@owner "GodSpeed AI"
+@profile "default"
+
+// Canonical Horizon Interaction Domain Model (T01, topology P1).
+// Source ruler: .agents/specs/horizon.agent.spec.yaml (frozen 1.0.0).
+// Business entities, authorization and operational obligations remain owned by
+// DomainForge, SEA-Forge, Gauntlet, RealityTrace and Context Kernel.
+
+import * as research from "./research-artifacts.sea"
+import { ProductIntegrationContract, IntegrationDisposition, ProductTargetLevel } from "./product-integration-contract.sea"
+import { StrategistProduct, StrategyEntity, PlanEntity } from "./products/strategist.sea"
+import { ResearchSubsystemProduct } from "./products/godspeed-research.sea"
+
+// ---------------------------------------------------------------------------
+// Closed sets (canonical, from the frozen spec)
+// ---------------------------------------------------------------------------
+
+enum WorldStateKind {
+    historical = "historical",
+    current = "current",
+    candidate = "candidate",
+}
+
+enum AffordanceStatus {
+    possible = "possible",
+    available = "available",
+    blocked = "blocked",
+    unknown = "unknown",
+    conflicted = "conflicted",
+}
+
+enum GateKey {
+    visibility = "visibility",
+    reach = "reach",
+    payment = "payment",
+    authority = "authority",
+    capability = "capability",
+    recovery = "recovery",
+    settlement_access = "settlement_access",
+}
+
+enum AuthorityOutcome {
+    likely_allow = "likely_allow",
+    requires_approval = "requires_approval",
+    deferred_to_invocation = "deferred_to_invocation",
+    denied = "denied",
+    unreachable = "unreachable",
+    unknown = "unknown",
+}
+
+enum ReversibilityClass {
+    read_only = "read_only",
+    reversible = "reversible",
+    compensable = "compensable",
+    irreversible = "irreversible",
+    unknown = "unknown",
+}
+
+enum NavigationResponsibility {
+    orient = "orient",
+    inspect = "inspect",
+    choose = "choose",
+    commit = "commit",
+    observe = "observe",
+    review = "review",
+}
+
+enum SurfaceIntent {
+    inspect = "inspect",
+    compare = "compare",
+    decide = "decide",
+    verify = "verify",
+    monitor = "monitor",
+}
+
+enum EpistemicStatus {
+    supported = "supported",
+    contradicted = "contradicted",
+    unresolved = "unresolved",
+    inconsistent = "inconsistent",
+}
+
+enum ReviewDisposition {
+    close = "close",
+    continue = "continue",
+    revise = "revise",
+    escalate = "escalate",
+    suspend = "suspend",
+    defer = "defer",
+}
+
+enum EvidenceClass {
+    declared = "declared",
+    observed = "observed",
+    inferred = "inferred",
+    proposed = "proposed",
+    unknown = "unknown",
+}
+
+enum ExecutionPath {
+    direct_action = "direct_action",
+    bounded_gauntlet = "bounded_gauntlet",
+}
+
+enum JourneyStatus {
+    modelled = "modelled",
+    partially_bound = "partially_bound",
+    unresolved = "unresolved",
+}
+
+// ---------------------------------------------------------------------------
+// Participant roles
+// ---------------------------------------------------------------------------
+
+role "NavigatingObserver"
+role "ProposingBuilder"
+role "NavigationHost"
+role "SemanticAuthority"
+role "ExecutionAuthority"
+role "ExecutionEngine"
+role "EvidenceAuthority"
+role "ReferenceSource"
+role "SourceSystem"
+role "ResearchAuthority"
+
+// ---------------------------------------------------------------------------
+// Actors and systems
+// ---------------------------------------------------------------------------
+
+entity "ObserverActor"
+entity "BuilderActor"
+entity "HorizonHost"
+entity "CognateHost"
+entity "DomainForgeService"
+entity "SEAForgeService"
+entity "GauntletService"
+entity "RealityTraceService"
+entity "ContextKernelService"
+entity "ExternalSystem"
+entity "ResearchSubsystem"
+entity "ClackRenderer"
+entity "GUIRenderer"
+
+// ---------------------------------------------------------------------------
+// World, checkpoint and case state
+// ---------------------------------------------------------------------------
+
+entity "WorldRevision" {
+    key revision_ref: string (min_length 1)
+    state_kind: WorldStateKind
+    world_alias: string
+}
+
+entity "Checkpoint" {
+    key checkpoint_ref: string (min_length 1)
+    world_ref: ref<WorldRevision>
+    observed_at: timestamp
+}
+
+entity "CaseRecord" {
+    key case_ref: string (min_length 1)
+    purpose: string
+    world_ref: ref<WorldRevision>
+}
+
+entity "OperationRecord" {
+    key operation_ref: string (min_length 1)
+    intent: string
+    reversibility: ReversibilityClass
+    execution_path: ExecutionPath
+}
+
+// ---------------------------------------------------------------------------
+// Core domain entities (observer-relative navigation present)
+// ---------------------------------------------------------------------------
+
+entity "NavigationContext" {
+    key context_id: uuid
+    observer_ref: string
+    tenant_ref: string
+    world_ref: ref<WorldRevision>
+    checkpoint_ref: string
+    focus_ref: string
+    case_ref: string optional
+}
+
+entity "NavigationFrame" {
+    key frame_id: uuid
+    revision: int (min 0)
+    context_id: ref<NavigationContext>
+    responsibility: NavigationResponsibility
+    surface_ref: string optional
+    error_ref: string optional
+}
+
+entity "FocusSet" {
+    key focus_set_id: uuid
+    object_type_ref: string
+    selector: string
+    checkpoint_ref: string
+    relationship_ref: string optional
+    page_cursor: string optional
+}
+
+entity "AffordanceAssessment" {
+    key assessment_id: uuid
+    operation_ref: string
+    status: AffordanceStatus
+    reversibility: ReversibilityClass
+    authority_outcome: AuthorityOutcome
+    first_blocker: string optional
+    payment_estimate: string optional
+    estimate_provenance: string optional
+}
+
+entity "NavigationIntentRecord" {
+    key intent_id: uuid
+    frame_id: ref<NavigationFrame>
+    frame_revision: int (min 0)
+    actor_ref: string
+    operation_ref: string
+    authority_ref: string optional
+    correlation_ref: string optional
+}
+
+entity "SurfaceSpecRecord" {
+    key surface_id: uuid
+    intent: SurfaceIntent
+    layout_hint: string optional
+    title: string optional
+    focus_ref: string optional
+}
+
+entity "SettlementReviewRecord" {
+    key review_id: uuid
+    intent_ref: string
+    epistemic_status: EpistemicStatus
+    disposition: ReviewDisposition
+    operational_settlement_ref: string optional
+    developmental_assessment_ref: string optional
+}
+
+// ---------------------------------------------------------------------------
+// Build (J03) and develop (J06) state
+// ---------------------------------------------------------------------------
+
+entity "CandidateRevision" {
+    key candidate_ref: string (min_length 1)
+    parent_world_ref: ref<WorldRevision>
+    acceptance_criteria: string
+    validation_state: string default "pending"
+}
+
+entity "ExperimentRun" {
+    key run_ref: string (min_length 1)
+    preregistration_ref: string
+    criterion_ref: string
+    verdict_ref: string
+    executed_at: timestamp
+}
+
+// ---------------------------------------------------------------------------
+// Classification entities carrying the invariants and preserved unknowns
+// ---------------------------------------------------------------------------
+
+entity "CanonicalJourney"
+entity "AffordanceGate"
+entity "InteractionInvariant"
+entity "OpenSemanticQuestion"
+
+// ---------------------------------------------------------------------------
+// Participant resources
+// ---------------------------------------------------------------------------
+
+resource "FrameRequestMessage"
+resource "FocusQueryMessage"
+resource "WorldRevisionReference"
+resource "CheckpointQueryMessage"
+resource "ContextCitationMessage"
+resource "AffordanceAssessmentMessage"
+resource "AuthorityGateRequest"
+resource "AuthorityEvaluationRequest"
+resource "AuthorityDecisionRecord"
+resource "FrozenExecutionReference"
+resource "ExecutionRecordMessage"
+resource "EvidenceObservationMessage"
+resource "SettlementRecordMessage"
+resource "CandidateRevisionMessage"
+resource "SemanticValidationReport"
+resource "PromotionDecisionMessage"
+resource "ExperimentPreregistrationMessage"
+resource "ExperimentEvidenceMessage"
+resource "SurfaceBindingMessage"
+
+// ---------------------------------------------------------------------------
+// Canonical journey flows
+// ---------------------------------------------------------------------------
+
+flow "FrameRequestMessage" from "ObserverActor" to "HorizonHost"
+flow "FocusQueryMessage" from "HorizonHost" to "CognateHost"
+flow "WorldRevisionReference" from "DomainForgeService" to "CognateHost"
+flow "CheckpointQueryMessage" from "HorizonHost" to "CognateHost"
+flow "ContextCitationMessage" from "ContextKernelService" to "HorizonHost"
+flow "AffordanceAssessmentMessage" from "HorizonHost" to "ObserverActor"
+flow "AuthorityGateRequest" from "HorizonHost" to "CognateHost"
+flow "AuthorityEvaluationRequest" from "CognateHost" to "SEAForgeService"
+flow "AuthorityDecisionRecord" from "SEAForgeService" to "CognateHost"
+flow "FrozenExecutionReference" from "CognateHost" to "GauntletService"
+flow "ExecutionRecordMessage" from "GauntletService" to "CognateHost"
+flow "EvidenceObservationMessage" from "RealityTraceService" to "CognateHost"
+flow "SettlementRecordMessage" from "SEAForgeService" to "CognateHost"
+flow "CandidateRevisionMessage" from "BuilderActor" to "CognateHost"
+flow "SemanticValidationReport" from "DomainForgeService" to "CognateHost"
+flow "PromotionDecisionMessage" from "SEAForgeService" to "CognateHost"
+flow "ExperimentPreregistrationMessage" from "ObserverActor" to "ResearchSubsystem"
+flow "ExperimentEvidenceMessage" from "ResearchSubsystem" to "RealityTraceService"
+flow "SurfaceBindingMessage" from "HorizonHost" to "GUIRenderer"
+
+// ---------------------------------------------------------------------------
+// Relationships between roles
+// ---------------------------------------------------------------------------
+
+relation "navigates_revision"
+    subject: "NavigatingObserver"
+    predicate: "navigates"
+    object: "NavigationHost"
+    via: flow "FrameRequestMessage"
+
+relation "publishes_immutable_revision"
+    subject: "SemanticAuthority"
+    predicate: "publishes_immutable_revision_to"
+    object: "NavigationHost"
+    via: flow "WorldRevisionReference"
+
+relation "evaluates_authority"
+    subject: "ExecutionAuthority"
+    predicate: "evaluates_authority_for"
+    object: "NavigationHost"
+    via: flow "AuthorityDecisionRecord"
+
+relation "executes_bounded_work"
+    subject: "ExecutionEngine"
+    predicate: "executes_bounded_work_for"
+    object: "NavigationHost"
+    via: flow "ExecutionRecordMessage"
+
+relation "observes_evidence"
+    subject: "EvidenceAuthority"
+    predicate: "returns_observations_to"
+    object: "NavigationHost"
+    via: flow "EvidenceObservationMessage"
+
+relation "settles_obligations"
+    subject: "ExecutionAuthority"
+    predicate: "settles_obligations_for"
+    object: "NavigationHost"
+    via: flow "SettlementRecordMessage"
+
+relation "cites_reference"
+    subject: "ReferenceSource"
+    predicate: "cites_to"
+    object: "NavigationHost"
+    via: flow "ContextCitationMessage"
+
+relation "proposes_revision"
+    subject: "ProposingBuilder"
+    predicate: "proposes_to"
+    object: "NavigationHost"
+    via: flow "CandidateRevisionMessage"
+
+relation "runs_preregistered_experiment"
+    subject: "ResearchAuthority"
+    predicate: "runs_experiment_to"
+    object: "EvidenceAuthority"
+    via: flow "ExperimentEvidenceMessage"
+
+relation "supplies_source_event"
+    subject: "SourceSystem"
+    predicate: "notifies"
+    object: "NavigationHost"
+    via: flow "CheckpointQueryMessage"
+
+// ---------------------------------------------------------------------------
+// Policies: binding points only. Horizon does not own authorization; SEA-Forge
+// does. These declarations record the precondition at which the authority gate
+// is enforced and are intentionally inert expressions.
+// ---------------------------------------------------------------------------
+
+policy affordance_gate_integrity per Constraint Obligation priority 1
+    @rationale "Any consequential path must be assessed against the canonical gates before it is offered."
+    as: true
+
+policy navigation_intent_integrity per Constraint Obligation priority 1
+    @rationale "A committed navigation intent must not duplicate external side effects."
+    as: true
+
+policy semantic_revision_integrity per Constraint Obligation priority 2
+    @rationale "A candidate semantic revision must validate before promotion; identity stays immutable inside a run."
+    as: true
+
+policy preregistration_integrity per Constraint Obligation priority 2
+    @rationale "A developmental experiment must freeze its preregistration before compute is authorized."
+    as: true
+
+// ---------------------------------------------------------------------------
+// Journey-instance operations (inbound, synchronous, evidenced)
+// ---------------------------------------------------------------------------
+
+record AssessAffordanceInput {
+    assessment_id: uuid
+}
+
+record AssessAffordanceOutput {
+    assessment_id: uuid
+    status: AffordanceStatus
+    authority_outcome: AuthorityOutcome
+    reversibility: ReversibilityClass
+}
+
+operation assess_affordance {
+    intent "assess whether a proposed move is a reachable, governed, settleable affordance at the current frame revision"
+    direction inbound
+    actor NavigationHost
+    access policy_governed by affordance_gate_integrity at precondition fails with assessment_blocked
+    input AssessAffordanceInput
+    output AssessAffordanceOutput
+    state AffordanceAssessment
+    effect reads AffordanceAssessment
+    transaction read_only
+    failure invalid_query for input_validation "the assessment reference failed input validation"
+    failure assessment_blocked for policy "a hard gate is failed, conflicted or unknown and availability must not be granted"
+    failure frame_stale for missing_state "the referenced navigation frame revision is no longer current"
+    idempotency inherent
+    concurrency read_snapshot
+    evidence operation_trace
+    lifecycle synchronous_request_response
+}
+
+record CommitIntentInput {
+    intent_id: uuid
+    frame_id: ref<NavigationFrame>
+    frame_revision: int (min 0)
+    actor_ref: string
+    operation_ref: string
+}
+
+record CommitIntentOutput {
+    intent_id: uuid
+    correlation_ref: string optional
+}
+
+operation commit_navigation_intent {
+    intent "commit one reviewed renderer-independent navigation intent exactly once, subject to authority"
+    direction inbound
+    actor NavigatingObserver
+    access policy_governed by navigation_intent_integrity at precondition fails with intent_rejected
+    input CommitIntentInput
+    output CommitIntentOutput
+    state NavigationIntentRecord
+    effect creates NavigationIntentRecord
+    transaction single_aggregate
+    failure invalid_intent for input_validation "the intent payload failed record validation"
+    failure intent_rejected for policy, missing_state "authority denied the commitment or the frame is stale"
+    failure duplicate_intent for idempotency_conflict, concurrency_conflict "the intent id was reused with different canonical input"
+    idempotency keyed_by intent_id
+    concurrency unique_key intent_id
+    evidence operation_trace
+    lifecycle synchronous_request_response
+}
+
+record ProposeRevisionInput {
+    candidate_ref: string (min_length 1)
+    parent_world_ref: ref<WorldRevision>
+    acceptance_criteria: string
+}
+
+record ProposeRevisionOutput {
+    candidate_ref: string (min_length 1)
+    validation_state: string
+}
+
+operation propose_semantic_revision {
+    intent "propose a governed semantic or pipeline revision with the parent world identity preserved"
+    direction inbound
+    actor ProposingBuilder
+    access policy_governed by semantic_revision_integrity at precondition fails with revision_invalid
+    input ProposeRevisionInput
+    output ProposeRevisionOutput
+    state CandidateRevision
+    effect creates CandidateRevision
+    transaction single_aggregate
+    failure revision_invalid for input_validation, policy "the candidate closure does not validate or the parent identity is missing"
+    failure duplicate_revision for idempotency_conflict, concurrency_conflict "the candidate ref was reused with different canonical input"
+    idempotency keyed_by candidate_ref
+    concurrency unique_key candidate_ref
+    evidence operation_trace
+    lifecycle synchronous_request_response
+}
+
+// ---------------------------------------------------------------------------
+// Canonical journey instances (J01-J06 from the frozen spec)
+// ---------------------------------------------------------------------------
+
+instance j01_explore of "CanonicalJourney" {
+    journey_id: "J01",
+    title: "Enter, search, filter and traverse a shared world",
+    actor_role: "NavigatingObserver",
+    initiating_condition: "an observer has a question about objects in a shared world",
+    desired_state: "a source-backed, access-scoped, filterable typed result set with provenance",
+    capability: "typed object resolution and relationship traversal over a pinned world revision and checkpoint",
+    authority: "read-scoped access; no consequential authority granted",
+    evidence: "resolved object types, matching instances and traversal provenance",
+    settlement: "the focus set is inspectable and provenance-bearing; no world change occurred",
+    next_affordance: "inspect, filter further, traverse, or propose a consequential operation",
+    failure_recovery: "source changes invalidate affected results explicitly; unavailable citations are marked unavailable, not invented",
+    status: "partially_bound"
+}
+
+instance j02_operate of "CanonicalJourney" {
+    journey_id: "J02",
+    title: "Preflight, authorize, execute and review a consequential operation",
+    actor_role: "NavigatingObserver",
+    initiating_condition: "an observer selects objects and considers a consequential move",
+    desired_state: "reviewed scope, payment and expected evidence followed by an exactly-once authorized effect and separate settlement",
+    capability: "affordance assessment, capability binding, authority evaluation, bounded execution and evidence correlation",
+    authority: "authority gate values only; no gate value grants authority; SEA-Forge authorizes invocation",
+    evidence: "execution records, RealityTrace observations and SEA-Forge operational settlement references",
+    settlement: "operational settlement reference, distinct from evidence and from developmental interpretation",
+    next_affordance: "review evidence, choose the next bounded response, or defer",
+    failure_recovery: "blocked or unknown paths expose a blocker and a reachable prerequisite; denied or pending authority preserves status with no side effect",
+    status: "partially_bound"
+}
+
+instance j03_build of "CanonicalJourney" {
+    journey_id: "J03",
+    title: "Inspect lineage and propose a governed semantic or pipeline revision",
+    actor_role: "ProposingBuilder",
+    initiating_condition: "a builder inspects lineage and identifies a candidate change",
+    desired_state: "an evidence-backed diff and a governed version transition",
+    capability: "lineage projection, candidate storage with parent identity, DomainForge closure validation and governed promotion",
+    authority: "SEA-Forge governs the proposal and the promotion transition",
+    evidence: "DomainForge diagnostics and immutable identity, Gauntlet verified records, RealityTrace observations",
+    settlement: "an immutable candidate identity and, on promotion, an alias-history entry",
+    next_affordance: "request promotion, revise the candidate, or abandon it while preserving the candidate and reason",
+    failure_recovery: "an invalid candidate shows diagnostics with no active world change; denial preserves the candidate and reason",
+    status: "partially_bound"
+}
+
+instance j04_monitor of "CanonicalJourney" {
+    journey_id: "J04",
+    title: "Observe changed world state and choose a bounded response",
+    actor_role: "NavigatingObserver",
+    initiating_condition: "a source system emits a new event with a unique identity",
+    desired_state: "an evidence-backed notice or a bounded authorized response",
+    capability: "event-driven reassessment of the case and candidate moves at a checkpoint",
+    authority: "automatic authority where it exists; otherwise an authorized decision is requested in the home attention view",
+    evidence: "RealityTrace receipts, observations and residuals; SEA-Forge operational status",
+    settlement: "applicable declared obligations are settled; a receipt alone is not settlement",
+    next_affordance: "act, defer, or escalate for authorized decision",
+    failure_recovery: "informational or non-permissible conditions surface a blocker rather than an invented action",
+    status: "partially_bound"
+}
+
+instance j05_compare of "CanonicalJourney" {
+    journey_id: "J05",
+    title: "Compare hypothetical alternatives without pretending to change the world",
+    actor_role: "NavigatingObserver",
+    initiating_condition: "an observer wants to compare alternative paths",
+    desired_state: "clearly marked baseline versus hypothetical outcomes with explicit uncertainty, or an explicit unsupported result",
+    capability: "bounded hypothetical evaluation over a pinned world revision and checkpoint; optional scenario model",
+    authority: "authority preview only, never authorization for execution",
+    evidence: "cited assumptions and limitations; estimates carry uncertainty",
+    settlement: "no world change and no authority granted; simulation NEVER settles or changes world state",
+    next_affordance: "request a real actionable candidate, which becomes a new real-world intent",
+    failure_recovery: "an unsupported scenario model reports unsupported rather than fabricating an estimate",
+    status: "partially_bound"
+}
+
+instance j06_develop of "CanonicalJourney" {
+    journey_id: "J06",
+    title: "Review developmental evidence and run a preregistered research experiment",
+    actor_role: "NavigatingObserver",
+    initiating_condition: "an observer opens the develop lens for a capability or case family",
+    desired_state: "capability status with variation, recovery and transfer evidence, or an explicit unproven verdict naming the missing variation",
+    capability: "episode and research-record review, preregistration freeze, scoped dataset export and bounded pinned-pipeline execution",
+    authority: "SEA-Forge authorizes compute and data use; a separate governed activation promotes an estimator",
+    evidence: "metrics, verdict and hashed artifacts compared against the frozen held-out criterion; failures retained",
+    settlement: "the result is compared against the preregistration; activation of an estimator is a separate governed decision",
+    next_affordance: "request estimator activation, propose another experiment, or leave the capability unproven",
+    failure_recovery: "denial or escalation keeps the preregistration and reports blocked or pending with a reason",
+    status: "partially_bound"
+}
+
+// ---------------------------------------------------------------------------
+// Canonical affordance gates (exactly the seven keys of REQ-NAV-002)
+// ---------------------------------------------------------------------------
+
+instance gate_visibility of "AffordanceGate" {
+    gate_key: "visibility",
+    meaning: "the observer may see that this path exists",
+    owner: "Horizon",
+    unknown_behavior: "unknown blocks availability"
+}
+
+instance gate_reach of "AffordanceGate" {
+    gate_key: "reach",
+    meaning: "the exact operation is reachable from the current focus and checkpoint",
+    owner: "Horizon",
+    unknown_behavior: "unknown blocks availability"
+}
+
+instance gate_payment of "AffordanceGate" {
+    gate_key: "payment",
+    meaning: "material cost, time, attention, risk or coordination the observer must spend",
+    owner: "Cognate with capability binding",
+    unknown_behavior: "unknown or failed hard gate is not availability"
+}
+
+instance gate_authority of "AffordanceGate" {
+    gate_key: "authority",
+    meaning: "SEA-Forge evaluation vocabulary of REQ-NAV-006, never a grant",
+    owner: "SEA-Forge",
+    unknown_behavior: "denied, unreachable and unknown block availability"
+}
+
+instance gate_capability of "AffordanceGate" {
+    gate_key: "capability",
+    meaning: "an eligible capability binding exists for the operation",
+    owner: "Cognate",
+    unknown_behavior: "unknown blocks availability"
+}
+
+instance gate_recovery of "AffordanceGate" {
+    gate_key: "recovery",
+    meaning: "a recovery or compensation path exists for the reversibility class",
+    owner: "Horizon with SEA-Forge and Gauntlet",
+    unknown_behavior: "unknown blocks availability for irreversible operations"
+}
+
+instance gate_settlement_access of "AffordanceGate" {
+    gate_key: "settlement_access",
+    meaning: "a path to observable settlement evidence is visible",
+    owner: "SEA-Forge and RealityTrace",
+    unknown_behavior: "unknown blocks availability"
+}
+
+// ---------------------------------------------------------------------------
+// Interaction invariants (typed, requirement-traced)
+// ---------------------------------------------------------------------------
+
+instance inv_possibility_not_affordance of "InteractionInvariant" {
+    invariant_id: "INV-01",
+    statement: "A represented possibility is not an affordance until a reachable, payable, governable, settleable path is visible.",
+    requirement_ref: "REQ-NAV-001",
+    evidence_class: "declared",
+    status: "active"
+}
+
+instance inv_gate_keys_closed of "InteractionInvariant" {
+    invariant_id: "INV-02",
+    statement: "Affordance gates use exactly the canonical keys visibility, reach, payment, authority, capability, recovery and settlement_access.",
+    requirement_ref: "REQ-NAV-002",
+    evidence_class: "declared",
+    status: "active"
+}
+
+instance inv_no_gate_grants_authority of "InteractionInvariant" {
+    invariant_id: "INV-03",
+    statement: "No authority gate value grants authority; likely_allow requires a non-granting evaluation.",
+    requirement_ref: "REQ-NAV-006",
+    evidence_class: "declared",
+    status: "active"
+}
+
+instance inv_review_before_commit of "InteractionInvariant" {
+    invariant_id: "INV-04",
+    statement: "Before a consequential commitment the observer sees reversibility, payment, expected evidence and escalation behaviour.",
+    requirement_ref: "REQ-NAV-007",
+    evidence_class: "declared",
+    status: "active"
+}
+
+instance inv_world_identity_immutable of "InteractionInvariant" {
+    invariant_id: "INV-05",
+    statement: "Historical, current and candidate worlds stay visibly distinguished by immutable references; flaws become candidate revisions for a higher observer.",
+    requirement_ref: "REQ-WORLD-004",
+    evidence_class: "declared",
+    status: "active"
+}
+
+instance inv_domainforge_owns_identity of "InteractionInvariant" {
+    invariant_id: "INV-06",
+    statement: "DomainForge alone owns canonical semantic compilation and world_ref identity.",
+    requirement_ref: "REQ-STACK-001",
+    evidence_class: "declared",
+    status: "active"
+}
+
+instance inv_settlement_not_evidence of "InteractionInvariant" {
+    invariant_id: "INV-07",
+    statement: "Observed evidence, operational settlement and developmental capability assessment remain distinct; a receipt is not settlement.",
+    requirement_ref: "REQ-DEV-001",
+    evidence_class: "declared",
+    status: "active"
+}
+
+instance inv_intent_idempotent of "InteractionInvariant" {
+    invariant_id: "INV-08",
+    statement: "Duplicate navigation intent ids must not duplicate external side effects.",
+    requirement_ref: "REQ-NAV-001",
+    evidence_class: "declared",
+    status: "active"
+}
+
+instance inv_surface_not_authority of "InteractionInvariant" {
+    invariant_id: "INV-09",
+    statement: "A surface specification is closed declarative presentation, never an authority or business record; no raw executable UI code is allowed.",
+    requirement_ref: "REQ-UI-001",
+    evidence_class: "declared",
+    status: "active"
+}
+
+instance inv_simulation_never_changes_world of "InteractionInvariant" {
+    invariant_id: "INV-10",
+    statement: "Hypothetical comparison never changes world state and never grants authority.",
+    requirement_ref: "REQ-CMP-001",
+    evidence_class: "declared",
+    status: "active"
+}
+
+instance inv_separate_developmental_interpretation of "InteractionInvariant" {
+    invariant_id: "INV-11",
+    statement: "Developmental interpretation is evaluated separately from operational settlement.",
+    requirement_ref: "REQ-DEV-003",
+    evidence_class: "declared",
+    status: "active"
+}
+
+// ---------------------------------------------------------------------------
+// Preserved unknowns and contradictions
+// ---------------------------------------------------------------------------
+
+instance oq_cognitiveos_refs of "OpenSemanticQuestion" {
+    question_id: "OQ-IDM-01",
+    statement: "Canonical CognitiveOS reference documents (Manifesto v13.1, Mathematical Spec v2.3, Purposeful Case Navigation, Developmental Orientation) were not located locally.",
+    evidence_class: "unknown",
+    status: "open",
+    blocks: "faithful derivation of some purpose, capability, payment and authority detail"
+}
+
+instance oq_payment_model of "OpenSemanticQuestion" {
+    question_id: "OQ-IDM-02",
+    statement: "The concrete payment model (units, estimation source, affordability gate inputs) is not yet specified.",
+    evidence_class: "unknown",
+    status: "open",
+    blocks: "binding the payment gate to a real capability contract"
+}
+
+instance oq_authority_preview of "OpenSemanticQuestion" {
+    question_id: "OQ-IDM-03",
+    statement: "Whether SEA-Forge exposes an evaluate-only preview is unknown; deferred_to_invocation is required when no preview exists.",
+    evidence_class: "unknown",
+    status: "open",
+    blocks: "binding likely_allow in the authority gate"
+}
+
+instance oq_bounded_execution_threshold of "OpenSemanticQuestion" {
+    question_id: "OQ-IDM-04",
+    statement: "The threshold separating a direct bound action from bounded long-horizon Gauntlet execution is not specified.",
+    evidence_class: "unknown",
+    status: "open",
+    blocks: "selecting the execution path for a given operation"
+}
+
+instance oq_first_product_models of "OpenSemanticQuestion" {
+    question_id: "OQ-IDM-05",
+    statement: "Strategist and the research subsystem do not yet own .sea models; the product modules here are Horizon-side integration contracts, not product-authoritative models.",
+    evidence_class: "proposed",
+    status: "open",
+    blocks: "claiming product-owned semantics for first-wave products"
+}
+
+instance oq_plan_journey_count of "OpenSemanticQuestion" {
+    question_id: "OQ-IDM-06",
+    statement: "Plan T01 prose says five journeys J01-J05 while the frozen spec declares six journeys including J06_develop; the spec is authoritative here.",
+    evidence_class: "unknown",
+    status: "open",
+    blocks: "nothing in this model; flagged for plan/spec reconciliation"
+}

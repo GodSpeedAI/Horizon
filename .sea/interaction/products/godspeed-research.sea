@@ -1,0 +1,32 @@
+@namespace "horizon.products.godspeed_research"
+@version "1.0.0"
+@owner "GodSpeed AI"
+@profile "default"
+
+// First-wave product module: the GodSpeed research subsystem derived from the
+// godspeed_agent predecessor (REQ-RES-006, T21). Horizon owns the join contract
+// only; dataset custody, compute and estimator state stay with the subsystem.
+
+import { ProductTargetLevel } from "../product-integration-contract.sea"
+import { ExperimentRun } from "../research-artifacts.sea"
+
+export entity "ResearchSubsystemProduct" {
+    key product_ref: string (min_length 1)
+    target_level: ProductTargetLevel
+    language: string
+    owned_by: string
+}
+
+export entity "ResearchCapability" {
+    key capability_ref: string (min_length 1)
+    description: string
+    evidence_status: string
+    experiment_ref: ref<ExperimentRun> optional
+}
+
+instance product_research_subsystem of "ResearchSubsystemProduct" {
+    product_ref: "godspeed-research-subsystem",
+    target_level: "evidenced",
+    language: "Python",
+    owned_by: "research subsystem"
+}

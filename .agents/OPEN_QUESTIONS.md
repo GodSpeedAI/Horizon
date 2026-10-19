@@ -30,3 +30,10 @@ before the affected task. None blocks T00 settlement.
 ## OQ-05 SEA family liveness (resolved for Horizon, revisitable)
 - SEA / NewSea / XSEA / sentient-enterprise-architecture own no live behavior Horizon
   consumes (DEC-T00-03). Revisit only on explicit owner instruction.
+
+## OQ-06 Plan journey count vs frozen spec (T01)
+- Plan T01 `changes` reads "five Horizon journeys" and step 2 says "five J01–J05".
+- The frozen spec `execution_integration_contract.journeys` declares six:
+  J01_explore, J02_operate, J03_build, J04_monitor, J05_compare, J06_develop.
+- Ruler hierarchy: the spec wins. T01 models all six. Recorded as `OQ-IDM-06` in the IDM.
+- Proposed resolution: reconcile plan prose at the next plan revision; no spec change needed.

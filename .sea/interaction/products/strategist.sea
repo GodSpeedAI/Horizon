@@ -1,0 +1,52 @@
+@namespace "horizon.products.strategist"
+@version "1.0.0"
+@owner "GodSpeed AI"
+@profile "default"
+
+// First-wave product module: Strategist strategy and plan entities joined as
+// queryable objects. This is a Horizon-side integration contract; Strategist
+// does not yet own a .sea model (OQ-IDM-05).
+
+import { ProductTargetLevel } from "../product-integration-contract.sea"
+
+export entity "StrategistProduct" {
+    key product_ref: string (min_length 1)
+    target_level: ProductTargetLevel
+    language: string
+    owned_by: string
+}
+
+export entity "StrategyEntity" {
+    key strategy_ref: string (min_length 1)
+    title: string
+    state: string
+    source_custody: string
+}
+
+export entity "PlanEntity" {
+    key plan_ref: string (min_length 1)
+    strategy_ref: string
+    milestone: string
+    source_custody: string
+}
+
+instance product_strategist of "StrategistProduct" {
+    product_ref: "strategist",
+    target_level: "queryable",
+    language: "Rust",
+    owned_by: "Strategist"
+}
+
+instance strategy_001 of "StrategyEntity" {
+    strategy_ref: "strategy-001",
+    title: "Join first-wave products as queryable objects",
+    state: "active",
+    source_custody: "Strategist"
+}
+
+instance plan_001 of "PlanEntity" {
+    plan_ref: "plan-001",
+    strategy_ref: "strategy-001",
+    milestone: "first-wave join contract",
+    source_custody: "Strategist"
+}

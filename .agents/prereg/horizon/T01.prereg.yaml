@@ -1,0 +1,102 @@
+# T01 preregistration — canonical DomainForge interaction model (topology P1)
+# Authored before authoring or validating any T01 .sea source.
+# Plan ref: .agents/plans/horizon.plan.yaml tasks.T01
+schema: horizon.task_prereg
+task: T01
+title: "Derive canonical DomainForge interaction model (topology P1)"
+recorded: "2026-10-19"
+proof_level: P2
+confirmation: builder_with_adversarial_teeth
+
+ruler:
+  spec_path: .agents/specs/horizon.agent.spec.yaml
+  plan_path: .agents/plans/horizon.plan.yaml
+  expected_spec_sha256: "75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130"
+  expected_spec_version: "1.0.0"
+  expected_spec_status: "frozen"
+  domainforge_pin: "0.21.1"
+
+claim: >-
+  DomainForge's supported .sea and canonical composed world_ref encode stable
+  observer, purpose, object, relationship, action, settlement and next-affordance
+  distinctions.
+
+positive_expectations:
+  - id: PE-01
+    expectation: >-
+      `domainforge validate .sea/interaction/interaction-model.sea --application`
+      exits 0 on the pinned 0.21.1 binary and reports no APP diagnostics.
+  - id: PE-02
+    expectation: >-
+      The model represents all SIX frozen journeys J01–J06. Plan T01 prose says
+      "five J01–J05"; the frozen spec is authoritative and contains six
+      (J01_explore, J02_operate, J03_build, J04_monitor, J05_compare, J06_develop).
+  - id: PE-03
+    expectation: >-
+      The seven core domain entities (NavigationContext, NavigationFrame,
+      FocusSet, AffordanceAssessment, NavigationIntent, SurfaceSpec,
+      SettlementReview) and the required distinctions—possibility vs affordance,
+      observer context vs world revision, intent vs action, operation vs evidence,
+      evidence vs settlement, operational settlement vs developmental
+      assessment—are typed and inspectable in parsed output.
+  - id: PE-04
+    expectation: >-
+      Canonical composed world identity is computed from the validated import
+      closure; a changed closure produces a different identity, and comparing a
+      pinned identity against a changed one exits non-zero.
+  - id: PE-05
+    expectation: >-
+      Companion modules exist for research artifacts (dataset, preregistration,
+      experiment run, verdict, estimator), the product integration contract, and
+      each first-wave product (GodSpeed research subsystem, Strategist), and the
+      combined closure validates.
+  - id: PE-06
+    expectation: >-
+      Material source statements are traceable in a source translation map;
+      unresolved capability, payment, authority and CognitiveOS-reference
+      details are recorded as unknowns rather than invented.
+
+falsifier: "Insert unsupported guessed .sea relation or capability"
+
+negative_expectations:
+  - id: NE-01
+    attack: >-
+      Insert a guessed Relation referencing an undeclared Role (and separately a
+      Flow referencing an undeclared Resource/Entity) into a temporary copy.
+    expected: >-
+      `domainforge validate` MUST fail; the canonical source is never mutated
+      for this test.
+  - id: NE-02
+    attack: >-
+      Recompute world identity for a changed semantic closure and assert equality
+      with the previously pinned identity.
+    expected: >-
+      The identity comparison MUST report changed identity and exit non-zero,
+      demanding an explicit promotion instead of silently reusing the old ref.
+  - id: NE-03
+    attack: >-
+      Remove or leave unbound a journey's settlement/evidence distinction and run
+      the coverage check.
+    expected: >-
+      The explicit unrepresented-semantics check MUST fail with the missing
+      journey/binding named.
+
+known_confounds:
+  - "Mocks and fixture-only results are not live settlement evidence."
+  - "Pinned external API and skill versions may differ from prose documentation."
+  - "CognitiveOS reference documents are external and were not located locally; some capability, payment and authority details remain unknown."
+  - "The plan's T01 prose says five journeys while the frozen spec declares six; this preregistration follows the spec."
+
+confirmation_condition: >-
+  Builder demonstrates preregistered positive and negative checks with stable
+  evidence and documents plausible alternate failures.
+
+evidence_plan:
+  - "Exact commands and observed output retained under .agents/evidence/horizon/T01/."
+  - "Pinned binary path/version recorded before the gate run."
+  - "Negative teeth executed against isolated temporary copies; canonical sources untouched."
+  - "World identity output retained with the closure inventory used to derive it."
+
+redesign_trigger: >-
+  The source semantics cannot be represented with supported .sea without losing
+  payment, role, settlement or world-revision distinctions.

@@ -1,0 +1,5 @@
+# T01 teeth-03 coverage gate names the missing journey (expect FAIL)
+$ python3 scripts/check-idm-coverage.py <tmp/without-j06>/interaction-model.sea
+check-idm-coverage: FAILED (1)
+- missing canonical journey J06
+exit=1

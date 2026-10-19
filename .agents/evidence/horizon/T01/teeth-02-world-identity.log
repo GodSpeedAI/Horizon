@@ -1,0 +1,11 @@
+# T01 teeth-02 changed semantic closure vs pinned world_ref
+# original: world:horizon@sha256:b0f31fcc60f49af730ca0b863af8e0eae990924fd0beb1d004f10c602cd24ca1
+# changed closure computes: world:horizon@sha256:7c2dff6e033bc985a181a3bb30dd3af859edee3e89449dbd1a6ab4813e57ca61
+$ python3 scripts/world-ref.py --expect 'world:horizon@sha256:b0f31fcc60f49af730ca0b863af8e0eae990924fd0beb1d004f10c602cd24ca1' <changed>/interaction-model.sea   # expect CHANGED, exit 1
+world-ref: identity CHANGED
+  expected world:horizon@sha256:b0f31fcc60f49af730ca0b863af8e0eae990924fd0beb1d004f10c602cd24ca1
+  actual   world:horizon@sha256:7c2dff6e033bc985a181a3bb30dd3af859edee3e89449dbd1a6ab4813e57ca61
+exit=1
+$ python3 scripts/world-ref.py --expect 'world:horizon@sha256:7c2dff6e033bc985a181a3bb30dd3af859edee3e89449dbd1a6ab4813e57ca61' <changed>/interaction-model.sea     # expect unchanged, exit 0
+world-ref: identity unchanged world:horizon@sha256:7c2dff6e033bc985a181a3bb30dd3af859edee3e89449dbd1a6ab4813e57ca61
+exit=0

@@ -1,0 +1,32 @@
+# T01 evidence — artifact hashes and final re-run
+
+## files
+4af638171000ff9b8aa642efed7d2c891c02d2d719eaa8859f0bdbe28f3d3f44  .sea/interaction/README.md
+082da94672fdf03be1f64c6c4ef71063ef214c97f7f94c54318f20e1c07f7532  .sea/interaction/assumptions-and-unknowns.md
+42c88184f2dedcabd365f187788784060264931dcc25b77de07705c14ec5608e  .sea/interaction/canonical-journey-catalog.md
+0b188a09c55b26442b0b8cb9a11b1d0d787b939a6b475ebbf72e46fc9bec77c0  .sea/interaction/handoff.md
+117e268a5b4c5b36fc0e44362779d6fb502af84e5b9646ce1c01f703c6d77989  .sea/interaction/interaction-model.sea
+449e002140b53a1e8379641c5d430b7504e915649807c300281e2a382a26ae24  .sea/interaction/product-integration-contract.sea
+b8b3083175d18c987e3ca4e1c39f804518a4cedcb27176ad5d0fb3ae68819aee  .sea/interaction/products/godspeed-research.sea
+7b446dc6c4d2692981c6f3d29965d3511dbefbfa72e42770bafae7ea167eea88  .sea/interaction/products/strategist.sea
+53506404bedef847028052a60aba9f9dacf61ed988db123bd21603d1ec422b55  .sea/interaction/research-artifacts.sea
+459955b36cc72b369356faaa4d13344c9b4b24e6865ea974acea9b9df0b85edd  .sea/interaction/source-translation-map.md
+aaa85fd88e8bf3b807bf137bcfdfe18c79efdd5f347ca5eeed63d6d0cab96bdf  .sea/interaction/validation/diagnostics.md
+a47cfa22073471cf0b41aab6d9aec179c926f0ecea8187e491406850b8be4943  .sea/interaction/validation/domainforge-output.txt
+d93c7802423a1b57067c8b6573db9f0872de7c231a5c322e13f41db57f22077e  .sea/interaction/validation/limitations.md
+
+## scripts
+3f8ea444a32a31ae29352a6e312eafb85ea928010cf3429ddbfed9b2c8d76533  scripts/world-ref.py
+ed0b1ed23736cf9a982fe3c64290acc058864e9c6f482b327e52d6d3167a60fb  scripts/check-idm-coverage.py
+
+## final validate --application
+Validation succeeded: 0 violations total
+Application contract valid: 4 operation(s), 8 record(s), 16 enum(s), 24 entities
+exit=0
+
+## final coverage
+check-idm-coverage: OK (6 journeys, 7 gates, 4 operations, 6 open questions)
+exit=0
+
+## final world_ref
+world:horizon@sha256:b0f31fcc60f49af730ca0b863af8e0eae990924fd0beb1d004f10c602cd24ca1

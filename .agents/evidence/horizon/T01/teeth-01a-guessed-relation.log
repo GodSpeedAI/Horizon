@@ -1,0 +1,4 @@
+# T01 teeth-01a guessed Relation with undeclared Role (expect FAIL)
+$ /home/sprime01/projects/domainforge/target/release/domainforge validate <tmp>/interaction-model.sea --application --format human
+Error: Parse failed for /tmp/opencode/t01.wmVAxD/ne1a/interaction-model.sea: resolved closure failed graph construction: Grammar error: Undefined object role 'UndeclaredApproverRole'
+exit=1

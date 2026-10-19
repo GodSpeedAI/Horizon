@@ -1,0 +1,4 @@
+# T01 gate-05 composed world_ref
+$ python3 scripts/world-ref.py .sea/interaction/interaction-model.sea
+world:horizon@sha256:b0f31fcc60f49af730ca0b863af8e0eae990924fd0beb1d004f10c602cd24ca1
+exit=0

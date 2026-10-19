@@ -30,10 +30,23 @@
 - Impact: T04 scaffolding must pass `--source`; a registry-only path is not available at the pinned version.
 - Next: scaffold with `--source <cognate checkout>`; revisit when a release containing 61015df is published (OQ-01).
 
-## D-007 domainforge CLI on PATH lags the bound binding
+## D-007 domainforge CLI on PATH lags the bound binding — PARTIALLY RESOLVED (T01)
 - Evidence (T00): `domainforge --version` = 0.19.0; Cognate main binds `@godspeedai/domainforge` 0.21.1.
-- Impact: `.sea` validation with the stale CLI may reject or accept different grammar.
-- Next: install/pin 0.21.1 for T01 validation (OQ-03).
+- Evidence (T01): built pinned `0.21.1` from `~/projects/domainforge` HEAD `6e941ff` at
+  `~/projects/domainforge/target/release/domainforge`; all T01 validation used it via
+  `DOMAINFORGE_BIN`. The PATH CLI is still `0.19.0`.
+- Impact: remaining risk is operators/CI invoking the stale PATH CLI. Pin the release binary
+  in T04 toolchain wiring.
+- Next: T04 binds the pinned binary into `justfile` gates; operator may still install 0.21.1 (OQ-03).
+
+## D-010 Bundled domainforge-sea skill predates the 0.21 Application Contract
+- Evidence (T01): `.agents/skills/domainforge-sea/references/sea-dsl-ai-cheatsheet.yaml:4`
+  says it was re-verified against 0.17.0; the pinned 0.21.1 adds typed entity bodies,
+  `record`, `enum`, `operation` and APP001–APP015. T01 authored against the real grammar
+  (`domainforge-core/grammar/sea.pest`, `docs/reference/sea-application-contract.md`).
+- Impact: recurring — any agent trusting the cheatsheet's syntax/CLI sections will author
+  stale `.sea`. Local T01 syntax guesses were corrected by live validation.
+- Next: regenerate the skill references from the pinned DomainForge source in T04.
 
 ## D-008 RealityTrace sxr CLI absent from PATH
 - Evidence (T00): `command -v sxr` empty.
