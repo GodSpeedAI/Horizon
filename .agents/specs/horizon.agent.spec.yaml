@@ -353,11 +353,11 @@ core_domain_model:
       purpose: Identifies the observer-relative operating present.
       used_by: [navigation controller, renderers, replay]
       required_fields:
-        - { name: id, type: opaque-id, meaning: Stable navigation session identity }
-        - { name: observer_ref, type: scoped-ref, meaning: Authenticated human or agent identity }
-        - { name: world_ref, type: DomainForge-world-ref, meaning: Immutable semantic revision }
-        - { name: checkpoint_ref, type: opaque-ref-or-unknown, meaning: Operational snapshot identity distinct from semantic revision }
-        - { name: focus_ref, type: typed-ref, meaning: Current object, object set, resource or case focus }
+        - { name: "id", type: "opaque-id", meaning: "Stable navigation session identity" }
+        - { name: "observer_ref", type: "scoped-ref", meaning: "Authenticated human or agent identity" }
+        - { name: "world_ref", type: "DomainForge-world-ref", meaning: "Immutable semantic revision" }
+        - { name: "checkpoint_ref", type: "opaque-ref-or-unknown", meaning: "Operational snapshot identity distinct from semantic revision" }
+        - { name: "focus_ref", type: "typed-ref", meaning: "Current object, object set, resource or case focus" }
       optional_fields: [workspace_ref, case_ref, direction_ref, presentation_prefs]
       rules:
         - No context switch may silently retarget a committed operation.
@@ -366,11 +366,11 @@ core_domain_model:
       purpose: A reproducible question or inspectable state for one observer at one revision.
       used_by: [navigation controller, Clack, GUI, reducer]
       required_fields:
-        - { name: id, type: opaque-id, meaning: Stable frame identity }
-        - { name: revision, type: monotonic-integer, meaning: Stale-intent rejection token }
-        - { name: context_ref, type: opaque-id, meaning: Resolved NavigationContext }
-        - { name: responsibility, type: enum, meaning: orient|inspect|choose|commit|observe|review }
-        - { name: choice_refs, type: list-of-typed-refs, meaning: Zero or more derived choices }
+        - { name: "id", type: "opaque-id", meaning: "Stable frame identity" }
+        - { name: "revision", type: "monotonic-integer", meaning: "Stale-intent rejection token" }
+        - { name: "context_ref", type: "opaque-id", meaning: "Resolved NavigationContext" }
+        - { name: "responsibility", type: "enum", meaning: "orient|inspect|choose|commit|observe|review" }
+        - { name: "choice_refs", type: "list-of-typed-refs", meaning: "Zero or more derived choices" }
       optional_fields: [surface_ref, evidence_refs, error_ref]
       rules:
         - A rendered choice MUST be grounded in the same frame revision as its invocation.
@@ -379,10 +379,10 @@ core_domain_model:
       purpose: Carries typed object selections and relationship traversal without losing context.
       used_by: [world explorer, source resolvers, case navigation]
       required_fields:
-        - { name: id, type: opaque-id, meaning: Stable focus set identity }
-        - { name: object_type_ref, type: semantic-ref, meaning: DomainForge object type }
-        - { name: selector, type: validated-predicate, meaning: Source-backed filter with deterministic semantics }
-        - { name: checkpoint_ref, type: opaque-ref, meaning: Which operational state was queried }
+        - { name: "id", type: "opaque-id", meaning: "Stable focus set identity" }
+        - { name: "object_type_ref", type: "semantic-ref", meaning: "DomainForge object type" }
+        - { name: "selector", type: "validated-predicate", meaning: "Source-backed filter with deterministic semantics" }
+        - { name: "checkpoint_ref", type: "opaque-ref", meaning: "Which operational state was queried" }
       optional_fields: [parent_focus_ref, relationship_ref, page_cursor]
       rules:
         - Source changes MUST invalidate affected results explicitly.
@@ -391,10 +391,10 @@ core_domain_model:
       purpose: Distinguishes a merely represented possibility from an executable, governed present path.
       used_by: [navigation controller, action review]
       required_fields:
-        - { name: operation_ref, type: semantic-ref, meaning: Stable meaning of the proposed move }
-        - { name: status, type: enum, meaning: available|blocked|unknown|conflicted }
-        - { name: gates, type: keyed-assessments, meaning: Visibility reach payment authority execution recovery settlement access }
-        - { name: basis_refs, type: list-of-refs, meaning: Evidence or derivation supporting each gate }
+        - { name: "operation_ref", type: "semantic-ref", meaning: "Stable meaning of the proposed move" }
+        - { name: "status", type: "enum", meaning: "available|blocked|unknown|conflicted" }
+        - { name: "gates", type: "keyed-assessments", meaning: "Visibility reach payment authority execution recovery settlement access" }
+        - { name: "basis_refs", type: "list-of-refs", meaning: "Evidence or derivation supporting each gate" }
       optional_fields: [first_blocker, next_prerequisite_ref, payment_estimate, consequence_estimate]
       rules:
         - A failed or unknown hard gate MUST NOT be treated as availability.
@@ -403,12 +403,12 @@ core_domain_model:
       purpose: Durable renderer-independent user or agent choice.
       used_by: [reducer, Cognate runtime, governance boundary]
       required_fields:
-        - { name: id, type: idempotency-id, meaning: Exactly-once logical intent across retries }
-        - { name: frame_id, type: opaque-id, meaning: Originating navigation frame }
-        - { name: frame_revision, type: integer, meaning: Required optimistic concurrency check }
-        - { name: actor_ref, type: scoped-ref, meaning: Who made the choice }
-        - { name: operation_ref, type: semantic-ref, meaning: Inspect, traverse, select, defer or commit }
-        - { name: target_refs, type: list-of-refs, meaning: Explicit action subjects }
+        - { name: "id", type: "idempotency-id", meaning: "Exactly-once logical intent across retries" }
+        - { name: "frame_id", type: "opaque-id", meaning: "Originating navigation frame" }
+        - { name: "frame_revision", type: "integer", meaning: "Required optimistic concurrency check" }
+        - { name: "actor_ref", type: "scoped-ref", meaning: "Who made the choice" }
+        - { name: "operation_ref", type: "semantic-ref", meaning: "Inspect, traverse, select, defer or commit" }
+        - { name: "target_refs", type: "list-of-refs", meaning: "Explicit action subjects" }
       optional_fields: [commitment_ref, authority_ref, correlation_ref]
       rules:
         - A rendered control MUST NOT mutate the world except via a validated intent and authorized capability.
@@ -417,10 +417,10 @@ core_domain_model:
       purpose: Closed declarative presentation, never an authority or business record.
       used_by: [Clack renderer, GUI renderer, composition validator]
       required_fields:
-        - { name: id, type: opaque-id, meaning: Stable surface reference }
-        - { name: intent, type: enum, meaning: inspect|compare|decide|verify|monitor }
-        - { name: blocks, type: validated-closed-union, meaning: Composable bounded block vocabulary }
-        - { name: source_bindings, type: typed-source-expressions, meaning: Source-grounded data references }
+        - { name: "id", type: "opaque-id", meaning: "Stable surface reference" }
+        - { name: "intent", type: "enum", meaning: "inspect|compare|decide|verify|monitor" }
+        - { name: "blocks", type: "validated-closed-union", meaning: "Composable bounded block vocabulary" }
+        - { name: "source_bindings", type: "typed-source-expressions", meaning: "Source-grounded data references" }
       optional_fields: [layout_hint, focus_ref, title]
       rules:
         - No raw executable UI code or arbitrary DOM operations are allowed.
@@ -429,11 +429,11 @@ core_domain_model:
       purpose: Makes the distinction between operation, observed evidence, settlement and development inspectable.
       used_by: [navigation controller, review surface, replay]
       required_fields:
-        - { name: id, type: opaque-id, meaning: Review identity }
-        - { name: intent_ref, type: opaque-ref, meaning: Act or inquiry reviewed }
-        - { name: evidence_refs, type: list-of-refs, meaning: Observations and provenance }
-        - { name: epistemic_status, type: enum, meaning: supported|contradicted|unresolved|inconsistent }
-        - { name: disposition, type: enum, meaning: close|continue|revise|escalate|suspend|defer }
+        - { name: "id", type: "opaque-id", meaning: "Review identity" }
+        - { name: "intent_ref", type: "opaque-ref", meaning: "Act or inquiry reviewed" }
+        - { name: "evidence_refs", type: "list-of-refs", meaning: "Observations and provenance" }
+        - { name: "epistemic_status", type: "enum", meaning: "supported|contradicted|unresolved|inconsistent" }
+        - { name: "disposition", type: "enum", meaning: "close|continue|revise|escalate|suspend|defer" }
       optional_fields: [operational_settlement_ref, developmental_assessment_ref, next_affordance_refs]
       rules:
         - Operational settlement and developmental capability assessments MUST remain distinct.
@@ -447,10 +447,10 @@ core_domain_model:
 
 configuration_and_input_contract:
   configuration_sources_precedence:
-    - { order: 1, source: Authenticated request and validated explicit navigation selection }
-    - { order: 2, source: Persisted scoped workspace preferences and case binding }
-    - { order: 3, source: Deployment configuration and adapter registry }
-    - { order: 4, source: Safe documented defaults; secret references resolved out of band }
+    - { order: 1, source: "Authenticated request and validated explicit navigation selection" }
+    - { order: 2, source: "Persisted scoped workspace preferences and case binding" }
+    - { order: 3, source: "Deployment configuration and adapter registry" }
+    - { order: 4, source: "Safe documented defaults; secret references resolved out of band" }
   resolution_rules:
     - id: REQ-CONFIG-001
       text: Observer identity and service authority MUST come from an authenticated trusted boundary, never from presentation metadata.
@@ -461,18 +461,18 @@ configuration_and_input_contract:
     - id: REQ-CONFIG-004
       text: Configured provider endpoints, credentials, timeouts and scope MUST remain below stable behavior contracts.
   required_config_fields:
-    - { field: world_source, type: typed-adapter-binding, required: true, default: null, validation: Must resolve a canonical DomainForge world }
-    - { field: runtime_source, type: typed-adapter-binding, required: true, default: null, validation: Must bind scoped Cognate runtime/projections }
-    - { field: authority_source, type: typed-adapter-binding, required: false, default: null, validation: Required before consequential world-directed operation }
-    - { field: evidence_source, type: typed-adapter-binding, required: false, default: null, validation: Required when declared settlement requires independent observations }
+    - { field: "world_source", type: "typed-adapter-binding", required: true, default: null, validation: "Must resolve a canonical DomainForge world" }
+    - { field: "runtime_source", type: "typed-adapter-binding", required: true, default: null, validation: "Must bind scoped Cognate runtime/projections" }
+    - { field: "authority_source", type: "typed-adapter-binding", required: false, default: null, validation: "Required before consequential world-directed operation" }
+    - { field: "evidence_source", type: "typed-adapter-binding", required: false, default: null, validation: "Required when declared settlement requires independent observations" }
   error_classes:
-    - { code: semantic_world_unavailable, blast_radius: Semantic discovery and affected navigation }
-    - { code: stale_frame, blast_radius: Originating intent only }
-    - { code: source_unavailable, blast_radius: Dependent read and payment/settlement gate }
-    - { code: input_schema_invalid, blast_radius: Submitted surface or intent only }
-    - { code: authority_unavailable, blast_radius: Consequential commitment only }
-    - { code: evidence_unresolved, blast_radius: Settlement assertion only }
-    - { code: execution_uncertain, blast_radius: Retry and affected operation until reconciled }
+    - { code: "semantic_world_unavailable", blast_radius: "Semantic discovery and affected navigation" }
+    - { code: "stale_frame", blast_radius: "Originating intent only" }
+    - { code: "source_unavailable", blast_radius: "Dependent read and payment/settlement gate" }
+    - { code: "input_schema_invalid", blast_radius: "Submitted surface or intent only" }
+    - { code: "authority_unavailable", blast_radius: "Consequential commitment only" }
+    - { code: "evidence_unresolved", blast_radius: "Settlement assertion only" }
+    - { code: "execution_uncertain", blast_radius: "Retry and affected operation until reconciled" }
   error_surface_requirements:
     - Errors MUST carry stable code, bounded message, and recovery hint where known.
     - Errors MUST NOT disclose secrets or pretend stale data is current.
@@ -495,8 +495,8 @@ configuration_and_input_contract:
     type: NavigationIntent or authenticated entry request
     source: Human or agent through Clack, GUI, CLI or machine adapter
     required_fields:
-      - { name: observer_scope, type: authenticated-scope, validation: Derived from trusted session }
-      - { name: operation, type: typed-semantic-intent, validation: Must be a declared, currently applicable action }
+      - { name: "observer_scope", type: "authenticated-scope", validation: "Derived from trusted session" }
+      - { name: "operation", type: "typed-semantic-intent", validation: "Must be a declared, currently applicable action" }
     optional_fields: [world_ref, focus_ref, case_ref, direction_ref, checkpoint_ref]
     invalid_input_behavior:
       missing_required: Return typed unresolved-context error; ask only discriminating questions.
@@ -539,28 +539,28 @@ operational_flow_and_state_model:
   service_states:
     stateful_object: Navigation episode; mode selection is a derived presentation state, not the authoritative lifecycle.
     states:
-      - { name: contextualized, meaning: Observer and world pinned, entry_trigger: Entry or resume, exit_trigger: Focus/inquiry choice }
-      - { name: exploring, meaning: Read-only search/traversal/inspection, entry_trigger: Source-backed focus selection, exit_trigger: New focus, deferral or intent }
-      - { name: deciding, meaning: Choice and hard gates presented, entry_trigger: Candidate assessment, exit_trigger: Inquiry, commitment, block or defer }
-      - { name: awaiting_authority, meaning: Frozen consequential intent awaits independent decision, entry_trigger: Commit request, exit_trigger: Allow/deny/escalate }
-      - { name: executing, meaning: Governed work in flight, entry_trigger: Actual invocation allow, exit_trigger: Result, cancel or failure }
-      - { name: reviewing, meaning: Observations evaluated against frozen criteria, entry_trigger: Evidence/status received, exit_trigger: Decision/disposition }
-      - { name: suspended, meaning: Missing dependency, approval or recovery decision, entry_trigger: Unsatisfied hard gate or uncertain effect, exit_trigger: Explicit remediation and revalidation }
+      - { name: "contextualized", meaning: "Observer and world pinned", entry_trigger: "Entry or resume", exit_trigger: "Focus/inquiry choice" }
+      - { name: "exploring", meaning: "Read-only search/traversal/inspection", entry_trigger: "Source-backed focus selection", exit_trigger: "New focus, deferral or intent" }
+      - { name: "deciding", meaning: "Choice and hard gates presented", entry_trigger: "Candidate assessment", exit_trigger: "Inquiry, commitment, block or defer" }
+      - { name: "awaiting_authority", meaning: "Frozen consequential intent awaits independent decision", entry_trigger: "Commit request", exit_trigger: "Allow/deny/escalate" }
+      - { name: "executing", meaning: "Governed work in flight", entry_trigger: "Actual invocation allow", exit_trigger: "Result, cancel or failure" }
+      - { name: "reviewing", meaning: "Observations evaluated against frozen criteria", entry_trigger: "Evidence/status received", exit_trigger: "Decision/disposition" }
+      - { name: "suspended", meaning: "Missing dependency, approval or recovery decision", entry_trigger: "Unsatisfied hard gate or uncertain effect", exit_trigger: "Explicit remediation and revalidation" }
   transition_rules:
-    - { from: exploring, to: deciding, when: Contextual operation is evaluated }
-    - { from: deciding, to: awaiting_authority, when: Valid world-directed intent is durably frozen }
-    - { from: awaiting_authority, to: executing, when: SEA-Forge invocation allows the exact scoped operation }
-    - { from: awaiting_authority, to: suspended, when: Decision denies, escalates or is unavailable }
-    - { from: executing, to: reviewing, when: Execution result and observation status are recorded }
-    - { from: reviewing, to: exploring, when: Case status and next-affordance interpretation are recorded }
-    - { from: suspended, to: deciding, when: Blocker resolution is evidenced and fresh gates are evaluated }
+    - { from: "exploring", to: "deciding", when: "Contextual operation is evaluated" }
+    - { from: "deciding", to: "awaiting_authority", when: "Valid world-directed intent is durably frozen" }
+    - { from: "awaiting_authority", to: "executing", when: "SEA-Forge invocation allows the exact scoped operation" }
+    - { from: "awaiting_authority", to: "suspended", when: "Decision denies, escalates or is unavailable" }
+    - { from: "executing", to: "reviewing", when: "Execution result and observation status are recorded" }
+    - { from: "reviewing", to: "exploring", when: "Case status and next-affordance interpretation are recorded" }
+    - { from: "suspended", to: "deciding", when: "Blocker resolution is evidenced and fresh gates are evaluated" }
   transition_triggers:
-    - { name: focus.selected, behavior: Update typed selection and refresh scoped projections }
-    - { name: relation.traversed, behavior: Derive a new focus from canonical link semantics }
-    - { name: intent.deferred, behavior: Preserve case and chosen deferral without world mutation }
-    - { name: commitment.requested, behavior: Freeze expectation and request invocation authorization }
-    - { name: evidence.recorded, behavior: Correlate observation without granting settlement }
-    - { name: disposition.recorded, behavior: Preserve reviewed status and reveal revised next affordances }
+    - { name: "focus.selected", behavior: "Update typed selection and refresh scoped projections" }
+    - { name: "relation.traversed", behavior: "Derive a new focus from canonical link semantics" }
+    - { name: "intent.deferred", behavior: "Preserve case and chosen deferral without world mutation" }
+    - { name: "commitment.requested", behavior: "Freeze expectation and request invocation authorization" }
+    - { name: "evidence.recorded", behavior: "Correlate observation without granting settlement" }
+    - { name: "disposition.recorded", behavior: "Preserve reviewed status and reveal revised next affordances" }
   idempotency_rule: >-
     Reprocessing the same action ID MUST return the same logical result or an
     explicit uncertain state. It MUST NOT issue a second external commitment
@@ -574,46 +574,46 @@ operational_flow_and_state_model:
 
 core_behavior_requirements:
   world_navigation:
-    - { id: REQ-WORLD-001, text: Horizon MUST search semantic types, live objects, resources and apps without treating them as one undifferentiated graph. }
-    - { id: REQ-WORLD-002, text: Horizon MUST filter typed operational sets and traverse declared relationships at a known checkpoint. }
-    - { id: REQ-WORLD-003, text: Horizon MUST preserve focus, object-set selection, observer and world across surfaces and journeys. }
-    - { id: REQ-WORLD-004, text: Historical, current and candidate worlds MUST be visibly distinguished with immutable references. }
-    - { id: REQ-WORLD-005, text: The import graph, operational relation graph, and data lineage MUST retain distinct identities and semantics. }
+    - { id: "REQ-WORLD-001", text: "Horizon MUST search semantic types, live objects, resources and apps without treating them as one undifferentiated graph." }
+    - { id: "REQ-WORLD-002", text: "Horizon MUST filter typed operational sets and traverse declared relationships at a known checkpoint." }
+    - { id: "REQ-WORLD-003", text: "Horizon MUST preserve focus, object-set selection, observer and world across surfaces and journeys." }
+    - { id: "REQ-WORLD-004", text: "Historical, current and candidate worlds MUST be visibly distinguished with immutable references." }
+    - { id: "REQ-WORLD-005", text: "The import graph, operational relation graph, and data lineage MUST retain distinct identities and semantics." }
   navigation_and_affordances:
-    - { id: REQ-NAV-001, text: Horizon MUST distinguish possible, available, blocked, unknown and conflicted paths before ranking. }
-    - { id: REQ-NAV-002, text: Affordance gates MUST cover visibility, reach, payment, governance, capability, recovery and settlement access. }
-    - { id: REQ-NAV-003, text: Only eligible paths MAY be recommended as spendable; blocked paths MUST expose material reasons and reachable prerequisites where known. }
-    - { id: REQ-NAV-004, text: The observer MUST retain discretion to inspect alternatives, defer, reframe or disagree with the representation. }
-    - { id: REQ-NAV-005, text: The navigation controller MUST avoid asking for context it can resolve without user burden. }
+    - { id: "REQ-NAV-001", text: "Horizon MUST distinguish possible, available, blocked, unknown and conflicted paths before ranking." }
+    - { id: "REQ-NAV-002", text: "Affordance gates MUST cover visibility, reach, payment, governance, capability, recovery and settlement access." }
+    - { id: "REQ-NAV-003", text: "Only eligible paths MAY be recommended as spendable; blocked paths MUST expose material reasons and reachable prerequisites where known." }
+    - { id: "REQ-NAV-004", text: "The observer MUST retain discretion to inspect alternatives, defer, reframe or disagree with the representation." }
+    - { id: "REQ-NAV-005", text: "The navigation controller MUST avoid asking for context it can resolve without user burden." }
   presentation_and_atomic_ui:
-    - { id: REQ-UI-001, text: A closed versioned declarative surface schema MUST separate agents from executable UI code. }
-    - { id: REQ-UI-002, text: Schema validation MUST reject unknown blocks, unauthorized actions, invalid refs and unsafe source expressions. }
-    - { id: REQ-UI-003, text: Deterministic source-binding and pure composition/reducer behavior MUST define displayed facts and resulting intents. }
-    - { id: REQ-UI-004, text: Clack and GUI MUST consume the same behavioral contract and produce equivalent typed intents for equivalent frames. }
-    - { id: REQ-UI-005, text: Atomic UI MUST derive elements, groups, regions and views from proved behavioral necessities, preserving accessible loading, empty, blocked and recovery states. }
-    - { id: REQ-UI-006, text: Agent-composed content MUST NOT reorder owner-pinned surfaces or seize presentation control; owner choices govern layout. }
-    - { id: REQ-UI-007, text: The source of every substantive value MUST be inspectable, and agent-supplied values MUST be visibly marked as such. }
-    - { id: REQ-UI-008, text: Contextual MCP, WebMCP and CLI tools MUST share the same validation and role boundaries; tool discovery MUST NOT imply authorization. }
+    - { id: "REQ-UI-001", text: "A closed versioned declarative surface schema MUST separate agents from executable UI code." }
+    - { id: "REQ-UI-002", text: "Schema validation MUST reject unknown blocks, unauthorized actions, invalid refs and unsafe source expressions." }
+    - { id: "REQ-UI-003", text: "Deterministic source-binding and pure composition/reducer behavior MUST define displayed facts and resulting intents." }
+    - { id: "REQ-UI-004", text: "Clack and GUI MUST consume the same behavioral contract and produce equivalent typed intents for equivalent frames." }
+    - { id: "REQ-UI-005", text: "Atomic UI MUST derive elements, groups, regions and views from proved behavioral necessities, preserving accessible loading, empty, blocked and recovery states." }
+    - { id: "REQ-UI-006", text: "Agent-composed content MUST NOT reorder owner-pinned surfaces or seize presentation control; owner choices govern layout." }
+    - { id: "REQ-UI-007", text: "The source of every substantive value MUST be inspectable, and agent-supplied values MUST be visibly marked as such." }
+    - { id: "REQ-UI-008", text: "Contextual MCP, WebMCP and CLI tools MUST share the same validation and role boundaries; tool discovery MUST NOT imply authorization." }
   interactions:
-    - { id: REQ-INT-001, text: Every canonical journey MUST project the IS1–IS8 Behavioral IR responsibilities and identify unresolved bindings explicitly. }
-    - { id: REQ-INT-002, text: The GUI MUST preserve persistent case/world/focus context while Clack presents one next meaningful decision at a time. }
-    - { id: REQ-INT-003, text: Actions MUST use stable semantic IDs, frame revision checks and idempotency keys. }
-    - { id: REQ-INT-004, text: An answer, choice or confirmation MUST NOT be misrepresented as independent approval or a world mutation. }
+    - { id: "REQ-INT-001", text: "Every canonical journey MUST project the IS1–IS8 Behavioral IR responsibilities and identify unresolved bindings explicitly." }
+    - { id: "REQ-INT-002", text: "The GUI MUST preserve persistent case/world/focus context while Clack presents one next meaningful decision at a time." }
+    - { id: "REQ-INT-003", text: "Actions MUST use stable semantic IDs, frame revision checks and idempotency keys." }
+    - { id: "REQ-INT-004", text: "An answer, choice or confirmation MUST NOT be misrepresented as independent approval or a world mutation." }
   integration:
-    - { id: REQ-STACK-001, text: DomainForge alone MUST own canonical semantic compilation and world_ref identity. }
-    - { id: REQ-STACK-002, text: Cognate MUST own app events/capability invocation/projection state; adapters MUST not create a second authoritative event history. }
-    - { id: REQ-STACK-003, text: SEA-Forge MUST authorize each consequential invocation; preflight MUST NOT substitute for invocation authorization. }
-    - { id: REQ-STACK-004, text: Gauntlet MUST be used only for tasks that require bounded long-horizon work and MUST freeze and preserve its Reference. }
-    - { id: REQ-STACK-005, text: Context Kernel results MUST remain scoped/cited and MUST NOT be interpreted as canonical organizational truth. }
-    - { id: REQ-STACK-006, text: RealityTrace delivery receipts MUST NOT be treated as evidence derivation or settlement. }
-    - { id: REQ-STACK-007, text: Operational obligation settlement and GodSpeed developmental interpretation MUST be separately referenced. }
-    - { id: REQ-STACK-008, text: Every cross-system episode MUST preserve correlation through observer/world/case/intent/authority/execution/evidence/settlement refs. }
+    - { id: "REQ-STACK-001", text: "DomainForge alone MUST own canonical semantic compilation and world_ref identity." }
+    - { id: "REQ-STACK-002", text: "Cognate MUST own app events/capability invocation/projection state; adapters MUST not create a second authoritative event history." }
+    - { id: "REQ-STACK-003", text: "SEA-Forge MUST authorize each consequential invocation; preflight MUST NOT substitute for invocation authorization." }
+    - { id: "REQ-STACK-004", text: "Gauntlet MUST be used only for tasks that require bounded long-horizon work and MUST freeze and preserve its Reference." }
+    - { id: "REQ-STACK-005", text: "Context Kernel results MUST remain scoped/cited and MUST NOT be interpreted as canonical organizational truth." }
+    - { id: "REQ-STACK-006", text: "RealityTrace delivery receipts MUST NOT be treated as evidence derivation or settlement." }
+    - { id: "REQ-STACK-007", text: "Operational obligation settlement and GodSpeed developmental interpretation MUST be separately referenced." }
+    - { id: "REQ-STACK-008", text: "Every cross-system episode MUST preserve correlation through observer/world/case/intent/authority/execution/evidence/settlement refs." }
   case_and_development:
-    - { id: REQ-CASE-001, text: A Case MUST remain a purpose-relative derived view anchored in authoritative facts and declared direction, not a competing ontology. }
-    - { id: REQ-CASE-002, text: The next primary move MUST respond to material deviation; no primary recommendation is required when only optional choices remain. }
-    - { id: REQ-CASE-003, text: Settlement reachable and should settle now MUST be separate; the latter requires an authorized judgment. }
-    - { id: REQ-DEV-001, text: Failure, contradictions, recovery, payment and orchestration burden MUST remain available to developmental evaluation. }
-    - { id: REQ-DEV-002, text: Durable capability MUST NOT be claimed without repeated settlement under variation and transfer/recovery evidence. }
+    - { id: "REQ-CASE-001", text: "A Case MUST remain a purpose-relative derived view anchored in authoritative facts and declared direction, not a competing ontology." }
+    - { id: "REQ-CASE-002", text: "The next primary move MUST respond to material deviation; no primary recommendation is required when only optional choices remain." }
+    - { id: "REQ-CASE-003", text: "Settlement reachable and should settle now MUST be separate; the latter requires an authorized judgment." }
+    - { id: "REQ-DEV-001", text: "Failure, contradictions, recovery, payment and orchestration burden MUST remain available to developmental evaluation." }
+    - { id: "REQ-DEV-002", text: "Durable capability MUST NOT be claimed without repeated settlement under variation and transfer/recovery evidence." }
   completion_rules:
     may_claim_completion_only_when:
       - All required journeys and authority boundaries have live proof or are explicitly declared incomplete.
@@ -941,11 +941,11 @@ proof_and_observability:
     - intent_id and correlation_id
     - authority_ref, execution_ref and evidence_refs when applicable
   required_metrics:
-    - { name: unnecessary_prompt_burden, reason: Distinguish useful discrimination from repeated questioning }
-    - { name: renderer_intent_equivalence_rate, reason: Verify Clack and GUI preserve the behavioral contract }
-    - { name: gate_false_allow_count, reason: Safety-critical false affordability and authority signal }
-    - { name: settled_vs_acknowledged_claims, reason: Detect premature success and false developmental promotion }
-    - { name: recovery_success_and_cost, reason: Evaluate sustainable capability under variation }
+    - { name: "unnecessary_prompt_burden", reason: "Distinguish useful discrimination from repeated questioning" }
+    - { name: "renderer_intent_equivalence_rate", reason: "Verify Clack and GUI preserve the behavioral contract" }
+    - { name: "gate_false_allow_count", reason: "Safety-critical false affordability and authority signal" }
+    - { name: "settled_vs_acknowledged_claims", reason: "Detect premature success and false developmental promotion" }
+    - { name: "recovery_success_and_cost", reason: "Evaluate sustainable capability under variation" }
   required_events:
     - navigation.focus_changed
     - navigation.intent_proposed
@@ -959,17 +959,17 @@ proof_and_observability:
 
 repeatability_and_variation:
   required_variations:
-    - { id: VAR-001, case: Same object set under two observer scopes, expected: Authorized object visibility and actions differ without cross-scope leakage }
-    - { id: VAR-002, case: Same journey via Clack and GUI, expected: Same state transitions, typed intents and authority semantics }
-    - { id: VAR-003, case: New DomainForge world revision during an existing navigation episode, expected: Existing pins remain stable and migration is explicit }
-    - { id: VAR-004, case: One materialized world with multiple object types and two links, expected: Filter and traversal match reference queries at checkpoint }
-    - { id: VAR-005, case: One successful, one failed and one contradictory execution, expected: Different status/evidence and next-affordance records }
-    - { id: VAR-006, case: Repeated attempt with new cases, providers and failure conditions, expected: Learning/capability claims do not exceed measured transfer/recovery }
+    - { id: "VAR-001", case: "Same object set under two observer scopes", expected: "Authorized object visibility and actions differ without cross-scope leakage" }
+    - { id: "VAR-002", case: "Same journey via Clack and GUI", expected: "Same state transitions, typed intents and authority semantics" }
+    - { id: "VAR-003", case: "New DomainForge world revision during an existing navigation episode", expected: "Existing pins remain stable and migration is explicit" }
+    - { id: "VAR-004", case: "One materialized world with multiple object types and two links", expected: "Filter and traversal match reference queries at checkpoint" }
+    - { id: "VAR-005", case: "One successful, one failed and one contradictory execution", expected: "Different status/evidence and next-affordance records" }
+    - { id: "VAR-006", case: "Repeated attempt with new cases, providers and failure conditions", expected: "Learning/capability claims do not exceed measured transfer/recovery" }
   required_recovery_cases:
-    - { id: RECOV-001, case: Terminal or browser closes between decision and resume, expected: Replay restores focus, revision and pending approval safely }
-    - { id: RECOV-002, case: SEA-Forge unavailable or approval unknown, expected: No consequential invocation; scoped blocker persists }
-    - { id: RECOV-003, case: External acknowledgment lost during commit, expected: Uncertain state and idempotent reconciliation without duplicate side effect }
-    - { id: RECOV-004, case: Evidence sink unavailable after event commit, expected: Durable outbox/reconciliation; no fabricated settlement }
+    - { id: "RECOV-001", case: "Terminal or browser closes between decision and resume", expected: "Replay restores focus, revision and pending approval safely" }
+    - { id: "RECOV-002", case: "SEA-Forge unavailable or approval unknown", expected: "No consequential invocation; scoped blocker persists" }
+    - { id: "RECOV-003", case: "External acknowledgment lost during commit", expected: "Uncertain state and idempotent reconciliation without duplicate side effect" }
+    - { id: "RECOV-004", case: "Evidence sink unavailable after event commit", expected: "Durable outbox/reconciliation; no fabricated settlement" }
   capability_claim_rule: >-
     Capability is unverified until required variations and recovery cases pass in
     target environments and varied settled episodes justify transfer and recovery.
@@ -992,22 +992,22 @@ failure_model_and_recovery:
       symptoms: [Clack and GUI render different action sets, stale frame submits, generated code in a surface]
       required_behavior: Reject and report schema/semantic mismatch without privileged effects.
   safe_failure_requirements:
-    - { id: REQ-SAFE-001, text: Horizon MUST fail closed on unknown runtime authorization, unsafe world revision or unreconciled duplicate commit. }
-    - { id: REQ-SAFE-002, text: Horizon MUST preserve immutable expectation, evidence and error history during recovery and reframing. }
-    - { id: REQ-SAFE-003, text: Horizon MUST distinguish source unavailable, access denied, empty result and no matching object. }
-    - { id: REQ-SAFE-004, text: Horizon MUST permit valid read-only navigation and diagnostics when an unrelated executor is unavailable. }
-    - { id: REQ-SAFE-005, text: Horizon MUST prevent a candidate, historical view or simulated outcome being presented as current observed fact. }
+    - { id: "REQ-SAFE-001", text: "Horizon MUST fail closed on unknown runtime authorization, unsafe world revision or unreconciled duplicate commit." }
+    - { id: "REQ-SAFE-002", text: "Horizon MUST preserve immutable expectation, evidence and error history during recovery and reframing." }
+    - { id: "REQ-SAFE-003", text: "Horizon MUST distinguish source unavailable, access denied, empty result and no matching object." }
+    - { id: "REQ-SAFE-004", text: "Horizon MUST permit valid read-only navigation and diagnostics when an unrelated executor is unavailable." }
+    - { id: "REQ-SAFE-005", text: "Horizon MUST prevent a candidate, historical view or simulated outcome being presented as current observed fact." }
   unsafe_behaviors:
     - UI confirmation, agent proposal or simulated scenario authorizes a real side effect.
     - A failed check is replaced by a model explanation of why work probably succeeded.
     - A running Gauntlet task changes its frozen Reference or active DomainForge world in place.
   recoverable_failures:
-    - { failure: Source query temporarily unavailable, recovery: Restore read-only saved view with clear checkpoint and retry safely }
-    - { failure: Stale navigation frame, recovery: Refresh frame and request explicit re-selection if relevant choices changed }
-    - { failure: RealityTrace delivery delayed, recovery: Reconcile durable intent/outbox and retain evidence unknown }
+    - { failure: "Source query temporarily unavailable", recovery: "Restore read-only saved view with clear checkpoint and retry safely" }
+    - { failure: "Stale navigation frame", recovery: "Refresh frame and request explicit re-selection if relevant choices changed" }
+    - { failure: "RealityTrace delivery delayed", recovery: "Reconcile durable intent/outbox and retain evidence unknown" }
   nonrecoverable_or_operator_required:
-    - { failure: Irreversible operation prohibited or recovery capacity below hard floor, behavior: Stop or escalate; no local override }
-    - { failure: Conflicting or unresolvable authority decision, behavior: Suspend affected action and route to authorized resolution }
+    - { failure: "Irreversible operation prohibited or recovery capacity below hard floor", behavior: "Stop or escalate; no local override" }
+    - { failure: "Conflicting or unresolvable authority decision", behavior: "Suspend affected action and route to authorized resolution" }
 
 security_safety_trust_boundaries:
   trusted_inputs:
@@ -1022,11 +1022,11 @@ security_safety_trust_boundaries:
     - External resource mutation and semantic world promotion.
     - Human approval, production changes, credential access and Gauntlet task delegation.
   mandatory_requirements:
-    - { id: REQ-SEC-001, text: Renderer and model-proposed actions MUST NOT bypass Cognate capability and SEA-Forge invocation checks. }
-    - { id: REQ-SEC-002, text: Agent, human and system presentation roles MUST remain separated in transport and reducer enforcement. }
-    - { id: REQ-SEC-003, text: All untrusted source and UI strings MUST be schema-validated, scoped, and escaped; no arbitrary executable markup may be submitted. }
-    - { id: REQ-SEC-004, text: Multi-user or remote deployments MUST NOT reuse Product Actualizer loopback-token trust assumptions unchanged. }
-    - { id: REQ-SEC-005, text: Credential and private reference material MUST never be exposed through shared UI context, logs or evidence. }
+    - { id: "REQ-SEC-001", text: "Renderer and model-proposed actions MUST NOT bypass Cognate capability and SEA-Forge invocation checks." }
+    - { id: "REQ-SEC-002", text: "Agent, human and system presentation roles MUST remain separated in transport and reducer enforcement." }
+    - { id: "REQ-SEC-003", text: "All untrusted source and UI strings MUST be schema-validated, scoped, and escaped; no arbitrary executable markup may be submitted." }
+    - { id: "REQ-SEC-004", text: "Multi-user or remote deployments MUST NOT reuse Product Actualizer loopback-token trust assumptions unchanged." }
+    - { id: "REQ-SEC-005", text: "Credential and private reference material MUST never be exposed through shared UI context, logs or evidence." }
   secret_handling:
     source: Deployment-managed secret provider, implementation-defined.
     must_not: [log secrets, persist secrets in evidence artifacts, emit secrets in error messages, expose secrets to render-only agents]
@@ -1075,19 +1075,19 @@ reference_algorithms:
 
 validation_matrix:
   core_conformance:
-    - { area: Outcome, test: Navigate source-bound operational set and produce next affordance frame, expected: Reproducible result at pinned context, evidence: J01 fixture and replay }
-    - { area: Input validation, test: Unknown block and stale frame submission, expected: Typed rejection without mutation, evidence: Closed-schema and reducer tests }
-    - { area: Config errors, test: Missing world or authority endpoint, expected: Appropriate read-only degradation and action block, evidence: Dependency failure suite }
-    - { area: Startup/preflight, test: Inaccessible semantic world or unmet payment, expected: No apparent executable affordance, evidence: Startup/affordance gate tests }
-    - { area: State transitions, test: Concurrent pending decision and active run, expected: Tested deterministic priority without hidden blocker, evidence: Selector matrix }
-    - { area: Failure handling, test: Lost acknowledgment and duplicate retry, expected: At most one external effect or explicit uncertain state, evidence: Fault injection and integration trace }
-    - { area: Observability, test: Reconstruct full context and evidence after restart, expected: Stable correlations and history, evidence: Resume/replay artifacts }
-    - { area: Security/safety, test: Agent attempts owner approval and direct external mutation, expected: Denied by trusted boundary, evidence: Adversarial role tests }
-    - { area: Renderer equivalence, test: Execute same golden journey through Clack and GUI, expected: Same typed intents and transitions, evidence: Dual renderer golden test }
+    - { area: "Outcome", test: "Navigate source-bound operational set and produce next affordance frame", expected: "Reproducible result at pinned context", evidence: "J01 fixture and replay" }
+    - { area: "Input validation", test: "Unknown block and stale frame submission", expected: "Typed rejection without mutation", evidence: "Closed-schema and reducer tests" }
+    - { area: "Config errors", test: "Missing world or authority endpoint", expected: "Appropriate read-only degradation and action block", evidence: "Dependency failure suite" }
+    - { area: "Startup/preflight", test: "Inaccessible semantic world or unmet payment", expected: "No apparent executable affordance", evidence: "Startup/affordance gate tests" }
+    - { area: "State transitions", test: "Concurrent pending decision and active run", expected: "Tested deterministic priority without hidden blocker", evidence: "Selector matrix" }
+    - { area: "Failure handling", test: "Lost acknowledgment and duplicate retry", expected: "At most one external effect or explicit uncertain state", evidence: "Fault injection and integration trace" }
+    - { area: "Observability", test: "Reconstruct full context and evidence after restart", expected: "Stable correlations and history", evidence: "Resume/replay artifacts" }
+    - { area: "Security/safety", test: "Agent attempts owner approval and direct external mutation", expected: "Denied by trusted boundary", evidence: "Adversarial role tests" }
+    - { area: "Renderer equivalence", test: "Execute same golden journey through Clack and GUI", expected: "Same typed intents and transitions", evidence: "Dual renderer golden test" }
   variation_and_recovery:
-    - { case: Different observer authority scopes, why: Detect permission leaks, expected: Different valid objects/actions without leaking denied data, evidence: VAR-001 }
-    - { case: Evidence sink down during successful external action, why: Prevent premature settlement, expected: Unknown result with durable outbox, evidence: RECOV-004 }
-    - { case: Semantics revision while execution in flight, why: Prevent moving acceptance criteria, expected: Old pin retained; candidate change separately reviewed, evidence: VAR-003 }
+    - { case: "Different observer authority scopes", why: "Detect permission leaks", expected: "Different valid objects/actions without leaking denied data", evidence: "VAR-001" }
+    - { case: "Evidence sink down during successful external action", why: "Prevent premature settlement", expected: "Unknown result with durable outbox", evidence: "RECOV-004" }
+    - { case: "Semantics revision while execution in flight", why: "Prevent moving acceptance criteria", expected: "Old pin retained; candidate change separately reviewed", evidence: "VAR-003" }
   real_integration_condition: >-
     Full conformance requires real target deployment with a published DomainForge
     binding, actual Cognate durable storage, SEA-Forge authority, an authorized
