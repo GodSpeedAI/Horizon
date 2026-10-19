@@ -10,7 +10,7 @@ This document is the **cold-agent router**, not a second specification, implemen
 - **Execution route:** [`.agents/plans/horizon.plan.yaml`](.agents/plans/horizon.plan.yaml) (`HORIZON-PLAN-001`). Use its DAG, preregistrations, task gates, evidence and falsifiers—not a linear to-do list.
 - **Mutable execution state:** `.agents/CURRENT_STATUS.jsonl` and its `.agents/CURRENT_STATUS.md` mirror. Follow [`.agents/AGENTS.md`](.agents/AGENTS.md) for exact append/update semantics.
 - **FIRST REQUIRED SKILL:** read **`~/projects/project-topology-architect/skills/project-topology-architect/SKILL.md`** from the executing machine, then its Greenfield Formation references. T00 begins here, *before* repo scaffolding, code, UI or agent implementation. This owner-designated location is authoritative for skill loading. If unavailable, report the blocker; don't quietly substitute an older vendored copy.
-- The normative spec may still be `draft`. T00 may inventory and identify an approval/freeze gap, but **T01 and implementation tasks MUST NOT proceed** until source approval, SHA-256 binding, and any revision are recorded. Plan `ready` does not override a draft spec.
+- The normative spec is **approved and frozen at 1.0.0** (owner, 2026-10-19). T00 MUST verify its SHA-256 matches `.agents/plans/horizon.plan.yaml` `source.spec.sha256`; on mismatch, **T01 and implementation tasks MUST NOT proceed**. Never edit a frozen spec in place: propose a new version for owner approval and rebind the plan.
 
 ## 2. Repository and workspace map
 
@@ -21,14 +21,17 @@ Horizon is a separate application repository in the shared GodSpeed stack worksp
 - `.agents/skills/`: Horizon's bundled interaction, behavioral, atomic UI, DomainForge and review skills.
 - **Cognate:** often `../cognate`; owns application runtime, events, projections, continuations and capability bindings.
 - **Product Actualizer:** `SPRIME01/Product-Actualizer`, especially `cockpit/`, `docs/workbench.md`, `docs/case-navigation.md`, `docs/world-debugger.md` and `tests/cockpit/grammar.test.ts`. Donor, not application runtime authority.
-- **godspeed_agent**, DomainForge, SEA-Forge, Gauntlet, RealityTrace/SXR, Context Kernel and related GodSpeed repos are subsystem donors/independent owners. Inspect source and tests before assuming the integration APIs exist.
+- Workspace directory names differ from product names: SEA-Forge is `../sea-rs`, RealityTrace is `../sxr`, Context Kernel is `../Context_Kernel`, GodSpeed Agent is `../godspeed_agent`. The spec's `sources.existing_implementation.repositories` is the authoritative map.
+- Local sibling checkouts may lag their remotes (Cognate and DomainForge did at spec 0.2.0). Pin published releases; never fetch or switch branches in a sibling without the operator.
+- **godspeed_agent** is Horizon's predecessor: its developmental rules and Python ML research infrastructure move into Horizon (T17, T21). DomainForge, SEA-Forge, Gauntlet, RealityTrace and Context Kernel are independent owners. Inspect source and tests before assuming the integration APIs exist.
+- Product dispositions (supersede, host, join, defer) live in `.agents/reports/horizon-product-integration-register.yaml`.
 
 ## 3. Mandatory method and skills
 
 1. **Project Topology Architect** from the exact owner-provided `~/projects/project-topology-architect/skills/project-topology-architect/SKILL.md`. Use P0 → P1 → P1B → P1C → P2–P8 as applicable, frozen external contracts, executable walking skeleton, verification graph, requirement ledger, critical Wayfinder checks and independent formation criticism.
 2. **Building with Cognate**: read `../cognate/.agents/skills/building-with-cognate/SKILL.md` or the corresponding pinned source in `GodSpeedAI/Cognate` and its CLI/API/IDM mapping references. This skill is REQUIRED for Cognate application architecture and implementation.
 3. `.agents/skills/deriving-interaction-domain-models/SKILL.md` + `.agents/skills/domainforge-sea/SKILL.md` for canonical `.sea`; never invent grammar.
-4. `.agents/skills/deriving-behavioral-interaction-proofs/SKILL.md` for five Behavioral IRs and one-decision-at-a-time proof (IS1–IS8).
+4. `.agents/skills/deriving-behavioral-interaction-proofs/SKILL.md` for six Behavioral IRs and one-decision-at-a-time proof (IS1–IS8).
 5. `.agents/skills/deriving-atomic-ui-models/SKILL.md` for renderer-neutral atomic elements/groups/regions/views after proof and projection pressure.
 6. Use `neatcode` and verification skills when their documented conditions apply.
 
@@ -66,7 +69,7 @@ Scaffold Cognate using its actual `cognate create` contract. Use Product Actuali
 
 Every settlement task must name its spec IDs, positive observation, falsifier/teeth, redesign trigger, evidence path and confirmation. P2 requires adversarial evidence; P3 requires **preregistered expectations and a fresh independent/adversarial confirmation**, not self-attestation.
 
-Run the five canonical journeys (J01 Explore, J02 Operate, J03 Build, J04 Monitor, J05 Compare), at minimum across happy, blocked, unknown, denied, contradicted, duplicate, interruption and recovery states. Test Clack/GUI intent equivalence and old-world pinned execution. A skipped required integration blocks final conformance.
+Run the six canonical journeys (J01 Explore, J02 Operate, J03 Build, J04 Monitor, J05 Compare, J06 Develop), at minimum across happy, blocked, unknown, denied, contradicted, duplicate, interruption and recovery states. Test Clack/GUI intent equivalence and old-world pinned execution. A skipped required integration blocks final conformance.
 
 Use real source observations, retained trace IDs, and explicit proof levels. A mocked SEA-Forge or simulated RealityTrace result cannot establish live settlement. Preserve failed proof rounds when corrected.
 

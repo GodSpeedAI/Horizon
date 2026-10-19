@@ -1,0 +1,79 @@
+# Horizon product integration register — operational, non-normative.
+# Normative rules: spec REQ-STACK-011..013, REQ-RES-*. T00 confirms; T20 updates achieved levels.
+# disposition: stack_owner | supersede | absorb_concepts | host_surface | consume_library | join_product | defer | ignore
+# level (target): visible | queryable | actionable | evidenced  — achieved level is derived by T20, never declared here.
+schema: horizon.product_register
+version: 1
+recorded: "2026-10-19"
+basis: "Haiku recon of workspace sources, 2026-10-19; see .agents/reports/horizon-spec-adversarial-review.md"
+
+stack_owners:   # authorities Horizon integrates but never absorbs
+  - { name: DomainForge, path: domainforge, disposition: stack_owner }
+  - { name: Cognate, path: cognate, disposition: stack_owner }
+  - { name: SEA-Forge, path: sea-rs, disposition: stack_owner }
+  - { name: Gauntlet, path: gauntlet, disposition: stack_owner }
+  - { name: RealityTrace, path: sxr, disposition: stack_owner }
+  - { name: Context Kernel, path: Context_Kernel, disposition: stack_owner }
+
+predecessor:
+  - name: GodSpeed Agent
+    path: godspeed_agent
+    disposition: supersede
+    notes: "Horizon replaces it. godspeed_nav developmental rules move per REQ-DEV-003; Python ML research moves to the research subsystem (T21); cybernetic_nav tools get a mapping (REQ-RES-006)."
+
+overlapping_control_surfaces:
+  - name: godspeed-compass
+    path: godspeed-compass
+    disposition: supersede
+    notes: "Case navigation with affordance gating and SQLite authority; absorb concepts and data model into T07/T17, retire its HTML renderer. Stale since 2026-09-05."
+  - name: gs-term
+    path: gs-term
+    disposition: host_surface
+    notes: "Semantic terminal on Cognate (state→affordances→action→effects→evidence). Absorb its attention model (src/focus/attention.ts) into T22; host its PTY door as a surface rather than rebuild it."
+  - name: cognate-workbench
+    path: cognate-workbench
+    disposition: host_surface
+    notes: "Coding-agent harness with declared authority; reachable as a hosted surface for software work."
+  - name: WarpRoom (Paperclip)
+    path: WarpRoom
+    disposition: join_product
+    target_level: queryable, then actionable
+    wave: second
+    notes: >-
+      Fork of paperclipai/paperclip (about 4,800 commits) plus 3 owner Bun-migration commits;
+      no dependency on any sibling. Keep it standalone and tracking upstream; never fork its
+      core to fit Horizon (REQ-STACK-014). Join one-way through its own MCP server
+      (packages/mcp-server) and REST API: agents, issues, goals, budgets, heartbeat runs and
+      approvals become queryable objects. Actions (create or check out an issue, decide an
+      approval) are Horizon capabilities governed by SEA-Forge when Horizon initiates them;
+      WarpRoom's board approvals and budgets stay authoritative inside WarpRoom and are shown
+      as that product's own records. Heartbeat run events become evidence. Do not use it as a
+      second executor for Horizon work until Gauntlet/direct paths are proven. Retire only if
+      maintaining the Bun fork costs more than using upstream Paperclip unmodified.
+  - name: Product Actualizer
+    path: product-actualizer
+    disposition: absorb_concepts
+    notes: "Cockpit grammar donor, relicensed Apache-2.0 on 2026-10-19 (CLAIM-009). Its Product Model can later join as a product; it is never Horizon runtime truth."
+
+ui_libraries:
+  - { name: terminal-ui, path: terminal-ui, disposition: consume_library, notes: "Clack-inspired OpenTUI components for T08" }
+  - { name: SEA-Forge workbench components and tokens, path: sea-rs/workbench/packages, disposition: consume_library, notes: "Governed components for T09; tokens are dark-only, add light theme" }
+  - { name: Cognate React, path: cognate/packages/react, disposition: consume_library, notes: "GUI data layer" }
+  - { name: Cognate ui-astryx, path: cognate/packages/ui-astryx, disposition: absorb_concepts, notes: "Reference only; Astryx is beta and the shell is chat-first" }
+
+product_candidates:   # first two for VAR-007 must include one non-TypeScript product
+  - { name: GodSpeed research subsystem, path: "godspeed_agent → Horizon research subsystem", language: Python, target_level: evidenced, first_wave: true }
+  - { name: Strategist, path: Strategist, language: Rust, target_level: queryable, first_wave: true, notes: "Strategy and plan entities; local-first markdown" }
+  - { name: Weople, path: Weople, language: TypeScript, target_level: queryable, first_wave: false, notes: "People, commitments, follow-through" }
+  - { name: godspeed-growth, path: godspeed-growth, language: Markdown, target_level: visible, first_wave: false, notes: "Campaign and brand state; strategy-growth is a stale duplicate" }
+  - { name: cep, path: cep, language: Python, target_level: evidenced, first_wave: false, notes: "Canonical Evaluation Protocol capability benchmarks" }
+  - { name: SWE_SEED, path: SWE_SEED, language: Rust, target_level: evidenced, first_wave: false, notes: "Software work proof traces; godspeed_agent already reads them" }
+  - { name: zeroclaw-sea-forge, path: zeroclaw-sea-forge, language: Rust, target_level: actionable, first_wave: false, notes: "SEA-governed executor" }
+  - { name: open-design, path: open-design, language: TypeScript, target_level: actionable, first_wave: false, notes: "Design runs via MCP" }
+  - { name: home-assistant-config, path: home-assistant-config, language: YAML, target_level: actionable, first_wave: false, notes: "Physical-world sensors and actuators" }
+  - { name: edgeai, path: edgeai, language: Rust/Python, target_level: queryable, first_wave: false }
+  - { name: Context sources (graft, nexusnotes, osiris), path: "graft, nexusnotes, osiris", language: mixed, target_level: visible, first_wave: false, notes: "Prefer routing through Context Kernel adapters" }
+
+ignored: [antigravity-claude-proxy, novels, resume-tailor, youcom-ext, youcom_vscode_extension, my_LLMLingua_project, open-design-tools-recovered, strategy-growth, colab, autoresearch]
+dev_tooling_only: [NeatCode, ponytail, ast-grep-mcp-rs, gitleaks, plugin-orchestrator, skill-dev, project-template, domainforge-lsp, domainforge-vsc-extension, SEA-vsc-extension, SEA-zed-extension, tree-sitter-sea, secret-scanning-scaffold, oh-my-openagent, ideal, actual]
+unresolved_sea_family: "SEA, NewSea, XSEA and sentient-enterprise-architecture overlap with sea-rs/DomainForge; T00 records which, if any, still own live behavior."

@@ -88,6 +88,8 @@ Horizon is the **experience and navigation controller**, not a new implementatio
 | **RealityTrace / SXR** | Preserves predeclared expectations, observations, residuals, evidence and provenance |
 | **Context Kernel** | Retrieves scoped, versioned references and session context with citations; its retrieval does not become world truth |
 | **RuVector** | Accelerates derived cognitive retrieval and graph queries where proven; indexes are not authority |
+| **GodSpeed research subsystem** | The Python ML research infrastructure carried over from GodSpeed Agent: datasets, calibration, preregistered experiments and advisory estimators, reached through Cognate |
+| **Your products** | Each product joins through the product integration contract (semantic module, read connector, governed actions, evidence hooks) at an integration level Horizon derives from what is proven |
 | **Horizon** | Maintains observer-relative navigation, meaningful focus, affordance evaluation, case status, developmental interpretation and next moves |
 
 ~~~mermaid
@@ -112,6 +114,10 @@ flowchart TB
 
 The diagram describes **logical responsibilities and information paths**, not a claim that every direct endpoint or adapter already exists. Cognate can broker integrations without absorbing their authorities.
 
+### Where you start
+
+Opening Horizon lands on a home view that resumes where you left off and puts first what needs you: pending approvals, contradicted evidence, work in flight and degraded sources. A keyboard command palette reaches every object and every available move. Every focus has a stable link that reopens the same world, checkpoint and selection, and Horizon tells you when newer state exists instead of silently moving you.
+
 ### The three things Horizon will never confuse
 
 **Possibility is not an affordance.** A candidate action becomes a present affordance only when visibility, reachability, payment, execution capability, governance, recovery and settlement access satisfy the applicable gates. A blocked action stays inspectable and explains its blocker; it is not offered as an executable choice.
@@ -122,17 +128,18 @@ The diagram describes **logical responsibilities and information paths**, not a 
 
 ## The canonical navigation journeys
 
-Five foundational journeys express the platform without requiring one custom wizard or page per domain:
+Six foundational journeys express the platform without requiring one custom wizard or page per domain:
 
 1. **Enter and explore:** Resolve observer and pinned world, search resources, filter typed operational objects, traverse semantic relationships, inspect references and preserve focus.
 2. **Act under governance:** Discover a contextual operation, evaluate its spendability, freeze expectations, request SEA-Forge invocation authority, execute directly or through Gauntlet, correlate RealityTrace observations, and review consequences.
 3. **Build and revise:** Navigate data lineage and semantic dependencies, propose a candidate change, validate its DomainForge closure, execute bounded work, and explicitly govern any promotion to a new active world_ref.
 4. **Monitor and respond:** Receive a source event through Cognate, update projections, reassess relevant cases, and notify, request approval, or perform a specifically authorized idempotent response.
 5. **Compare without committing:** Pin a baseline, test stated hypothetical assumptions, inspect uncertainty, and return through real-world authority before any actual side effect.
+6. **Develop:** Review what repeated settlement has actually made reliable, run a preregistered research experiment in the GodSpeed research subsystem, and activate a predictive estimator only under governance.
 
 Each journey is derived using eight reusable responsibilities: **context selection, preflight, authority resolution, capability invocation, state/artifact effect, evidence inspection, settlement/decision, and next-affordance selection**. These are semantic responsibilities rather than eight mandatory screens.
 
-Detailed sequence diagrams, blocked branches, integration ownership and normative acceptance criteria for all five journeys are included in the [specification](.agents/specs/horizon.agent.spec.yaml) under **execution_integration_contract.journeys**.
+Detailed sequence diagrams, blocked branches, integration ownership and normative acceptance criteria for all six journeys are included in the [specification](.agents/specs/horizon.agent.spec.yaml) under **execution_integration_contract.journeys**.
 
 ## The operational world is not just one graph
 

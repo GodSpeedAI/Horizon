@@ -6,9 +6,27 @@ schema_version: "1.0"
 metadata:
   id: HORIZON-001
   title: Horizon — observer-relative operational navigation environment
-  status: draft
-  version: "0.1.0"
+  status: frozen
+  version: "1.0.0"
+  approval:
+    approved_by: owner (GodSpeed AI)
+    approved_on: "2026-10-19"
+    frozen_on: "2026-10-19"
+    freeze_rule: >-
+      This file is immutable while frozen. Any change in meaning or acceptance requires a
+      new version, explicit owner approval, a new SHA-256 and a plan rebind. The binding
+      hash is recorded in .agents/plans/horizon.plan.yaml and .agents/CURRENT_STATUS.jsonl,
+      not here, because a file cannot contain its own hash.
   created: "2026-10-19"
+  revised: "2026-10-19"
+  revision_note: >-
+    0.2.0 grounds every subsystem claim against workspace source (see
+    .agents/reports/horizon-spec-adversarial-review.md), corrects workspace paths,
+    adds the operational object layer, product integration contract, GodSpeed
+    research (Python ML) subsystem, SEA-Forge disposition mapping, deployment
+    profiles, J06 Develop journey and normative operator UX requirements.
+    1.0.0 records the Product Actualizer Apache-2.0 relicense, adds the one-way
+    dependency rule (REQ-STACK-014), and is approved and frozen by the owner.
   scope: >-
     The Horizon application contract across semantic-world exploration, purposeful
     cases, affordance-based navigation, governed action, evidence, developmental
@@ -42,14 +60,19 @@ sources:
       Donor mechanisms and existing subsystem APIs; source evidence, not authority
       to override this specification. Inspect actual revisions during planning.
     location: >-
-      ~/projects/product-actualizer/cockpit;
-      ~/projects/cognate;
-      ~/projects/domainforge;
-      ~/projects/sea-forge;
-      ~/projects/gauntlet;
-      ~/projects/realitytrace;
-      ~/projects/context-kernel;
-      ~/projects/godspeed-agent;
+      Workspace checkouts are resolved by git remote identity, not directory name.
+      Local checkouts MAY lag their remotes; pin by published package version or
+      remote commit and record any local drift.
+    repositories:
+      - { name: "Product Actualizer cockpit", remote: "SPRIME01/Product-Actualizer", workspace_path: "~/projects/product-actualizer/cockpit", license: "Apache-2.0 (relicensed from AGPL-3.0 by the owner, 2026-10-19)" }
+      - { name: "Cognate", remote: "GodSpeedAI/Cognate", workspace_path: "~/projects/cognate", note: "npm @godspeedai/cognate-* 0.6.1; composed-world loader on origin/main" }
+      - { name: "DomainForge", remote: "GodSpeedAI/DomainForge", workspace_path: "~/projects/domainforge", note: "npm @godspeedai/domainforge 0.21.1 bound by Cognate main" }
+      - { name: "SEA-Forge", remote: "GodSpeedAI/SEA-Forge", workspace_path: "~/projects/sea-rs", note: "Rust; Unix-socket NDJSON authority and stdio MCP" }
+      - { name: "Gauntlet", remote: "GodSpeedAI/Gauntlet", workspace_path: "~/projects/gauntlet", note: "Rust CLI; no Cognate adapter yet" }
+      - { name: "RealityTrace", remote: "GodSpeedAI/RealityTrace", workspace_path: "~/projects/sxr", note: "Rust sxr CLI; Cognate adapter @godspeedai/cognate-realitytrace" }
+      - { name: "Context Kernel", remote: "GodSpeedAI/Context-Kernel", workspace_path: "~/projects/Context_Kernel", note: "Rust; MCP over stdio and HTTP /mcp; no TS client" }
+      - { name: "GodSpeed Agent (predecessor, research infrastructure)", remote: "GodSpeedAI/GodSpeed-Agent", workspace_path: "~/projects/godspeed_agent", note: "Python 3.11; godspeed_nav, cybernetic_nav MCP, ML research pipelines" }
+      - { name: "Project Topology Architect", remote: "GodSpeedAI/project-topology-architect", workspace_path: "~/projects/project-topology-architect" }
   interface_methodology:
     role: Normative derivation order; skills in this repository are procedural, not runtime dependencies.
     path: >-
@@ -189,7 +212,7 @@ outcome_contract:
       - id: REQ-VERIFY-004
         text: Operational and developmental conclusions never exceed the strength or scope of their evidence.
       - id: REQ-VERIFY-005
-        text: Five canonical Foundry-inspired journeys pass recorded happy, blocked, and recovery fixtures.
+        text: Six canonical journeys (J01–J06) pass recorded happy, blocked, and recovery fixtures.
     false_completion_conditions:
       - The GUI looks correct but its buttons produce different intents than the Clack proof.
       - The test uses static toy rows while claiming live DomainForge/Cognate object graph integration.
@@ -239,9 +262,14 @@ claim_discipline:
     - id: CLAIM-001
       claim: DomainForge can provide Cognate a canonical composed .sea world identity.
       level: evidence_backed
-      current_evidence: Cognate PR 57 merge and DomainForge 0.21.1 native parseSourceMap integration tests.
+      current_evidence: >-
+        Cognate origin/main a477933 (2026-10-18, "complete canonical composed-world
+        integration") exports loadSemanticWorld and binds @godspeedai/domainforge 0.21.1;
+        governed operations carry worldRef "world:<name>@sha256:<hex>".
       required_evidence: Re-run against pinned releases and verify the intended organizational import closure.
-      gap: Target deployment and operational object-set linkage remain separate.
+      gap: >-
+        Local workspace checkouts lag (cognate on a feature branch at 0.5.0/DomainForge
+        0.19.0; domainforge at 0.18.2). Operational object-set linkage is absent (CLAIM-005).
     - id: CLAIM-002
       claim: Product Actualizer cockpit provides a reusable deterministic presentation grammar.
       level: evidence_backed
@@ -262,6 +290,52 @@ claim_discipline:
       current_evidence: Domain-specific trajectory experiments are not general validation.
       required_evidence: Preregistered predictions, calibration, uncertainty, and failed-prediction analysis.
       gap: Validated simulator and transfer across domains.
+    - id: CLAIM-005
+      claim: Cognate provides queryable typed operational object sets, relationship traversal and a business checkpoint identity.
+      level: assumption
+      current_evidence: >-
+        False as of Cognate 0.6.1. Cognate offers durable events, projections with
+        {name, version, position, status} checkpoints, idempotent observations and
+        top-level-equality listRecords; DomainForge Instance objects are read-only
+        parsed declarations, not operational records.
+      required_evidence: A Horizon-owned typed object projection built on Cognate's public Projection API (REQ-WORLD-006).
+      gap: The operational object layer (Foundry "ontology objects") must be built; it is the largest unowned component.
+    - id: CLAIM-006
+      claim: SEA-Forge exposes a non-granting authority preview usable as an affordance gate.
+      level: assumption
+      current_evidence: >-
+        sea-rs PolicyAuthorityEngine has separate evaluate and grant functions in-library,
+        but only invocation-time authorization (move-only ActionGrant bound to action hash
+        and expiry) is reachable through Cognate's Unix-socket adapter. The SFWP case
+        "preflight" validates templates and makes no authority decision.
+      required_evidence: An upstream evaluate-only wire operation, or the deferred_to_invocation gate state (REQ-NAV-006).
+      gap: Until exposed, Horizon cannot predict allow vs escalate before commitment.
+    - id: CLAIM-007
+      claim: Gauntlet and Context Kernel have Cognate-reachable integrations.
+      level: assumption
+      current_evidence: >-
+        Gauntlet is a Rust CLI (reference freeze to .gauntlet/reference.lock; run, verify,
+        settle) with no Cognate adapter. Context Kernel is Rust MCP (stdio, HTTP /mcp) with
+        query_reference/resolve_reference/recall_context tools and no TypeScript client.
+      required_evidence: Cognate capability adapters exercised against the real binaries.
+      gap: Both adapters are Horizon-side or upstream work.
+    - id: CLAIM-008
+      claim: GodSpeed Agent research results are reusable evidence for developmental and predictive work.
+      level: partially_proven
+      current_evidence: >-
+        godspeed_agent preregistered experiment matrices (v006, v007 PARTIAL, v008 transfer
+        SETTLED, macro held-out ROC-AUC 0.660 vs 0.601 minimal) with frozen preregistrations,
+        dataset adapters, calibration pipeline and shadow/guarded-activation evaluations.
+      required_evidence: Reproduction from migrated, hash-pinned data inside the research subsystem.
+      gap: Results are agent-trajectory proxies, not Horizon operational settlements; transfer to Horizon episodes is unproven.
+    - id: CLAIM-009
+      claim: Product Actualizer cockpit code may be copied into Horizon.
+      level: evidence_backed
+      current_evidence: >-
+        The owner (sole author) relicensed Product Actualizer from AGPL-3.0 to Apache-2.0 on
+        2026-10-19; its vendored skills are MIT and its AGPL donors contributed ideas only.
+      required_evidence: The Apache-2.0 LICENSE on the pinned Product Actualizer revision Horizon copies from.
+      gap: Copied files keep attribution per Apache-2.0 section 4; Product Actualizer's own product model must record the change.
 
 system_overview:
   architecture_pattern:
@@ -301,12 +375,39 @@ system_overview:
       responsibility: Correlate RealityTrace expectations/evidence and operational settlement with separate developmental appraisal.
       inputs: [execution events, expectations, observations, settlement references]
       outputs: [residuals, case-status revision, developmental evidence]
+    - name: Operational object layer
+      responsibility: >-
+        Materialize typed, provenance-bearing object instances and links as Cognate
+        projections keyed by DomainForge semantic IDs; answer scoped search, filter,
+        traversal and lineage queries at an explicit checkpoint.
+      inputs: [connector observations, Cognate events, world_ref, observer scope]
+      outputs: [object sets, link results, checkpoint_ref, freshness]
+    - name: Product connectors
+      responsibility: >-
+        Bring each workspace product into the shared world through the product
+        integration contract: semantic module, read connector, governed capability
+        bindings, evidence hooks and optional hosted surface.
+      inputs: [product source systems, product .sea module, capability manifests]
+      outputs: [observations into Cognate, capability bindings, integration level]
+    - name: GodSpeed research subsystem
+      responsibility: >-
+        Preserve the Python ML research infrastructure inherited from GodSpeed Agent
+        (datasets, adapters, calibration, preregistered experiments, shadow and guarded
+        evaluation, predictive models) behind typed process contracts reached only via
+        Cognate capabilities.
+      inputs: [exported developmental episodes, preregistrations, research configs]
+      outputs: [experiment records, verdicts, calibrated advisory estimators, evidence refs]
   component_diagram:
     mermaid: |-
       flowchart TB
         O["Human or agent observer"] --> UI["Horizon Clack or Atomic GUI"]
         UI <--> NAV["Horizon navigation controller"]
         NAV <--> C["Cognate events, projections and capabilities"]
+        OBJ["Operational object layer (Cognate projections)"] <--> NAV
+        C --> OBJ
+        P["Product connectors"] --> C
+        C --> RS["GodSpeed research subsystem (Python)"]
+        RS --> C
         D["DomainForge canonical .sea world"] --> C
         CK["Context Kernel scoped references"] --> NAV
         C --> S["SEA-Forge authority and operational obligations"]
@@ -342,6 +443,16 @@ system_overview:
     - name: RuVector
       purpose: Derived cognitive search and optional graph index.
       failure_behavior: Fall back to verified canonical source queries without implying vector recall is authoritative.
+    - name: GodSpeed research subsystem
+      purpose: Python ML research, calibration and advisory predictive estimators migrated from GodSpeed Agent.
+      failure_behavior: >-
+        Navigation, gates and settlement continue with heuristic or disabled estimators
+        visibly marked; research runs show unavailable; no estimate is fabricated.
+    - name: Product connectors
+      purpose: Per-product read, action and evidence bindings under the product integration contract.
+      failure_behavior: >-
+        Affected product objects show stale or unavailable with last checkpoint; other
+        products and read-only navigation remain usable.
 
 core_domain_model:
   scope_rule: >-
@@ -354,8 +465,9 @@ core_domain_model:
       used_by: [navigation controller, renderers, replay]
       required_fields:
         - { name: "id", type: "opaque-id", meaning: "Stable navigation session identity" }
-        - { name: "observer_ref", type: "scoped-ref", meaning: "Authenticated human or agent identity" }
-        - { name: "world_ref", type: "DomainForge-world-ref", meaning: "Immutable semantic revision" }
+        - { name: "observer_ref", type: "scoped-ref", meaning: "Authenticated principal (user, agent, service or system); an agent acting for a human also carries on_behalf_of" }
+        - { name: "tenant_ref", type: "scoped-ref", meaning: "Cognate tenant scoping runs, projections, state and artifacts" }
+        - { name: "world_ref", type: "DomainForge-world-ref", meaning: "Immutable semantic revision (currently world:<name>@sha256:<hex>); never a mutable alias" }
         - { name: "checkpoint_ref", type: "opaque-ref-or-unknown", meaning: "Operational snapshot identity distinct from semantic revision" }
         - { name: "focus_ref", type: "typed-ref", meaning: "Current object, object set, resource or case focus" }
       optional_fields: [workspace_ref, case_ref, direction_ref, presentation_prefs]
@@ -393,12 +505,15 @@ core_domain_model:
       required_fields:
         - { name: "operation_ref", type: "semantic-ref", meaning: "Stable meaning of the proposed move" }
         - { name: "status", type: "enum", meaning: "available|blocked|unknown|conflicted" }
-        - { name: "gates", type: "keyed-assessments", meaning: "Visibility reach payment authority execution recovery settlement access" }
+        - { name: "gates", type: "keyed-assessments", meaning: "Exactly the canonical gate keys: visibility, reach, payment, authority, capability, recovery, settlement_access" }
         - { name: "basis_refs", type: "list-of-refs", meaning: "Evidence or derivation supporting each gate" }
-      optional_fields: [first_blocker, next_prerequisite_ref, payment_estimate, consequence_estimate]
+        - { name: "reversibility", type: "enum", meaning: "read_only|reversible|compensable|irreversible|unknown" }
+      optional_fields: [first_blocker, next_prerequisite_ref, payment_estimate, consequence_estimate, estimate_provenance]
       rules:
         - A failed or unknown hard gate MUST NOT be treated as availability.
         - Availability is provisional and does not grant invocation authority.
+        - The authority gate uses the vocabulary of REQ-NAV-006; deferred_to_invocation and requires_approval are known states, not unknown.
+        - Estimates from predictive models are advisory, carry estimate_provenance, and MUST NOT change any gate outcome.
     - name: NavigationIntent
       purpose: Durable renderer-independent user or agent choice.
       used_by: [reducer, Cognate runtime, governance boundary]
@@ -465,6 +580,9 @@ configuration_and_input_contract:
     - { field: "runtime_source", type: "typed-adapter-binding", required: true, default: null, validation: "Must bind scoped Cognate runtime/projections" }
     - { field: "authority_source", type: "typed-adapter-binding", required: false, default: null, validation: "Required before consequential world-directed operation" }
     - { field: "evidence_source", type: "typed-adapter-binding", required: false, default: null, validation: "Required when declared settlement requires independent observations" }
+    - { field: "product_connectors", type: "list-of-typed-adapter-bindings", required: false, default: "[]", validation: "Each names its DomainForge module, connector, declared integration level and owning product remote" }
+    - { field: "research_source", type: "typed-adapter-binding", required: false, default: null, validation: "Python research subsystem endpoint; absent means estimators run heuristic/disabled and research operations are unavailable" }
+    - { field: "deployment_profile", type: "enum", required: true, default: "local_operator", validation: "local_operator|shared_remote; shared_remote requires a real identity provider (REQ-SEC-006)" }
   error_classes:
     - { code: "semantic_world_unavailable", blast_radius: "Semantic discovery and affected navigation" }
     - { code: "stale_frame", blast_radius: "Originating intent only" }
@@ -546,8 +664,16 @@ operational_flow_and_state_model:
       - { name: "executing", meaning: "Governed work in flight", entry_trigger: "Actual invocation allow", exit_trigger: "Result, cancel or failure" }
       - { name: "reviewing", meaning: "Observations evaluated against frozen criteria", entry_trigger: "Evidence/status received", exit_trigger: "Decision/disposition" }
       - { name: "suspended", meaning: "Missing dependency, approval or recovery decision", entry_trigger: "Unsatisfied hard gate or uncertain effect", exit_trigger: "Explicit remediation and revalidation" }
+      - { name: "closed", meaning: "Episode ended by recorded disposition or explicit abandonment; history immutable", entry_trigger: "close disposition or abandon intent", exit_trigger: "None; a resumed purpose opens a new episode linked to this one" }
   transition_rules:
+    - { from: "contextualized", to: "exploring", when: "A focus is selected or restored" }
     - { from: "exploring", to: "deciding", when: "Contextual operation is evaluated" }
+    - { from: "deciding", to: "exploring", when: "Observer defers, inspects or reframes without commitment" }
+    - { from: "executing", to: "suspended", when: "Timeout, lost acknowledgment or uncertain effect requires reconciliation" }
+    - { from: "suspended", to: "exploring", when: "Observer abandons the commitment and no effect is outstanding, or reconciliation proves none occurred" }
+    - { from: "reviewing", to: "deciding", when: "Disposition is continue or revise and new gates are evaluated" }
+    - { from: "reviewing", to: "closed", when: "An authorized close disposition is recorded" }
+    - { from: "exploring", to: "closed", when: "Observer explicitly abandons the episode with no outstanding commitment" }
     - { from: "deciding", to: "awaiting_authority", when: "Valid world-directed intent is durably frozen" }
     - { from: "awaiting_authority", to: "executing", when: "SEA-Forge invocation allows the exact scoped operation" }
     - { from: "awaiting_authority", to: "suspended", when: "Decision denies, escalates or is unavailable" }
@@ -579,12 +705,17 @@ core_behavior_requirements:
     - { id: "REQ-WORLD-003", text: "Horizon MUST preserve focus, object-set selection, observer and world across surfaces and journeys." }
     - { id: "REQ-WORLD-004", text: "Historical, current and candidate worlds MUST be visibly distinguished with immutable references." }
     - { id: "REQ-WORLD-005", text: "The import graph, operational relation graph, and data lineage MUST retain distinct identities and semantics." }
+    - { id: "REQ-WORLD-006", text: "Operational objects and links MUST be typed Cognate projections over durable events and connector observations, keyed by DomainForge semantic IDs; checkpoint_ref MUST identify the Cognate commit position and the projection versions read; Horizon MUST NOT keep a separate mutable object database outside Cognate." }
+    - { id: "REQ-WORLD-007", text: "Every object, set and link MUST expose its owning product, connector, checkpoint age and integration level, and stale or degraded sources MUST be visibly marked." }
+    - { id: "REQ-WORLD-008", text: "An active world MUST be selected through a DomainForge world alias pinned to an immutable world_ref; a candidate-versus-active semantic diff MAY be a Horizon-derived read-only view but MUST NOT mint or verify identity." }
   navigation_and_affordances:
     - { id: "REQ-NAV-001", text: "Horizon MUST distinguish possible, available, blocked, unknown and conflicted paths before ranking." }
-    - { id: "REQ-NAV-002", text: "Affordance gates MUST cover visibility, reach, payment, governance, capability, recovery and settlement access." }
+    - { id: "REQ-NAV-002", text: "Affordance gates MUST use exactly the canonical keys visibility, reach, payment, authority, capability, recovery and settlement_access." }
     - { id: "REQ-NAV-003", text: "Only eligible paths MAY be recommended as spendable; blocked paths MUST expose material reasons and reachable prerequisites where known." }
     - { id: "REQ-NAV-004", text: "The observer MUST retain discretion to inspect alternatives, defer, reframe or disagree with the representation." }
     - { id: "REQ-NAV-005", text: "The navigation controller MUST avoid asking for context it can resolve without user burden." }
+    - { id: "REQ-NAV-006", text: "The authority gate MUST take one of likely_allow, requires_approval, deferred_to_invocation, denied, unreachable or unknown. likely_allow requires a non-granting SEA-Forge evaluation; deferred_to_invocation means SEA-Forge is reachable and the exact operation is policy-covered but no preview exists; denied, unreachable and unknown block availability. No gate value grants authority." }
+    - { id: "REQ-NAV-007", text: "Before any consequential commitment the observer MUST see the operation's reversibility class, payment, expected evidence and what happens if authority escalates." }
   presentation_and_atomic_ui:
     - { id: "REQ-UI-001", text: "A closed versioned declarative surface schema MUST separate agents from executable UI code." }
     - { id: "REQ-UI-002", text: "Schema validation MUST reject unknown blocks, unauthorized actions, invalid refs and unsafe source expressions." }
@@ -608,12 +739,40 @@ core_behavior_requirements:
     - { id: "REQ-STACK-006", text: "RealityTrace delivery receipts MUST NOT be treated as evidence derivation or settlement." }
     - { id: "REQ-STACK-007", text: "Operational obligation settlement and GodSpeed developmental interpretation MUST be separately referenced." }
     - { id: "REQ-STACK-008", text: "Every cross-system episode MUST preserve correlation through observer/world/case/intent/authority/execution/evidence/settlement refs." }
+    - { id: "REQ-STACK-009", text: "Only a SEA-Forge allow disposition with a matching invocation grant (bound to the exact action, targets, world_ref and unexpired) MAY permit a side effect; deny, escalate, boundary, degraded and any unrecognized disposition MUST produce no effect and a visible typed status." }
+    - { id: "REQ-STACK-010", text: "Horizon MUST reach SEA-Forge, Gauntlet, RealityTrace, Context Kernel and the research subsystem only through Cognate capabilities or Cognate-owned adapters; the navigation controller and renderers MUST NOT hold a second client to an authority or evidence owner." }
+    - { id: "REQ-STACK-011", text: "A product joins the world only through the product integration contract: a DomainForge module for its types, links and operations; a read connector emitting provenance-bearing observations into Cognate; capability bindings for actions, each covered by SEA-Forge policy; and optional RealityTrace evidence hooks. Its integration level (visible, queryable, actionable, evidenced) MUST be derived from which facets are proven." }
+    - { id: "REQ-STACK-012", text: "Products MUST NOT be required to adopt Horizon's language, storage or UI; non-TypeScript products integrate through process, CLI, MCP or Connect boundaries owned by Cognate." }
+    - { id: "REQ-STACK-014", text: "Dependency MUST be one-way: every stack owner (DomainForge, Cognate, SEA-Forge, Gauntlet, RealityTrace, Context Kernel) and every joined product MUST remain fully operable without Horizon. Horizon MUST NOT require changes that make a product depend on Horizon, and integration MUST use each product's own public surfaces; a product unaware of Horizon is a valid product." }
+    - { id: "REQ-STACK-013", text: "A product with its own UI MAY be reachable as a hosted surface via deep links that carry focus refs in and return typed intents or focus out; a hosted surface MUST NOT run inside Horizon's trust boundary or acquire Horizon authority." }
   case_and_development:
     - { id: "REQ-CASE-001", text: "A Case MUST remain a purpose-relative derived view anchored in authoritative facts and declared direction, not a competing ontology." }
     - { id: "REQ-CASE-002", text: "The next primary move MUST respond to material deviation; no primary recommendation is required when only optional choices remain." }
     - { id: "REQ-CASE-003", text: "Settlement reachable and should settle now MUST be separate; the latter requires an authorized judgment." }
     - { id: "REQ-DEV-001", text: "Failure, contradictions, recovery, payment and orchestration burden MUST remain available to developmental evaluation." }
     - { id: "REQ-DEV-002", text: "Durable capability MUST NOT be claimed without repeated settlement under variation and transfer/recovery evidence." }
+    - { id: "REQ-DEV-003", text: "Developmental settlement scoring and capability-promotion rules MUST have exactly one authoritative implementation. If ported from GodSpeed Agent, its golden fixtures and tests are the conformance oracle and the superseded implementation is retired for that function; inherited thresholds migrate as provenance-bearing configuration, never silently changed." }
+  research_and_learning:
+    - { id: "REQ-RES-001", text: "The GodSpeed Agent Python research infrastructure (dataset adapters, corpora builders, calibration pipeline, preregistered experiment matrices, shadow and guarded evaluation, predictive model port) MUST be carried into Horizon as a Python research subsystem behind typed, versioned process contracts invoked via Cognate capabilities. Horizon MUST NOT reimplement ML training or evaluation in TypeScript." }
+    - { id: "REQ-RES-002", text: "Research artifacts (datasets and corpora, preregistrations, experiment runs, results and verdicts, models, shadow evaluations) MUST be navigable world objects with content-hash provenance. Migrated results MUST keep their original claim level and verdict and MUST NOT be upgraded by migration." }
+    - { id: "REQ-RES-003", text: "Starting a research run MUST be a consequential governed operation with a compute/payment gate and a preregistration frozen before execution; long runs use Gauntlet or a bounded Cognate execution world, and results become evidence, not settlement by assertion." }
+    - { id: "REQ-RES-004", text: "Predictive estimates MAY inform payment, consequence or ranking only after governed activation: a frozen preregistered held-out criterion, retained evaluation evidence and an authorized promotion. Active, heuristic and disabled estimator states MUST be visible, and estimates MUST NOT change hard-gate outcomes." }
+    - { id: "REQ-RES-005", text: "Settled, failed and contradicted Horizon episodes MUST be exportable to the research subsystem as versioned, scope-filtered datasets with provenance and without secrets or cross-scope leakage." }
+    - { id: "REQ-RES-006", text: "Existing agent workflows using the cybernetic_nav MCP tools and godspeed-nav CLI MUST receive an explicit mapping to Horizon equivalents or a documented deprecation; no tool may silently disappear or change meaning." }
+    - { id: "REQ-RES-007", text: "Migrated ledgers, data and reports MUST preserve append-only history, original timestamps and content hashes; large data MUST be referenced by hash and location rather than committed to the repository." }
+  operator_experience:
+    - { id: "REQ-UX-001", text: "Opening Horizon MUST land on a home view that resumes the last focus and shows, ordered by the mode-precedence selector, pending human decisions (including SEA-Forge approvals), work in flight, contradicted or unresolved evidence, degraded sources and changes to watched objects." }
+    - { id: "REQ-UX-002", text: "A keyboard-first command palette MUST reach search, focus, traversal and every currently derived choice; it is a renderer of the same frame and MUST emit the same typed intents as Clack and GUI." }
+    - { id: "REQ-UX-003", text: "Every focus and frame MUST be addressable by a stable link pinning world_ref, checkpoint and focus; opening a link reproduces that context or states explicitly that newer state exists and offers to move to it." }
+    - { id: "REQ-UX-004", text: "Navigation MUST keep a traversal trail with back/forward and breadcrumbs that preserve selections; read-only navigation is always reversible." }
+    - { id: "REQ-UX-005", text: "Explanations MUST lead with plain language (what this is, why it is blocked, the single next prerequisite) with progressive drill-down to gates, evidence, provenance and raw refs; internal vocabulary MUST NOT be required to operate." }
+    - { id: "REQ-UX-006", text: "Every action, answer and composition MUST show its actor; an agent acting for a human MUST be visibly distinct from the human." }
+    - { id: "REQ-UX-007", text: "SEA-Forge approvals MUST be presented and resolved as SEA-Forge approval records under the approver's own authenticated identity; Horizon MUST NOT keep a local approval state." }
+    - { id: "REQ-UX-008", text: "The GUI and terminal renderers MUST be fully keyboard operable, meet WCAG 2.2 AA for the GUI, respect reduced motion, support light and dark themes, and announce frame changes to assistive technology." }
+    - { id: "REQ-UX-009", text: "Read-only navigation interactions SHOULD respond within 300 ms p95 on the local_operator profile; operations exceeding 1 s MUST show progress tied to real events and remain cancellable where the owner supports cancellation." }
+    - { id: "REQ-UX-010", text: "First run and empty states MUST guide the observer to connect a world and a product, and MUST explain each unavailable capability with its next prerequisite instead of showing blank regions." }
+    - { id: "REQ-UX-011", text: "Graph and lineage views MUST open fit-to-content, aggregate beyond a bounded node count, and always offer an equivalent table or list projection." }
+    - { id: "REQ-UX-012", text: "Notices MUST be deduplicated by source identity and severity-ranked; repeated identical conditions update one notice rather than creating new ones." }
   completion_rules:
     may_claim_completion_only_when:
       - All required journeys and authority boundaries have live proof or are explicitly declared incomplete.
@@ -630,7 +789,7 @@ navigation_and_presentation_contract:
     - "R2: Behavioral IR per canonical journey, preserving IS1–IS8 responsibilities"
     - "R3: runnable Clack-like sequential behavioral proof, fixtures and projection-pressure evidence"
     - "R4: renderer-neutral Atomic UI IR with traceable elements, groups, regions and views"
-    - "R5: renderer-specific Clack, OpenTUI and React/Astryx projections"
+    - "R5: renderer-specific Clack-style terminal, React GUI (Astryx-compatible) and command-palette projections; OpenTUI is optional"
   behavioral_phases:
     IS1: Context selection; observer, world, focus and optional case.
     IS2: Preflight; preconditions, completeness and reachable prerequisites.
@@ -644,9 +803,21 @@ navigation_and_presentation_contract:
     atomic_levels: [element, group, region, view]
     cockpit_block_vocabulary: [metric, callout, table, tree, timeline, graph, chart, compare, media, document, entity, progress, preflight, ask, form]
     surface_intents: [inspect, compare, decide, verify, monitor]
-    user_experience_lenses: [explore, operate, build, monitor, compare, review]
+    user_experience_lenses: [explore, operate, build, monitor, compare, develop]
     continuous_context: [world, observer, focus, checkpoint, optional_case, direction, evidence_state]
-    tool_surfaces: [Clack, OpenTUI, React/Astryx, CLI, MCP, optional_WebMCP]
+    tool_surfaces: [Clack-style terminal, React GUI, command palette, CLI with machine-readable frames, MCP, optional_OpenTUI, optional_WebMCP]
+  vocabulary_alignment:
+    rule: >-
+      These enumerations are distinct axes and MUST NOT be substituted for one another.
+      Service state is authoritative lifecycle; screen mode is derived presentation;
+      surface intent describes one surface; frame responsibility describes one frame;
+      lens is the observer's chosen way in; IS1–IS8 are behavioral responsibilities.
+    screen_mode_to_surface_intent: { orient: inspect, decide: decide, execute: monitor, verify: verify, complete: inspect }
+    lens_to_journey: { explore: J01, operate: J02, build: J03, monitor: J04, compare: J05, develop: J06 }
+    observer_facing_terms: >-
+      User-facing copy uses plain terms (for example "can do now", "needs approval",
+      "blocked by", "not yet verified", "done and verified") mapped one-to-one to the
+      canonical states; the canonical term remains visible in the inspector.
     block_growth_rule: A new block is permitted only when a legitimate journey fails the existing closed grammar and a regression fixture documents why.
   mode_precedence: >-
     A pure, tested selector MUST resolve simultaneous active execution, pending
@@ -749,8 +920,10 @@ execution_integration_contract:
           T->>H: Candidate operation
           H->>C: Discover eligible capability binding
           H->>H: Gate payment, reach, recovery and settlement access
-          H->>S: Explainable preflight request
-          S-->>H: Provisional allow/deny/escalate/unknown
+          H->>C: Authority gate request
+          C->>S: Evaluate-only preview if exposed, else policy coverage and reachability
+          S-->>C: likely_allow / requires_approval / denied, or no preview
+          C-->>H: Authority gate (REQ-NAV-006), never a grant
           alt Blocked or unknown
             H-->>T: Explain blocker and reachable prerequisite
           else Proposed path currently spendable
@@ -826,7 +999,8 @@ execution_integration_contract:
               C->>S: Authorize transition
               S-->>C: Decision
               opt Allowed and required checks pass
-                C->>C: Activate new pinned world_ref explicitly
+                C->>D: Retarget world alias to the new pinned world_ref
+                D-->>C: Alias history entry
               end
             else Denied or escalated
               C-->>T: Blocked; preserve candidate and reason
@@ -856,10 +1030,12 @@ execution_integration_contract:
           alt Informational or no permissible action
             H-->>U: Evidence-backed notice or blocker
           else Consequential response proposed
-            H->>S: Preflight and approval prerequisites
+            H->>C: Authority gate request
+            C->>S: Evaluate-only preview or policy coverage
             alt Approval required
-              S-->>H: Escalate
-              H-->>U: Request authorized decision
+              S-->>C: Escalate or requires_approval
+              C-->>H: Pending SEA-Forge approval record
+              H-->>U: Request authorized decision in home attention view
             else Automatic authority exists
               H->>C: Typed idempotent response intent
               C->>S: Authorize actual invocation
@@ -899,10 +1075,55 @@ execution_integration_contract:
           U->>T: Request real actionable candidate
           T->>H: New real-world intent
           H->>C: Construct scoped capability candidate
-          C->>S: Preflight, not authorization for execution
+          C->>S: Authority gate preview, not authorization for execution
           S-->>C: Authority status
           C-->>T: Governable choice or blocker
           Note over M,S: Simulation NEVER changes world state or grants authority
+    J06_develop:
+      title: Review developmental evidence and run a preregistered research experiment
+      mermaid: |-
+        sequenceDiagram
+          autonumber
+          actor U as Observer
+          participant T as Horizon UI
+          participant H as Horizon
+          participant C as Cognate
+          participant RS as Research subsystem
+          participant S as SEA-Forge
+          participant G as Gauntlet or execution world
+          participant R as RealityTrace
+          U->>T: Open develop lens for a capability or case family
+          T->>H: Focus developmental history
+          H->>C: Read settled, failed and contradicted episodes and research records
+          C-->>H: Episodes, prior verdicts, active estimator state
+          H-->>T: Capability status with variation, recovery and transfer evidence
+          alt Evidence insufficient for any claim
+            H-->>T: Unproven, with the variation still missing
+          else Observer proposes an experiment
+            U->>T: Draft hypothesis and held-out criterion
+            T->>H: Typed experiment intent
+            H->>C: Freeze preregistration and export scoped dataset
+            C->>S: Authorize compute and data use
+            alt Denied or escalated
+              S-->>C: Decision
+              C-->>T: Blocked or pending approval; preregistration retained
+            else Allowed
+              C->>G: Run bounded experiment in research subsystem
+              G->>RS: Execute pinned pipeline
+              RS-->>G: Metrics, verdict, artifacts with hashes
+              G-->>C: Execution record
+              C->>R: Correlate results against frozen criterion
+              R-->>C: Evidence and residuals
+              C-->>H: Verdict and evidence refs
+              H-->>T: Result vs preregistration; failure retained
+              opt Observer requests estimator activation
+                T->>C: Governed activation intent
+                C->>S: Authorize promotion
+                S-->>C: Decision
+                C-->>T: Estimator active, or unchanged with reason
+              end
+            end
+          end
   operational_notes:
     - Process flows above are intended architecture; they are NOT proof that subsystem endpoints already compose this way.
     - Direct external actions do not require Gauntlet; bounded long work may use Gauntlet.
@@ -913,7 +1134,7 @@ execution_integration_contract:
 proof_and_observability:
   required_evidence_artifacts:
     - Canonical .sea IDM validation and journey-to-semantics translation report.
-    - Behavioral IR and validated sequential proof for J01–J05 with blocked and recovery traces.
+    - Behavioral IR and validated sequential proof for J01–J06 with blocked and recovery traces.
     - Atomic UI IR traceability and two-renderer equivalence fixtures.
     - Real cross-system authorization, execution, observation and restart receipts.
     - Non-claim evidence report identifying skipped tests, assumptions and unresolved interfaces.
@@ -925,7 +1146,7 @@ proof_and_observability:
   proof_interface:
     preferred_commands:
       - Implementation MUST expose one documented command for schema and ID traceability validation.
-      - Implementation MUST expose one documented command for five-journey fixture and replay conformance.
+      - Implementation MUST expose one documented command for six-journey fixture and replay conformance.
       - Implementation MUST expose one documented command for real integration gates and clearly report missing dependencies.
     pass_condition: >-
       Commands return success only when corresponding REQUIRED checks ran and their
@@ -946,6 +1167,10 @@ proof_and_observability:
     - { name: "gate_false_allow_count", reason: "Safety-critical false affordability and authority signal" }
     - { name: "settled_vs_acknowledged_claims", reason: "Detect premature success and false developmental promotion" }
     - { name: "recovery_success_and_cost", reason: "Evaluate sustainable capability under variation" }
+    - { name: "read_navigation_latency_p95", reason: "Hold REQ-UX-009 to a measured budget" }
+    - { name: "time_to_pending_decision", reason: "How long a required human decision waits before it is seen in the home view" }
+    - { name: "estimator_calibration_drift", reason: "Detect an active predictive estimator leaving its preregistered calibration" }
+    - { name: "connector_freshness_age", reason: "Make stale product data measurable per connector" }
   required_events:
     - navigation.focus_changed
     - navigation.intent_proposed
@@ -956,6 +1181,12 @@ proof_and_observability:
     - navigation.evidence_reconciled
     - navigation.settlement_reviewed
     - navigation.next_affordance_derived
+    - connector.observation_ingested
+    - connector.degraded
+    - research.preregistration_frozen
+    - research.run_recorded
+    - research.estimator_activation_decided
+    - developmental.episode_exported
 
 repeatability_and_variation:
   required_variations:
@@ -965,11 +1196,18 @@ repeatability_and_variation:
     - { id: "VAR-004", case: "One materialized world with multiple object types and two links", expected: "Filter and traversal match reference queries at checkpoint" }
     - { id: "VAR-005", case: "One successful, one failed and one contradictory execution", expected: "Different status/evidence and next-affordance records" }
     - { id: "VAR-006", case: "Repeated attempt with new cases, providers and failure conditions", expected: "Learning/capability claims do not exceed measured transfer/recovery" }
+    - { id: "VAR-007", case: "Two heterogeneous products (one non-TypeScript) joined to one world", expected: "Cross-product traversal works with per-product provenance, integration level and freshness" }
+    - { id: "VAR-008", case: "Same frame via Clack, GUI and command palette", expected: "Identical typed intents and blockers" }
+    - { id: "VAR-009", case: "Estimator active, heuristic and disabled", expected: "Gate outcomes identical; only labeled advisory estimates differ" }
+    - { id: "VAR-010", case: "Migrated GodSpeed Agent experiment reproduced from hash-pinned data", expected: "Same verdict and claim level, or a recorded discrepancy; never an upgraded claim" }
+    - { id: "VAR-011", case: "Horizon stopped or uninstalled", expected: "Every stack owner and joined product keeps operating through its own surfaces with no error, missing dependency or degraded function" }
   required_recovery_cases:
     - { id: "RECOV-001", case: "Terminal or browser closes between decision and resume", expected: "Replay restores focus, revision and pending approval safely" }
     - { id: "RECOV-002", case: "SEA-Forge unavailable or approval unknown", expected: "No consequential invocation; scoped blocker persists" }
     - { id: "RECOV-003", case: "External acknowledgment lost during commit", expected: "Uncertain state and idempotent reconciliation without duplicate side effect" }
     - { id: "RECOV-004", case: "Evidence sink unavailable after event commit", expected: "Durable outbox/reconciliation; no fabricated settlement" }
+    - { id: "RECOV-005", case: "Product connector down or research subsystem process crashes mid-run", expected: "Stale/unavailable marks, unaffected products usable, run reconciled without duplicate compute charge or fabricated result" }
+    - { id: "RECOV-006", case: "Deep link opened after world alias retargeted", expected: "Pinned context reproduced and newer world offered explicitly" }
   capability_claim_rule: >-
     Capability is unverified until required variations and recovery cases pass in
     target environments and varied settled episodes justify transfer and recovery.
@@ -1027,6 +1265,10 @@ security_safety_trust_boundaries:
     - { id: "REQ-SEC-003", text: "All untrusted source and UI strings MUST be schema-validated, scoped, and escaped; no arbitrary executable markup may be submitted." }
     - { id: "REQ-SEC-004", text: "Multi-user or remote deployments MUST NOT reuse Product Actualizer loopback-token trust assumptions unchanged." }
     - { id: "REQ-SEC-005", text: "Credential and private reference material MUST never be exposed through shared UI context, logs or evidence." }
+    - { id: "REQ-SEC-006", text: "Initial conformance targets the local_operator profile: loopback-bound, per-launch secrets, operator identity from the OS session, and agent principals distinct from the human. shared_remote MUST NOT be enabled without a real identity provider at Cognate's authenticate boundary; conformance claims MUST name their profile." }
+  deployment_profiles:
+    local_operator: One owner on one machine; loopback transports; satisfies initial conformance.
+    shared_remote: Multiple users or remote access; roadmap until a production identity provider is bound; Cognate's dev token authenticator is never acceptable.
   secret_handling:
     source: Deployment-managed secret provider, implementation-defined.
     must_not: [log secrets, persist secrets in evidence artifacts, emit secrets in error messages, expose secrets to render-only agents]
@@ -1098,10 +1340,12 @@ validation_matrix:
     - Gauntlet bounded frozen Reference test for a long-horizon journey.
     - Context Kernel scoped retrieval and unavailable-corpus handling.
     - Restart, event replay, stale world and idempotent duplicate delivery.
+    - Two real product connectors, one of them the Python research subsystem, through Cognate.
+    - A governed research run with frozen preregistration, verdict readback and refused estimator activation on a failed criterion.
   skipped_test_rule: Skipped REQUIRED real integration tests MUST block full conformance and be reported explicitly.
 
 implementation_definition_of_done:
-  - A cold agent can reproduce normative intent and the five journeys without guessing authorizations.
+  - A cold agent can reproduce normative intent and the six journeys without guessing authorizations.
   - Canonical IDM, Behavioral IRs, Clack sequential proof and Atomic UI IR retain traceable identities.
   - Closed presentation grammar, pure reducer and dual-renderer intent equivalence are evidenced.
   - Read-only source-bound navigations work with real semantic and operational data.
@@ -1127,6 +1371,14 @@ roadmap_boundaries:
     level: roadmap
     future_shape: Federation across organizations and heterogeneous authorities.
     current_requirement: One pinned world and scoped context without implying federation support.
+  shared_remote_deployment:
+    level: roadmap
+    future_shape: Multi-user and remote Horizon with a production identity provider.
+    current_requirement: local_operator conformance; REQ-SEC-004 and REQ-SEC-006 block unsafe remote enablement.
+  all_workspace_products_joined:
+    level: roadmap
+    future_shape: Every active workspace product joined at its highest provable integration level.
+    current_requirement: The product integration contract plus two heterogeneous products (VAR-007); the rest are tracked in the product integration register.
 
 conformance_traceability:
   high_risk_requirement_groups:
@@ -1139,6 +1391,12 @@ conformance_traceability:
     - group: World identity, cross-renderer equivalence and replay
       requirements: [REQ-WORLD-004, REQ-UI-004, REQ-INT-003, REQ-VERIFY-003]
       confirmation: fresh_target_reproduction
+    - group: Authority disposition mapping and single integration seam
+      requirements: [REQ-STACK-009, REQ-STACK-010, REQ-NAV-006, REQ-UX-007]
+      confirmation: independent
+    - group: Research claims and predictive influence
+      requirements: [REQ-RES-002, REQ-RES-004, REQ-DEV-003]
+      confirmation: adversarial
   plan_projection_rule: >-
     Every REQUIRED requirement MUST map to a future plan task and proof. Each
     settlement-critical task MUST name its requirement IDs, preregistered

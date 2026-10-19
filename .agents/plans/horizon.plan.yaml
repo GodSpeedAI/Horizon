@@ -4,55 +4,65 @@ schema_version: "1.0"
 metadata:
   id: "HORIZON-PLAN-001"
   title: "Horizon end-to-end semantic navigation, deterministic Clack + Atomic GUI and governed evidence"
-  status: "draft"
-  version: "0.1.0"
+  status: "ready"
+  version: "1.0.0"
   created: "2026-10-19"
   purpose: "Project Horizon's normative specification into a dependency-correct settlement graph, beginning with the owner's canonical Project Topology Architect skill and a Cognate-native, Product Actualizer-informed application, with independent evidence for consequential claims."
+  revised: "2026-10-19"
+  revision_note: "Rebound to spec 0.2.0 after source-grounded adversarial review (.agents/reports/horizon-spec-adversarial-review.md). Fixed workspace paths, added T20 product connectors, T21 GodSpeed research subsystem, T22 operator home and navigation UX, regenerated traceability. 1.0.0 rebinds to the approved, frozen spec 1.0.0 (Apache-2.0 Product Actualizer, REQ-STACK-014 one-way dependency)."
 source:
   spec:
     intended_repository_path: ".agents/specs/horizon.agent.spec.yaml"
     artifact_name: "horizon.agent.spec.yaml"
     spec_id: "HORIZON-001"
-    spec_version: "0.1.0"
-    sha256: "852e85e4a7b3ad613a98f1ef5f5fe6610f4543a9d39c5f58b290ccda170936bc"
+    spec_version: "1.0.0"
+    sha256: "75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130"
     authority: "normative"
-    current_status: "draft; T00 may perform preflight but T01+ cannot begin until this exact spec is explicitly approved/frozen"
+    current_status: "approved and frozen by the owner on 2026-10-19; T01+ may proceed once T00 verifies this SHA-256"
   implementation_brief:
     intended_repository_path: ".agents/reports/implementation-context.md"
     authority: "non_normative_execution_context"
     status: "not_yet_authored; T00 creates concise pinned brief only if needed"
     conflict_rule: "Source spec governs. A conflict blocks affected work; do not silently resolve in code."
   supporting_sources:
-    -
-      path: "~/projects/project-topology-architect/skills/project-topology-architect/SKILL.md"
+    - path: "~/projects/project-topology-architect/skills/project-topology-architect/SKILL.md"
       role: "Owner-designated canonical greenfield topology workflow; load FIRST on executing machine"
-    -
-      path: "~projects/cognate/.agents/skills/building-with-cognate/SKILL.md"
-      role: "Required Cognate implementation skill; resolve from workspace and inspect installed revision"
-    -
-      path: "~/projects/product-actualizer/cockpit"
-      role: "Donor deterministic UI grammar, source binding, world debugger and pure reducer, not source of Horizon runtime truth"
-    -
-      path: "~/projects/godspeed_agent"
-      role: "Existing GodSpeed observer/developmental implementation and tests to inspect before porting"
-    -
-      path: ".agents/skills/deriving-interaction-domain-models/SKILL.md"
+    - path: "~/projects/cognate/.agents/skills/building-with-cognate/SKILL.md"
+      role: "Required Cognate implementation skill. Its references/cli.md still says --source is required for 'cognate create'; code (commit 61015df) makes it optional. Code wins."
+    - path: "~/projects/cognate (remote GodSpeedAI/Cognate)"
+      role: "Runtime. Local checkout is on feature/landing-repositioning at 0.5.0 with DomainForge 0.19.0; origin/main a477933 is 0.6.1 with DomainForge 0.21.1 and loadSemanticWorld. Pin published 0.6.1+ packages, not the local branch."
+    - path: "~/projects/domainforge (remote GodSpeedAI/DomainForge)"
+      role: "Semantics and world identity. Local checkout is 0.18.2; bind the published @godspeedai/domainforge 0.21.1+ napi package."
+    - path: "~/projects/sea-rs (remote GodSpeedAI/SEA-Forge)"
+      role: "Authority, approvals and obligation settlement (crates/sea-forge-authority, sea-forge-server, sea-forge-settlement); governed UI components and tokens in workbench/packages."
+    - path: "~/projects/gauntlet"
+      role: "Bounded long-horizon executor (Rust CLI, .wayfinder reference frozen to .gauntlet/reference.lock)"
+    - path: "~/projects/sxr (remote GodSpeedAI/RealityTrace)"
+      role: "Evidence CLI; reached through @godspeedai/cognate-realitytrace"
+    - path: "~/projects/Context_Kernel"
+      role: "Scoped reference retrieval over MCP (stdio or HTTP /mcp)"
+    - path: "~/projects/product-actualizer/cockpit"
+      role: "Donor deterministic UI grammar, source binding, world debugger and pure reducer. Relicensed Apache-2.0 by the owner on 2026-10-19: code may be copied with attribution; never its Product Model as Horizon runtime truth."
+    - path: "~/projects/godspeed_agent"
+      role: "Predecessor: developmental controller (godspeed_nav), cybernetic_nav MCP tools, and the Python ML research infrastructure carried over by T21"
+    - path: "~/projects/terminal-ui"
+      role: "Clack-inspired OpenTUI React components (shadcn-style registry copy) for the terminal renderer"
+    - path: "~/projects/gs-term, ~/projects/godspeed-compass, ~/projects/cognate-workbench, ~/projects/WarpRoom"
+      role: "Overlapping control surfaces; dispositions recorded in .agents/reports/horizon-product-integration-register.yaml"
+    - path: ".agents/skills/deriving-interaction-domain-models/SKILL.md"
       role: "Required canonical semantic derivation"
-    -
-      path: ".agents/skills/deriving-behavioral-interaction-proofs/SKILL.md"
+    - path: ".agents/skills/deriving-behavioral-interaction-proofs/SKILL.md"
       role: "Required Behavioral IR and Clack-like proof"
-    -
-      path: ".agents/skills/deriving-atomic-ui-models/SKILL.md"
+    - path: ".agents/skills/deriving-atomic-ui-models/SKILL.md"
       role: "Required renderer-neutral atomic UI derivation"
-    -
-      path: ".agents/skills/domainforge-sea/SKILL.md"
+    - path: ".agents/skills/domainforge-sea/SKILL.md"
       role: "Required .sea grammar and CLI validation"
-target_settlement: "From a clean checkout, an observer can load a real canonical composed DomainForge world via Cognate, find and traverse scoped operational objects, navigate purposeful Cases and affordable operations via Clack or Atomic GUI, perform a truly governed direct/Gauntlet action, read independent RealityTrace evidence, distinguish operational settlement from developmental interpretation, recover from interruption, and compare bounded hypothetical alternatives without fabricating world state. Every required claim has variation, adversarial and independent conformance evidence."
+target_settlement: "From a clean checkout on the local_operator profile, an observer lands on a home view, loads a real canonical composed DomainForge world via Cognate, finds and traverses scoped operational objects from at least two heterogeneous products, navigates purposeful Cases and affordable operations via Clack, GUI or command palette, performs a truly governed direct/Gauntlet action, reads independent RealityTrace evidence, distinguishes operational settlement from developmental interpretation, runs a preregistered research experiment in the migrated Python research subsystem, recovers from interruption, and compares bounded hypothetical alternatives without fabricating world state. Every required claim has variation, adversarial and independent conformance evidence."
 operating_contract:
   core_principle: "Project Topology Architect derives the substrate and acceptance ledger from frozen semantics; Building with Cognate realizes it; Product Actualizer donates deterministic presentation patterns only. Never make Horizon a parallel Cognate, SEA-Forge, DomainForge, or Product Model engine."
   rules:
     - "Begin T00 by reading the owner-designated topology skill at ~/projects/project-topology-architect/skills/project-topology-architect/SKILL.md; do not start by scaffolding or writing screens."
-    - "Load the building-with-cognate skill before Cognate project creation/binding; its old 0.19.0 prose is not the installed 0.21.1 authority. Inspect code/CLI first."
+    - "Load the building-with-cognate skill before Cognate project creation/binding; its 0.19.0 prose and '--source required' CLI note are stale. Inspect code/CLI of the pinned published release first."
     - "Keep spec draft/frozen status truthful: do not execute implementation tasks until the bound spec is explicitly approved and its SHA-256 matches."
     - "Execute by actual dependency DAG, not task numbering; parallel tasks may proceed only after shared prerequisites settle."
     - "No task is settled by code existence, logs alone, UI polish, skipped tests, a green mock or a tool acknowledgment."
@@ -63,6 +73,11 @@ operating_contract:
     - "Never import Product Actualizer's Product Model/router as Horizon runtime truth; check donor licenses and change attribution."
     - "Keep read-only world exploration usable when unrelated action/Context Kernel/agent integrations are degraded."
     - "Preserve original failures, cost, recovery and correction history, with clearly separated sources, observation and developmental claims."
+    - "Local sibling checkouts may lag their remotes. Never fetch, pull or switch branches in them without the operator; pin published package versions or remote commits and record drift."
+    - "Product Actualizer is Apache-2.0 (owner relicense, 2026-10-19). Copied files keep attribution and a NOTICE entry."
+    - "Horizon reaches SEA-Forge, Gauntlet, RealityTrace, Context Kernel and the research subsystem only through Cognate capabilities or Cognate-owned adapters (REQ-STACK-010)."
+    - "The Python research subsystem keeps its own uv lockfile and pytest gate, wired into 'just' targets; never port ML training or evaluation to TypeScript."
+    - "Dependency is one-way (REQ-STACK-014): never change a product or stack owner so that it needs Horizon; integrate through its own public surfaces."
   claim_states:
     - "OBSERVED"
     - "INFERRED"
@@ -85,20 +100,16 @@ artifacts:
   status_rule: "Mutable status and reports are operational projections only and never override the spec or settled evidence. Respect .agents/AGENTS.md append/mirror protocol."
 verification:
   global_gates:
-    -
-      id: "H-BUILD"
+    - id: "H-BUILD"
       command: "just check"
       available_after: "T04; before then use task-local structural gates"
-    -
-      id: "H-TEST"
+    - id: "H-TEST"
       command: "just test"
       available_after: "T04"
-    -
-      id: "H-BOUNDARY"
+    - id: "H-BOUNDARY"
       command: "just boundaries"
       available_after: "T04"
-    -
-      id: "H-VERIFY"
+    - id: "H-VERIFY"
       command: "just verify"
       available_after: "T04"
   gate_binding_rule: "T04 MUST create a real, verified Justfile resolving only actual Bun/Cognate/DomainForge commands. Tasks T00–T03 use their explicit narrow gates because the app skeleton does not yet exist. Each subsequent task provides its 'just gate-tNN' target with real tests, and global gates reuse the same underlying checks; do not create fake green aliases."
@@ -109,46 +120,122 @@ verification:
     P3: "Frozen preregistration before work, builder evidence, adversarial attacks, independent fresh replay, correction/reconfirmation after failure."
 dependency_graph:
   edges:
-    - ["T00", "T01"]
-    - ["T01", "T02"]
-    - ["T02", "T03"]
-    - ["T03", "T04"]
-    - ["T04", "T05"]
-    - ["T04", "T06"]
-    - ["T01", "T06"]
-    - ["T02", "T07"]
-    - ["T05", "T07"]
-    - ["T06", "T07"]
-    - ["T07", "T08"]
-    - ["T07", "T09"]
-    - ["T03", "T09"]
-    - ["T06", "T10"]
-    - ["T07", "T10"]
-    - ["T07", "T11"]
-    - ["T04", "T11"]
-    - ["T11", "T12"]
-    - ["T11", "T13"]
-    - ["T06", "T14"]
-    - ["T11", "T14"]
-    - ["T12", "T14"]
-    - ["T13", "T14"]
-    - ["T06", "T15"]
-    - ["T11", "T15"]
-    - ["T13", "T15"]
-    - ["T07", "T16"]
-    - ["T10", "T16"]
-    - ["T07", "T17"]
-    - ["T13", "T17"]
-    - ["T08", "T18"]
-    - ["T09", "T18"]
-    - ["T10", "T19"]
-    - ["T12", "T19"]
-    - ["T13", "T19"]
-    - ["T14", "T19"]
-    - ["T15", "T19"]
-    - ["T16", "T19"]
-    - ["T17", "T19"]
-    - ["T18", "T19"]
+    - - "T00"
+      - "T01"
+    - - "T01"
+      - "T02"
+    - - "T02"
+      - "T03"
+    - - "T03"
+      - "T04"
+    - - "T04"
+      - "T05"
+    - - "T04"
+      - "T06"
+    - - "T01"
+      - "T06"
+    - - "T02"
+      - "T07"
+    - - "T05"
+      - "T07"
+    - - "T06"
+      - "T07"
+    - - "T07"
+      - "T08"
+    - - "T07"
+      - "T09"
+    - - "T03"
+      - "T09"
+    - - "T06"
+      - "T10"
+    - - "T07"
+      - "T10"
+    - - "T07"
+      - "T11"
+    - - "T04"
+      - "T11"
+    - - "T11"
+      - "T12"
+    - - "T11"
+      - "T13"
+    - - "T06"
+      - "T14"
+    - - "T11"
+      - "T14"
+    - - "T12"
+      - "T14"
+    - - "T13"
+      - "T14"
+    - - "T06"
+      - "T15"
+    - - "T11"
+      - "T15"
+    - - "T13"
+      - "T15"
+    - - "T07"
+      - "T16"
+    - - "T10"
+      - "T16"
+    - - "T07"
+      - "T17"
+    - - "T13"
+      - "T17"
+    - - "T21"
+      - "T17"
+    - - "T08"
+      - "T18"
+    - - "T09"
+      - "T18"
+    - - "T11"
+      - "T18"
+    - - "T22"
+      - "T18"
+    - - "T10"
+      - "T19"
+    - - "T12"
+      - "T19"
+    - - "T13"
+      - "T19"
+    - - "T14"
+      - "T19"
+    - - "T15"
+      - "T19"
+    - - "T16"
+      - "T19"
+    - - "T17"
+      - "T19"
+    - - "T18"
+      - "T19"
+    - - "T20"
+      - "T19"
+    - - "T21"
+      - "T19"
+    - - "T22"
+      - "T19"
+    - - "T06"
+      - "T20"
+    - - "T07"
+      - "T20"
+    - - "T11"
+      - "T20"
+    - - "T04"
+      - "T21"
+    - - "T06"
+      - "T21"
+    - - "T11"
+      - "T21"
+    - - "T13"
+      - "T21"
+    - - "T07"
+      - "T22"
+    - - "T08"
+      - "T22"
+    - - "T09"
+      - "T22"
+    - - "T11"
+      - "T22"
+    - - "T13"
+      - "T22"
   critical_path:
     - "T00"
     - "T01"
@@ -158,42 +245,44 @@ dependency_graph:
     - "T05"
     - "T07"
     - "T11"
-    - "T12"
-    - "T14"
+    - "T13"
+    - "T21"
+    - "T17"
     - "T19"
   parallel_tracks:
-    -
-      name: "T05 presentation protocol and T06 operational projections"
+    - name: "T05 presentation protocol and T06 operational projections"
       after: "T04"
       tasks:
         - "T05"
         - "T06"
-    -
-      name: "Independent renderers"
+    - name: "Independent renderers"
       after: "T07"
       tasks:
         - "T08"
         - "T09"
-    -
-      name: "Context debugger and authority"
+    - name: "Context debugger and authority"
       after: "T07"
       tasks:
         - "T10"
         - "T11"
-    -
-      name: "Bounded execution and independent observations"
+    - name: "Bounded execution and independent observations"
       after: "T11"
       tasks:
         - "T12"
         - "T13"
-    -
-      name: "Builder, monitoring, scenarios, learning"
+    - name: "Builder, monitoring, scenarios, learning"
       after: "T13 and T10 where individually required"
       tasks:
         - "T14"
         - "T15"
         - "T16"
         - "T17"
+    - name: "Products, research and operator experience"
+      after: "T11 (T22 also after T08, T09, T13)"
+      tasks:
+        - "T20"
+        - "T21"
+        - "T22"
   settlement_sequence:
     - "P0 topology skill inventory and source/spec freeze gate"
     - "P1 semantic IDM; P1B Behavioral IR/Clack proof; P1C Atomic UI IR"
@@ -201,6 +290,7 @@ dependency_graph:
     - "Canonical source/reducer, instance projections and navigation"
     - "Clack and React renderers plus read-only world debugger"
     - "SEA-Forge authority, Gauntlet, RealityTrace evidence and advanced journeys"
+    - "Product connectors, research subsystem and operator home"
     - "Renderer parity, variation/recovery, fresh independent whole-stack conformance"
 initial_state:
   current_task: "T00"
@@ -255,9 +345,12 @@ initial_state:
     T17:
       - "T07"
       - "T13"
+      - "T21"
     T18:
       - "T08"
       - "T09"
+      - "T11"
+      - "T22"
     T19:
       - "T10"
       - "T12"
@@ -267,6 +360,24 @@ initial_state:
       - "T16"
       - "T17"
       - "T18"
+      - "T20"
+      - "T21"
+      - "T22"
+    T20:
+      - "T06"
+      - "T07"
+      - "T11"
+    T21:
+      - "T04"
+      - "T06"
+      - "T11"
+      - "T13"
+    T22:
+      - "T07"
+      - "T08"
+      - "T09"
+      - "T11"
+      - "T13"
 tasks:
   T00:
     title: "Start with Project Topology Architect: inspect, bind ruler, freeze formation constraints"
@@ -285,19 +396,24 @@ tasks:
     steps:
       - "FIRST load ~/projects/project-topology-architect/skills/project-topology-architect/SKILL.md and follow Greenfield P0 and relevant references. Do not silently substitute the vendored Horizon copy if the specified path is unavailable; block and ask."
       - "Read Horizon spec/README, root and .agents/AGENTS.md; verify sha256, requirement count, diagram labels and whether the spec is approved/frozen. Record any approval gap and refrain from implementation until resolved."
-      - "Inspect sibling GodSpeed stack checkouts and GitHub refs: Cognate's building-with-cognate skill, DomainForge, SEA-Forge, Gauntlet, RealityTrace, Context Kernel, existing godspeed_agent, Product Actualizer cockpit and scaffold capabilities."
+      - "Inspect sibling stack checkouts by remote identity (see supporting_sources): building-with-cognate, Cognate origin/main vs local branch, DomainForge published vs local, SEA-Forge (sea-rs), Gauntlet, RealityTrace (sxr), Context Kernel, godspeed_agent, Product Actualizer cockpit, terminal-ui and sea-rs workbench components."
       - "Record stable vs proposed APIs, license obligations, source-of-truth map, open questions and the P0/P1/P1B/P1C/P2 formation contract without reordering the normative plan."
       - "Initialize machine-readable requirement ledger and establish per-task evidence/prereg roots; document actual CLI/gate versions and user-controlled env paths."
+      - "Record version drift between local checkouts and pinned releases without fetching; ask the operator before any fetch."
+      - "Verify Product Actualizer's Apache-2.0 LICENSE is committed at the revision Horizon will copy from; record it in the decision log."
+      - "Decide and record the single home for developmental scoring and promotion rules (REQ-DEV-003): Python capability, or TypeScript port with godspeed_agent golden fixtures as oracle."
+      - "Build the research migration manifest: godspeed_agent packages, scripts, configs, preregistrations, reports, ledgers and data with sizes and SHA-256, plus the cybernetic_nav MCP and godspeed-nav CLI tool inventory for REQ-RES-006."
+      - "Confirm or revise .agents/reports/horizon-product-integration-register.yaml (product dispositions and first two products for VAR-007)."
+      - "Check whether SEA-Forge exposes a non-granting evaluate over the wire; if not, record the upstream request and plan the deferred_to_invocation gate state (CLAIM-006)."
     gate:
       - "test -r .agents/specs/horizon.agent.spec.yaml && test -r .agents/plans/horizon.plan.yaml"
       - "sha256sum .agents/specs/horizon.agent.spec.yaml"
       - "git diff --check"
+      - "test -r .agents/reports/horizon-product-integration-register.yaml"
     teeth:
-      -
-        attack: "Remove or falsify the requested topology skill path"
+      - attack: "Remove or falsify the requested topology skill path"
         expected: "Formation MUST block rather than proceed with an unverified different skill."
-      -
-        attack: "A preregistration says 'approved' while spec is still draft"
+      - attack: "A preregistration says 'approved' while spec is still draft"
         expected: "No implementation task unlocks until explicit freeze and matching spec hash are recorded."
     redesign_trigger: "The canonical topology skill's structural contracts contradict the normative Horizon spec or its requested skill location cannot be read."
     evidence: ".agents/evidence/horizon/T00/"
@@ -338,15 +454,14 @@ tasks:
       - "Derive .sea from canonical CognitiveOS references and the five J01–J05 spec journeys; preserve unknown capability, payment and authority details as unresolved rather than inventing syntax."
       - "Validate import closure and world identity using DomainForge actual installed CLI/binding; compare semantics against source spec, not just parse success."
       - "Capture canonicality conclusion, translation map, open questions, and immutable identity output."
+      - "Include semantic modules for research artifacts (dataset, preregistration, experiment run, verdict, estimator) and for the product integration contract, plus one module per first product; keep each product module owned by that product where it already models itself."
     gate:
       - "domainforge validate .sea/interaction/interaction-model.sea --application"
       - "git diff --check"
     teeth:
-      -
-        attack: "Insert unsupported guessed .sea relation or capability"
+      - attack: "Insert unsupported guessed .sea relation or capability"
         expected: "The model must fail validation or an explicit unrepresented semantics gate."
-      -
-        attack: "Treat a changed semantic closure as the same active world_ref"
+      - attack: "Treat a changed semantic closure as the same active world_ref"
         expected: "World identity comparison must show changed identity and demand explicit promotion."
     redesign_trigger: "The source semantics cannot be represented with supported .sea without losing payment, role, settlement or world-revision distinctions."
     evidence: ".agents/evidence/horizon/T01/"
@@ -365,7 +480,7 @@ tasks:
         - "Pinned external API and skill versions may differ from prose documentation."
       confirmation_condition: "Builder demonstrates preregistered positive and negative checks with stable evidence and documents plausible alternate failures."
   T02:
-    title: "Project J01–J05 into Behavioral IR and prove the Clack journey (P1B)"
+    title: "Project J01–J06 into Behavioral IR and prove the Clack journey (P1B)"
     initial_status: "blocked"
     depends_on:
       - "T01"
@@ -376,7 +491,7 @@ tasks:
       - "REQ-GOAL-002"
       - "REQ-NAV-004"
       - "REQ-CASE-001"
-    changes: "Five separate Behavioral IRs with IS1–IS8, a runnable fixture-backed sequential proof and explicit missing-boundary records."
+    changes: "Six separate Behavioral IRs with IS1–IS8, a runnable fixture-backed sequential proof and explicit missing-boundary records."
     proves: "A bounded observer can ask, inspect, choose, defer, reframe, or block each canonical journey without invented authority, payment or settlement."
     does_not_prove: "Fixtures do not prove production Cognate/SEA-Forge integrations or any durable external effect."
     hot_context:
@@ -384,18 +499,16 @@ tasks:
       - ".agents/specs/horizon.agent.spec.yaml"
     steps:
       - "Use deriving-behavioral-interaction-proofs skill PROVE mode for behavior fixtures; load its schemas and validator."
-      - "Instantiate J01 explore, J02 operate, J03 build, J04 monitor, J05 compare with stable semantic refs and explicit authority/payment/recovery/evidence statuses."
+      - "Instantiate J01 explore, J02 operate, J03 build, J04 monitor, J05 compare and J06 develop with stable semantic refs and explicit authority/payment/recovery/evidence statuses; use the REQ-NAV-006 authority gate vocabulary."
       - "Exercise positive, blocked, unknown, conflicted, cancelled and contradicted routes with Clack-like one-decision-at-a-time prompts."
       - "Record projection-pressure findings, including required persistent focus, graph, comparison, timeline and evidence context."
     gate:
       - "python3 .agents/skills/deriving-behavioral-interaction-proofs/scripts/validate_behavioral_ir.py behavioral/journeys/*.yaml"
       - "git diff --check"
     teeth:
-      -
-        attack: "Remove approval or settlement binding from a consequential journey"
+      - attack: "Remove approval or settlement binding from a consequential journey"
         expected: "Sequential proof must block or mark unresolved; never infer permission."
-      -
-        attack: "Make every question mandatory regardless of already resolved context"
+      - attack: "Make every question mandatory regardless of already resolved context"
         expected: "Prompt-burden test must demonstrate redundant questions are skipped."
     redesign_trigger: "The canonical IDM lacks a necessary typed state, guard, decision, authority, recovery or next-affordance edge."
     evidence: ".agents/evidence/horizon/T02/"
@@ -434,15 +547,14 @@ tasks:
       - "Use deriving-atomic-ui-models skill, not screen sketches, to project Behavioral IR and projection pressure."
       - "Specify compact Clack prompts vs persistent regions, focus indicators, evidence inspector, choices, history and comparison, without mixing authority logic."
       - "Validate each view IR; record what a graph, timeline, table, or docked panel buys over a sequential question."
+      - "Model the home/attention view, command palette, breadcrumbs and deep-link entry as projections of the same behavioral frames, not new behavior."
     gate:
       - "python3 .agents/skills/deriving-atomic-ui-models/scripts/validate_atomic_ui_ir.py ui-model/views/*.yaml"
       - "git diff --check"
     teeth:
-      -
-        attack: "Insert an untraceable dashboard metric or approval button"
+      - attack: "Insert an untraceable dashboard metric or approval button"
         expected: "Atomic UI validator or traceability check must reject it."
-      -
-        attack: "Make GUI availability state diverge from behavioral gate"
+      - attack: "Make GUI availability state diverge from behavioral gate"
         expected: "The model must reference behavioral availability and block duplicated UI decision policy."
     redesign_trigger: "Sequential proof does not actually justify the rich-region or simultaneous-view responsibilities being modeled."
     evidence: ".agents/evidence/horizon/T03/"
@@ -475,30 +587,32 @@ tasks:
       - "REQ-CONFIG-004"
       - "REQ-CONFIG-010"
       - "REQ-GOAL-005"
+      - "REQ-SEC-006"
     changes: "An executable greenfield topology, Cognate application starter, Justfile gates, scoped config and clean adapter seams are present without copying another product's truth engine."
     proves: "The project boots, parses/pins semantics, resolves configuration and performs an honest structural source-to-intent-to-projection round-trip."
     does_not_prove: "No business behavior, live SEA-Forge approval, real external settlement or framework generality is proved by structural E2E."
     hot_context:
       - "~/projects/project-topology-architect/skills/project-topology-architect/SKILL.md"
-      - "../cognate/.agents/skills/building-with-cognate/references/cli.md"
+      - "~/projects/cognate/.agents/skills/building-with-cognate/references/cli.md"
       - "~/projects/product-actualizer/cockpit"
+      - "~/projects/godspeed_agent/pyproject.toml"
     steps:
       - "Resume canonical topology skill P2–P8 using validated IDM/Behavioral/Atomic IR and minimum sufficient project topology; create requirement ledger, acceptance contracts and Wayfinder candidate with independent criticism before freezing."
-      - "Read ../cognate/.agents/skills/building-with-cognate/SKILL.md plus references/cli.md, cognate-api.md and idm-to-cognate.md; use actual 'cognate create' profile sourced from checkout, adapting the result to current published composed-world loader rather than stale 0.19.0 skill examples."
+      - "Read building-with-cognate SKILL.md plus references/cli.md, cognate-api.md and idm-to-cognate.md; scaffold with the pinned published CLI ('cognate create <dir> --profile copilot|harness', --source optional) and bind loadSemanticWorld from @godspeedai/cognate-domainforge 0.6.1+ with DomainForge 0.21.1+."
       - "Inspect SPRIME01/Product-Actualizer cockpit and applicable actualize-product skill and templates; use the actual reusable structural/surface patterns to scaffold the cockpit portion. Do not assume it has an app generator or import its Product Model/router as runtime authority."
       - "Derive Bun/TypeScript Cognate layout, runtime, projections, adapters, CLI/TUI and UI seams; pin reproducible dependency versions and use existing GodSpeed tooling."
       - "Create justfile with stable setup, check, test, boundaries, verify, status and task-scoped gate recipes; structural E2E must boot real wiring, while unsatisfied behavior remains explicitly open."
       - "Run project-topology-architect requirement ledger and skeleton validation tools; record exact release API mismatches rather than silently working around them."
+      - "Place the Python research subsystem in the topology (own uv project and lock, pytest gate called by 'just test'), with a typed process contract stub that Cognate invokes; no ML logic yet."
+      - "Configure the local_operator deployment profile: loopback transports, per-launch secrets, OS-session operator identity and separate agent principals; refuse shared_remote without an identity provider."
     gate:
       - "just check"
       - "just boundaries"
       - "just verify"
     teeth:
-      -
-        attack: "Remove required Cognate project dependency or load a fake in-memory runtime"
+      - attack: "Remove required Cognate project dependency or load a fake in-memory runtime"
         expected: "Structural E2E must fail with bounded diagnostic rather than quietly pass a mock."
-      -
-        attack: "Copy Product Actualizer's process source as canonical Horizon world state"
+      - attack: "Copy Product Actualizer's process source as canonical Horizon world state"
         expected: "Boundary test must reject competing model/authority store."
     redesign_trigger: "Cognate starter cannot represent required semantics without a framework change, or scaffold donor requires copying a second authoritative system."
     evidence: ".agents/evidence/horizon/T04/"
@@ -533,27 +647,28 @@ tasks:
       - "REQ-SEC-002"
       - "REQ-SEC-003"
       - "REQ-SEC-004"
+      - "REQ-UX-006"
     changes: "A versioned validated surface schema, semantic action reducer, authorized source expressions, contextual CLI/MCP/WebMCP views and role-separated layout actions exist as portable Cognate-facing contracts."
     proves: "The same validated intent/projection rules reject injected code, forbidden roles, unknown blocks/refs and agent layout theft."
     does_not_prove: "Does not prove that source projections are live, or that a correctly formed command is independently authorized by SEA-Forge."
     hot_context:
       - "~/projects/product-actualizer/cockpit/protocol"
-      - "~/projects/product-actualizer/cockpit/grammar.test.ts"
+      - "~/projects/product-actualizer/tests/cockpit/grammar.test.ts"
     steps:
       - "Inspect cockpit/protocol/spec.ts, actions.ts, catalog.ts, server/workspace.ts, server/sources.ts, web/Surface.tsx and tests/cockpit/grammar.test.ts before extraction."
       - "Preserve fifteen closed blocks unless a failed real fixture justifies a change; keep human/agent/system roles distinct."
       - "Create source-bound adapters with typed provenance and bounded query syntax; preserve owner's pins and layout."
       - "Share semantic tooling definitions across CLI, MCP and optional WebMCP without exposing raw DOM or owner-ruling actions."
       - "Write schema, ref, role, injection and grammar composition tests."
+      - "Copy cockpit code under Apache-2.0 with attribution and a NOTICE entry, keeping only what the earned journeys need."
+      - "Carry over the actor field for every op so delegated agent actions are distinct from owner actions (fixes Product Actualizer debt)."
     gate:
       - "just gate-t05"
       - "just verify"
     teeth:
-      -
-        attack: "Provide '<script>' or arbitrary JSX as agent-provided surface"
+      - attack: "Provide '<script>' or arbitrary JSX as agent-provided surface"
         expected: "Schema must reject with no render/mutation."
-      -
-        attack: "Agent calls human.approve or moves pinned owner panel"
+      - attack: "Agent calls human.approve or moves pinned owner panel"
         expected: "Reducer must return typed authority/layout rejection."
     redesign_trigger: "Closed grammar cannot represent an earned journey and no defensible extension passes a new scenario test."
     evidence: ".agents/evidence/horizon/T05/"
@@ -572,7 +687,7 @@ tasks:
         - "Pinned external API and skill versions may differ from prose documentation."
       confirmation_condition: "Builder demonstrates preregistered positive and negative checks with stable evidence and documents plausible alternate failures."
   T06:
-    title: "Build Cognate operational object-set and relationship projections"
+    title: "Build the operational object layer: typed object-set and relationship projections on Cognate"
     initial_status: "blocked"
     depends_on:
       - "T04"
@@ -585,27 +700,31 @@ tasks:
       - "REQ-WORLD-003"
       - "REQ-WORLD-005"
       - "REQ-SAFE-003"
-    changes: "Typed instance sets, filters, relationship traversal and lineage sources are grounded in scoped Cognate projections under canonical DomainForge semantics."
+      - "REQ-WORLD-006"
+      - "REQ-WORLD-007"
+    changes: "A Horizon-owned typed object projection layer on Cognate's public Projection API materializes instances, links and lineage keyed by DomainForge semantic IDs with composite checkpoint refs (CLAIM-005)."
     proves: "A real pinned organization model can search, filter and follow at least two relationships with source provenance, scope boundaries and reproducible checkpoint identities."
     does_not_prove: "Graph existence does not prove operational instance completeness or any external action."
     hot_context:
-      - "../cognate/packages/domainforge"
-      - "../cognate/packages/runtime-bun"
-      - "../domainforge"
+      - "~/projects/cognate/packages/projections"
+      - "~/projects/cognate/packages/events"
+      - "~/projects/cognate/packages/domainforge"
+      - "~/projects/domainforge"
     steps:
       - "Bind canonical semantic IDs from .sea to Cognate runtime projections and durable typed operational fixture instances; do not conflate import graph, operational graph and lineage graph."
       - "Implement deterministic scoped query/filter and typed links; include cursor/empty/denied/unavailable distinctions."
       - "Create a reproducible live projection fixture plus property/relationship conformance checks at checkpoint."
       - "Keep RuVector indexing derived/rebuildable and optional; do not invent graph features unavailable in installed versions."
+      - "Define checkpoint_ref as Cognate commit position plus the projection names/versions read; reject queries across mismatched checkpoints."
+      - "Expose owning product, connector, checkpoint age and integration level on every result (REQ-WORLD-007)."
+      - "Report generic object-query gaps upstream to Cognate instead of patching framework internals."
     gate:
       - "just gate-t06"
       - "just verify"
     teeth:
-      -
-        attack: "Change observer role to one with no object access"
+      - attack: "Change observer role to one with no object access"
         expected: "Query must not leak objects or disclose denied identities."
-      -
-        attack: "Return no rows when source is down"
+      - attack: "Return no rows when source is down"
         expected: "Status must distinguish unavailable from genuine empty result."
     redesign_trigger: "Live operational instance semantics cannot be projected without inventing a second ontology or incompatible object identity."
     evidence: ".agents/evidence/horizon/T06/"
@@ -643,26 +762,30 @@ tasks:
       - "REQ-CASE-003"
       - "REQ-OUT-001"
       - "REQ-OUT-002"
+      - "REQ-NAV-006"
+      - "REQ-NAV-007"
     changes: "A pure context/focus/case selector derives candidate operations and explanations, evaluates visible/reachable/payable/governable/executable/recoverable/settleable gates, and emits revisioned frames."
     proves: "Available, blocked, unknown and conflicted alternatives remain distinct, a single primary move is evidence-responsive and optional-only cases are not spuriously forced to settle."
     does_not_prove: "Gate evaluation is a provisional representation and not invocation authority or developmental settlement."
     hot_context:
-      - "../godspeed_agent"
-      - "~/projects/product-actualizer/blob/main/docs/case-navigation.md"
+      - "~/projects/godspeed_agent/godspeed_nav"
+      - "~/projects/product-actualizer/docs/case-navigation.md"
+      - "~/projects/godspeed-compass"
+      - "~/projects/gs-term/src/focus/attention.ts"
     steps:
       - "Derive case and affordance fields from real sources, avoiding a second case database."
       - "Implement a pure mode selector and deterministic narrowing over the eligible set; preserve alternatives and 'not the right problem' reframe."
       - "Carry observer, world_ref, checkpoint, focus, operation, reasons, payment and evidence refs into immutable frame revisions."
       - "Test simultaneous attention modes, no-affordance branches, uncertain payment/recovery, settlementReachable versus shouldSettleNow."
+      - "Implement the authority gate vocabulary of REQ-NAV-006 and the reversibility class; deferred_to_invocation is a known state, unknown blocks."
+      - "Expose the mode-precedence selector so the home view (T22) reuses it rather than re-ranking."
     gate:
       - "just gate-t07"
       - "just verify"
     teeth:
-      -
-        attack: "Rank an unauthorized high-value action first"
+      - attack: "Rank an unauthorized high-value action first"
         expected: "Elimination must remove it from usable options regardless of rank."
-      -
-        attack: "Force an end-case primary on optional-only reachable case"
+      - attack: "Force an end-case primary on optional-only reachable case"
         expected: "Frame must present an owner choice with no forced primary."
     redesign_trigger: "Affordance state cannot be derived from independent sources without collapsing prediction into fact."
     evidence: ".agents/evidence/horizon/T07/"
@@ -691,25 +814,28 @@ tasks:
       - "REQ-UI-004"
       - "REQ-INT-002"
       - "REQ-GOAL-003"
+      - "REQ-UX-008"
+      - "REQ-UX-005"
     changes: "A keyboard-operable Clack-style journey presents one discriminating decision at a time and emits only validated typed intents."
     proves: "J01–J05 fixture episodes traverse all relevant branches and return to persistent context with no renderer-side business authority."
     does_not_prove: "Does not prove parity with GUI or real external integrations."
     hot_context:
       - "behavioral/journeys"
       - ".agents/skills/deriving-behavioral-interaction-proofs/SKILL.md"
+      - "~/projects/terminal-ui"
     steps:
       - "Consume validated frame and surface specs; use semantic choices, confirmation review and informative errors."
       - "Implement back, defer, cancel, resume, selected-object preservation and no-question fallback for deterministically known context."
       - "Use real source adapter in the read-only exploration fixture; simulate consequential effects only when explicitly labeled."
+      - "Build on terminal-ui Clack-inspired components (registry copy); keep business logic out of components."
+      - "Provide 'horizon frame --json' so agents and scripts read the same frames."
     gate:
       - "just gate-t08"
       - "just verify"
     teeth:
-      -
-        attack: "Terminal submits stale frame revision after world focus change"
+      - attack: "Terminal submits stale frame revision after world focus change"
         expected: "Reducer refuses action and requests refresh."
-      -
-        attack: "Cancel midway through a choice"
+      - attack: "Cancel midway through a choice"
         expected: "No side effect or erased context."
     redesign_trigger: "Clack requires business-specific state branching not expressible by shared Behavioral IR."
     evidence: ".agents/evidence/horizon/T08/"
@@ -719,7 +845,7 @@ tasks:
       - "The task evidence includes touched refs, commands, results, and remaining unknowns."
       - "Applicable global gates remain green; no required test is skipped."
   T09:
-    title: "Implement Atomic GUI projection in Cognate/React/Astryx"
+    title: "Implement Atomic GUI projection in Cognate React"
     initial_status: "blocked"
     depends_on:
       - "T07"
@@ -730,26 +856,34 @@ tasks:
       - "REQ-UI-005"
       - "REQ-UI-006"
       - "REQ-OUT-004"
+      - "REQ-UX-005"
+      - "REQ-UX-006"
+      - "REQ-UX-008"
+      - "REQ-UX-011"
+      - "REQ-NAV-007"
     changes: "A persistent world workspace presents source-bound exploration, contextual actions, evidence, and layout using the same frames, intents, and closed blocks."
     proves: "Rich GUI does not create a second availability/approval policy; pinned panels, focus and evidence state survive agent updates."
     does_not_prove: "A working GUI alone does not prove Clack equivalence, live authority or world consequence."
     hot_context:
-      - "../cognate/packages/client-react"
-      - "~/projects/product-actualizer/cockpit/web/layoutMap.ts"
+      - "~/projects/cognate/packages/react"
+      - "~/projects/cognate/packages/ui-astryx (reference only; Astryx is beta)"
+      - "~/projects/sea-rs/workbench/packages/sea-forge-ui-components"
+      - "~/projects/sea-rs/workbench/packages/sea-forge-ui-tokens"
+      - "~/projects/product-actualizer/cockpit/web"
     steps:
-      - "Use Atomic UI IR with React/Astryx and current Cognate client patterns; adapt Product Actualizer 15 block renderers, Dockview topology and owner-pinning tests only where earned."
+      - "Use Atomic UI IR with @godspeedai/cognate-react as the data layer; reuse SEA-Forge governed components (ProtectedActionButton, AvailabilityLadder, WhyStatePanel, EvidenceDrawer, SourceFreshnessBadge) and tokens, adding a light theme; adapt Product Actualizer block renderers, Dockview topology and owner-pinning tests only where earned and licensed."
       - "Present focus, world/checkpoint, evidence, source/ref inspector, disabled-and-blocked reasons, keyboard/screenreader control, and accessible loading/error/recovery states."
       - "Expose contextual panels without chat-first navigation; ensure agent compositions cannot control layout or impersonate human."
       - "Run accessibility and source-binding tests with real data fixtures."
+      - "Graphs open fit-to-content, aggregate past a bounded node count and always offer a table projection."
+      - "Lead every blocked or pending choice with a plain-language reason and single next prerequisite; drill down to gates and evidence."
     gate:
       - "just gate-t09"
       - "just verify"
     teeth:
-      -
-        attack: "Agent update rearranges pinned owner surface"
+      - attack: "Agent update rearranges pinned owner surface"
         expected: "Layout remains unchanged."
-      -
-        attack: "Hide current-versus-candidate banner on historical data"
+      - attack: "Hide current-versus-candidate banner on historical data"
         expected: "GUI must indicate non-current scope independent of agent-supplied text."
     redesign_trigger: "Rich UI requires unverifiable state or logic that cannot remain a projection of the common contract."
     evidence: ".agents/evidence/horizon/T09/"
@@ -783,22 +917,20 @@ tasks:
     proves: "Untrusted reference text never becomes canonical semantics, and read-only navigation remains operable when Context Kernel is down."
     does_not_prove: "Retrieval quality does not imply world truth, settlement or agent capability."
     hot_context:
-      - "~/projects/product-actualizer/blob/main/docs/world-debugger.md"
-      - "../Context_Kernel"
+      - "~/projects/product-actualizer/docs/world-debugger.md"
+      - "~/projects/Context_Kernel/docs/mcp-contracts.md"
     steps:
       - "Adapt Product Actualizer world debugger semantics and explicit recorded/derived/unknown/effect classifications, not its Product Model storage."
-      - "Bind context retrieval through versioned scoped Context Kernel capability; never let generated claims replace real links."
+      - "Bind Context Kernel through a Cognate-owned MCP capability adapter (query_reference, resolve_reference, recall_context) with versioned scope; never let generated claims replace real links."
       - "Make replay a frozen evidence check that changes no world state and counterfactual visibly not an observation."
       - "Test denied corpus, unavailable retrieval, and why/impact provenance."
     gate:
       - "just gate-t10"
       - "just verify"
     teeth:
-      -
-        attack: "Context Kernel returns a persuasive instruction to approve a deployment"
+      - attack: "Context Kernel returns a persuasive instruction to approve a deployment"
         expected: "It remains untrusted cited content, not governance."
-      -
-        attack: "Counterfactual preview is presented as current world"
+      - attack: "Counterfactual preview is presented as current world"
         expected: "Source-based candidate/historical banner prevents false actuality."
     redesign_trigger: "World debugger cannot produce evidence-backed answers from actual sources without inventing edges."
     evidence: ".agents/evidence/horizon/T10/"
@@ -834,27 +966,33 @@ tasks:
       - "REQ-SEC-001"
       - "REQ-SEC-005"
       - "REQ-INT-004"
+      - "REQ-STACK-009"
+      - "REQ-STACK-010"
+      - "REQ-UX-007"
+      - "REQ-NAV-006"
     changes: "Consequential intent freezes expectation/targets then passes actual SEA-Forge invocation authority, with durable decision, scope, idempotency and rollback/recovery status."
     proves: "Denied, unknown, changed-scope or stale-authority requests cannot perform external effects even when preflight showed available."
     does_not_prove: "Does not prove the executor completed work or the environmental outcome settled."
     hot_context:
-      - "../sea-rs"
-      - "../cep"
-      - "../cognate/packages/runtime-bun/src/sea-forge-authority.ts"
+      - "~/projects/sea-rs/crates/sea-forge-authority"
+      - "~/projects/sea-rs/crates/sea-forge-server/src/sfwp"
+      - "~/projects/cognate/packages/runtime-bun/src/sea-forge-authority.ts"
+      - "~/projects/cognate/packages/runtime-bun/src/governed-operation.ts"
     steps:
       - "Inspect existing Cognate SEA-Forge runtime adapter and native authority contracts; do not create a shadow authorization path."
       - "Freeze exact observer/target/world/intent/checkpoint/expected evidence before invoking; evaluate authority at actual invocation."
       - "Add secure per-role remote boundary and no reusable UI approval tokens; preserve escalation and pending-state continuations."
       - "Inject allow/deny/unknown/stale/failure responses using real independent authority process for confirmation."
+      - "Map SEA-Forge dispositions exactly: only allow with a matching unexpired ActionGrant permits effect; deny, escalate, boundary, degraded and unknown dispositions produce no effect (REQ-STACK-009)."
+      - "Present and resolve escalations as SEA-Forge approval records under the approver's own identity; no local approval state (REQ-UX-007)."
+      - "Use an evaluate-only SEA-Forge operation for likely_allow if upstream exposes it; otherwise emit deferred_to_invocation."
     gate:
       - "just gate-t11"
       - "just verify"
     teeth:
-      -
-        attack: "Replay previous allow token for changed target or world"
+      - attack: "Replay previous allow token for changed target or world"
         expected: "SEA-Forge invocation must refuse before effect."
-      -
-        attack: "Disconnect authority provider before commit"
+      - attack: "Disconnect authority provider before commit"
         expected: "Fail closed; no provider fallback or fabricated approval."
     redesign_trigger: "Canonical SEA-Forge cannot express or reliably enforce the intended scope, requiring explicit upstream contract revision."
     evidence: ".agents/evidence/horizon/T11/"
@@ -897,18 +1035,16 @@ tasks:
       - "../cognate"
     steps:
       - "Inspect gauntlet docs, frozen contract, Wayfinder and installed harness adapters; pin actual compatible revision."
-      - "Bind a Cognate capability dispatch with start, monitor, cancel, resume, results, reconciliation and idempotent effects."
+      - "Bind a Cognate capability that drives the real 'gauntlet' CLI (reference freeze, run, verify, settle, resume) through Cognate execution ports, with start, monitor, cancel, resume, results, reconciliation and idempotent effects."
       - "Test deliberate mid-run representation contradiction and partial recovery; preserve original reference and propose correction outside run."
       - "Require fresh isolated verifier to repeat against real Gauntlet engine, not mocked adapter."
     gate:
       - "just gate-t12"
       - "just verify"
     teeth:
-      -
-        attack: "Try rewriting frozen Wayfinder after discovering invalid plan"
+      - attack: "Try rewriting frozen Wayfinder after discovering invalid plan"
         expected: "Mutation refused and proposal recorded without changing current run."
-      -
-        attack: "Dispatch simple direct business action through Gauntlet needlessly"
+      - attack: "Dispatch simple direct business action through Gauntlet needlessly"
         expected: "Planner must justify bounded orchestration or choose direct adapter."
     redesign_trigger: "Real Gauntlet binding cannot preserve immutable Reference and observed verification under supplied contract."
     evidence: ".agents/evidence/horizon/T12/"
@@ -952,9 +1088,9 @@ tasks:
     proves: "Receipt acknowledgment, trace evidence, operational settlement and developmental evaluation are separate observable states; unresolved evidence fails closed."
     does_not_prove: "Does not prove durable developmental capability, which requires repeated variation and transfer."
     hot_context:
-      - "../sxr"
-      - "../cognate/packages/realitytrace"
-      - "../sea-rs"
+      - "~/projects/sxr"
+      - "~/projects/cognate/packages/realitytrace"
+      - "~/projects/sea-rs/crates/sea-forge-settlement"
     steps:
       - "Inspect Cognate RealityTrace outbox and actual CLI/readback semantics; preserve existing durable event authority."
       - "Freeze expectation and primary/guardrail criteria before invocation; correlate external observations and residuals by stable IDs."
@@ -964,11 +1100,9 @@ tasks:
       - "just gate-t13"
       - "just verify"
     teeth:
-      -
-        attack: "Return successful delivery receipt but no supporting observation"
+      - attack: "Return successful delivery receipt but no supporting observation"
         expected: "Review remains evidence-pending, not settled."
-      -
-        attack: "Alter frozen criterion after receiving outcome"
+      - attack: "Alter frozen criterion after receiving outcome"
         expected: "Historical criterion remains immutable and alteration is rejected or a new candidate."
     redesign_trigger: "RealityTrace evidence API cannot actually read back the type of independent observation required by spec."
     evidence: ".agents/evidence/horizon/T13/"
@@ -1008,27 +1142,27 @@ tasks:
       - "REQ-STACK-001"
       - "REQ-WORLD-004"
       - "REQ-GOAL-001"
+      - "REQ-WORLD-008"
     changes: "A proposed semantic or pipeline change has lineage, bounded verification, evidence, and an explicit SEA-Forge-governed promote decision from old to candidate world."
     proves: "In-flight work retains pinned world_ref and acceptance criteria; candidate revision cannot silently become active."
     does_not_prove: "Does not validate general automatic self-modification or external organization-wide migration."
     hot_context:
-      - "../domainforge"
-      - "../cognate/packages/domainforge"
-      - "../gauntlet"
+      - "~/projects/domainforge/domainforge-core/src/application/world.rs"
+      - "~/projects/cognate/packages/domainforge"
+      - "~/projects/gauntlet"
     steps:
       - "Derive separate typed views for source lineage, semantic definitions, and operational instance effects."
       - "Validate candidate DomainForge composed closure and diff identity; keep old active world until independent review and authority."
       - "Use bounded Gauntlet work when necessary and RealityTrace for observed verification and negative evidence."
       - "Test concurrent active run, promotion denial, failed candidate validation and rollback/recovery."
+      - "Promote by retargeting a DomainForge world alias (WorldCatalog alias history) after SEA-Forge authority; build the candidate-versus-active semantic diff as a read-only derived view, since DomainForge has no world diff."
     gate:
       - "just gate-t14"
       - "just verify"
     teeth:
-      -
-        attack: "Swap active world_ref during frozen execution"
+      - attack: "Swap active world_ref during frozen execution"
         expected: "Execution continues with old pin; explicit subsequent migration needed."
-      -
-        attack: "Promote a candidate with invalid closure or denied policy"
+      - attack: "Promote a candidate with invalid closure or denied policy"
         expected: "No active pointer change."
     redesign_trigger: "World promotion needs semantics or governance unavailable in existing owners, not a Horizon-owned shadow registry."
     evidence: ".agents/evidence/horizon/T14/"
@@ -1067,27 +1201,27 @@ tasks:
       - "REQ-INT-003"
       - "REQ-OUT-003"
       - "REQ-SAFE-001"
+      - "REQ-UX-012"
     changes: "Source events can update operational projections and generate evidence-backed notices or independently authorized bounded responses."
     proves: "Duplicate source triggers and delayed approvals cannot cause duplicate effects or bypass actual invocation authority."
     does_not_prove: "Does not prove general-purpose event streaming or perpetual autonomous operation."
     hot_context:
-      - "../cognate"
-      - "../sea-rs"
-      - "../sxr"
+      - "~/projects/cognate"
+      - "~/projects/sea-rs"
+      - "~/projects/sxr"
     steps:
       - "Bind Cognate durable event identity, checkpoint and conditions to an exact response intent."
       - "Distinguish notification, request-human, and fully governed automatic effect; use Gauntlet only if appropriate."
       - "Record RealityTrace observations and SEA-Forge obligation decisions where applicable."
       - "Repeat conditions with duplicate deliveries and uncertain acknowledgment under an isolated verifier."
+      - "Route notices into the home attention view, deduplicated by source identity and severity-ranked."
     gate:
       - "just gate-t15"
       - "just verify"
     teeth:
-      -
-        attack: "Deliver same source event three times after timeout"
+      - attack: "Deliver same source event three times after timeout"
         expected: "No duplicate external effect; uncertainty remains traceable."
-      -
-        attack: "Auto-invoke while approval pending"
+      - attack: "Auto-invoke while approval pending"
         expected: "No effect before independent allow."
     redesign_trigger: "Exactly-once logical action cannot be reconstructed from durable events and idempotency without a new owner contract."
     evidence: ".agents/evidence/horizon/T15/"
@@ -1128,22 +1262,21 @@ tasks:
     proves: "No simulated result is presented as observed, settlement, or authorization to execute."
     does_not_prove: "Does not prove calibrated organizational prediction or full-fledged simulation."
     hot_context:
-      - "../godspeed_agent"
-      - "~/projects/product-actualizer/blob/main/docs/world-debugger.md"
+      - "~/projects/godspeed_agent/godspeed_nav/ml.py"
+      - "~/projects/product-actualizer/docs/world-debugger.md"
     steps:
       - "Use deterministic what-if effects where source-backed and label heuristic or unavailable predictions."
       - "Preserve candidate parent world and checkpoint; show alternate scenarios in closed compare/graph/table blocks."
       - "A selected real action must create a fresh governed intent through T11, not reuse simulated permission."
       - "Record no-simulator negative case as unsupported rather than generated fake estimate."
+      - "If T21 has activated an estimator, show its estimates only as labeled advisory values with calibration refs; otherwise use the deterministic or unsupported path."
     gate:
       - "just gate-t16"
       - "just verify"
     teeth:
-      -
-        attack: "Pretend a simulated expediting result reduced actual delays"
+      - attack: "Pretend a simulated expediting result reduced actual delays"
         expected: "Projection retains hypothetical class and excludes settlement."
-      -
-        attack: "Scenario model adapter missing"
+      - attack: "Scenario model adapter missing"
         expected: "Offer deterministic comparison of known constraints or clearly report unsupported."
     redesign_trigger: "Required hypothetical distinction cannot be represented without creating a parallel mutable world authority."
     evidence: ".agents/evidence/horizon/T16/"
@@ -1167,6 +1300,7 @@ tasks:
     depends_on:
       - "T07"
       - "T13"
+      - "T21"
     proof_level: "P3"
     confirmation: "fresh_independent_adversarial"
     settles:
@@ -1176,27 +1310,29 @@ tasks:
       - "REQ-GOAL-004"
       - "REQ-VERIFY-004"
       - "REQ-CASE-003"
+      - "REQ-DEV-003"
+      - "REQ-RES-005"
     changes: "Case developmental history preserves unsuccessful attempts, payment, recovery, orchestration burden, repeated settlement evidence and justified next-affordance updates."
     proves: "Capability assessment refuses promotion after one pass and changes only with varied transfer/recovery evidence."
     does_not_prove: "Cannot prove horizon expansion outside domains and settings actually observed."
     hot_context:
-      - "../godspeed_agent"
+      - "~/projects/godspeed_agent/godspeed_nav/developmental_memory.py"
+      - "~/projects/godspeed_agent/HARNESS.md"
       - "CognitiveOS Mathematical Specification v2.3"
       - "Purposeful Case Navigation and Observer–Case–Settlement"
     steps:
-      - "Port/apply canonical GodSpeed-Agent developmental model without a second evidence or authority ledger."
+      - "Apply the T00 decision for the single home of developmental rules; if porting, run godspeed_agent golden fixtures as the conformance oracle and retire the Python copy of that function."
       - "Implement explicit evidence provenance, counterexamples, contradiction ledger and capacity/payment updates."
       - "Preregister capability criteria requiring repeated settlement under variation, reduced orchestration and recovery."
       - "Exercise repeated episodes across changed scope/observer/environment, including false-success trap."
+      - "Export settled, failed and contradicted episodes to the research subsystem as versioned, scope-filtered datasets (REQ-RES-005)."
     gate:
       - "just gate-t17"
       - "just verify"
     teeth:
-      -
-        attack: "One task passed and agent stored explanation of success"
+      - attack: "One task passed and agent stored explanation of success"
         expected: "Capability state remains unproven."
-      -
-        attack: "Later successful run erases previous failure"
+      - attack: "Later successful run erases previous failure"
         expected: "Failure and its costs persist in history and affect next path."
     redesign_trigger: "Existing developmental representation lacks evidence of recovery/transfer and needs a spec-level semantic revision."
     evidence: ".agents/evidence/horizon/T17/"
@@ -1223,11 +1359,13 @@ tasks:
         - "Builder rationale used to explain away earlier failures"
       required_verdict: "CONFIRM with separately retained logs or REJECT with a falsifying counterexample"
   T18:
-    title: "Prove Clack ↔ Atomic GUI behavioral parity, restart and source replay"
+    title: "Prove Clack ↔ Atomic GUI ↔ command palette parity, restart and source replay"
     initial_status: "blocked"
     depends_on:
       - "T08"
       - "T09"
+      - "T11"
+      - "T22"
     proof_level: "P3"
     confirmation: "fresh_independent_adversarial"
     settles:
@@ -1237,15 +1375,17 @@ tasks:
       - "REQ-UI-004"
       - "REQ-INT-003"
       - "REQ-GOAL-005"
+      - "REQ-UX-002"
+      - "REQ-UX-003"
     changes: "Two renderers produce equivalent typed intents and guards from pinned frames; interrupt/resume recovers focus, evidence/checkpoint and layout without duplicate commitment."
     proves: "UI rendering differences cannot change decision semantics or authority; stale revisions and cross-world focus never silently retarget operations."
     does_not_prove: "Does not prove real SEA-Forge / external-world settlement until full target confirmation."
     hot_context:
-      - "cockpit/protocol/actions.ts donor reference"
+      - "~/projects/product-actualizer/cockpit/protocol/actions.ts (donor reference)"
       - "ui-model/traceability.yaml"
       - "behavioral/journeys"
     steps:
-      - "Replay same golden J01–J05 fixtures through Clack and GUI adapters."
+      - "Replay the same golden J01–J06 fixtures through Clack, GUI and command-palette adapters, and reopen deep links after restart."
       - "Compare semantic IDs, frame revisions, operation payloads, blocker states and results, not pixel equality."
       - "Destroy and restore client between commit and observation, vary world revision and role."
       - "Use independent verifier to compare reconstructed application event state with UI projections."
@@ -1253,11 +1393,9 @@ tasks:
       - "just gate-t18"
       - "just verify"
     teeth:
-      -
-        attack: "Make GUI bypass a blocked option but Clack reject it"
+      - attack: "Make GUI bypass a blocked option but Clack reject it"
         expected: "Differential test fails with exact frame/choice mismatch."
-      -
-        attack: "Restart in middle of previously committed action"
+      - attack: "Restart in middle of previously committed action"
         expected: "No second side effect; same intent and pending outcome."
     redesign_trigger: "Representation-dependent UI assumptions make the same behavioral intent impossible to express in both interfaces."
     evidence: ".agents/evidence/horizon/T18/"
@@ -1295,6 +1433,9 @@ tasks:
       - "T16"
       - "T17"
       - "T18"
+      - "T20"
+      - "T21"
+      - "T22"
     proof_level: "P3"
     confirmation: "fresh_independent_adversarial"
     settles:
@@ -1304,32 +1445,35 @@ tasks:
       - "REQ-VERIFY-002"
       - "REQ-SEC-004"
       - "REQ-SAFE-004"
+      - "REQ-STACK-010"
+      - "REQ-UX-009"
+      - "REQ-SEC-006"
+      - "REQ-STACK-014"
     changes: "A fresh target environment executes all five canonical journeys and adversarial branches with distinct authoritative records, evidence and recoverable replay."
     proves: "Every required normative ID has settled task evidence, P3 independent verdicts and no skipped required integration; claims match target observations."
     does_not_prove: "Successful app conformance is not proof of universally transferable human/AI developmental capability or future roadmap promises."
     hot_context:
       - ".agents/specs/horizon.agent.spec.yaml"
       - ".agents/plans/horizon.plan.yaml"
-      - "../cognate"
-      - "../sea-rs"
-      - "../gauntlet"
-      - "../sxr"
-      - "../Context_Kernel"
+      - "~/projects/cognate"
+      - "~/projects/sea-rs"
+      - "~/projects/gauntlet"
+      - "~/projects/sxr"
+      - "~/projects/Context_Kernel"
+      - "~/projects/godspeed_agent"
     steps:
       - "Freeze final source revision, requirement ledger, expectations and blind verifier question; provide independent validator with clean checkout and real target dependencies."
       - "Run actual Cognate/DomainForge/SEA-Forge/Gauntlet/RealityTrace/Context Kernel integration for relevant journeys; read authoritative logs not UI assertions."
-      - "Confirm exact source-bounded object traversal, denied/escalated actions, evidence discrepancy, semantic revision freeze, monitored duplicate event, hypothetical isolation, renderer parity, recovery and development evidence."
+      - "Confirm exact source-bounded object traversal across two products, denied/escalated actions, evidence discrepancy, semantic revision freeze, monitored duplicate event, hypothetical isolation, renderer parity, research run and estimator refusal, recovery and development evidence."
       - "Generate requirement-to-evidence report, unresolved cases, security findings, rollback, and explicit 'none — plan settled' only when every required gate passes."
       - "Preserve failures and rerun original negative test and fresh confirmation after corrections."
     gate:
       - "just gate-t19"
       - "just verify"
     teeth:
-      -
-        attack: "Mark final green when SEA-Forge or RealityTrace live checks were skipped"
+      - attack: "Mark final green when SEA-Forge or RealityTrace live checks were skipped"
         expected: "Final gate must fail and claim incomplete."
-      -
-        attack: "Feed contradictory settlement evidence after prior positive test"
+      - attack: "Feed contradictory settlement evidence after prior positive test"
         expected: "Verifier must revoke or qualify the settlement and retain both records."
     redesign_trigger: "One or more normative requirements proves untestable without invented evidence or an impossible cross-system contract."
     evidence: ".agents/evidence/horizon/T19/"
@@ -1355,6 +1499,180 @@ tasks:
       verifier_should_not_receive:
         - "Builder rationale used to explain away earlier failures"
       required_verdict: "CONFIRM with separately retained logs or REJECT with a falsifying counterexample"
+  T20:
+    title: "Product integration contract and first two heterogeneous product connectors"
+    initial_status: "blocked"
+    depends_on:
+      - "T06"
+      - "T07"
+      - "T11"
+    proof_level: "P3"
+    confirmation: "fresh_independent_adversarial"
+    settles:
+      - "REQ-STACK-011"
+      - "REQ-STACK-012"
+      - "REQ-STACK-013"
+      - "REQ-WORLD-007"
+      - "REQ-STACK-014"
+    changes: "A versioned product integration contract (semantic module, read connector, governed capability bindings, evidence hooks, optional hosted surface) and two real connectors, one non-TypeScript, joined to one world."
+    proves: "Products join through declared facets, their integration level is derived from proven facets, and cross-product traversal keeps per-product provenance and freshness."
+    does_not_prove: "Does not prove every workspace product is joined; the remainder stays in the product integration register."
+    hot_context:
+      - ".agents/reports/horizon-product-integration-register.yaml"
+      - "~/projects/cognate/packages/mcp"
+      - "~/projects/cognate/packages/execution"
+    steps:
+      - "Specify the contract as typed manifests validated at load; integration level is computed from passing facet checks, never declared."
+      - "Onboard the two register-selected products end to end through Cognate (process, CLI, MCP or Connect), one of them non-TypeScript."
+      - "Add hosted-surface deep links in and out for a product with its own UI; it runs outside Horizon's trust boundary."
+      - "Update the register with achieved levels and the next product queue."
+      - "Prove VAR-011: stop Horizon and exercise each connected product and stack owner through its own surface."
+    gate:
+      - "just gate-t20"
+      - "just verify"
+    teeth:
+      - attack: "Connector declares 'actionable' but its capability lacks SEA-Forge policy coverage"
+        expected: "Derived level stays queryable; actions show blocked with reason."
+      - attack: "Kill one product connector during cross-product traversal"
+        expected: "That product's objects show stale with last checkpoint; the other product stays live."
+      - attack: "Stop Horizon while both connected products are in use"
+        expected: "Both products keep working through their own surfaces (VAR-011)."
+    redesign_trigger: "A product cannot join without Horizon owning its data or authority."
+    evidence: ".agents/evidence/horizon/T20/"
+    done_when: &id001
+      - "Every declared narrow gate ran and passed with retained exact output."
+      - "Every deliberate negative/teeth case behaved as claimed."
+      - "The task evidence includes touched refs, commands, results, and remaining unknowns."
+      - "Applicable global gates remain green; no required test is skipped."
+    preregistration:
+      required: true
+      artifact: ".agents/prereg/horizon/T20.prereg.yaml"
+      claim: "Products join only through proven contract facets, with derived integration level and isolated failure."
+      falsifier: "Connector declares 'actionable' but its capability lacks SEA-Forge policy coverage"
+      known_confounds:
+        - "Mocks and fixture-only results are not live settlement evidence."
+        - "Pinned external API and skill versions may differ from prose documentation."
+      confirmation_condition: "Fresh independent verifier reproduces the declared positive and adversarial boundary tests against pinned artifacts, reports verdict and evidence."
+    independent_confirmation: &id002
+      verifier_receives:
+        - "Frozen source requirements, target claims and exact preregistration"
+        - "Pinned candidate artifacts and actual builder evidence"
+        - "Executable confirmation questions and permissions necessary for fresh reproduction"
+      verifier_should_not_receive:
+        - "Builder rationale used to explain away earlier failures"
+      required_verdict: "CONFIRM with separately retained logs or REJECT with a falsifying counterexample"
+  T21:
+    title: "Carry GodSpeed Agent research infrastructure into the Python research subsystem"
+    initial_status: "blocked"
+    depends_on:
+      - "T04"
+      - "T06"
+      - "T11"
+      - "T13"
+    proof_level: "P3"
+    confirmation: "fresh_independent_adversarial"
+    settles:
+      - "REQ-RES-001"
+      - "REQ-RES-002"
+      - "REQ-RES-003"
+      - "REQ-RES-004"
+      - "REQ-RES-005"
+      - "REQ-RES-006"
+      - "REQ-RES-007"
+    changes: "godspeed_agent dataset adapters, corpora builders, calibration pipeline, experiment matrices, shadow/guarded evaluation and predictive model port run as a Python subsystem invoked through Cognate, with research artifacts navigable as world objects and estimator activation governed."
+    proves: "A migrated experiment reproduces its original verdict from hash-pinned data, a new governed run freezes its preregistration first, and an estimator cannot influence ranking without governed activation on a passed held-out criterion."
+    does_not_prove: "Does not prove that agent-trajectory results transfer to Horizon operational episodes or that any estimator improves navigation."
+    hot_context:
+      - "~/projects/godspeed_agent/scripts/settlement_datasets"
+      - "~/projects/godspeed_agent/godspeed_nav/ml.py"
+      - "~/projects/godspeed_agent/.agents/reports"
+      - "~/projects/godspeed_agent/mcp/cybernetic_nav_server/server.py"
+      - "~/projects/godspeed_agent/HARNESS.md"
+    steps:
+      - "Move Python packages, scripts, configs, preregistrations, reports and tests per the T00 migration manifest with history and hashes; reference large data by hash and location."
+      - "Define the typed process contract (run experiment, read results, evaluate estimator, export/import dataset) and bind it as Cognate capabilities."
+      - "Reproduce v008 (SETTLED) and v007 (PARTIAL) from pinned data; record any discrepancy without upgrading claims."
+      - "Make research artifacts navigable world objects with provenance; launch runs as governed operations with compute payment and frozen preregistration."
+      - "Implement governed estimator activation and visible active/heuristic/disabled states; prove gate outcomes do not change (VAR-009)."
+      - "Publish the cybernetic_nav and godspeed-nav mapping or deprecation table and keep a compatibility shim where agents depend on it."
+      - "Keep the subsystem's pytest suite green under 'just test'."
+    gate:
+      - "just gate-t21"
+      - "just verify"
+    teeth:
+      - attack: "Edit a frozen preregistration after the run starts"
+        expected: "Mutation refused; a new candidate preregistration is required."
+      - attack: "Activate an estimator whose held-out criterion failed"
+        expected: "Activation denied; ranking unchanged; failure retained."
+      - attack: "Migration relabels v007 PARTIAL as settled"
+        expected: "Claim-level check fails the gate."
+    redesign_trigger: "The research pipelines cannot run behind a process contract without duplicating Horizon's authority or evidence ledgers."
+    evidence: ".agents/evidence/horizon/T21/"
+    done_when: *id001
+    preregistration:
+      required: true
+      artifact: ".agents/prereg/horizon/T21.prereg.yaml"
+      claim: "Migrated research reproduces original verdicts at original claim levels, and estimators influence nothing without governed activation."
+      falsifier: "Activate an estimator whose held-out criterion failed"
+      known_confounds:
+        - "Mocks and fixture-only results are not live settlement evidence."
+        - "Pinned external API and skill versions may differ from prose documentation."
+      confirmation_condition: "Fresh independent verifier reproduces the declared positive and adversarial boundary tests against pinned artifacts, reports verdict and evidence."
+    independent_confirmation: *id002
+  T22:
+    title: "Operator home, command palette, deep links and navigation trail"
+    initial_status: "blocked"
+    depends_on:
+      - "T07"
+      - "T08"
+      - "T09"
+      - "T11"
+      - "T13"
+    proof_level: "P2"
+    confirmation: "builder_with_adversarial_teeth"
+    settles:
+      - "REQ-UX-001"
+      - "REQ-UX-002"
+      - "REQ-UX-003"
+      - "REQ-UX-004"
+      - "REQ-UX-007"
+      - "REQ-UX-009"
+      - "REQ-UX-010"
+      - "REQ-UX-012"
+    changes: "A home view ordered by the shared mode-precedence selector, a keyboard command palette over the same frames, stable deep links pinning world/checkpoint/focus, a back/forward trail and guided first-run states."
+    proves: "The observer always sees pending approvals, contradictions and in-flight work first; every navigation path is keyboard reachable, linkable and reversible; the palette emits the same intents as other renderers."
+    does_not_prove: "Does not prove renderer parity across all journeys (T18) or remote multi-user behavior."
+    hot_context:
+      - "~/projects/gs-term/src/focus/attention.ts"
+      - "~/projects/product-actualizer/cockpit/web/App.tsx"
+      - "~/projects/WarpRoom"
+      - "ui-model/views"
+    steps:
+      - "Derive the home view from the T07 selector and SEA-Forge approval records; never maintain a separate priority list."
+      - "Implement the palette as a renderer of frame choices plus search and traversal intents."
+      - "Define the link scheme and its resolution, including explicit newer-state offers after alias retarget (RECOV-006)."
+      - "Build first-run and empty states that name the next prerequisite for each missing world, product or capability."
+      - "Measure read_navigation_latency_p95 and time_to_pending_decision on the local_operator profile."
+    gate:
+      - "just gate-t22"
+      - "just verify"
+    teeth:
+      - attack: "Background agent floods 50 duplicate notices"
+        expected: "One deduplicated notice; pending approval remains first."
+      - attack: "Open a deep link after the world alias moved"
+        expected: "Pinned context shown with explicit offer of the newer world; no silent retarget."
+    redesign_trigger: "Home ordering cannot be derived from the shared selector without a second priority policy."
+    evidence: ".agents/evidence/horizon/T22/"
+    done_when: *id001
+    preregistration:
+      required: true
+      artifact: ".agents/prereg/horizon/T22.prereg.yaml"
+      claim: "Home, palette, links and trail are projections of shared frames that keep critical decisions first and never retarget context silently."
+      falsifier: "Background agent floods 50 duplicate notices"
+      known_confounds:
+        - "Mocks and fixture-only results are not live settlement evidence."
+        - "Pinned external API and skill versions may differ from prose documentation."
+      confirmation_condition: "Builder demonstrates preregistered positive and negative checks with stable evidence and documents plausible alternate failures."
 final_acceptance:
   canonical_world_and_navigation:
     - "One pin to DomainForge world_ref plus distinct operational checkpoint is preserved across all journeys."
@@ -1363,7 +1681,7 @@ final_acceptance:
     - "No path is spendable if a visibility/reach/payment/authority/capability/recovery/settlement hard gate is unknown or false."
     - "SEA-Forge invocation governs exact effect; Gauntlet frozen Reference cannot mutate in-flight; independent RealityTrace evidence and operational settlement are not conflated."
   deterministic_interaction:
-    - "Clack and GUI produce equivalent typed intents, same denial logic, same current-vs-historical/candidate semantics and replayable context."
+    - "Clack, GUI and command palette produce equivalent typed intents, same denial logic, same current-vs-historical/candidate semantics and replayable context."
     - "Closed declarative blocks and owner layout authority hold under adversarial agent-generated surfaces."
   developmental_recovery:
     - "A single pass, resource increase, simulation or trace receipt never causes a false capability promotion."
@@ -1373,6 +1691,12 @@ final_acceptance:
     - "Every P3 task has a separately retained fresh independent confirmation."
     - "Failed/correction evidence is preserved; skipped required live tests prevent whole-system conformance."
     - "All bound global gates are green against the released target; README and status do not exceed actual evidence."
+  products_and_research:
+    - "Two heterogeneous products join one world at derived integration levels with isolated failure."
+    - "Migrated research reproduces original verdicts at original claim levels; estimators never alter hard gates and activate only under governance."
+  operator_experience:
+    - "Home view surfaces pending approvals, contradictions and in-flight work first; palette, deep links and trail work across journeys."
+    - "Measured read-navigation latency and accessibility checks meet REQ-UX-008 and REQ-UX-009 on local_operator."
 guardrails:
   - "Source spec and DomainForge semantic identity are immutable within an active frozen run; candidate revisions require new explicit freeze."
   - "Never reimplement DomainForge, Cognate durable event truth, SEA-Forge authority, Gauntlet execution or RealityTrace evidence in Horizon."
@@ -1391,167 +1715,246 @@ handoff_contract:
     - "Next executable task ID or 'none — plan settled' after final T19 only."
   settled_next_action_rule: "Only after T19 independently confirms all required proof may next action say 'none — plan settled'; otherwise report earliest dependency-ready unsettled task."
 traceability:
-  spec_requirement_count: 66
-  mapped_requirement_count: 66
+  spec_requirement_count: 98
+  mapped_requirement_count: 98
   unmapped_requirements: []
   unknown_plan_requirement_ids: []
   requirement_to_tasks:
-    REQ-GOAL-001:
+    "REQ-CASE-001":
+      - "T02"
+      - "T07"
+    "REQ-CASE-002":
+      - "T07"
+    "REQ-CASE-003":
+      - "T07"
+      - "T17"
+    "REQ-CONFIG-001":
+      - "T04"
+    "REQ-CONFIG-002":
+      - "T04"
+    "REQ-CONFIG-003":
+      - "T04"
+    "REQ-CONFIG-004":
+      - "T04"
+    "REQ-CONFIG-010":
+      - "T04"
+    "REQ-CONFIG-011":
+      - "T11"
+    "REQ-CONFIG-012":
+      - "T11"
+    "REQ-DEV-001":
+      - "T17"
+    "REQ-DEV-002":
+      - "T17"
+    "REQ-DEV-003":
+      - "T17"
+    "REQ-GOAL-001":
       - "T01"
       - "T14"
-    REQ-GOAL-002:
+    "REQ-GOAL-002":
       - "T02"
-    REQ-GOAL-003:
+    "REQ-GOAL-003":
       - "T03"
       - "T08"
-    REQ-GOAL-004:
+    "REQ-GOAL-004":
       - "T17"
       - "T19"
-    REQ-GOAL-005:
+    "REQ-GOAL-005":
       - "T04"
       - "T18"
-    REQ-OUT-001:
-      - "T07"
-    REQ-OUT-002:
-      - "T07"
-    REQ-OUT-003:
-      - "T11"
-      - "T13"
+    "REQ-INT-001":
+      - "T02"
+    "REQ-INT-002":
+      - "T03"
+      - "T08"
+    "REQ-INT-003":
       - "T15"
-    REQ-OUT-004:
-      - "T09"
       - "T18"
-    REQ-VERIFY-001:
-      - "T18"
-    REQ-VERIFY-002:
+    "REQ-INT-004":
       - "T11"
-      - "T19"
-    REQ-VERIFY-003:
-      - "T18"
-    REQ-VERIFY-004:
-      - "T13"
-      - "T17"
-    REQ-VERIFY-005:
-      - "T19"
-    REQ-CONFIG-001:
-      - "T04"
-    REQ-CONFIG-002:
-      - "T04"
-    REQ-CONFIG-003:
-      - "T04"
-    REQ-CONFIG-004:
-      - "T04"
-    REQ-CONFIG-010:
-      - "T04"
-    REQ-CONFIG-011:
-      - "T11"
-    REQ-CONFIG-012:
-      - "T11"
-    REQ-WORLD-001:
-      - "T06"
-    REQ-WORLD-002:
-      - "T06"
-    REQ-WORLD-003:
-      - "T06"
-    REQ-WORLD-004:
-      - "T01"
-      - "T14"
-    REQ-WORLD-005:
-      - "T06"
-    REQ-NAV-001:
+    "REQ-NAV-001":
       - "T07"
-    REQ-NAV-002:
+    "REQ-NAV-002":
       - "T07"
-    REQ-NAV-003:
+    "REQ-NAV-003":
       - "T07"
-    REQ-NAV-004:
+    "REQ-NAV-004":
       - "T02"
       - "T07"
       - "T16"
-    REQ-NAV-005:
+    "REQ-NAV-005":
       - "T07"
-    REQ-UI-001:
-      - "T05"
-    REQ-UI-002:
-      - "T05"
-    REQ-UI-003:
-      - "T05"
-    REQ-UI-004:
-      - "T08"
-      - "T18"
-    REQ-UI-005:
-      - "T03"
-      - "T09"
-    REQ-UI-006:
-      - "T05"
-      - "T09"
-    REQ-UI-007:
-      - "T05"
-      - "T10"
-    REQ-UI-008:
-      - "T05"
-    REQ-INT-001:
-      - "T02"
-    REQ-INT-002:
-      - "T03"
-      - "T08"
-    REQ-INT-003:
-      - "T15"
-      - "T18"
-    REQ-INT-004:
+    "REQ-NAV-006":
+      - "T07"
       - "T11"
-    REQ-STACK-001:
+    "REQ-NAV-007":
+      - "T07"
+      - "T09"
+    "REQ-OUT-001":
+      - "T07"
+    "REQ-OUT-002":
+      - "T07"
+    "REQ-OUT-003":
+      - "T11"
+      - "T13"
+      - "T15"
+    "REQ-OUT-004":
+      - "T09"
+      - "T18"
+    "REQ-RES-001":
+      - "T21"
+    "REQ-RES-002":
+      - "T21"
+    "REQ-RES-003":
+      - "T21"
+    "REQ-RES-004":
+      - "T21"
+    "REQ-RES-005":
+      - "T17"
+      - "T21"
+    "REQ-RES-006":
+      - "T21"
+    "REQ-RES-007":
+      - "T21"
+    "REQ-SAFE-001":
+      - "T11"
+      - "T15"
+    "REQ-SAFE-002":
+      - "T13"
+    "REQ-SAFE-003":
+      - "T06"
+    "REQ-SAFE-004":
+      - "T10"
+      - "T19"
+    "REQ-SAFE-005":
+      - "T13"
+      - "T16"
+    "REQ-SEC-001":
+      - "T11"
+    "REQ-SEC-002":
+      - "T05"
+    "REQ-SEC-003":
+      - "T05"
+    "REQ-SEC-004":
+      - "T05"
+      - "T19"
+    "REQ-SEC-005":
+      - "T11"
+    "REQ-SEC-006":
+      - "T04"
+      - "T19"
+    "REQ-STACK-001":
       - "T01"
       - "T14"
-    REQ-STACK-002:
+    "REQ-STACK-002":
       - "T04"
-    REQ-STACK-003:
+    "REQ-STACK-003":
       - "T11"
-    REQ-STACK-004:
+    "REQ-STACK-004":
       - "T12"
-    REQ-STACK-005:
+    "REQ-STACK-005":
       - "T10"
-    REQ-STACK-006:
+    "REQ-STACK-006":
       - "T13"
-    REQ-STACK-007:
+    "REQ-STACK-007":
       - "T13"
       - "T17"
-    REQ-STACK-008:
+    "REQ-STACK-008":
       - "T19"
-    REQ-CASE-001:
-      - "T02"
-      - "T07"
-    REQ-CASE-002:
-      - "T07"
-    REQ-CASE-003:
-      - "T07"
-      - "T17"
-    REQ-DEV-001:
-      - "T17"
-    REQ-DEV-002:
-      - "T17"
-    REQ-SAFE-001:
+    "REQ-STACK-009":
       - "T11"
+    "REQ-STACK-010":
+      - "T11"
+      - "T19"
+    "REQ-STACK-011":
+      - "T20"
+    "REQ-STACK-012":
+      - "T20"
+    "REQ-STACK-013":
+      - "T20"
+    "REQ-STACK-014":
+      - "T19"
+      - "T20"
+    "REQ-UI-001":
+      - "T05"
+    "REQ-UI-002":
+      - "T05"
+    "REQ-UI-003":
+      - "T05"
+    "REQ-UI-004":
+      - "T08"
+      - "T18"
+    "REQ-UI-005":
+      - "T03"
+      - "T09"
+    "REQ-UI-006":
+      - "T05"
+      - "T09"
+    "REQ-UI-007":
+      - "T05"
+      - "T10"
+    "REQ-UI-008":
+      - "T05"
+    "REQ-UX-001":
+      - "T22"
+    "REQ-UX-002":
+      - "T18"
+      - "T22"
+    "REQ-UX-003":
+      - "T18"
+      - "T22"
+    "REQ-UX-004":
+      - "T22"
+    "REQ-UX-005":
+      - "T08"
+      - "T09"
+    "REQ-UX-006":
+      - "T05"
+      - "T09"
+    "REQ-UX-007":
+      - "T11"
+      - "T22"
+    "REQ-UX-008":
+      - "T08"
+      - "T09"
+    "REQ-UX-009":
+      - "T19"
+      - "T22"
+    "REQ-UX-010":
+      - "T22"
+    "REQ-UX-011":
+      - "T09"
+    "REQ-UX-012":
       - "T15"
-    REQ-SAFE-002:
+      - "T22"
+    "REQ-VERIFY-001":
+      - "T18"
+    "REQ-VERIFY-002":
+      - "T11"
+      - "T19"
+    "REQ-VERIFY-003":
+      - "T18"
+    "REQ-VERIFY-004":
       - "T13"
-    REQ-SAFE-003:
+      - "T17"
+    "REQ-VERIFY-005":
+      - "T19"
+    "REQ-WORLD-001":
       - "T06"
-    REQ-SAFE-004:
-      - "T10"
-      - "T19"
-    REQ-SAFE-005:
-      - "T13"
-      - "T16"
-    REQ-SEC-001:
-      - "T11"
-    REQ-SEC-002:
-      - "T05"
-    REQ-SEC-003:
-      - "T05"
-    REQ-SEC-004:
-      - "T05"
-      - "T19"
-    REQ-SEC-005:
-      - "T11"
-  coverage_rule: "Every REQUIRED source requirement must map to at least one task, no unknown IDs, P3 independent confirmation and honest evidence coverage. This map was generated from the GitHub spec and the task settles arrays."
+    "REQ-WORLD-002":
+      - "T06"
+    "REQ-WORLD-003":
+      - "T06"
+    "REQ-WORLD-004":
+      - "T01"
+      - "T14"
+    "REQ-WORLD-005":
+      - "T06"
+    "REQ-WORLD-006":
+      - "T06"
+    "REQ-WORLD-007":
+      - "T06"
+      - "T20"
+    "REQ-WORLD-008":
+      - "T14"
+  coverage_rule: "Every REQUIRED source requirement must map to at least one task, no unknown IDs, P3 independent confirmation and honest evidence coverage. Generated from spec 1.0.0 and the task settles arrays."
