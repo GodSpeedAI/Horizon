@@ -1,0 +1,52 @@
+view:
+  id: comparison
+  purpose: >-
+    Keep baseline, alternatives and assumptions simultaneously visible so a
+    hypothetical comparison is never mistaken for a world change.
+sources:
+  journey: J05
+  behavioral_phases: [IS1, IS2, IS6, IS7, IS8]
+context:
+  persistence:
+    baseline_identity: persistent
+    assumptions: persistent_during_comparison
+regions:
+  - { id: baseline, responsibility: anchor_the_pinned_baseline }
+  - { id: alternatives, responsibility: compare_hypothetical_alternatives }
+  - { id: limits, responsibility: expose_assumptions_and_uncertainty }
+elements:
+  - { id: baseline_identity, primitive: identity, binds: { entity: BaselineEvidence }, region: baseline, traces_to: { journey: J05, phase: IS1_context_selection } }
+  - { id: alternative_collection, primitive: collection, item_primitive: value, binds: { field: alternatives }, region: alternatives, traces_to: { journey: J05, phase: IS1_context_selection } }
+  - { id: comparison, primitive: comparison, binds: { operands: [baseline, alternatives] }, region: alternatives, traces_to: { journey: J05, phase: IS6_evidence_inspection } }
+  - { id: assumptions, primitive: collection, item_primitive: value, binds: { field: assumptions }, region: limits, traces_to: { journey: J05, phase: IS2_preflight } }
+  - { id: uncertainty, primitive: status, binds: { field: uncertainty }, region: limits, traces_to: { journey: J05, phase: IS6_evidence_inspection } }
+  - id: adjust_assumptions
+    primitive: action
+    semantic_action: adjust_assumptions
+    consequence: epistemic
+    region: limits
+    traces_to: { journey: J05, phase: IS8_next_affordance_selection, ref: adjust_assumptions }
+    availability: { source: behavioral_ir, behavioral_ref: J05.IS8.candidates.adjust_assumptions }
+  - id: request_real_actionable_candidate
+    primitive: action
+    semantic_action: request_real_actionable_candidate
+    consequence: consequential
+    region: alternatives
+    traces_to: { journey: J05, phase: IS8_next_affordance_selection, ref: request_real_actionable_candidate }
+    availability: { source: behavioral_ir, behavioral_ref: J05.IS8.candidates.request_real_actionable_candidate, gates: [authority, payment, capability, recovery, settlement_access] }
+    commitment: { world_effect: none_in_J05_routes_to_J02, settlement_required: true }
+    authority_binding: { source: behavioral_ir, evaluator: SEA-Forge, grants_authority: false }
+    evidence_requirement: [cited_assumptions, limitations, uncertainty]
+    recovery_relation: read_only_until_J02_preflight
+states:
+  ready: { when: baseline_and_assumptions_loaded }
+  empty: { when: no_alternatives_defined }
+  partial: { when: estimates_unsupported }
+  blocked: { when: baseline_unpinned }
+  unknown: { when: scenario_model_unavailable }
+  error: { when: comparison_failed }
+accessibility:
+  focus_order: [baseline_identity, alternative_collection, comparison, adjust_assumptions, request_real_actionable_candidate]
+  non_color_status: true
+  keyboard_navigation: true
+  screen_reader_summary: baseline, alternatives, differences, assumptions, uncertainty, then next actions

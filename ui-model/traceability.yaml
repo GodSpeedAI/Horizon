@@ -1,0 +1,130 @@
+# Forward traceability: UI element -> responsibility -> Behavioral IR -> journey -> IDM.
+# Reverse coverage follows, including explicit reasons where no persistent UI is earned.
+
+forward:
+  - view: home_attention
+    elements:
+      - { id: observer_identity, behavioral: J01.IS1_context_selection, idm: NavigationContext }
+      - { id: world_identity, behavioral: J01.IS1_context_selection, idm: NavigationContext }
+      - { id: checkpoint_status, behavioral: J01.IS2_preflight, idm: NavigationContext }
+      - { id: attention_collection, behavioral: J01.IS1_context_selection, idm: FocusSet }
+      - { id: focus_indicator, behavioral: J01.IS8_next_affordance_selection, idm: AffordanceAssessment }
+      - { id: status_message, behavioral: J01.IS2_preflight, idm: AffordanceAssessment }
+      - { id: explore, behavioral: J01.IS4_capability_invocation, idm: assess_affordance }
+      - { id: operate, behavioral: J02.IS4_capability_invocation, idm: commit_navigation_intent }
+      - { id: build, behavioral: J03.IS4_capability_invocation, idm: propose_semantic_revision }
+      - { id: monitor, behavioral: J04.IS4_capability_invocation, idm: respond_to_change }
+      - { id: compare, behavioral: J05.IS4_capability_invocation, idm: compare_scenarios }
+      - { id: develop, behavioral: J06.IS4_capability_invocation, idm: run_preregistered_experiment }
+      - { id: open_inspector, behavioral: J01.IS8_next_affordance_selection, idm: NavigationFrame }
+  - view: sequential_prompt
+    elements:
+      - { id: question_label, behavioral: J02.IS1_context_selection, idm: NavigationContext }
+      - { id: question_input, behavioral: J02.IS1_context_selection, idm: NavigationContext }
+      - { id: resolved_context, behavioral: J02.IS1_context_selection, idm: NavigationContext }
+      - { id: why_asked, behavioral: J02.IS1_context_selection, idm: NavigationContext }
+      - { id: skip_resolved, behavioral: J02.IS1_context_selection, idm: NavigationContext }
+      - { id: blocked_reason, behavioral: J02.IS2_preflight, idm: AffordanceAssessment }
+      - { id: pending_authority, behavioral: J02.IS3_authority_resolution, idm: AffordanceAssessment }
+      - { id: defer_action, behavioral: J02.IS8_next_affordance_selection, idm: NavigationFrame }
+      - { id: cancel_navigation, behavioral: J02.IS8_next_affordance_selection, idm: NavigationIntentRecord }
+  - view: evidence_inspector
+    elements:
+      - { id: evidence_collection, behavioral: J02.IS6_evidence_inspection, idm: EvidenceObservation }
+      - { id: contradiction_status, behavioral: J02.IS6_evidence_inspection, idm: EvidenceObservation }
+      - { id: evidence_gap, behavioral: J02.IS6_evidence_inspection, idm: EvidenceObservation }
+      - { id: artifact_reference, behavioral: J02.IS5_state_and_artifact_effect, idm: ExecutionRecord }
+      - { id: settlement_status, behavioral: J02.IS7_settlement_or_decision, idm: SettlementReviewRecord }
+      - { id: settlement_criterion, behavioral: J02.IS7_settlement_or_decision, idm: SettlementReviewRecord }
+      - { id: close_inspector, behavioral: J02.IS8_next_affordance_selection, idm: NavigationFrame }
+  - view: history_timeline
+    elements:
+      - { id: checkpoint_identity, behavioral: J02.IS1_context_selection, idm: NavigationContext }
+      - { id: timeline_events, behavioral: J02.IS5_state_and_artifact_effect, idm: NavigationIntentRecord }
+      - { id: selected_event, behavioral: J02.IS6_evidence_inspection, idm: EvidenceObservation }
+      - { id: execution_vs_settlement, behavioral: J02.IS7_settlement_or_decision, idm: SettlementReviewRecord }
+      - { id: residuals, behavioral: J02.IS6_evidence_inspection, idm: EvidenceObservation }
+      - { id: artifact_reference, behavioral: J02.IS5_state_and_artifact_effect, idm: ExecutionRecord }
+      - { id: return_to_decision, behavioral: J02.IS8_next_affordance_selection, idm: NavigationFrame }
+  - view: comparison
+    elements:
+      - { id: baseline_identity, behavioral: J05.IS1_context_selection, idm: NavigationContext }
+      - { id: alternative_collection, behavioral: J05.IS1_context_selection, idm: NavigationContext }
+      - { id: comparison, behavioral: J05.IS6_evidence_inspection, idm: EvidenceObservation }
+      - { id: assumptions, behavioral: J05.IS2_preflight, idm: NavigationContext }
+      - { id: uncertainty, behavioral: J05.IS6_evidence_inspection, idm: EvidenceObservation }
+      - { id: adjust_assumptions, behavioral: J05.IS8_next_affordance_selection, idm: NavigationFrame }
+      - { id: request_real_actionable_candidate, behavioral: J05.IS8_next_affordance_selection, idm: NavigationIntentRecord }
+  - view: navigation_entry
+    elements:
+      - { id: command_palette, behavioral: J01.IS8_next_affordance_selection, idm: NavigationFrame }
+      - { id: breadcrumb, behavioral: J01.IS1_context_selection, idm: NavigationContext }
+      - { id: deep_link_input, behavioral: J01.IS1_context_selection, idm: NavigationContext }
+      - { id: deep_link_status, behavioral: J01.IS1_context_selection, idm: NavigationContext }
+      - { id: current_frame, behavioral: J01.IS1_context_selection, idm: NavigationFrame }
+      - { id: inspect, behavioral: J01.IS8_next_affordance_selection, idm: NavigationFrame }
+      - { id: propose_consequential_operation, behavioral: J01.IS8_next_affordance_selection, idm: NavigationIntentRecord }
+
+reverse_coverage:
+  J01:
+    IS1: projected in home_attention.context_bar and navigation_entry
+    IS2: projected as status_message
+    IS3: no persistent element; read-only journey cannot grant authority
+    IS4: projected as explore action
+    IS5: read-only effect; no artifact region earned
+    IS6: matching instances are the attention collection; no separate inspector earned
+    IS7: not applicable read-only; no settlement element
+    IS8: projected as focus_indicator, inspect and propose_consequential_operation
+  J02:
+    IS1: projected as context strip and question prompt
+    IS2: projected as blocked_reason
+    IS3: projected as pending_authority
+    IS4: projected as operate action with safeguards
+    IS5: projected as artifact_reference and timeline
+    IS6: projected as evidence_inspector
+    IS7: projected as settlement_status and execution_vs_settlement
+    IS8: projected as defer, cancel and next affordances
+  J03:
+    IS1: lineage is reachable through breadcrumbs; a dedicated lineage view is deferred
+    IS2: projected as blocked_reason in sequential_prompt
+    IS3: authority stays with SEA-Forge; only pending state is shown
+    IS4: projected as build action with safeguards
+    IS5: candidate artifact reference is deferred to the build workflow view
+    IS6: diagnostics are evidence items; representation decision deferred
+    IS7: candidate identity distinct from promoted world is deferred
+    IS8: promotion and revision moves are deferred until the build workflow is proven
+  J04:
+    IS1: projected as context and attention collection
+    IS2: projected as blocked_reason
+    IS3: automatic versus pending authority shown only as status
+    IS4: projected as monitor action with safeguards
+    IS5: bounded response effect is deferred to execution view
+    IS6: receipts and residuals projected in evidence_inspector
+    IS7: receipt is not settlement; projected in execution_vs_settlement
+    IS8: act, defer and escalate remain deferred until the monitor workflow is proven
+  J05:
+    IS1: projected as baseline_identity and alternative_collection
+    IS2: projected as assumptions
+    IS3: read-only scope; no authority element
+    IS4: projected as compare action
+    IS5: no world effect; no artifact region earned
+    IS6: projected as comparison and uncertainty
+    IS7: read-only; no settlement element
+    IS8: projected as adjust_assumptions and request_real_actionable_candidate
+  J06:
+    IS1: capability-family context is deferred to the research workflow view
+    IS2: prerequisites are deferred to the research workflow view
+    IS3: activation authority shown only as pending status when present
+    IS4: projected as develop action with safeguards
+    IS5: dataset, preregistration and verdict artifacts are deferred
+    IS6: metrics and residuals are deferred
+    IS7: developmental verdict distinct from operational settlement is deferred
+    IS8: activation and further experiments are deferred until the research workflow is proven
+
+unresolved:
+  - id: UIQ-01
+    question: Which deferred build, monitor and research representations are actually earned?
+    status: deferred_to_T04_T05
+  - id: UIQ-02
+    question: What terminal focus and screen-reader semantics does the chosen Clack renderer provide?
+    status: deferred_to_renderer_verification

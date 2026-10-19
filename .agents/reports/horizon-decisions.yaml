@@ -141,3 +141,22 @@ decisions:
       - "behavioral/proof/engine.py"
       - "behavioral/proof/scenarios.yaml"
       - ".agents/evidence/horizon/T02/scenario-matrix.log"
+
+  - id: DEC-T03-01
+    date: "2026-10-19"
+    task: T03
+    requirement: REQ-UI-005
+    decision: >-
+      Keep compact one-question-at-a-time prompts as the default projection, and earn
+      persistent regions only for context, evidence/settlement inspection, history and
+      comparison. Reject a dashboard and any UI approval control: metrics without a
+      behavioral trace are untraceable, and approval is a SEA-Forge relationship.
+    rationale:
+      - "Behavioral proof shows one-decision-at-a-time navigation for most steps."
+      - "Evidence and settlement need simultaneous visibility with actions; a dashboard does not reduce a proven burden."
+      - "A UI approval control would duplicate authority and violate the boundary that possibility is not affordance."
+    reversible: true
+    evidence:
+      - "ui-model/projection-decisions.yaml"
+      - "ui-model/traceability.yaml"
+      - ".agents/evidence/horizon/T03/teeth-ui-traceability.log"

@@ -1,0 +1,35 @@
+view:
+  id: evidence_inspector
+  purpose: >-
+    Keep independent evidence, artifact identity, contradictions and settlement state
+    visible while the observer judges a consequential decision.
+sources:
+  journey: J02
+  behavioral_phases: [IS5, IS6, IS7]
+context:
+  persistence:
+    evidence_collection: persistent_during_decision
+    settlement_status: persistent_with_actions
+regions:
+  - { id: evidence, responsibility: inspect_independent_evidence }
+  - { id: artifacts, responsibility: identify_artifacts_and_receipts }
+  - { id: settlement, responsibility: distinguish_execution_from_settlement }
+elements:
+  - { id: evidence_collection, primitive: collection, item_primitive: evidence_item, binds: { entity: EvidenceObservation }, region: evidence, traces_to: { journey: J02, phase: IS6_evidence_inspection } }
+  - { id: contradiction_status, primitive: status, binds: { field: consistency }, region: evidence, traces_to: { journey: J02, phase: IS6_evidence_inspection } }
+  - { id: evidence_gap, primitive: message, binds: { field: missing_evidence }, region: evidence, traces_to: { journey: J02, phase: IS6_evidence_inspection } }
+  - { id: artifact_reference, primitive: artifact_reference, binds: { entity: ExecutionRecord }, region: artifacts, traces_to: { journey: J02, phase: IS5_state_and_artifact_effect } }
+  - { id: settlement_status, primitive: status, binds: { field: settlement_reference }, region: settlement, traces_to: { journey: J02, phase: IS7_settlement_or_decision } }
+  - { id: settlement_criterion, primitive: message, binds: { field: settlement_criterion }, region: settlement, traces_to: { journey: J02, phase: IS7_settlement_or_decision } }
+  - { id: close_inspector, primitive: navigation, binds: { action: return_to_decision }, region: settlement, traces_to: { journey: J02, phase: IS8_next_affordance_selection } }
+states:
+  ready: { when: evidence_loaded }
+  partial: { when: evidence_incomplete }
+  unknown: { when: evidence_unavailable_not_invented }
+  conflicted: { when: contradictory_claims_present }
+  error: { when: evidence_load_failed }
+accessibility:
+  focus_order: [evidence_collection, artifact_reference, settlement_status, close_inspector]
+  non_color_status: true
+  keyboard_navigation: true
+  screen_reader_summary: evidence items, contradictions, missing evidence, artifact, settlement status

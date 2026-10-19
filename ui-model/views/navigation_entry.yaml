@@ -1,0 +1,50 @@
+view:
+  id: navigation_entry
+  purpose: >-
+    Project command palette, breadcrumbs and deep-link entry onto the same behavioral
+    frames; entry never creates a new decision or authority path.
+sources:
+  journey: J01
+  behavioral_phases: [IS1, IS8]
+context:
+  persistence:
+    current_frame: persistent
+    world_ref: persistent
+regions:
+  - { id: entry, responsibility: accept_command_breadcrumb_or_deep_link }
+  - { id: frame, responsibility: show_the_current_behavioral_frame }
+  - { id: moves, responsibility: expose_affordances_from_the_current_frame }
+elements:
+  - { id: command_palette, primitive: command, binds: { field: command_query }, region: entry, traces_to: { journey: J01, phase: IS8_next_affordance_selection } }
+  - { id: breadcrumb, primitive: navigation, binds: { field: frame_path }, region: entry, traces_to: { journey: J01, phase: IS1_context_selection } }
+  - { id: deep_link_input, primitive: input, binds: { field: deep_link }, region: entry, traces_to: { journey: J01, phase: IS1_context_selection } }
+  - { id: deep_link_status, primitive: status, binds: { field: entry_resolution }, region: entry, traces_to: { journey: J01, phase: IS1_context_selection } }
+  - { id: current_frame, primitive: identity, binds: { entity: NavigationFrame }, region: frame, traces_to: { journey: J01, phase: IS1_context_selection } }
+  - id: inspect
+    primitive: action
+    semantic_action: inspect
+    consequence: epistemic
+    region: moves
+    traces_to: { journey: J01, phase: IS8_next_affordance_selection, ref: inspect }
+    availability: { source: behavioral_ir, behavioral_ref: J01.IS8.candidates.inspect }
+  - id: propose_consequential_operation
+    primitive: action
+    semantic_action: propose_consequential_operation
+    consequence: consequential
+    region: moves
+    traces_to: { journey: J01, phase: IS8_next_affordance_selection, ref: propose_consequential_operation }
+    availability: { source: behavioral_ir, behavioral_ref: J01.IS8.candidates.propose_consequential_operation, gates: [authority, payment, capability, recovery, settlement_access] }
+    commitment: { world_effect: none_until_J02_preflight, settlement_required: true }
+    authority_binding: { source: behavioral_ir, evaluator: SEA-Forge, grants_authority: false }
+    evidence_requirement: [matching_instances, provenance]
+    recovery_relation: read_only_until_J02_authorizes
+states:
+  ready: { when: current_frame_resolved }
+  blocked: { when: deep_link_target_unresolved }
+  unknown: { when: world_ref_unavailable }
+  error: { when: entry_parse_failed }
+accessibility:
+  focus_order: [deep_link_input, command_palette, breadcrumb, inspect, propose_consequential_operation]
+  non_color_status: true
+  keyboard_navigation: true
+  screen_reader_summary: entry mode, current frame, breadcrumb path, available moves

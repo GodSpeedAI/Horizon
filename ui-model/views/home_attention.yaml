@@ -1,0 +1,96 @@
+view:
+  id: home_attention
+  purpose: >-
+    Orient the observer in the current world and expose the spendable journeys
+    without asserting authority or settlement.
+sources:
+  journey: J01
+  behavioral_phases: [IS1, IS2, IS3, IS4, IS8]
+context:
+  persistence:
+    observer_identity: persistent
+    world_ref: persistent
+    checkpoint: persistent
+regions:
+  - { id: context_bar, responsibility: orient_observer_in_world }
+  - { id: attention, responsibility: show_current_focus_set }
+  - { id: affordances, responsibility: expose_currently_available_journeys }
+  - { id: system_truth, responsibility: show_readiness_and_blocked_reasons }
+elements:
+  - { id: observer_identity, primitive: identity, binds: { entity: observer }, region: context_bar, traces_to: { journey: J01, phase: IS1_context_selection } }
+  - { id: world_identity, primitive: identity, binds: { entity: world }, region: context_bar, traces_to: { journey: J01, phase: IS1_context_selection } }
+  - { id: checkpoint_status, primitive: status, binds: { field: checkpoint_ref }, region: context_bar, traces_to: { journey: J01, phase: IS2_preflight } }
+  - { id: attention_collection, primitive: collection, item_primitive: identity, binds: { entity: FocusSet }, region: attention, traces_to: { journey: J01, phase: IS1_context_selection } }
+  - { id: focus_indicator, primitive: status, binds: { field: focus_state }, region: attention, traces_to: { journey: J01, phase: IS8_next_affordance_selection } }
+  - { id: status_message, primitive: message, binds: { field: first_blocker }, region: system_truth, traces_to: { journey: J01, phase: IS2_preflight } }
+  - id: explore
+    primitive: action
+    semantic_action: assess_affordance
+    consequence: epistemic
+    region: affordances
+    traces_to: { journey: J01, phase: IS4_capability_invocation, ref: assess_affordance }
+    availability: { source: behavioral_ir, behavioral_ref: J01.IS4.capability }
+  - id: operate
+    primitive: action
+    semantic_action: commit_navigation_intent
+    consequence: consequential
+    region: affordances
+    traces_to: { journey: J02, phase: IS4_capability_invocation, ref: commit_navigation_intent }
+    availability: { source: behavioral_ir, behavioral_ref: J02.IS4.capability, gates: [authority, payment, capability, recovery, settlement_access] }
+    commitment: { world_effect: authorized_once, settlement_required: true }
+    authority_binding: { source: behavioral_ir, evaluator: SEA-Forge, grants_authority: false }
+    evidence_requirement: [execution_record, realitytrace_observation, settlement_reference]
+    recovery_relation: compensable_or_reversible_per_assessment
+  - id: build
+    primitive: action
+    semantic_action: propose_semantic_revision
+    consequence: consequential
+    region: affordances
+    traces_to: { journey: J03, phase: IS4_capability_invocation, ref: propose_semantic_revision }
+    availability: { source: behavioral_ir, behavioral_ref: J03.IS4.capability, gates: [authority, capability, settlement_access] }
+    commitment: { world_effect: candidate_only_until_promotion, settlement_required: true }
+    authority_binding: { source: behavioral_ir, evaluator: SEA-Forge, grants_authority: false }
+    evidence_requirement: [domainforge_diagnostics, candidate_identity, gauntlet_record, realitytrace_observation]
+    recovery_relation: reversible_until_promotion
+  - id: monitor
+    primitive: action
+    semantic_action: respond_to_change
+    consequence: consequential
+    region: affordances
+    traces_to: { journey: J04, phase: IS4_capability_invocation, ref: respond_to_change }
+    availability: { source: behavioral_ir, behavioral_ref: J04.IS4.capability, gates: [authority, payment, capability, recovery, settlement_access] }
+    commitment: { world_effect: bounded_authorized_response, settlement_required: true }
+    authority_binding: { source: behavioral_ir, evaluator: SEA-Forge, grants_authority: false }
+    evidence_requirement: [realitytrace_receipt, correlated_observations, residuals]
+    recovery_relation: escalate_when_not_automatic
+  - id: compare
+    primitive: action
+    semantic_action: compare_scenarios
+    consequence: epistemic
+    region: affordances
+    traces_to: { journey: J05, phase: IS4_capability_invocation, ref: compare_scenarios }
+    availability: { source: behavioral_ir, behavioral_ref: J05.IS4.capability }
+  - id: develop
+    primitive: action
+    semantic_action: run_preregistered_experiment
+    consequence: consequential
+    region: affordances
+    traces_to: { journey: J06, phase: IS4_capability_invocation, ref: run_preregistered_experiment }
+    availability: { source: behavioral_ir, behavioral_ref: J06.IS4.capability, gates: [authority, capability, settlement_access] }
+    commitment: { world_effect: no_world_change_estimator_state_separate, settlement_required: true }
+    authority_binding: { source: behavioral_ir, evaluator: SEA-Forge, grants_authority: false }
+    evidence_requirement: [metrics, verdict, hashed_artifacts, residuals]
+    recovery_relation: retained_failures_and_reproducible_artifacts
+  - { id: open_inspector, primitive: navigation, binds: { view: evidence_inspector }, region: system_truth, traces_to: { journey: J01, phase: IS8_next_affordance_selection } }
+states:
+  uninitialized: { when: observer_context_not_loaded }
+  ready: { when: behavioral_affordances_available }
+  empty: { when: focus_set_empty }
+  blocked: { when: no_current_affordance }
+  unknown: { when: world_ref_or_checkpoint_unresolved }
+  error: { when: context_load_failed }
+accessibility:
+  focus_order: [explore, operate, build, monitor, compare, develop, open_inspector]
+  non_color_status: true
+  keyboard_navigation: true
+  screen_reader_summary: observer, world, checkpoint, focus set, then available journeys

@@ -1,0 +1,6 @@
+ok   ui-model/views/comparison.yaml
+ok   ui-model/views/evidence_inspector.yaml
+ok   ui-model/views/history_timeline.yaml
+ok   ui-model/views/home_attention.yaml
+ok   ui-model/views/navigation_entry.yaml
+ok   ui-model/views/sequential_prompt.yaml

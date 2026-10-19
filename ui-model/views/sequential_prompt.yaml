@@ -1,0 +1,43 @@
+view:
+  id: sequential_prompt
+  purpose: >-
+    Ask only the one unresolved question that the current behavioral decision needs,
+    state why it is needed, and keep resolved context visible without re-asking it.
+sources:
+  journey: J02
+  behavioral_phases: [IS1, IS2, IS3, IS8]
+context:
+  persistence:
+    resolved_context: persistent_during_prompt
+regions:
+  - { id: question, responsibility: ask_one_unresolved_decision }
+  - { id: context_strip, responsibility: keep_resolved_context_visible }
+  - { id: hints, responsibility: explain_blocker_and_pending_decision }
+elements:
+  - { id: question_label, primitive: label, binds: { field: current_question }, region: question, traces_to: { journey: J02, phase: IS1_context_selection } }
+  - { id: question_input, primitive: input, binds: { field: current_question }, region: question, traces_to: { journey: J02, phase: IS1_context_selection } }
+  - { id: resolved_context, primitive: value, binds: { field: resolved_fields }, region: context_strip, traces_to: { journey: J02, phase: IS1_context_selection } }
+  - { id: why_asked, primitive: message, binds: { field: decision_reason }, region: hints, traces_to: { journey: J02, phase: IS1_context_selection } }
+  - { id: skip_resolved, primitive: status, binds: { field: resolved_fields }, region: context_strip, traces_to: { journey: J02, phase: IS1_context_selection } }
+  - { id: blocked_reason, primitive: message, binds: { field: first_blocker }, region: hints, traces_to: { journey: J02, phase: IS2_preflight } }
+  - { id: pending_authority, primitive: status, binds: { field: authority_state }, region: hints, traces_to: { journey: J02, phase: IS3_authority_resolution } }
+  - id: defer_action
+    primitive: action
+    semantic_action: defer
+    consequence: epistemic
+    region: hints
+    traces_to: { journey: J02, phase: IS8_next_affordance_selection, ref: defer }
+    availability: { source: behavioral_ir, behavioral_ref: J02.IS8.candidates.defer }
+  - { id: cancel_navigation, primitive: navigation, binds: { action: cancel_pending_commitment }, region: hints, traces_to: { journey: J02, phase: IS8_next_affordance_selection } }
+states:
+  ready: { when: unresolved_question_identified }
+  blocked: { when: no_answer_available_or_precondition_failed }
+  unknown: { when: authority_or_context_unresolved }
+  cancelled: { when: observer_cancelled }
+  settled: { when: decision_recorded }
+  error: { when: prompt_render_failed }
+accessibility:
+  focus_order: [question_input, defer_action, cancel_navigation]
+  non_color_status: true
+  keyboard_navigation: true
+  screen_reader_summary: current question, why asked, resolved context, blocker, pending authority

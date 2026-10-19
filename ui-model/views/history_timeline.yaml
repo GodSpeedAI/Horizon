@@ -1,0 +1,35 @@
+view:
+  id: history_timeline
+  purpose: >-
+    Show the ordered checkpoint, intent, execution and settlement history so an
+    observer can distinguish what happened from what was settled.
+sources:
+  journey: J02
+  behavioral_phases: [IS5, IS6, IS7]
+context:
+  persistence:
+    checkpoint_identity: persistent
+    settlement_state: persistent
+regions:
+  - { id: timeline, responsibility: order_events_over_time }
+  - { id: detail, responsibility: inspect_selected_event }
+  - { id: settlement, responsibility: compare_execution_with_settlement }
+elements:
+  - { id: checkpoint_identity, primitive: identity, binds: { entity: checkpoint }, region: timeline, traces_to: { journey: J02, phase: IS1_context_selection } }
+  - { id: timeline_events, primitive: timeline, binds: { entity: NavigationIntentRecord }, region: timeline, traces_to: { journey: J02, phase: IS5_state_and_artifact_effect } }
+  - { id: selected_event, primitive: inspector, binds: { field: selected_event }, region: detail, traces_to: { journey: J02, phase: IS6_evidence_inspection } }
+  - { id: execution_vs_settlement, primitive: comparison, binds: { operands: [execution_record, settlement_reference] }, region: settlement, traces_to: { journey: J02, phase: IS7_settlement_or_decision } }
+  - { id: residuals, primitive: collection, item_primitive: value, binds: { field: residuals }, region: detail, traces_to: { journey: J02, phase: IS6_evidence_inspection } }
+  - { id: artifact_reference, primitive: artifact_reference, binds: { entity: ExecutionRecord }, region: detail, traces_to: { journey: J02, phase: IS5_state_and_artifact_effect } }
+  - { id: return_to_decision, primitive: navigation, binds: { action: return_to_current_frame }, region: settlement, traces_to: { journey: J02, phase: IS8_next_affordance_selection } }
+states:
+  ready: { when: history_loaded }
+  empty: { when: no_events_for_checkpoint }
+  partial: { when: some_events_missing_evidence }
+  unknown: { when: settlement_state_unavailable }
+  error: { when: history_load_failed }
+accessibility:
+  focus_order: [timeline_events, selected_event, artifact_reference, return_to_decision]
+  non_color_status: true
+  keyboard_navigation: true
+  screen_reader_summary: ordered events, selected event detail, execution versus settlement, residuals

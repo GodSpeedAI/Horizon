@@ -1,0 +1,63 @@
+# Representation decisions. Each projection-pressure finding is adopted, simplified
+# or deferred with a reason. No renderer is selected here.
+
+decisions:
+  - id: PD-01
+    pressure: persistent_context
+    outcome: adopted
+    views: [home_attention, sequential_prompt, evidence_inspector, history_timeline, comparison, navigation_entry]
+    representation: persistent context strip or header, not necessarily a sidebar
+    reason: every consequential journey needs observer, world_ref and checkpoint to remain visible
+  - id: PD-02
+    pressure: temporal_view
+    outcome: adopted
+    views: [history_timeline]
+    representation: ordered timeline with selected-event detail
+    reason: execution and settlement diverge in time; a flat status would hide that difference
+  - id: PD-03
+    pressure: simultaneous_comparison
+    outcome: adopted
+    views: [comparison, history_timeline]
+    representation: side-by-side comparison of baseline and alternatives, and of execution versus settlement
+    reason: alternating between artifacts would make a hypothetical or an execution record look settled
+  - id: PD-04
+    pressure: collection
+    outcome: simplified
+    views: [home_attention, evidence_inspector, history_timeline]
+    representation: comparative collection with sort and filter deferred; no table or grid yet
+    reason: collections exist, but no proof shows that columns or spatial grouping reduce a consequential burden
+  - id: PD-05
+    pressure: artifact_context
+    outcome: adopted
+    views: [evidence_inspector, history_timeline]
+    representation: evidence and artifact references persist while actions remain available
+    reason: evidence detached from the decision invites post-hoc rationalization
+  - id: PD-06
+    pressure: relationship_view
+    outcome: deferred
+    views: [navigation_entry, history_timeline]
+    representation: breadcrumb and lineage references only; no graph
+    reason: J03 and J06 prove topology exists, but no proven decision requires simultaneous graph manipulation; revisit with live lineage
+  - id: PD-07
+    decision: compact Clack prompts remain the default
+    outcome: adopted
+    views: [sequential_prompt]
+    reason: most decisions are one at a time; persistent layout is earned only for evidence, history and comparison
+  - id: PD-08
+    decision: no dashboard
+    outcome: rejected
+    reason: a dashboard would aggregate metrics that no canonical journey uses for a decision, and would become an untraceable UI authority
+  - id: PD-09
+    decision: no approval control in the UI
+    outcome: rejected
+    reason: approval is a SEA-Forge relationship; the UI may display pending or denied state but must not collect or simulate approval
+  - id: PD-10
+    decision: no graph over list
+    outcome: rejected_for_now
+    reason: the representation test does not show that a graph reduces burden beyond breadcrumbs and references
+  - id: PD-11
+    decision: no docked multi-pane workspace beyond the evidence inspector
+    outcome: rejected_for_now
+    reason: only evidence and settlement need simultaneous visibility with actions
+
+renderer_neutral: true

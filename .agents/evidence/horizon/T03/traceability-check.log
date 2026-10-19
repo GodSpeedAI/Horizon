@@ -1,0 +1,6 @@
+ok   /home/sprime01/projects/Horizon/ui-model/views/comparison.yaml
+ok   /home/sprime01/projects/Horizon/ui-model/views/evidence_inspector.yaml
+ok   /home/sprime01/projects/Horizon/ui-model/views/history_timeline.yaml
+ok   /home/sprime01/projects/Horizon/ui-model/views/home_attention.yaml
+ok   /home/sprime01/projects/Horizon/ui-model/views/navigation_entry.yaml
+ok   /home/sprime01/projects/Horizon/ui-model/views/sequential_prompt.yaml

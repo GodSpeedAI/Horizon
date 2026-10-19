@@ -1,0 +1,52 @@
+# Atomic UI contract. Renderer-neutral responsibilities projected from the proven
+# Behavioral IR. No framework component names appear here.
+
+contract_version: 1
+semantic_source: .sea/interaction/interaction-model.sea
+behavioral_source: behavioral/journeys
+world_ref: "world:horizon@sha256:b0f31fcc60f49af730ca0b863af8e0eae990924fd0beb1d004f10c602cd24ca1"
+
+primitives: [identity, label, value, status, metric, message, evidence_item, artifact_reference, action, choice, input, collection, tree, table, graph, timeline, progress, navigation, notification, inspector, comparison, command, workspace, viewport]
+
+composition_levels:
+  element: smallest meaningful responsibility
+  group: elements serving one local responsibility
+  region: persistent or spatially meaningful area for one behavioral responsibility
+  view: bounded interface state composing regions for one purposeful interaction
+
+mode:
+  default: clack_sequential
+  default_reason: most decisions are one-at-a-time and do not earn persistent layout
+  persistent_regions_when: context_or_evidence_must_survive_a_consequential_decision
+  focus_indicator: required
+  skip_resolved_context: required
+
+affordance_rules:
+  availability_source: behavioral_ir
+  actions_must_reference_behavioral_action: true
+  consequential_requires: [commitment, authority_binding, evidence_requirement, recovery_relation]
+  local_policy_forbidden: true
+
+forbidden_policy_keys: [enabled_when, visible_when, policy, gate_policy, approval_override, is_authorized, allow_if, deny_if]
+
+renderer_mappings:
+  - renderer: terminal_clack
+    mapping: one_question_at_a_time_with_persistent_context_strip
+    preserves: [focus_order, blocked_reason, cancellation, next_affordance]
+  - renderer: graphical
+    mapping: persistent_regions_with_evidence_inspector
+    preserves: [focus_order, blocked_reason, cancellation, next_affordance, comparison]
+  - renderer: voice
+    mapping: spoken_prompt_with_explicit_confirmation_and_summary
+    preserves: [blocked_reason, cancellation, settlement_separation]
+
+accessibility:
+  keyboard_navigation_required: true
+  screen_reader_semantics_required: true
+  non_color_status: true
+  focus_visible: true
+  text_alternative_for_visual_relations: true
+  reduced_motion_equivalent: true
+
+traceability_rule: >-
+  element -> traces_to {journey, phase, ref?} -> Behavioral IR -> canonical journey -> IDM

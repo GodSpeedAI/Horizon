@@ -1,0 +1,72 @@
+preregistration:
+  id: HORIZON-PREREG-T03
+  task: T03
+  title: Project sequential proof into renderer-neutral Atomic UI IR (P1C)
+  recorded_at: "2026-10-19"
+  recorded_before_artifacts: true
+
+  claim: >-
+    Every persistent or spatial UI element is justified by a behavioral obligation,
+    an accessibility requirement, an explicit platform constraint, or a recorded
+    projection-pressure finding, and every action's availability projects the
+    Behavioral IR without duplicating gate policy in the UI.
+
+  upstream_pins:
+    spec: {id: HORIZON-001, version: 1.0.0, sha256: 75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130}
+    world_ref: "world:horizon@sha256:b0f31fcc60f49af730ca0b863af8e0eae990924fd0beb1d004f10c602cd24ca1"
+    behavioral: behavioral/journeys
+    projection_pressure: behavioral/projection-pressure.yaml
+
+  positive_expectations:
+    - id: PE-01
+      expectation: Atomic UI validator passes every view with declared journey and IS phases.
+    - id: PE-02
+      expectation: Traceability check passes every view; every element resolves to a declared Behavioral IR phase and, where applicable, to a known behavioral action.
+    - id: PE-03
+      expectation: Every projected action declares availability.source behavioral_ir and a behavioral reference, and declares no local enable/visibility policy.
+    - id: PE-04
+      expectation: Each projection-pressure finding is adopted, simplified or explicitly deferred in projection-decisions.yaml with a reason.
+    - id: PE-05
+      expectation: At least two materially different renderer mappings preserve the model's meaning, and accessibility obligations are declared per view.
+
+  falsifier: >-
+    An untraceable dashboard metric or approval action is accepted by the validator or
+    traceability check, or a view declares GUI availability that can diverge from the
+    Behavioral IR gate.
+
+  negative_expectations:
+    - id: NE-01
+      attack: Insert a metric element with no behavioral trace.
+      expected: Traceability check fails naming the untraceable metric.
+    - id: NE-02
+      attack: Insert an approval action whose semantic_action is not in the Behavioral IR.
+      expected: Traceability check fails naming the unknown behavioral action.
+    - id: NE-03
+      attack: Add a local enabled_when condition to an action that duplicates authority policy.
+      expected: Traceability check fails naming the duplicated availability policy.
+    - id: NE-04
+      attack: Remove the accessibility block from a view or reference an undeclared element in focus order.
+      expected: Traceability check fails.
+
+  known_confounds:
+    - Fixture-backed behavioral evidence is not live integration or rendered-UI evidence.
+    - Renderer mappings are conceptual; no renderer is implemented at T03.
+    - Platform constraints are explicit assumptions, not verified terminal or accessibility conformance.
+    - Pinned skill versions may differ from prose documentation.
+
+  evidence_plan:
+    - .agents/evidence/horizon/T03/atomic-ui-validation.log
+    - .agents/evidence/horizon/T03/traceability-check.log
+    - .agents/evidence/horizon/T03/teeth-untraceable-metric.log
+    - .agents/evidence/horizon/T03/teeth-unknown-approval.log
+    - .agents/evidence/horizon/T03/teeth-divergent-availability.log
+    - .agents/evidence/horizon/T03/teeth-accessibility.log
+    - .agents/evidence/horizon/T03/SUMMARY.md
+
+  redesign_trigger: >-
+    Sequential proof does not justify the rich-region or simultaneous-view
+    responsibilities being modelled, or a view requires behavior not present in J01-J06.
+
+  confirmation_condition: >-
+    Builder demonstrates each preregistered positive and negative check with retained
+    output, and documents plausible alternate failures and remaining unknowns.

@@ -1,0 +1,5 @@
+PASS untraceable dashboard metric: exit 1, expected rejection containing 'untraceable element'
+PASS unknown approval action: exit 1, expected rejection containing 'not in the Behavioral IR'
+PASS divergent GUI availability: exit 1, expected rejection containing 'forbidden local policy key'
+PASS missing accessibility: exit 1, expected rejection containing 'accessibility.focus_order required'
+PASS real views remain valid: exit 0
