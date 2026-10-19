@@ -121,3 +121,23 @@ decisions:
     reversible: true
     evidence: [".sea/interaction/validation/limitations.md", ".sea/interaction/assumptions-and-unknowns.md"]
 
+
+  - id: DEC-T02-01
+    date: "2026-10-19"
+    task: T02
+    requirement: REQ-INT-001
+    decision: >-
+      Prove the six journeys with a fixture-backed sequential engine (PROVE mode) that
+      evaluates IS1-IS8 one decision at a time. A `settled` result is a fixture outcome
+      only; bindings to Cognate, SEA-Forge, Gauntlet and RealityTrace are recorded as
+      inferred, not exercised. Generated transcripts are evidence artifacts, not live
+      integration proof.
+    rationale:
+      - "P1B requires executable sequential behavior before projections or UI, not a second semantic authority."
+      - "Live authority, execution and evidence integrations are later tasks; claiming them here would fabricate evidence."
+      - "Unknown, conflicted, cancelled and executed-but-unsettled outcomes must remain visible rather than collapse into success/failure."
+    reversible: true
+    evidence:
+      - "behavioral/proof/engine.py"
+      - "behavioral/proof/scenarios.yaml"
+      - ".agents/evidence/horizon/T02/scenario-matrix.log"

@@ -1,0 +1,53 @@
+# Renderer-neutral interaction-kind catalog for the six canonical journeys.
+# Kinds describe interaction responsibilities, not widgets.
+
+catalog_version: 1
+semantic_source: .sea/interaction/interaction-model.sea
+
+kinds:
+  entity_resolution:
+    description: identify the entity or context a decision applies to
+  commitment:
+    description: record an intent whose effect requires authorization and settlement
+  validation:
+    description: check preconditions, affordability, recoverability or evidence consistency
+  execution:
+    description: invoke a bound capability through an authorized execution path
+  observation:
+    description: inspect current state, projections or source events
+  evidence_review:
+    description: inspect independent evidence, residuals and limitations
+  settlement:
+    description: record the operational decision that the obligation is settled
+  navigation:
+    description: move the observer's frame without changing the world
+  cancel:
+    description: abandon the pending commitment without effect
+
+journeys:
+  J01:
+    kinds: [entity_resolution, validation, observation, evidence_review, navigation, cancel]
+    operation_class: epistemic
+  J02:
+    kinds: [commitment, validation, execution, observation, evidence_review, settlement, navigation, cancel]
+    operation_class: consequential
+  J03:
+    kinds: [entity_resolution, validation, commitment, execution, evidence_review, settlement, navigation, cancel]
+    operation_class: consequential
+  J04:
+    kinds: [observation, validation, commitment, execution, evidence_review, settlement, navigation]
+    operation_class: consequential
+  J05:
+    kinds: [entity_resolution, validation, observation, evidence_review, navigation]
+    operation_class: epistemic
+  J06:
+    kinds: [entity_resolution, validation, commitment, execution, observation, evidence_review, settlement, navigation]
+    operation_class: consequential
+
+ownership:
+  authority: SEA-Forge
+  execution_records: Gauntlet
+  evidence_observations: RealityTrace
+  runtime_state: Cognate
+  semantic_candidate_validation: DomainForge
+  navigation_and_developmental_interpretation: Horizon

@@ -1,0 +1,52 @@
+# Behavioral IR contract. Declares what each journey IR may assume, what the proof
+# engine must never do, and how fixture outcomes map to observable language.
+
+contract_version: 1
+semantic_source: .sea/interaction/interaction-model.sea
+world_ref: "world:horizon@sha256:b0f31fcc60f49af730ca0b863af8e0eae990924fd0beb1d004f10c602cd24ca1"
+
+proof_mode: PROVE
+proof_level: fixture_backed_sequential
+
+required_phases: [IS1, IS2, IS3, IS4, IS5, IS6, IS7, IS8]
+
+invariants:
+  - id: BHV-01
+    rule: one decision at a time; no phase may advance on an unresolved prior decision
+  - id: BHV-02
+    rule: a resolved context value is never asked again
+  - id: BHV-03
+    rule: no gate value grants authority; authority is evaluated by SEA-Forge
+  - id: BHV-04
+    rule: execution success is not settlement success
+  - id: BHV-05
+    rule: settlement is not evidence; evidence is not developmental assessment
+  - id: BHV-06
+    rule: unknown, unreachable, conflicted and denied remain distinct and visible
+  - id: BHV-07
+    rule: preview and simulation never authorize or settle a real action
+  - id: BHV-08
+    rule: cancellation leaves the world unchanged
+
+engine_prohibitions:
+  - infer_authority_from_any_gate
+  - treat_execution_record_as_settlement
+  - treat_settlement_as_developmental_verdict
+  - hide_unknown_as_blocked
+  - invent_unavailable_evidence
+  - mark_simulated_result_as_live
+
+fixture_outcomes:
+  available: read-only journey completed; no world change
+  settled: consequential journey executed and fixture settlement reached
+  blocked: a named precondition, authority, payment, capability, recovery or settlement-access gate failed
+  unknown: information is missing or unreachable; not the same as blocked
+  conflicted: evidence claims are contradictory; no action taken
+  cancelled: observer cancelled before effect; no world change
+  execution_failed: effect attempt failed; settlement not attempted
+  executed_unsettled: effect succeeded but settlement was not reached
+
+evidence_classes:
+  journeys: declared
+  bindings: inferred
+  settlement: simulated

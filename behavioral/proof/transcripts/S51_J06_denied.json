@@ -1,0 +1,66 @@
+{
+  "authority": "denied",
+  "authority_granted": false,
+  "consequential": true,
+  "execution_distinct_from_settlement": true,
+  "first_blocker": "unauthorized",
+  "inferred_authority": false,
+  "journey": "J06",
+  "next_affordances": [
+    "leave_capability_unproven"
+  ],
+  "questions_asked": [],
+  "scenario": "S51_J06_denied",
+  "settlement_distinct_from_evidence": true,
+  "simulated": true,
+  "status": "blocked",
+  "transcript": [
+    {
+      "decision": "resolve:observer_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:tenant_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:world_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:checkpoint_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:capability_family_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "developmental_history_loaded",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "preregistration_frozen",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "dataset_scope_exported",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "authority": "denied",
+      "decision": "authority_gate",
+      "outcome": "blocked",
+      "phase": "IS3",
+      "reason": "unauthorized"
+    }
+  ]
+}

@@ -1,0 +1,227 @@
+# Fixture-backed scenario matrix. Every expected value is preregistered in
+# .agents/prereg/horizon/T02.prereg.yaml. `settled` is a fixture outcome, never
+# live external settlement.
+
+- id: S01_J01_happy
+  journey: J01
+  expected: available
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1 }
+  gates: { capability: bound }
+  evidence: [matching_instances, provenance]
+
+- id: S02_J01_missing_context
+  journey: J01
+  expected: blocked
+  expected_reason: missing_context
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc" }
+  gates: { capability: bound }
+
+- id: S03_J01_unknown_capability
+  journey: J01
+  expected: unknown
+  expected_reason: missing_capability
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1 }
+  gates: { capability: unknown }
+
+- id: S04_J01_cancelled
+  journey: J01
+  expected: cancelled
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1 }
+  gates: { capability: bound }
+  cancelled: true
+
+- id: S10_J02_happy_settled
+  journey: J02
+  expected: settled
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, operation_ref: op-transfer }
+  preflight: { frame_revision: 7, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: likely_allow, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+  evidence: [execution_record, realitytrace_observation, settlement_reference]
+  settlement: settled
+
+- id: S11_J02_authority_denied
+  journey: J02
+  expected: blocked
+  expected_reason: unauthorized
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, operation_ref: op-transfer }
+  preflight: { frame_revision: 7, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: denied, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+
+- id: S12_J02_pending_approval
+  journey: J02
+  expected: blocked
+  expected_reason: pending_approval
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, operation_ref: op-transfer }
+  preflight: { frame_revision: 7, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: requires_approval, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+
+- id: S13_J02_authority_unknown
+  journey: J02
+  expected: unknown
+  expected_reason: authority_unknown
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, operation_ref: op-transfer }
+  preflight: { frame_revision: 7, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: unknown, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+
+- id: S14_J02_conflicted
+  journey: J02
+  expected: conflicted
+  expected_reason: contradictory_evidence
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, operation_ref: op-transfer }
+  preflight: { frame_revision: 7, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: likely_allow, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+  contradictory: [settlement_reference]
+
+- id: S15_J02_cancelled
+  journey: J02
+  expected: cancelled
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, operation_ref: op-transfer }
+  preflight: { frame_revision: 7, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: likely_allow, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+  cancelled: true
+
+- id: S16_J02_execution_failed
+  journey: J02
+  expected: execution_failed
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, operation_ref: op-transfer }
+  preflight: { frame_revision: 7, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: likely_allow, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+  execution: failure
+  failure_reason: downstream_rejected
+
+- id: S17_J02_settlement_failed
+  journey: J02
+  expected: executed_unsettled
+  expected_reason: settlement_not_reached
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, operation_ref: op-transfer }
+  preflight: { frame_revision: 7, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: likely_allow, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+  evidence: [execution_record, realitytrace_observation, settlement_reference]
+  settlement: failed
+
+- id: S18_J02_evidence_incomplete
+  journey: J02
+  expected: unknown
+  expected_reason: evidence_incomplete
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, operation_ref: op-transfer }
+  preflight: { frame_revision: 7, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: likely_allow, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+  evidence: [execution_record]
+
+- id: S19_J02_no_settlement_access
+  journey: J02
+  expected: blocked
+  expected_reason: no_settlement_access
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, operation_ref: op-transfer }
+  preflight: { frame_revision: 7, payment: within_budget, recovery: reversible }
+  gates: { authority: likely_allow, capability: bound, payment: within_budget, recovery: reversible }
+
+- id: S20_J03_happy_settled
+  journey: J03
+  expected: settled
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, lineage_ref: lin-1 }
+  preflight: { acceptance_criteria: "closure validates", payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: likely_allow, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+  evidence: [domainforge_diagnostics, candidate_identity, gauntlet_record, realitytrace_observation]
+  settlement: settled
+
+- id: S21_J03_missing_parent
+  journey: J03
+  expected: blocked
+  expected_reason: missing_context
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, checkpoint_ref: cp-1, lineage_ref: lin-1 }
+  preflight: { acceptance_criteria: "closure validates", payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: likely_allow, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+
+- id: S22_J03_unknown_capability
+  journey: J03
+  expected: unknown
+  expected_reason: missing_capability
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, lineage_ref: lin-1 }
+  preflight: { acceptance_criteria: "closure validates", payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: likely_allow, capability: unknown, payment: within_budget, recovery: reversible, settlement_access: bound }
+
+- id: S30_J04_happy_settled
+  journey: J04
+  expected: settled
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, case_ref: case-9 }
+  preflight: { event_ref: evt-1, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: likely_allow, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+  evidence: [realitytrace_receipt, correlated_observations, residuals]
+  settlement: settled
+
+- id: S31_J04_denied
+  journey: J04
+  expected: blocked
+  expected_reason: unauthorized
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, case_ref: case-9 }
+  preflight: { event_ref: evt-1, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: denied, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+
+- id: S32_J04_unknown_authority
+  journey: J04
+  expected: unknown
+  expected_reason: authority_unknown
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, case_ref: case-9 }
+  preflight: { event_ref: evt-1, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: unknown, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+
+- id: S40_J05_happy
+  journey: J05
+  expected: available
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1 }
+  preflight: { assumptions: "pinned baseline" }
+  gates: { capability: bound }
+  evidence: [cited_assumptions, limitations, uncertainty]
+
+- id: S41_J05_unsupported_model
+  journey: J05
+  expected: unknown
+  expected_reason: missing_capability
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1 }
+  preflight: { assumptions: "pinned baseline" }
+  gates: { capability: unknown }
+
+- id: S42_J05_cancelled
+  journey: J05
+  expected: cancelled
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1 }
+  preflight: { assumptions: "pinned baseline" }
+  gates: { capability: bound }
+  cancelled: true
+
+- id: S50_J06_happy_settled
+  journey: J06
+  expected: settled
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, capability_family_ref: cap-nav }
+  preflight: { prereg_ref: pre-horizon-001, dataset_ref: ds-horizon-dev-001, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: likely_allow, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+  evidence: [metrics, verdict, hashed_artifacts, residuals]
+  settlement: settled
+
+- id: S51_J06_denied
+  journey: J06
+  expected: blocked
+  expected_reason: unauthorized
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, capability_family_ref: cap-nav }
+  preflight: { prereg_ref: pre-horizon-001, dataset_ref: ds-horizon-dev-001, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: denied, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+
+- id: S52_J06_execution_failed
+  journey: J06
+  expected: execution_failed
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, capability_family_ref: cap-nav }
+  preflight: { prereg_ref: pre-horizon-001, dataset_ref: ds-horizon-dev-001, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: likely_allow, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+  execution: failure
+  failure_reason: pipeline_failed
+
+- id: S53_J06_settlement_failed
+  journey: J06
+  expected: executed_unsettled
+  expected_reason: settlement_not_reached
+  context: { observer_ref: obs-1, tenant_ref: tenant-1, world_ref: "world:horizon@sha256:b0f31fcc", checkpoint_ref: cp-1, capability_family_ref: cap-nav }
+  preflight: { prereg_ref: pre-horizon-001, dataset_ref: ds-horizon-dev-001, payment: within_budget, recovery: reversible, settlement_access: bound }
+  gates: { authority: likely_allow, capability: bound, payment: within_budget, recovery: reversible, settlement_access: bound }
+  evidence: [metrics, verdict, hashed_artifacts, residuals]
+  settlement: failed

@@ -1,0 +1,31 @@
+# Projection pressure observed while proving J01-J06. These are constraints on
+# T05 atomic UI models, not UI decisions; no widget or renderer is named.
+
+projection_pressure:
+  persistent_context:
+    observed_in: [J01, J02, J03, J04, J05, J06]
+    pressure: observer, tenant, world_ref and checkpoint must remain visible across decisions
+    failure_if_absent: observer cannot tell whether a candidate belongs to the current world
+  temporal_view:
+    observed_in: [J02, J03, J04, J05, J06]
+    pressure: checkpoint, intent history and settlement state must be inspectable over time
+    failure_if_absent: execution record is mistaken for settlement or for a later state
+  simultaneous_comparison:
+    observed_in: [J03, J05, J06]
+    pressure: baseline and alternative, or candidate and parent, must be compared side by side
+    failure_if_absent: a hypothetical or candidate is read as the active world
+  relationship_view:
+    observed_in: [J03, J06]
+    pressure: lineage and capability-family relationships must be navigable
+    failure_if_absent: revisions and experiments lose their parent identity
+  collection:
+    observed_in: [J01, J04]
+    pressure: many candidates, events or observations must stay scannable with a first-blocker summary
+    failure_if_absent: unknown and blocked states collapse into a flat list
+  artifact_context:
+    observed_in: [J02, J06]
+    pressure: evidence ids, receipts and hashed artifacts must stay attached to the decision they support
+    failure_if_absent: evidence is detached from the settlement it informs
+
+renderer_neutral: true
+source_journeys: behavioral/journeys

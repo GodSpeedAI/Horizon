@@ -1,0 +1,61 @@
+journey:
+  id: J04
+  title: Observe changed world state and choose a bounded response
+  semantic_source: .sea/interaction/interaction-model.sea
+  semantic_authority: canonical
+  canonical_instance: j04_monitor
+  actor_roles: [NavigatingObserver]
+  operation_class: consequential
+  consequential: true
+proof_mode: PROVE
+entry:
+  states: [watching]
+  actor_roles: [NavigatingObserver]
+  operation_class: consequential
+phases:
+  IS1_context_selection:
+    requires: [observer_ref, tenant_ref, world_ref, checkpoint_ref, case_ref]
+    resolved_from: [observer_ref, tenant_ref, world_ref, checkpoint_ref, case_ref]
+    questions_if_unresolved: [attention_scope]
+  IS2_preflight:
+    checks:
+      - { id: source_event_has_unique_identity, resolved_by: event_ref, failure: missing_precondition }
+      - { id: projections_rebuilt, resolved_by: checkpoint_ref, failure: missing_precondition }
+  IS3_authority_resolution:
+    required_role: NavigatingObserver
+    consequential: true
+    approval: { status: bound, evaluator: SEA-Forge, automatic_or_escalated: true }
+    rule: automatic_authority_only_where_it_exists_else_pending_decision
+  IS4_capability_invocation:
+    capability:
+      semantic_id: respond_to_change
+      binding: { status: bound, provider: cognate.runtime, execution_path: direct_or_gauntlet }
+  IS5_state_and_artifact_effect:
+    expected_state: { from: watching, to: responded_or_notified }
+    artifacts: [ExecutionRecord, EvidenceObservation]
+    world_effect: bounded_authorized_response
+  IS6_evidence_inspection:
+    required_evidence: [realitytrace_receipt, correlated_observations, residuals]
+    unavailable_evidence: unavailable_is_marked_not_invented
+  IS7_settlement_or_decision:
+    criterion: { source: "J04 applicable declared obligations settled; receipt alone is not settlement", machine_evaluable: false }
+    settlement_binding: { status: bound, owner: SEA-Forge }
+    separation: receipt_is_not_settlement
+  IS8_next_affordance_selection:
+    source: canonical_next_decisions
+    typed_edges: true
+    candidates:
+      - id: act
+        operation_class: consequential
+        requires_gates: [authority, payment, capability, recovery, settlement_access]
+      - id: defer
+        operation_class: navigation
+        gates: { visibility: pass, reach: pass, payment: not_required, authority: not_applicable, capability: bound, recovery: read_only, settlement_access: not_required }
+      - id: escalate_for_authorized_decision
+        operation_class: consequential
+        requires_gates: [authority]
+interaction_kinds: [observation, validation, commitment, execution, evidence_review, settlement, navigation]
+unresolved:
+  - { id: attention_model, status: unresolved_in_source, affects: [IS1], source: gs-term attention absorption }
+evidence_classes: { journeys: declared, bindings: inferred }
+projection_pressure_hints: [persistent_context, temporal_view, collection]

@@ -1,0 +1,80 @@
+{
+  "authority_granted": false,
+  "consequential": false,
+  "execution_distinct_from_settlement": true,
+  "first_blocker": "observer_cancelled",
+  "inferred_authority": false,
+  "journey": "J01",
+  "next_affordances": [],
+  "questions_asked": [],
+  "scenario": "S04_J01_cancelled",
+  "settlement_distinct_from_evidence": true,
+  "simulated": true,
+  "status": "cancelled",
+  "transcript": [
+    {
+      "decision": "resolve:observer_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:tenant_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:world_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:checkpoint_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "world_ref_pinned",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "checkpoint_resolved",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "access_scope_resolved",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "authority": "not_applicable_read_only",
+      "decision": "read_only_scope",
+      "outcome": "pass",
+      "phase": "IS3"
+    },
+    {
+      "decision": "capability_binding",
+      "outcome": "pass",
+      "phase": "IS4"
+    },
+    {
+      "decision": "payment_gate",
+      "outcome": "pass",
+      "payment": "not_required",
+      "phase": "IS2"
+    },
+    {
+      "decision": "recovery_gate",
+      "outcome": "pass",
+      "phase": "IS2",
+      "recovery": "read_only"
+    },
+    {
+      "decision": "commitment",
+      "outcome": "cancelled",
+      "phase": "IS5",
+      "world_effect": "none"
+    }
+  ]
+}

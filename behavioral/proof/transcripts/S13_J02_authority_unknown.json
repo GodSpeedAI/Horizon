@@ -1,0 +1,71 @@
+{
+  "authority": "unknown",
+  "authority_granted": false,
+  "consequential": true,
+  "execution_distinct_from_settlement": true,
+  "first_blocker": "authority_unknown",
+  "inferred_authority": false,
+  "journey": "J02",
+  "next_affordances": [
+    "defer"
+  ],
+  "questions_asked": [],
+  "scenario": "S13_J02_authority_unknown",
+  "settlement_distinct_from_evidence": true,
+  "simulated": true,
+  "status": "unknown",
+  "transcript": [
+    {
+      "decision": "resolve:observer_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:tenant_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:world_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:checkpoint_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:operation_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "frame_revision_current",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "payment_affordable",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "recovery_path_known",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "settlement_access_visible",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "authority": "unknown",
+      "decision": "authority_gate",
+      "outcome": "unknown",
+      "phase": "IS3",
+      "reason": "authority_unknown"
+    }
+  ]
+}

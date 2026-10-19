@@ -1,0 +1,61 @@
+{
+  "authority": "unknown",
+  "authority_granted": false,
+  "consequential": true,
+  "execution_distinct_from_settlement": true,
+  "first_blocker": "authority_unknown",
+  "inferred_authority": false,
+  "journey": "J04",
+  "next_affordances": [
+    "defer"
+  ],
+  "questions_asked": [],
+  "scenario": "S32_J04_unknown_authority",
+  "settlement_distinct_from_evidence": true,
+  "simulated": true,
+  "status": "unknown",
+  "transcript": [
+    {
+      "decision": "resolve:observer_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:tenant_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:world_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:checkpoint_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:case_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "source_event_has_unique_identity",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "projections_rebuilt",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "authority": "unknown",
+      "decision": "authority_gate",
+      "outcome": "unknown",
+      "phase": "IS3",
+      "reason": "authority_unknown"
+    }
+  ]
+}

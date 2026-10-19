@@ -1,0 +1,88 @@
+# T02 preregistration — J01-J06 Behavioral IR and sequential proof (P1B)
+# Authored before authoring any behavioral IR or proof artifact.
+# Plan ref: .agents/plans/horizon.plan.yaml tasks.T02
+schema: horizon.task_prereg
+task: T02
+title: "Project J01-J06 into Behavioral IR and prove the Clack journey (P1B)"
+recorded: "2026-10-19"
+proof_level: P2
+confirmation: builder_with_adversarial_teeth
+
+ruler:
+  spec_path: .agents/specs/horizon.agent.spec.yaml
+  plan_path: .agents/plans/horizon.plan.yaml
+  expected_spec_sha256: "75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130"
+  expected_spec_version: "1.0.0"
+  expected_spec_status: "frozen"
+  idm_entry: .sea/interaction/interaction-model.sea
+  world_ref: "world:horizon@sha256:b0f31fcc60f49af730ca0b863af8e0eae990924fd0beb1d004f10c602cd24ca1"
+
+claim: >-
+  A bounded observer can ask, inspect, choose, defer, reframe, or block each
+  canonical journey without invented authority, payment or settlement.
+
+positive_expectations:
+  - id: PE-01
+    expectation: >-
+      One Behavioral IR exists per canonical journey J01-J06, each instantiating
+      IS1-IS8 and passing the bundled validator.
+  - id: PE-02
+    expectation: >-
+      Every consequential action names the seven gates and the REQ-NAV-006
+      authority vocabulary; approval, payment, capability, recovery and
+      settlement bindings are present or explicitly unresolved.
+  - id: PE-03
+    expectation: >-
+      The runnable sequential proof exercises happy, blocked, unknown,
+      conflicted, cancelled and contradicted routes one decision at a time.
+  - id: PE-04
+    expectation: >-
+      Execution success and settlement success remain distinct; simulation is
+      declared and never presented as external settlement.
+  - id: PE-05
+    expectation: >-
+      Projection pressure is recorded for downstream Atomic UI IR (persistent
+      focus, comparison, timeline, evidence context).
+
+falsifier: "Remove approval or settlement binding from a consequential journey"
+
+negative_expectations:
+  - id: NE-01
+    attack: >-
+      Remove the authority approval and the settlement binding from the J02
+      consequential journey in a temporary copy.
+    expected: >-
+      The sequential proof blocks or marks unresolved (`unauthorized_or_unresolved`,
+      `no_settlement_access`) and never infers permission.
+  - id: NE-02
+    attack: >-
+      Make every context question mandatory even when the fixture already
+      resolves the field.
+    expected: >-
+      The prompt-burden check detects redundant questions (non-zero), whereas the
+      normal run skips every already-resolved field.
+  - id: NE-03
+    attack: >-
+      Present contradictory evidence for a claimed outcome.
+    expected: >-
+      The proof reports `conflicted` and does not offer the settlement-dependent
+      next affordance as available.
+
+known_confounds:
+  - "Mocks and fixture-only results are not live settlement evidence."
+  - "Pinned external API and skill versions may differ from prose documentation."
+  - "Concrete payment units, SEA-Forge preview availability and the Gauntlet threshold remain unresolved (OQ-IDM-02..04)."
+
+confirmation_condition: >-
+  Builder demonstrates preregistered positive and negative checks with stable
+  evidence and documents plausible alternate failures.
+
+evidence_plan:
+  - "Exact commands and observed output retained under .agents/evidence/horizon/T02/."
+  - "Behavioral IR validator output for all six journeys."
+  - "Sequential proof scenario matrix output and per-path transcripts."
+  - "Teeth run against isolated temporary copies; canonical IR untouched."
+
+redesign_trigger: >-
+  The canonical IDM lacks a necessary typed state, guard, decision, authority,
+  recovery or next-affordance edge.

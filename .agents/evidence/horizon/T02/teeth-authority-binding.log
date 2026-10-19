@@ -1,0 +1,4 @@
+PASS intact fixture settles (observed: blocked/unauthorized_or_unresolved)
+PASS degraded fixture does not settle (observed: blocked/unauthorized_or_unresolved)
+PASS degraded reason names missing binding (observed: blocked/unauthorized_or_unresolved)
+PASS no inferred authority (observed: blocked/unauthorized_or_unresolved)

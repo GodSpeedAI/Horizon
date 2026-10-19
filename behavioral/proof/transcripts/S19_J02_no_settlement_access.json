@@ -1,0 +1,64 @@
+{
+  "authority_granted": false,
+  "consequential": true,
+  "execution_distinct_from_settlement": true,
+  "first_blocker": "no_settlement_access",
+  "inferred_authority": false,
+  "journey": "J02",
+  "next_affordances": [
+    "defer"
+  ],
+  "questions_asked": [],
+  "scenario": "S19_J02_no_settlement_access",
+  "settlement_distinct_from_evidence": true,
+  "simulated": true,
+  "status": "blocked",
+  "transcript": [
+    {
+      "decision": "resolve:observer_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:tenant_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:world_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:checkpoint_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:operation_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "frame_revision_current",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "payment_affordable",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "recovery_path_known",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "settlement_access_visible",
+      "outcome": "blocked",
+      "phase": "IS2",
+      "reason": "no_settlement_access"
+    }
+  ]
+}

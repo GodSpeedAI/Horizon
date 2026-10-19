@@ -1,0 +1,4 @@
+PASS contextual run asks nothing already resolved
+PASS contextual run still available
+PASS mandatory-everything over-asks resolved context
+PASS mandatory-everything recorded each question as redundant

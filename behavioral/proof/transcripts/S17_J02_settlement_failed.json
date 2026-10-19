@@ -1,0 +1,108 @@
+{
+  "authority_granted": false,
+  "consequential": true,
+  "execution_distinct_from_settlement": true,
+  "first_blocker": "settlement_not_reached",
+  "inferred_authority": false,
+  "journey": "J02",
+  "next_affordances": [
+    "defer"
+  ],
+  "questions_asked": [],
+  "scenario": "S17_J02_settlement_failed",
+  "settlement_distinct_from_evidence": true,
+  "simulated": true,
+  "status": "executed_unsettled",
+  "transcript": [
+    {
+      "decision": "resolve:observer_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:tenant_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:world_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:checkpoint_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:operation_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "frame_revision_current",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "payment_affordable",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "recovery_path_known",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "settlement_access_visible",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "authority": "likely_allow",
+      "decision": "authority_gate",
+      "grants_authority": false,
+      "outcome": "pass",
+      "phase": "IS3"
+    },
+    {
+      "decision": "capability_binding",
+      "outcome": "pass",
+      "phase": "IS4"
+    },
+    {
+      "decision": "payment_gate",
+      "outcome": "pass",
+      "payment": "within_budget",
+      "phase": "IS2"
+    },
+    {
+      "decision": "recovery_gate",
+      "outcome": "pass",
+      "phase": "IS2",
+      "recovery": "reversible"
+    },
+    {
+      "decision": "settlement_access_gate",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "execute",
+      "outcome": "success",
+      "phase": "IS5",
+      "simulated": true
+    },
+    {
+      "decision": "evidence",
+      "outcome": "observed",
+      "phase": "IS6"
+    },
+    {
+      "decision": "settlement",
+      "outcome": "failed",
+      "phase": "IS7"
+    }
+  ]
+}

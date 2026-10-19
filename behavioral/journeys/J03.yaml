@@ -1,0 +1,61 @@
+journey:
+  id: J03
+  title: Inspect lineage and propose a governed semantic or pipeline revision
+  semantic_source: .sea/interaction/interaction-model.sea
+  semantic_authority: canonical
+  canonical_instance: j03_build
+  actor_roles: [ProposingBuilder]
+  operation_class: consequential
+  consequential: true
+proof_mode: PROVE
+entry:
+  states: [lineage_focused]
+  actor_roles: [ProposingBuilder]
+  operation_class: consequential
+phases:
+  IS1_context_selection:
+    requires: [observer_ref, tenant_ref, world_ref, checkpoint_ref, lineage_ref]
+    resolved_from: [observer_ref, tenant_ref, world_ref, checkpoint_ref, lineage_ref]
+    questions_if_unresolved: [candidate_change]
+  IS2_preflight:
+    checks:
+      - { id: parent_identity_present, resolved_by: world_ref, failure: missing_precondition }
+      - { id: acceptance_criteria_present, resolved_by: acceptance_criteria, failure: missing_precondition }
+  IS3_authority_resolution:
+    required_role: ProposingBuilder
+    consequential: true
+    approval: { status: bound, evaluator: SEA-Forge, scope: proposal_and_promotion }
+    rule: proposal_may_proceed_but_promotion_requires_separate_authorization
+  IS4_capability_invocation:
+    capability:
+      semantic_id: propose_semantic_revision
+      binding: { status: bound, provider: cognate.runtime, validator: DomainForge }
+  IS5_state_and_artifact_effect:
+    expected_state: { from: lineage_focused, to: candidate_stored }
+    artifacts: [CandidateRevision, SemanticValidationReport]
+    world_effect: none_until_promotion
+  IS6_evidence_inspection:
+    required_evidence: [domainforge_diagnostics, candidate_identity, gauntlet_record, realitytrace_observation]
+    unavailable_evidence: unavailable_is_marked_not_invented
+  IS7_settlement_or_decision:
+    criterion: { source: "J03 immutable candidate identity; promotion yields alias-history entry", machine_evaluable: false }
+    settlement_binding: { status: bound, owner: DomainForge, promotion_owner: SEA-Forge }
+    separation: valid_candidate_is_not_promoted_world
+  IS8_next_affordance_selection:
+    source: canonical_next_decisions
+    typed_edges: true
+    candidates:
+      - id: request_promotion
+        operation_class: consequential
+        requires_gates: [authority, capability, settlement_access]
+      - id: revise_candidate
+        operation_class: consequential
+        requires_gates: [authority, capability]
+      - id: abandon_candidate
+        operation_class: navigation
+        gates: { visibility: pass, reach: pass, payment: not_required, authority: not_applicable, capability: bound, recovery: reversible, settlement_access: not_required }
+interaction_kinds: [entity_resolution, validation, commitment, execution, evidence_review, settlement, navigation, cancel]
+unresolved:
+  - { id: promotion_approval_path, status: unresolved_in_source, affects: [IS3, IS8], source: OQ-IDM-03 }
+evidence_classes: { journeys: declared, bindings: inferred }
+projection_pressure_hints: [persistent_context, relationship_view, simultaneous_comparison]

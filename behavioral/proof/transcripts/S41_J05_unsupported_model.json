@@ -1,0 +1,58 @@
+{
+  "authority_granted": false,
+  "consequential": false,
+  "execution_distinct_from_settlement": true,
+  "first_blocker": "missing_capability",
+  "inferred_authority": false,
+  "journey": "J05",
+  "next_affordances": [],
+  "questions_asked": [],
+  "scenario": "S41_J05_unsupported_model",
+  "settlement_distinct_from_evidence": true,
+  "simulated": true,
+  "status": "unknown",
+  "transcript": [
+    {
+      "decision": "resolve:observer_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:tenant_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:world_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:checkpoint_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "baseline_refs_pinned",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "assumptions_explicit",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "authority": "not_applicable_read_only",
+      "decision": "read_only_scope",
+      "outcome": "pass",
+      "phase": "IS3"
+    },
+    {
+      "decision": "capability_binding",
+      "outcome": "unknown",
+      "phase": "IS4",
+      "reason": "missing_capability"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "authority_granted": false,
+  "consequential": true,
+  "execution_distinct_from_settlement": true,
+  "first_blocker": "missing_context",
+  "inferred_authority": false,
+  "journey": "J03",
+  "next_affordances": [
+    "abandon_candidate"
+  ],
+  "questions_asked": [
+    "world_ref"
+  ],
+  "scenario": "S21_J03_missing_parent",
+  "settlement_distinct_from_evidence": true,
+  "simulated": true,
+  "status": "blocked",
+  "transcript": [
+    {
+      "decision": "resolve:observer_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:tenant_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "ask:world_ref",
+      "outcome": "missing",
+      "phase": "IS1"
+    }
+  ]
+}

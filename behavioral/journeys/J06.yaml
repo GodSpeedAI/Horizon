@@ -1,0 +1,63 @@
+journey:
+  id: J06
+  title: Review developmental evidence and run a preregistered research experiment
+  semantic_source: .sea/interaction/interaction-model.sea
+  semantic_authority: canonical
+  canonical_instance: j06_develop
+  actor_roles: [NavigatingObserver, ResearchAuthority]
+  operation_class: consequential
+  consequential: true
+proof_mode: PROVE
+entry:
+  states: [develop_lens_open]
+  actor_roles: [NavigatingObserver, ResearchAuthority]
+  operation_class: consequential
+phases:
+  IS1_context_selection:
+    requires: [observer_ref, tenant_ref, world_ref, checkpoint_ref, capability_family_ref]
+    resolved_from: [observer_ref, tenant_ref, world_ref, checkpoint_ref, capability_family_ref]
+    questions_if_unresolved: [hypothesis, held_out_criterion]
+  IS2_preflight:
+    checks:
+      - { id: developmental_history_loaded, resolved_by: capability_family_ref, failure: missing_precondition }
+      - { id: preregistration_frozen, resolved_by: prereg_ref, failure: missing_precondition }
+      - { id: dataset_scope_exported, resolved_by: dataset_ref, failure: missing_precondition }
+  IS3_authority_resolution:
+    required_role: ResearchAuthority
+    consequential: true
+    approval: { status: bound, evaluator: SEA-Forge, scope: compute_and_data_use, activation_separate: true }
+    rule: estimator_activation_is_a_separate_governed_decision
+  IS4_capability_invocation:
+    capability:
+      semantic_id: run_preregistered_experiment
+      binding: { status: bound, provider: research.subsystem, executor: gauntlet_or_execution_world }
+  IS5_state_and_artifact_effect:
+    expected_state: { from: develop_lens_open, to: verdict_recorded }
+    artifacts: [Dataset, Preregistration, ExperimentRun, Verdict]
+    world_effect: no_world_change_estimator_state_separate
+  IS6_evidence_inspection:
+    required_evidence: [metrics, verdict, hashed_artifacts, residuals]
+    unavailable_evidence: failures_retained_not_dropped
+  IS7_settlement_or_decision:
+    criterion: { source: "J06 result compared against frozen held-out criterion", machine_evaluable: false }
+    settlement_binding: { status: bound, owner: RealityTrace, activation_owner: SEA-Forge }
+    separation: operational_settlement_vs_developmental_assessment
+  IS8_next_affordance_selection:
+    source: canonical_next_decisions
+    typed_edges: true
+    candidates:
+      - id: request_estimator_activation
+        operation_class: consequential
+        requires_gates: [authority, capability, settlement_access]
+      - id: propose_another_experiment
+        operation_class: consequential
+        requires_gates: [authority, capability, settlement_access]
+      - id: leave_capability_unproven
+        operation_class: navigation
+        gates: { visibility: pass, reach: pass, payment: not_required, authority: not_applicable, capability: bound, recovery: reversible, settlement_access: not_required }
+interaction_kinds: [entity_resolution, validation, commitment, execution, observation, evidence_review, settlement, navigation]
+unresolved:
+  - { id: estimator_activation_path, status: unresolved_in_source, affects: [IS3, IS8], source: OQ-IDM-03 }
+  - { id: research_subsystem_binding, status: unresolved_in_source, affects: [IS4], source: OQ-IDM-05 }
+evidence_classes: { journeys: declared, bindings: inferred }
+projection_pressure_hints: [persistent_context, temporal_view, artifact_context, simultaneous_comparison]

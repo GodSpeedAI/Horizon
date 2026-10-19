@@ -1,0 +1,98 @@
+{
+  "authority_granted": false,
+  "consequential": true,
+  "execution_distinct_from_settlement": true,
+  "first_blocker": "pipeline_failed",
+  "inferred_authority": false,
+  "journey": "J06",
+  "next_affordances": [
+    "leave_capability_unproven"
+  ],
+  "questions_asked": [],
+  "scenario": "S52_J06_execution_failed",
+  "settlement_distinct_from_evidence": true,
+  "simulated": true,
+  "status": "execution_failed",
+  "transcript": [
+    {
+      "decision": "resolve:observer_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:tenant_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:world_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:checkpoint_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:capability_family_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "developmental_history_loaded",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "preregistration_frozen",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "dataset_scope_exported",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "authority": "likely_allow",
+      "decision": "authority_gate",
+      "grants_authority": false,
+      "outcome": "pass",
+      "phase": "IS3"
+    },
+    {
+      "decision": "capability_binding",
+      "outcome": "pass",
+      "phase": "IS4"
+    },
+    {
+      "decision": "payment_gate",
+      "outcome": "pass",
+      "payment": "within_budget",
+      "phase": "IS2"
+    },
+    {
+      "decision": "recovery_gate",
+      "outcome": "pass",
+      "phase": "IS2",
+      "recovery": "reversible"
+    },
+    {
+      "decision": "settlement_access_gate",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "execute",
+      "outcome": "failed",
+      "phase": "IS5"
+    },
+    {
+      "decision": "settlement",
+      "outcome": "not_attempted",
+      "phase": "IS7",
+      "reason": "execution_failed"
+    }
+  ]
+}

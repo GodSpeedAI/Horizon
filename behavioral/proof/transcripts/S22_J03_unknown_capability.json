@@ -1,0 +1,66 @@
+{
+  "authority_granted": false,
+  "consequential": true,
+  "execution_distinct_from_settlement": true,
+  "first_blocker": "missing_capability",
+  "inferred_authority": false,
+  "journey": "J03",
+  "next_affordances": [
+    "abandon_candidate"
+  ],
+  "questions_asked": [],
+  "scenario": "S22_J03_unknown_capability",
+  "settlement_distinct_from_evidence": true,
+  "simulated": true,
+  "status": "unknown",
+  "transcript": [
+    {
+      "decision": "resolve:observer_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:tenant_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:world_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:checkpoint_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:lineage_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "parent_identity_present",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "acceptance_criteria_present",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "authority": "likely_allow",
+      "decision": "authority_gate",
+      "grants_authority": false,
+      "outcome": "pass",
+      "phase": "IS3"
+    },
+    {
+      "decision": "capability_binding",
+      "outcome": "unknown",
+      "phase": "IS4",
+      "reason": "missing_capability"
+    }
+  ]
+}

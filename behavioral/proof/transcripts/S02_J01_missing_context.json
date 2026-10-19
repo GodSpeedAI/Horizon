@@ -1,0 +1,38 @@
+{
+  "authority_granted": false,
+  "consequential": false,
+  "execution_distinct_from_settlement": true,
+  "first_blocker": "missing_context",
+  "inferred_authority": false,
+  "journey": "J01",
+  "next_affordances": [],
+  "questions_asked": [
+    "checkpoint_ref"
+  ],
+  "scenario": "S02_J01_missing_context",
+  "settlement_distinct_from_evidence": true,
+  "simulated": true,
+  "status": "blocked",
+  "transcript": [
+    {
+      "decision": "resolve:observer_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:tenant_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:world_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "ask:checkpoint_ref",
+      "outcome": "missing",
+      "phase": "IS1"
+    }
+  ]
+}

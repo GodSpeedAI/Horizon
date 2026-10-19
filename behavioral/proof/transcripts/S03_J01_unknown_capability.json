@@ -1,0 +1,63 @@
+{
+  "authority_granted": false,
+  "consequential": false,
+  "execution_distinct_from_settlement": true,
+  "first_blocker": "missing_capability",
+  "inferred_authority": false,
+  "journey": "J01",
+  "next_affordances": [],
+  "questions_asked": [],
+  "scenario": "S03_J01_unknown_capability",
+  "settlement_distinct_from_evidence": true,
+  "simulated": true,
+  "status": "unknown",
+  "transcript": [
+    {
+      "decision": "resolve:observer_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:tenant_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:world_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "resolve:checkpoint_ref",
+      "outcome": "already_resolved",
+      "phase": "IS1"
+    },
+    {
+      "decision": "world_ref_pinned",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "checkpoint_resolved",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "decision": "access_scope_resolved",
+      "outcome": "pass",
+      "phase": "IS2"
+    },
+    {
+      "authority": "not_applicable_read_only",
+      "decision": "read_only_scope",
+      "outcome": "pass",
+      "phase": "IS3"
+    },
+    {
+      "decision": "capability_binding",
+      "outcome": "unknown",
+      "phase": "IS4",
+      "reason": "missing_capability"
+    }
+  ]
+}

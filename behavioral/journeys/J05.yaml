@@ -1,0 +1,60 @@
+journey:
+  id: J05
+  title: Compare hypothetical alternatives without pretending to change the world
+  semantic_source: .sea/interaction/interaction-model.sea
+  semantic_authority: canonical
+  canonical_instance: j05_compare
+  actor_roles: [NavigatingObserver]
+  operation_class: epistemic
+  consequential: false
+proof_mode: PROVE
+entry:
+  states: [baseline_available]
+  actor_roles: [NavigatingObserver]
+  operation_class: epistemic
+phases:
+  IS1_context_selection:
+    requires: [observer_ref, tenant_ref, world_ref, checkpoint_ref]
+    resolved_from: [observer_ref, tenant_ref, world_ref, checkpoint_ref]
+    questions_if_unresolved: [alternatives, assumptions]
+  IS2_preflight:
+    checks:
+      - { id: baseline_refs_pinned, resolved_by: world_ref, failure: missing_precondition }
+      - { id: assumptions_explicit, resolved_by: assumptions, failure: missing_precondition }
+  IS3_authority_resolution:
+    required_role: NavigatingObserver
+    consequential: false
+    approval: { status: not_applicable_read_only, preview_only: true }
+    rule: preview_never_authorizes_execution
+  IS4_capability_invocation:
+    capability:
+      semantic_id: compare_scenarios
+      binding: { status: bound, provider: horizon.compare, scenario_model: optional }
+  IS5_state_and_artifact_effect:
+    expected_state: { from: baseline_available, to: comparison_marked }
+    artifacts: [BaselineEvidence, HypotheticalEstimates]
+    world_effect: none
+  IS6_evidence_inspection:
+    required_evidence: [cited_assumptions, limitations, uncertainty]
+    unavailable_evidence: unsupported_is_reported_not_invented
+  IS7_settlement_or_decision:
+    criterion: { source: "J05 no world change and no authority granted", machine_evaluable: true }
+    settlement_binding: { status: not_applicable_read_only }
+    separation: simulation_never_settles
+  IS8_next_affordance_selection:
+    source: canonical_next_decisions
+    typed_edges: true
+    candidates:
+      - id: adjust_assumptions
+        operation_class: epistemic
+        gates: { visibility: pass, reach: pass, payment: not_required, authority: not_applicable_read_only, capability: bound, recovery: read_only, settlement_access: not_required }
+      - id: request_real_actionable_candidate
+        operation_class: consequential
+        requires_gates: [authority, payment, capability, recovery, settlement_access]
+        status: routes_to_J02
+interaction_kinds: [entity_resolution, validation, observation, evidence_review, navigation]
+unresolved:
+  - { id: scenario_model_binding, status: unresolved_in_source, affects: [IS4], source: optional scenario model }
+  - { id: estimate_provenance, status: unresolved_in_source, affects: [IS6], source: OQ-IDM-02 }
+evidence_classes: { journeys: declared, bindings: inferred }
+projection_pressure_hints: [simultaneous_comparison, persistent_context, temporal_view]

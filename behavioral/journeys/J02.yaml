@@ -1,0 +1,66 @@
+journey:
+  id: J02
+  title: Preflight, authorize, execute and review a consequential operation
+  semantic_source: .sea/interaction/interaction-model.sea
+  semantic_authority: canonical
+  canonical_instance: j02_operate
+  actor_roles: [NavigatingObserver]
+  operation_class: consequential
+  consequential: true
+proof_mode: PROVE
+entry:
+  states: [focused, candidate_operation]
+  actor_roles: [NavigatingObserver]
+  operation_class: consequential
+phases:
+  IS1_context_selection:
+    requires: [observer_ref, tenant_ref, world_ref, checkpoint_ref, operation_ref]
+    resolved_from: [observer_ref, tenant_ref, world_ref, checkpoint_ref, operation_ref]
+    questions_if_unresolved: [target_selection]
+  IS2_preflight:
+    checks:
+      - { id: frame_revision_current, resolved_by: frame_revision, failure: missing_precondition }
+      - { id: payment_affordable, resolved_by: payment, failure: unpayable }
+      - { id: recovery_path_known, resolved_by: recovery, failure: unrecoverable }
+      - { id: settlement_access_visible, resolved_by: settlement_access, failure: no_settlement_access }
+  IS3_authority_resolution:
+    required_role: NavigatingObserver
+    consequential: true
+    approval: { status: bound, evaluator: SEA-Forge, non_granting: true }
+    authority_vocabulary: [likely_allow, requires_approval, deferred_to_invocation, denied, unreachable, unknown]
+    rule: no_gate_value_grants_authority
+  IS4_capability_invocation:
+    capability:
+      semantic_id: commit_navigation_intent
+      binding: { status: bound, provider: cognate.runtime, execution_path: direct_or_gauntlet }
+  IS5_state_and_artifact_effect:
+    expected_state: { from: candidate_operation, to: committed_or_preserved }
+    artifacts: [NavigationIntentRecord]
+    world_effect: exactly_once_authorized_effect
+  IS6_evidence_inspection:
+    required_evidence: [execution_record, realitytrace_observation, settlement_reference]
+    unavailable_evidence: unavailable_is_marked_not_invented
+  IS7_settlement_or_decision:
+    criterion: { source: "J02 operational settlement reference, distinct from evidence and development", machine_evaluable: false }
+    settlement_binding: { status: bound, owner: SEA-Forge, evidence_owner: RealityTrace }
+    separation: execution_success_is_not_settlement_success
+  IS8_next_affordance_selection:
+    source: canonical_next_decisions
+    typed_edges: true
+    candidates:
+      - id: review_evidence
+        operation_class: epistemic
+        requires_gates: [settlement_access]
+      - id: choose_next_bounded_response
+        operation_class: consequential
+        requires_gates: [authority, payment, capability, recovery, settlement_access]
+      - id: defer
+        operation_class: navigation
+        gates: { visibility: pass, reach: pass, payment: not_required, authority: not_applicable, capability: bound, recovery: read_only, settlement_access: not_required }
+interaction_kinds: [commitment, validation, execution, observation, evidence_review, settlement, navigation, cancel]
+unresolved:
+  - { id: payment_units, status: unresolved_in_source, affects: [IS2], source: OQ-IDM-02 }
+  - { id: authority_preview, status: unresolved_in_source, affects: [IS3], source: OQ-IDM-03 }
+  - { id: gauntlet_threshold, status: unresolved_in_source, affects: [IS4], source: OQ-IDM-04 }
+evidence_classes: { journeys: declared, bindings: inferred }
+projection_pressure_hints: [persistent_context, artifact_context, temporal_view]

@@ -1,0 +1,65 @@
+journey:
+  id: J01
+  title: Enter, search, filter and traverse a shared world
+  semantic_source: .sea/interaction/interaction-model.sea
+  semantic_authority: canonical
+  canonical_instance: j01_explore
+  actor_roles: [NavigatingObserver]
+  operation_class: epistemic
+  consequential: false
+proof_mode: PROVE
+entry:
+  states: [no_focus]
+  actor_roles: [NavigatingObserver]
+  operation_class: epistemic
+phases:
+  IS1_context_selection:
+    requires: [observer_ref, tenant_ref, world_ref, checkpoint_ref]
+    resolved_from: [observer_ref, tenant_ref, world_ref, checkpoint_ref]
+    questions_if_unresolved: [search_intent]
+  IS2_preflight:
+    checks:
+      - { id: world_ref_pinned, resolved_by: world_ref, failure: missing_precondition }
+      - { id: checkpoint_resolved, resolved_by: checkpoint_ref, failure: missing_precondition }
+      - { id: access_scope_resolved, resolved_by: tenant_ref, failure: unauthorized }
+  IS3_authority_resolution:
+    required_role: NavigatingObserver
+    consequential: false
+    approval: { status: not_applicable_read_only }
+    authority_vocabulary: [likely_allow, requires_approval, deferred_to_invocation, denied, unreachable, unknown]
+  IS4_capability_invocation:
+    capability:
+      semantic_id: assess_affordance
+      binding: { status: bound, provider: horizon.navigation.controller, mode: read_only }
+  IS5_state_and_artifact_effect:
+    expected_state: { from: no_focus, to: focused }
+    artifacts: [FocusSet, ContextCitation]
+    world_effect: none
+  IS6_evidence_inspection:
+    required_evidence: [matching_instances, provenance, citations]
+    unavailable_evidence: unavailable_is_marked_not_invented
+  IS7_settlement_or_decision:
+    criterion: { source: "J01 focus set is inspectable and provenance-bearing; no world change", machine_evaluable: false }
+    settlement_binding: { status: not_applicable_read_only }
+  IS8_next_affordance_selection:
+    source: canonical_next_decisions
+    typed_edges: true
+    candidates:
+      - id: inspect
+        operation_class: epistemic
+        gates: { visibility: pass, reach: pass, payment: not_required, authority: not_applicable_read_only, capability: bound, recovery: read_only, settlement_access: not_required }
+      - id: filter_further
+        operation_class: epistemic
+        gates: { visibility: pass, reach: pass, payment: not_required, authority: not_applicable_read_only, capability: bound, recovery: read_only, settlement_access: not_required }
+      - id: traverse_relationship
+        operation_class: epistemic
+        gates: { visibility: pass, reach: pass, payment: not_required, authority: not_applicable_read_only, capability: bound, recovery: read_only, settlement_access: not_required }
+      - id: propose_consequential_operation
+        operation_class: consequential
+        gates: { visibility: pass, reach: pass, payment: unresolved, authority: unresolved, capability: unresolved, recovery: unresolved, settlement_access: unresolved }
+        status: blocked_pending_journey_J02
+interaction_kinds: [entity_resolution, validation, navigation]
+unresolved:
+  - { id: focus_estimator, status: unresolved_in_source, affects: [IS8], source: OQ-IDM-02 }
+evidence_classes: { journeys: declared, bindings: inferred }
+projection_pressure_hints: [persistent_context, collection, relationship_view]
