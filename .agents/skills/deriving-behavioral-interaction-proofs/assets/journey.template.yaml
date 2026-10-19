@@ -1,0 +1,19 @@
+# Behavioral IR template. Replace <...>; keep unresolved items explicit.
+journey:
+  id: <CJxx>
+  title: <title>
+  semantic_source: <path to .sea or source>
+  semantic_authority: canonical   # canonical | derived | proposed
+proof_mode: PROTOTYPE             # IR_ONLY | PROTOTYPE | PROVE
+entry:
+  states: []
+  actor_roles: []
+phases:
+  IS1_context_selection: { requires: [] }
+  IS2_preflight: { checks: [] }
+  IS3_authority_resolution: { required_role: <role>, approval: { status: unresolved_in_source } }
+  IS4_capability_invocation: { capability: { semantic_id: <id>, binding: { status: unresolved } } }
+  IS5_state_and_artifact_effect: { expected_state: { from: <state>, to: <state> }, artifacts: [] }
+  IS6_evidence_inspection: { required_evidence: [] }
+  IS7_settlement_or_decision: { criterion: { source: <source>, machine_evaluable: false } }
+  IS8_next_affordance_selection: { source: <source>, typed_edges: false }

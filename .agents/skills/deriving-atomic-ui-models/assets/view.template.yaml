@@ -1,0 +1,18 @@
+# Atomic UI view template. Renderer-neutral: no framework component names.
+view:
+  id: <view_id>
+  purpose: <purposeful interaction this view supports>
+sources:
+  journey: <CJxx>
+  behavioral_phases: [IS1]        # IS<n> prefixes of Behavioral IR phases
+regions:
+  - { id: <region_id>, responsibility: <responsibility> }
+elements:
+  - { id: <element_id>, primitive: identity, binds: { entity: <entity> }, region: <region_id> }
+  - id: <action_id>
+    primitive: action
+    semantic_action: <semantic action id>
+    consequence: consequential    # epistemic | consequential
+    availability: { source: behavioral_ir }
+states:
+  ready: { when: <behavioral or application condition> }
