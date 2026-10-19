@@ -57,3 +57,17 @@
 - Evidence (T00): `~/projects/SEA` is GodSpeedAI/SEA (MPL-2.0, 0.19.1); the authoritative fork is GodSpeedAI/SEA-Forge at `~/projects/sea-rs` (LicenseRef-SEA-Forge).
 - Impact: resolving SEA by directory name picks the wrong repo.
 - Next: always resolve by remote identity (DEC-T00-03).
+
+## D-011 DomainForge application instance count may be stale (2026-10-19)
+- Location: `.sea/interaction/validation/domainforge-output.txt`
+- Debt: The captured `validate --application` output reports a count that did not change after an invariant's `requirement_ref` was corrected (T04 re-pin `b0f31fcc`.. -> `6c18d6a6`..). It may count entities only, or the capture may lag the model, in which case the recorded "0 violations" is weaker evidence than it looks.
+- Evidence: file diff on 2026-10-19 changed only the `world_ref`/hash lines; the instance count was unchanged across a substantive `.sea` edit.
+- Confidence: low
+- Closure: confirm what the count covers and whether `scripts/recapture-domainforge-output.sh` must be re-run after every `.sea` edit; document it. Size S.
+
+## D-012 72 acceptance contracts restate the runtime in its own terms (2026-10-19)
+- Location: `requirements/ledger.yaml`, `scripts/ledger-policy.yaml`
+- Debt: Most expected-observable cells use the generic `Observed in the runtime's own terms:` form, which is checkable but weak as a falsifiable acceptance contract. Only three conjunctions were split facet-by-facet at T04.
+- Evidence: T04 ledger census: 85 of 98 rows use the source-fidelity predicate; the generic restatement appears 72 times.
+- Confidence: medium
+- Closure: replace generic restatements with per-requirement observables as each owning task (T05+) is implemented, tightening the ledger policy so new rows cannot regress to the generic form. Size L.
