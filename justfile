@@ -31,6 +31,7 @@ wayfinder:
 teeth:
     bun run scripts/teeth.ts
     bash scripts/teeth-ledger-freeze.sh
+    python3 scripts/teeth-domainforge-gate.py
 
 status:
     tail -n 1 .agents/CURRENT_STATUS.jsonl

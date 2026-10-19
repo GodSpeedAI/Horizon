@@ -160,3 +160,48 @@ decisions:
       - "ui-model/projection-decisions.yaml"
       - "ui-model/traceability.yaml"
       - ".agents/evidence/horizon/T03/teeth-ui-traceability.log"
+
+  - id: DEC-T04-01
+    date: "2026-10-19"
+    task: T04
+    requirement: REQ-DEV-003
+    decision: >-
+      PE-01's ordering condition (independent criticism verdicts recorded BEFORE the
+      ledger/Wayfinder freeze) was not met as written. The owner ruled on 2026-10-19 that
+      post-freeze criticism stands in for it: PE-01 is NOT restated, the T04
+      preregistration is NOT edited, and the deviation is recorded here instead. T04
+      settles only after the verdicts are recorded under
+      .agents/evidence/horizon/T04/verdicts/ AND any material finding is resolved; a
+      material finding in a frozen artifact becomes a candidate revision and a re-freeze,
+      and is never waived.
+    rationale:
+      - "Owner decision 2026-10-19 (explicit): accept post-freeze criticism; do not restate PE-01, do not edit the T04 preregistration."
+      - "The miss was procedural, not epistemic: the builder ran out of affordable independent capacity, and the freeze was executed by the builder while PE-01 was already known to be unmet. It was recorded as unmet in CURRENT_STATUS revision 8 rather than claimed as met."
+      - "Retroactively inserting pre-freeze verdicts is impossible; fabricating them would be self-attestation. Late criticism is the only honest repair that preserves the frozen artifacts."
+      - "Late review is weaker than the preregistered order: the reviewer sees the freeze has already happened. That weakness is recorded, not argued away."
+    reversible: false
+    evidence:
+      - ".agents/prereg/horizon/T04.prereg.yaml#L43-L48"
+      - ".agents/evidence/horizon/T04/REVIEW_REQUEST.md"
+      - ".agents/CURRENT_STATUS.jsonl#rev8"
+
+  - id: DEC-T04-02
+    date: "2026-10-19"
+    task: T04
+    requirement: REQ-RES-002
+    decision: >-
+      "0 violations" from `domainforge validate --application` is demoted from
+      integrity evidence to symbol-resolution evidence. Vivisection showed the gate
+      accepts a dangling `requirement_ref` and a duplicated `invariant_id` at exit 0. A
+      tooth (scripts/teeth-domainforge-gate.py, wired into `just teeth`) now demonstrates
+      both blind spots and asserts a control injection still fails. No task may cite
+      "0 violations" as proof of referential or identity integrity; world_ref /
+      semantic_closure_hash pinning and check-idm-coverage.py remain the integrity controls.
+    rationale:
+      - "Observed directly: REQ-INT-003 -> REQ-DOES-NOT-EXIST-999 still reports 0 violations, exit 0."
+      - "Observed directly: INV-08 relabelled INV-07 (duplicate id) still reports 0 violations, exit 0."
+      - "The T04 pin revision was itself caused by a wrong requirement_ref, so the gate cited for that fix cannot see that class of defect."
+    reversible: true
+    evidence:
+      - "scripts/teeth-domainforge-gate.py"
+      - ".agents/DEBT.md#D-011"

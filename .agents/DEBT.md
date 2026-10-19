@@ -65,6 +65,26 @@
 - Confidence: low
 - Closure: confirm what the count covers and whether `scripts/recapture-domainforge-output.sh` must be re-run after every `.sea` edit; document it. Size S.
 
+### D-011 (continued) — CONFIRMED, not stale: the count is blind to dangling refs and duplicate ids
+- Date: 2026-10-19
+- Location: `justfile:46` (`gate-t01`), `scripts/teeth-domainforge-gate.py`
+- Debt: The count is not stale — the gate genuinely does not see these defects. Vivisection on a scratch copy of `interaction-model.sea`:
+  `requirement_ref: "REQ-INT-003"` -> `"REQ-DOES-NOT-EXIST-999"` still reports `Validation succeeded: 0 violations total`, exit 0.
+  Duplicating `invariant_id: "INV-08"` onto the INV-07 instance still reports `0 violations total`, exit 0.
+  This matters because the T04 pin revision was *caused by* a wrong `requirement_ref` (INV-08 pointed at REQ-NAV-001); the gate that was cited for that fix cannot detect the class of defect it was fixing.
+- Evidence: `domainforge validate <copy> --application --format human` -> exit 0 / "0 violations total" for both injections; 24 entities unchanged.
+- Confidence: high (directly observed)
+- Closure: **added a tooth**, `scripts/teeth-domainforge-gate.py`, invoked from `just teeth`. It asserts the null tree passes, the control (undefined instance type) fails, and the two blind spots are *demonstrated* rather than assumed. Standing rule until DomainForge can see these: no task may cite "0 violations" as evidence of referential or identity integrity. The `world_ref`/`semantic_closure_hash` pin plus `check-idm-coverage.py` remain the real integrity controls. Size S (tooth done); upstream DomainForge gap is theirs.
+
+## D-013 DomainForge diagnostic semantics asserted from partial source reading
+- Location: `../domainforge/domainforge-core/src/module/resolver.rs`
+- Debt: D-011 vivisection concluded the `--application` diagnostics are APP014 (symbol/import resolution) and APP015 (parse) from a grep of `resolver.rs` and `--help`, not from a diagnostic reference. The conclusion is behaviourally confirmed by the tooth (control fails, dangling/duplicate pass), but the *classification* of which diagnostic class covers what is not sourced from a spec.
+- Evidence: observed `Error: Parse failed ... resolved closure failed graph construction: Grammar error: ... Entity 'TotallyUndefinedType' not found`.
+- Confidence: medium
+- Closure: cite the DomainForge APP001–APP015 diagnostic reference (version 0.21.1) in the T04 evidence, or drop the classification claim and rely only on observed behaviour. Size S.
+
+
+
 ## D-012 72 acceptance contracts restate the runtime in its own terms (2026-10-19)
 - Location: `requirements/ledger.yaml`, `scripts/ledger-policy.yaml`
 - Debt: Most expected-observable cells use the generic `Observed in the runtime's own terms:` form, which is checkable but weak as a falsifiable acceptance contract. Only three conjunctions were split facet-by-facet at T04.

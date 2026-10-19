@@ -6,26 +6,26 @@ bun test
 bun test v1.4.0 (34cbb9a40)
 
 test/config.test.ts:
-(pass) local_operator configuration > accepts a loopback local operator [0.73ms]
-(pass) local_operator configuration > refuses a non-loopback bind [0.27ms]
+(pass) local_operator configuration > accepts a loopback local operator [0.39ms]
+(pass) local_operator configuration > refuses a non-loopback bind [0.32ms]
 (pass) local_operator configuration > refuses shared_remote without a real identity provider [0.07ms]
-(pass) local_operator configuration > keeps operator and agent principals distinct [0.16ms]
-(pass) local_operator configuration > issues a fresh 0600 secret on every launch [1.35ms]
+(pass) local_operator configuration > keeps operator and agent principals distinct [0.20ms]
+(pass) local_operator configuration > issues a fresh 0600 secret on every launch [1.29ms]
 
 test/app.test.ts:
-(pass) structural walking skeleton > boots the canonical world, real runtime, projection and HTTP health [162.15ms]
+(pass) structural walking skeleton > boots the canonical world, real runtime, projection and HTTP health [172.71ms]
 
 test/ui.test.ts:
 (pass) renderer-neutral surface seam > projects a frame without executable markup and with sources on every block [0.17ms]
-(pass) renderer-neutral surface seam > marks agent-supplied values as agent sources [0.12ms]
+(pass) renderer-neutral surface seam > marks agent-supplied values as agent sources [0.07ms]
 
  8 pass
  0 fail
  36 expect() calls
-Ran 8 tests across 3 files. [225.00ms]
+Ran 8 tests across 3 files. [240.00ms]
 uv run --project research pytest -q
 ....                                                                     [100%]
-4 passed in 0.05s
+4 passed in 0.06s
 python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
 ledger: 0 error(s) in ledger.yaml
   ok: 98 requirements, 98 acceptance contracts
@@ -58,4 +58,13 @@ BLOCKED  hashed input drifted (ledger policy) -> FAIL: wayfinder validation fail
 BLOCKED  ledger row removed after freeze (ledger structure / projection) -> FAIL: requirement ledger validation failed
 
 teeth: 6 blocked, 0 missed
+python3 scripts/teeth-domainforge-gate.py
+null: exit=0 exit=0 Validation succeeded: 0 violations total
+dangling: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: dangling .sea accepted with no violation
+duplicate: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: duplicate .sea accepted with no violation
+control: exit=1 exit=1 Error: Parse failed for /tmp/tmp_4rwkw_1/.sea/interaction/interaction-model.sea: resolved closure failed graph co
+
+tooth: gate discriminates (control fails, and the two blind spots are proven)
 gate-t04: ok
