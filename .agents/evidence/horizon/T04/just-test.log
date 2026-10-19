@@ -1,0 +1,24 @@
+bun test
+bun test v1.4.0 (34cbb9a40)
+
+test/config.test.ts:
+(pass) local_operator configuration > accepts a loopback local operator [0.38ms]
+(pass) local_operator configuration > refuses a non-loopback bind [0.18ms]
+(pass) local_operator configuration > refuses shared_remote without a real identity provider [0.04ms]
+(pass) local_operator configuration > keeps operator and agent principals distinct [0.14ms]
+(pass) local_operator configuration > issues a fresh 0600 secret on every launch [1.31ms]
+
+test/app.test.ts:
+(pass) structural walking skeleton > boots the canonical world, real runtime, projection and HTTP health [199.85ms]
+
+test/ui.test.ts:
+(pass) renderer-neutral surface seam > projects a frame without executable markup and with sources on every block [0.15ms]
+(pass) renderer-neutral surface seam > marks agent-supplied values as agent sources [0.07ms]
+
+ 8 pass
+ 0 fail
+ 36 expect() calls
+Ran 8 tests across 3 files. [291.00ms]
+uv run --project research pytest -q
+....                                                                     [100%]
+4 passed in 0.04s

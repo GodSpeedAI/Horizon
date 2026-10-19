@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+    "types": [
+      "bun"
+    ],
+    "jsx": "react-jsx",
+    "noImplicitAny": false
+  },
+  "include": [
+    "src",
+    "scripts",
+    "test",
+    "cognate.config.ts"
+  ]
+}

@@ -1,0 +1,23 @@
+[project]
+name = "horizon-research"
+version = "0.1.0"
+description = "Typed process contract for Horizon's developmental research subsystem"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+horizon-research = "horizon_research.contract:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8.3"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/horizon_research"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -1,4 +1,6 @@
 # DomainForge 0.21.1 — T01 IDM validation output (verbatim)
+# Re-captured at T04 after the INV-08 requirement_ref correction
+# (REQ-NAV-001 -> REQ-INT-003); no entity or invariant semantics changed.
 
 ## validate --application
 # T01 gate-01 validate --application (pinned 0.21.1)
@@ -19,13 +21,13 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
     "version": "0.21.1"
   },
   "inputs": {
-    "source_set_hash": "sha256:675f2db4c1a617e0a6a0945ae6229cffb9eb8658be5d22d136ac7b672163f929",
+    "source_set_hash": "sha256:4b3133412e72b20c31b94c9e52eaf676136796a69a4dbaab95e2eab84bc21a78",
     "semantic_pack_set_hash": "sha256:6e5312099a8d89e1d271bd89d9fcb36b031069bd8dad72be397af6b331d85c40",
     "language_schema_version": "domainforge-ast/v3",
     "interpretation_version": "domainforge-interpretation/v1"
   },
-  "self_hash": "sha256:aed724c857a31a309242cec675b88b035f5f49d2bb85f7b1cc33a27723bed056",
-  "semantic_closure_hash": "sha256:b0f31fcc60f49af730ca0b863af8e0eae990924fd0beb1d004f10c602cd24ca1",
+  "self_hash": "sha256:f2042b3efc8e1473249a3de28bc4d6c3eb9be6fd1ec4483d9e6f582b7b4966b3",
+  "semantic_closure_hash": "sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0",
   "contract": {
     "enums": [
       {
@@ -2607,9 +2609,3 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
     ]
   }
 }
-
-## composed world_ref
-# T01 gate-05 composed world_ref
-$ python3 scripts/world-ref.py .sea/interaction/interaction-model.sea
-world:horizon@sha256:b0f31fcc60f49af730ca0b863af8e0eae990924fd0beb1d004f10c602cd24ca1
-exit=0

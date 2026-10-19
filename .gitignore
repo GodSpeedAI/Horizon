@@ -1,2 +1,26 @@
-.tmp/__pycache__/
-*.pyc
+# Local runtime state, generated databases and secrets
+.cognate/app.sqlite*
+.cognate/dist/
+.cognate/*.secret
+.cognate/local-operator.secret
+
+# Dependency and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Python research subsystem
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+research/.venv/
+
+# Scratch space and OS/editor noise
+.tmp/
+tmp/
+.DS_Store
+.idea/
+.vscode/

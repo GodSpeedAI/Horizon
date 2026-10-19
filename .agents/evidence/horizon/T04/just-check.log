@@ -1,0 +1,2 @@
+bun run scripts/check.ts
+check: ok (local_operator, 127.0.0.1:4319, horizon)

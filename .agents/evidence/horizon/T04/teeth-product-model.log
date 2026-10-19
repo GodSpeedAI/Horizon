@@ -1,0 +1,4 @@
+# Extracted verbatim from just-teeth.log (single adversarial run of scripts/teeth.ts).
+# Kept per-case because T04.prereg.yaml evidence_plan names each case.
+blocked competing-product-model: exit=1
+BOUNDARY: competing canonical model/authority store at product-model/process.yaml

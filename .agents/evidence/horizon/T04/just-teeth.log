@@ -1,0 +1,25 @@
+bun run scripts/teeth.ts
+blocked missing-cognate-dependency: exit=1
+STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
+blocked in-memory-runtime: exit=1
+17 |   throw new RuntimeBoundaryError(`RUNTIME: ${message}`);
+RuntimeBoundaryError: RUNTIME: local_operator forbids an in-memory runtime; a durable SQLite store is required
+blocked competing-product-model: exit=1
+BOUNDARY: competing canonical model/authority store at product-model/process.yaml
+blocked duplicate-semantic-authority: exit=1
+BOUNDARY: duplicate semantic authority at other/model.sea; canonical model lives under .sea/
+blocked false-world-ref: exit=1
+19 |   throw new SemanticAdapterError(`SEMANTIC: ${message}`);
+SemanticAdapterError: SEMANTIC: world identity mismatch: expected world:horizon@sha256:0000000000000000000000000000000000000000000000000000000000000000, observed world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0
+
+teeth: all five attacks blocked
+bash scripts/teeth-ledger-freeze.sh
+BASELINE clean tree verifies
+BLOCKED  frozen ledger edited after freeze -> FAIL: ledger content does not match its freeze_hash (hand edit after freeze?)
+BLOCKED  frozen ledger reverted to candidate -> FAIL: ledger freeze_hash is not frozen: 'candidate'
+BLOCKED  wayfinder body hand-edited -> FAIL: committed wayfinder body is not the projection its generator produces (hand edit?)
+BLOCKED  wayfinder unfrozen -> FAIL: wayfinder validation failed
+BLOCKED  hashed input drifted (ledger policy) -> FAIL: wayfinder validation failed
+BLOCKED  ledger row removed after freeze (ledger structure / projection) -> FAIL: requirement ledger validation failed
+
+teeth: 6 blocked, 0 missed

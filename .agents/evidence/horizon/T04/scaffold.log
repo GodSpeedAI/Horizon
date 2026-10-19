@@ -1,0 +1,60 @@
+# T04 scaffold state — RECONSTRUCTED, not a replay of the original run
+#
+# The original `cognate create` invocation's terminal output was not retained when it
+# ran. Rather than invent it, this log records the current, re-observable facts about
+# what that scaffold produced. Commands below were run at record time.
+#
+# recorded_at: 2026-10-19 (T04 settlement)
+# status: reconstructed evidence — sufficient to audit the scaffold, NOT proof of
+#         reproducible creation (see "Limits").
+
+$ ../domainforge/target/release/domainforge --version
+domainforge 0.21.1
+
+$ bun --version
+1.4.0
+
+$ uv --version
+uv 0.12.1 (x86_64-unknown-linux-gnu)
+
+# Cognate 0.6.1 is vendored as tarballs pinned by package.json (file: dependencies),
+# so the dependency closure is local and version-pinned rather than floating.
+$ ls .cognate/vendor/*.tgz | wc -l
+27
+
+$ python3 -c "import json;d=json.load(open('package.json'));print(len(d['dependencies']),'direct deps')"
+9 direct deps
+  @godspeedai/cognate-cli, -profile-harness, -domainforge, -provider-local,
+  -runtime-bun, -projections, -kernel-api, -runtime-api, -events   (all 0.6.1)
+
+$ sha256sum package.json bun.lock
+9c088045443b8448c7ca14fb1efa84c35e4595f2a628bbf4e05fc4861ad67999  package.json
+f8e5699a8c99cfb21d1bc06eb55eb7e1d30d93b3febbc1c2b356b89b7eb53be7  bun.lock
+
+# Scaffold artifacts present
+  cognate.config.ts        semanticWorld.entry = domain/interaction-model.sea
+                           (domain/ is a directory symlink -> .sea/interaction)
+  config/horizon.toml      local_operator profile
+  src/                     adapters agents capabilities components config domain
+                           projections runtime ui; app.ts main.ts
+  research/                pyproject.toml, uv.lock, src/, tests/
+  docs/topology.md         component units and one-way dependencies
+  docs/donors.md           Donor attribution (Product Actualizer: Apache-2.0)
+
+# Secret handling (PE-05): the per-launch operator secret is git-ignored and 0600.
+$ git check-ignore -v .cognate/local-operator.secret
+.gitignore:5:.cognate/local-operator.secret	.cognate/local-operator.secret
+$ stat -c '%a %n' .cognate/local-operator.secret
+600 .cognate/local-operator.secret
+
+# Limits
+- This is not an attestation that `cognate create` was deterministic or idempotent;
+  that property (PE-02 "reproducible dependency closure") is evidenced only in the
+  sense that the closure is pinned to vendored 0.6.1 tarballs and bun.lock is committed.
+- Re-running `cognate create` was NOT performed; doing so could silently overwrite
+  Horizon composition code, so it is deliberately out of scope for T04 settlement.
+- `domain/` is a directory symlink to `.sea/interaction`, so the Cognate semantic entry
+  `domain/interaction-model.sea` resolves to the canonical `.sea` source. The symlink's
+  portability on other checkouts is a known open question, not a proven property here.
+- Executed evidence for this task is in the sibling logs (just-*.log, teeth-*.log);
+  this file only records the scaffold's static shape.

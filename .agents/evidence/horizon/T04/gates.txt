@@ -1,0 +1,25 @@
+# T04 final gate run — recorded 2026-10-19, exit codes as observed
+#
+# Reproduce from the repo root:  bash .agents/evidence/horizon/T04/run-gates.sh
+# Each target's stdout/stderr is written to just-<target>.log beside this file.
+
+check exit=0 6s
+boundaries exit=0 0s
+test exit=0 1s
+ledger exit=0 4s
+wayfinder exit=0 3s
+teeth exit=0 14s
+verify exit=0 11s
+gate-t04 exit=0 21s
+
+# Observed results
+#   just check        check: ok (local_operator, 127.0.0.1:4319, horizon)
+#   just boundaries   boundaries: ok (.)
+#   just test         8 pass, 0 fail, 36 expect(); research pytest 4 passed
+#   just ledger       98 requirements, 98 acceptance contracts, freeze verified
+#   just wayfinder    wayfinder: 0 error(s)
+#   just teeth        all five structural attacks blocked; 6 freeze attacks blocked, 0 missed
+#   just verify       verify: ok
+#   just gate-t04     gate-t04: ok
+#
+# All eight targets fail closed on a non-zero exit; none of them substitutes for another.

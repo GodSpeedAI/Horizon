@@ -1,0 +1,36 @@
+bun run scripts/check.ts
+check: ok (local_operator, 127.0.0.1:4319, horizon)
+bun run scripts/check-boundaries.ts
+boundaries: ok (.)
+bun test
+bun test v1.4.0 (34cbb9a40)
+
+test/config.test.ts:
+(pass) local_operator configuration > accepts a loopback local operator [0.35ms]
+(pass) local_operator configuration > refuses a non-loopback bind [0.14ms]
+(pass) local_operator configuration > refuses shared_remote without a real identity provider [0.03ms]
+(pass) local_operator configuration > keeps operator and agent principals distinct [0.15ms]
+(pass) local_operator configuration > issues a fresh 0600 secret on every launch [1.26ms]
+
+test/app.test.ts:
+(pass) structural walking skeleton > boots the canonical world, real runtime, projection and HTTP health [251.55ms]
+
+test/ui.test.ts:
+(pass) renderer-neutral surface seam > projects a frame without executable markup and with sources on every block [0.16ms]
+(pass) renderer-neutral surface seam > marks agent-supplied values as agent sources [0.08ms]
+
+ 8 pass
+ 0 fail
+ 36 expect() calls
+Ran 8 tests across 3 files. [333.00ms]
+uv run --project research pytest -q
+....                                                                     [100%]
+4 passed in 0.04s
+python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
+ledger: 0 error(s) in ledger.yaml
+  ok: 98 requirements, 98 acceptance contracts
+./scripts/check-ledger-freeze.sh
+python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py . --ledger requirements/ledger.yaml
+wayfinder: 0 error(s)
+./scripts/check-ledger-freeze.sh
+verify: ok

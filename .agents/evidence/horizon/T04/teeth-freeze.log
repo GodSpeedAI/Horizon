@@ -1,0 +1,9 @@
+BASELINE clean tree verifies
+BLOCKED  frozen ledger edited after freeze -> FAIL: ledger content does not match its freeze_hash (hand edit after freeze?)
+BLOCKED  frozen ledger reverted to candidate -> FAIL: ledger freeze_hash is not frozen: 'candidate'
+BLOCKED  wayfinder body hand-edited -> FAIL: committed wayfinder body is not the projection its generator produces (hand edit?)
+BLOCKED  wayfinder unfrozen -> FAIL: wayfinder validation failed
+BLOCKED  hashed input drifted (ledger policy) -> FAIL: wayfinder validation failed
+BLOCKED  ledger row removed after freeze (ledger structure / projection) -> FAIL: requirement ledger validation failed
+
+teeth: 6 blocked, 0 missed

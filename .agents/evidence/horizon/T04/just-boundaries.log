@@ -1,0 +1,2 @@
+bun run scripts/check-boundaries.ts
+boundaries: ok (.)

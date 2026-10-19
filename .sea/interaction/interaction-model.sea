@@ -709,7 +709,7 @@ instance inv_settlement_not_evidence of "InteractionInvariant" {
 instance inv_intent_idempotent of "InteractionInvariant" {
     invariant_id: "INV-08",
     statement: "Duplicate navigation intent ids must not duplicate external side effects.",
-    requirement_ref: "REQ-NAV-001",
+    requirement_ref: "REQ-INT-003",
     evidence_class: "declared",
     status: "active"
 }

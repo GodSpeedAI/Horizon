@@ -2,7 +2,7 @@
 
 Status: fixture-backed sequential proof (PROVE) over all six canonical journeys.
 
-- Semantic source: `.sea/interaction/interaction-model.sea` (canonical, `world_ref` `world:horizon@sha256:b0f31fcc60f49af730ca0b863af8e0eae990924fd0beb1d004f10c602cd24ca1`)
+- Semantic source: `.sea/interaction/interaction-model.sea` (canonical, `world_ref` `world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0`)
 - Preregistration: `.agents/prereg/horizon/T02.prereg.yaml`
 - Journeys: `behavioral/journeys/J01.yaml` … `J06.yaml`
 - Engine: `behavioral/proof/engine.py`; scenarios: `behavioral/proof/scenarios.yaml`; runner: `behavioral/proof/run.py`
