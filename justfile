@@ -47,7 +47,26 @@ wayfinder:
     python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py . --ledger requirements/ledger.yaml
     ./scripts/check-ledger-freeze.sh
 
-teeth:
+# T05: one closed grammar, one binder, one reducer, one projection. The narrow proof is the
+# topology check (`check-t05`), its teeth (`teeth-t05-boundaries`, which must catch a *second*
+# grammar, a route that binds for itself, or a renderer beside the authority) and the live
+# cross-transport equivalence (`teeth-t05-equivalence`, which starts the real server and runs
+# the real CLI rather than trusting a mock). Then the applicable global gates.
+check-t05:
+    bun run scripts/check-t05-boundaries.ts
+
+teeth-t05-boundaries:
+    bun run scripts/teeth-t05-boundaries.ts
+
+teeth-t05-equivalence:
+    bun run scripts/teeth-t05-equivalence.ts
+
+teeth-t05: teeth-t05-boundaries teeth-t05-equivalence
+
+gate-t05: check-t05 teeth-t05 check boundaries idm-integrity acceptance-claims witness-claims contract-modals test ledger wayfinder teeth
+    @echo "gate-t05: ok — horizon.surface/2 + horizon.gui-view/1 verified across GUI/CLI/MCP"
+
+teeth: teeth-t05-boundaries
     bun run scripts/teeth.ts
     bash scripts/teeth-ledger-freeze.sh
     python3 scripts/teeth-domainforge-gate.py
@@ -87,10 +106,6 @@ gate-t04: check boundaries idm-integrity acceptance-claims witness-claims contra
 
 freeze-t04:
     ./scripts/freeze-formation.sh
-
-gate-t05:
-    @echo "gate-t05: not implemented; fails closed until T05 settles"
-    @exit 1
 
 gate-t06:
     @echo "gate-t06: not implemented; fails closed until T06 settles"

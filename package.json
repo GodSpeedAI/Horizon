@@ -12,14 +12,15 @@
   },
   "dependencies": {
     "@godspeedai/cognate-cli": "file:./.cognate/vendor/godspeedai-cognate-cli-0.6.1.tgz",
-    "@godspeedai/cognate-profile-harness": "file:./.cognate/vendor/godspeedai-cognate-profile-harness-0.6.1.tgz",
     "@godspeedai/cognate-domainforge": "file:./.cognate/vendor/godspeedai-cognate-domainforge-0.6.1.tgz",
-    "@godspeedai/cognate-provider-local": "file:./.cognate/vendor/godspeedai-cognate-provider-local-0.6.1.tgz",
-    "@godspeedai/cognate-runtime-bun": "file:./.cognate/vendor/godspeedai-cognate-runtime-bun-0.6.1.tgz",
-    "@godspeedai/cognate-projections": "file:./.cognate/vendor/godspeedai-cognate-projections-0.6.1.tgz",
+    "@godspeedai/cognate-events": "file:./.cognate/vendor/godspeedai-cognate-events-0.6.1.tgz",
     "@godspeedai/cognate-kernel-api": "file:./.cognate/vendor/godspeedai-cognate-kernel-api-0.6.1.tgz",
+    "@godspeedai/cognate-profile-harness": "file:./.cognate/vendor/godspeedai-cognate-profile-harness-0.6.1.tgz",
+    "@godspeedai/cognate-projections": "file:./.cognate/vendor/godspeedai-cognate-projections-0.6.1.tgz",
+    "@godspeedai/cognate-provider-local": "file:./.cognate/vendor/godspeedai-cognate-provider-local-0.6.1.tgz",
     "@godspeedai/cognate-runtime-api": "file:./.cognate/vendor/godspeedai-cognate-runtime-api-0.6.1.tgz",
-    "@godspeedai/cognate-events": "file:./.cognate/vendor/godspeedai-cognate-events-0.6.1.tgz"
+    "@godspeedai/cognate-runtime-bun": "file:./.cognate/vendor/godspeedai-cognate-runtime-bun-0.6.1.tgz",
+    "zod": "3.25.76"
   },
   "overrides": {
     "@godspeedai/cognate-cli": "file:./.cognate/vendor/godspeedai-cognate-cli-0.6.1.tgz",

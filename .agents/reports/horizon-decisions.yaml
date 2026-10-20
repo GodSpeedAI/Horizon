@@ -334,6 +334,55 @@ decisions:
       - "requirements/ledger.yaml"
       - "scripts/idm-integrity-debt.yaml"
 
+  - id: DEC-T05-01
+    date: "2026-10-20"
+    task: T05
+    requirement: REQ-INT-001, REQ-INT-003
+    decision: >-
+      The observer principal is `os:<user>:<uid>` as issued by the host, and the grammar accepts it as
+      an authenticated human observer without inventing an `actor:` prefix. The alternative — fabricating
+      a transport-side actor identifier so the document looks uniform — was rejected because it would
+      make the grammar report an attribution Horizon does not actually hold. Source references are keyed
+      by responsibility (stable across frames) rather than by per-request `frame_id`, because a
+      frame-keyed source ref makes GUI/CLI/MCP equivalence unprovable by construction.
+    reversible: true
+    evidence:
+      - "src/ui/surface2/grammar.ts"
+      - "test/surface-negative.test.ts"
+      - ".agents/evidence/horizon/T05/SUMMARY.md"
+
+  - id: DEC-T05-02
+    date: "2026-10-20"
+    task: T05
+    requirement: REQ-UX-002
+    decision: >-
+      NE-03 failed against the implementation rather than the test: a placement whose attribution was
+      `agent` could still be reported as human-authored layout. The reducer now caps such a placement at
+      `agent_proposed` through `downgrade(placement, role, attributedTo)`, with the attribution threaded
+      from `block.provenance.attributed_to`. The test's expectation was not weakened to match the bug.
+    reversible: true
+    evidence:
+      - "src/ui/surface2/reducer.ts"
+      - "test/surface-negative.test.ts"
+      - ".agents/evidence/horizon/T05/teeth-t05.log"
+
+  - id: DEC-T05-03
+    date: "2026-10-20"
+    task: T05
+    requirement: REQ-INT-003
+    decision: >-
+      GUI/CLI/MCP equivalence is proven by starting the real server and running the real CLI
+      (`scripts/teeth-t05-equivalence.ts`), not by comparing two calls to the same in-process resolver.
+      A shared-function test would pass even if a transport stopped using the seam. The check demands a
+      byte-identical text body, one view schema across transports, MCP tools derived from the operation
+      union, and the same refusal for an unoffered intent. It found a real divergence on first run: MCP
+      folds `.` to `_` in tool names, which the comparison now asserts explicitly rather than hiding
+      (logged as D-024, which proposes carrying the operation id explicitly).
+    reversible: true
+    evidence:
+      - "scripts/teeth-t05-equivalence.ts"
+      - ".agents/evidence/horizon/T05/teeth-t05.log"
+
 open_questions:
   - id: OQ-001
     raised: "2026-10-19"

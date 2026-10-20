@@ -14,6 +14,7 @@
         "@godspeedai/cognate-provider-local": "file:./.cognate/vendor/godspeedai-cognate-provider-local-0.6.1.tgz",
         "@godspeedai/cognate-runtime-api": "file:./.cognate/vendor/godspeedai-cognate-runtime-api-0.6.1.tgz",
         "@godspeedai/cognate-runtime-bun": "file:./.cognate/vendor/godspeedai-cognate-runtime-bun-0.6.1.tgz",
+        "zod": "3.25.76",
       },
       "devDependencies": {
         "@types/bun": "^1.3.1",

@@ -18,7 +18,12 @@ export interface NavigationFrameV1 {
   readonly checkpoint_ref: string;
   readonly focus_ref: string;
   readonly case_ref: string | null;
-  readonly responsibility: "orient" | "decide" | "execute" | "monitor" | "compare" | "develop";
+  /**
+   * Journey names, not block kinds. `journey.compare` is written dotted because the plain
+   * word is also a surface block type, and the surface vocabulary belongs to
+   * `src/ui/surface2/` alone: one spelling for two meanings is how a second grammar starts.
+   */
+  readonly responsibility: "orient" | "decide" | "execute" | "monitor" | "journey.compare" | "develop";
   readonly choices: readonly StructuralChoice[];
 }
 

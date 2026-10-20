@@ -1,0 +1,4 @@
+donor inventory (T05)
+product-actualizer: vocabulary as data only (RESPONSIBILITIES, SURFACE_INTENTS, LAYOUT_PLACEMENTS, TONES); no module imported
+cognate: 0.6.1 vendored closure; no T05 change
+domainforge: via cognate-domainforge only; no T05 change

@@ -9,6 +9,15 @@
   authoritative state store. Horizon does not import Product Actualizer packages.
 - T04 implementation is an independent TypeScript derivation; no donor file was copied
   verbatim.
+- Reused at T05: the closed-surface *vocabulary as data* — responsibility and intent names,
+  layout-placement names and tone names — transcribed into `src/ui/surface2/grammar.ts`
+  (`RESPONSIBILITIES`, `SURFACE_INTENTS`, `LAYOUT_PLACEMENTS`, `TONES`). They are data, not
+  donor code: Horizon validates them with its own zod schemas and no Product Actualizer
+  module is imported.
+- Still not reused at T05: Product Actualizer's loopback/local-token trust model, its router,
+  its reducer or its server. Horizon's binder, reducer and projection are its own, and
+  `just check-t05` fails if a second grammar, a route-side binder or an off-authority renderer
+  appears.
 
 ## Cognate
 

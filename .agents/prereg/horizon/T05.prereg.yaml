@@ -1,0 +1,156 @@
+preregistration:
+  id: HORIZON-PREREG-T05
+  task: T05
+  title: Extract deterministic closed surface grammar, source bindings and role reducer
+  recorded_at: "2026-10-20"
+  recorded_before_artifacts: true
+
+  claim: >-
+    A single versioned closed surface grammar, a single authorized source-expression
+    binder, and a single role-aware pure reducer govern what Horizon displays and which
+    intents it can produce. The same rules reject executable markup, unknown blocks and
+    ops, invalid refs, unsafe source expressions, forbidden roles and agent layout theft
+    on every transport (in-process composition, the HTTP GUI route, the CLI route and the
+    MCP tool surface), and tool discovery grants no authorization.
+
+  upstream_pins:
+    spec: {id: HORIZON-001, version: 1.0.1, sha256: 14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4}
+    plan: {id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml}
+    world_ref: "world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0"
+    cognate: {version: 0.6.1, commit: a477933a1ddf1a8bcd64b4e762ccbb56e5fbd7d5}
+    domainforge: {version: 0.21.1}
+    product_actualizer: {commit: c9df8d2, license: Apache-2.0, role: donor-vocabulary-and-attribution}
+    zod: {version: 3.25.76, provenance: transitive dependency of the Cognate 0.6.1 project closure; promoted to a direct dependency at this version}
+
+  settles:
+    - REQ-UI-001
+    - REQ-UI-002
+    - REQ-UI-003
+    - REQ-UI-006
+    - REQ-UI-007
+    - REQ-UI-008
+    - REQ-SEC-002
+    - REQ-SEC-003
+    - REQ-SEC-004
+    - REQ-UX-006
+
+
+  positive_expectations:
+    - id: PE-01
+      expectation: >-
+        One closed, versioned surface schema exists in code (`horizon.surface/2`) with
+        exactly the fifteen closed block types inherited from Product Actualizer's cockpit
+        vocabulary (metric, callout, table, tree, timeline, graph, chart, compare, media,
+        document, entity, preflight, progress, ask, form), `.strict()` everywhere, and it is
+        the only surface validator any route uses. Its document is versioned and a
+        schema-derived JSON Schema is serialized so MCP/WebMCP tool discovery publishes the
+        same closed vocabulary.
+    - id: PE-02
+      expectation: >-
+        A composed surface names typed, inspectable source expressions only
+        (`horizon:<source>`, `semantic:<ref>`, `file:<allowed root>/...`, `agent:<ref>`).
+        The binder resolves each to a value plus provenance (source kind, originating
+        operation, observation) and always records one of available / empty / no-match /
+        blocked / denied / unavailable / contradicted / partial. Agent-supplied values carry
+        a visible `agent-supplied` mark distinguishing them from runtime-observed ones.
+    - id: PE-03
+      expectation: >-
+        Composition and every op are pure `(state, op) -> {state, result}` functions with no
+        I/O. Agent ops cannot move, resize, pin, close or focus an owner-laid surface;
+        human/system layout ops are the only writers of layout; a role without its required
+        authority receives a typed rejection. Reducer state is frozen after each step and is
+        stably serializable.
+    - id: PE-04
+      expectation: >-
+        One projection produces the session's deterministic foreground view
+        (`horizon.gui-view/1`) from reducer state plus bound sources. The GUI HTTP route
+        serves it serialized and escaped (no raw markup); the CLI route renders the same
+        view as text; the MCP route serves the foreground view and the same op union. A
+        GUI-sourced op and a CLI-sourced op naming the same choice produce the same
+        resulting intents.
+    - id: PE-05
+      expectation: >-
+        Every op and every composition shows its actor: each entry carries an
+        `ActorAttribution` (kind human/agent/system, role, instance), and an agent acting for
+        the human is rendered as visibly distinct (`acting_for` present, marked).
+
+  falsifier: >-
+    Provide '<script>' or arbitrary JSX as agent-provided surface and have it accepted,
+    rendered or stored; or let an agent call a human-authority op (human.approve /
+    human.answer as itself) or move a pinned owner panel and have the reducer return success.
+
+  negative_expectations:
+    - id: NE-01
+      attack: >-
+        Submit `<script>alert(1)</script>` or other markup as a surface title, a block
+        title, a table cell, or via the YAML/JSON surface document on the HTTP route.
+      expected: Typed `SCHEMA` rejection naming the failing path; nothing rendered or stored.
+    - id: NE-02
+      attack: Submit an unknown block type (`iframe`) and an executable-looking field (`jsx`, `onclick`).
+      expected: Rejection names the unknown block type and the unknown property; `.strict()` never ignores it.
+    - id: NE-03
+      attack: Submit an unauthorized action in a block (an operation the frame does not offer, or an owner-ruling op id).
+      expected: Rejection naming the action; the op union does not contain it for that role.
+    - id: NE-04
+      attack: Submit unsafe source expressions (`javascript:...`, `file:../../etc/passwd`, an unknown `horizon:` source, an over-long source).
+      expected: Each rejected by the source-expression validator with a bounded message.
+    - id: NE-05
+      attack: Agent role sends `view.move`, `view.pin`, `surface.put` into an owner-pinned slot, or `human.approve`.
+      expected: Typed layout/authority rejection; owner placement unchanged; human-only op never applied for an agent.
+    - id: NE-06
+      attack: Present a request whose only credential is the Product Actualizer loopback-token assumption on a non-loopback or multi-user posture.
+      expected: Refused with a message naming the missing trust boundary (REQ-SEC-004), not silently admitted.
+    - id: NE-07
+      attack: Strip actor attribution, or record an agent op as `human`.
+      expected: Validation rejects a missing actor; the reducer keeps the authenticated attribution; agent-for-human stays distinct.
+    - id: NE-08
+      attack: MCP call with discovery only, then submit an op outside the role's authority.
+      expected: Discovery output does not satisfy submission; the call fails closed with a typed rejection.
+    - id: NE-09
+      attack: Make the GUI route and the CLI route disagree; same choice via HTTP and via CLI, compare resulting intents.
+      expected: Any divergence makes gate-t05 fail (equivalence is asserted, not assumed).
+    - id: NE-10
+      attack: Put `<img onerror=...>` inside an observed source value.
+      expected: The projection escapes the observed value; the serialized view carries no executable markup.
+
+
+  known_confounds:
+    - The T04 `SurfaceModel` is replaced by `horizon.surface/2`; it was never a frozen contract.
+    - Sources bind to structural (health/research/world) data only until T06/T07 supply live objects. `semantic:` refs that cannot be observed are reported `blocked`, never fabricated.
+    - Clack and the WebMCP browser transport are not bound at T05; the CLI route and MCP/WebMCP tooling definitions are. Equivalence is proved between the GUI projection, the CLI projection and the MCP op union.
+    - Zod is already installed as a transitive dependency; this task promotes it to a direct dependency at the installed version instead of elevating a version.
+    - Product Actualizer's loopback-token model is not used; only its closed vocabulary as data.
+
+  evidence_plan:
+    - .agents/evidence/horizon/T05/SUMMARY.md
+    - .agents/evidence/horizon/T05/gate-t05.log
+    - .agents/evidence/horizon/T05/just-verify.log
+    - .agents/evidence/horizon/T05/teeth-t05.log
+    - .agents/evidence/horizon/T05/donor-inventory.log
+
+  redesign_trigger: >-
+    The closed grammar cannot represent an earned journey (J01-J06) and no defensible
+    extension passes a new scenario test, or sharing one reducer between the CLI/GUI/MCP
+    routes requires duplicating source-of-truth rules.
+
+  confirmation_condition: >-
+    Builder demonstrates every preregistered positive and negative check with retained
+    exact commands and output, records exact release API mismatches and remaining
+    unknowns. T05 is P2 (builder with adversarial teeth); an independent replica of
+    gate-t05 is commissioned in parallel and its verdict is recorded as a separate,
+    non-blocking asset.
+
+    - id: PE-06
+      expectation: >-
+        The MCP tool list is derived from the same schemas; it publishes the closed
+        vocabulary and the op union, contains no owner-ruling op for the agent role, and a
+        call with a schema, authority or discovery-only rejection is observed to fail
+        closed. The shared-disabled default and loopback HTTP are retained.
+    - id: PE-07
+      expectation: >-
+        `just gate-t05` exists, runs type check, the T05 test files, the T05 teeth and the
+        global applicable gates, and exits 0; `just verify` remains green.
+    - id: PE-08
+      expectation: >-
+        Any donor-derived vocabulary or structure is recorded in `docs/donors.md` and
+        `NOTICE`, and the boundary checks still reject a competing model/authority store.

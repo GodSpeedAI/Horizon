@@ -7,7 +7,7 @@ import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
 import { readIntentAttempts, readIntentRecords } from "../src/capabilities/navigation-intent.ts";
 import { REQUIRED_COGNATE } from "../src/runtime/required-cognate.ts";
-import { projectFrame } from "../src/ui/surface.ts";
+import { bindingContextOf, projectFrame } from "../src/ui/surface.ts";
 import { PINNED_WORLD_REF, horizonDocument, writeConfig } from "./support/config.ts";
 
 const PINNED = PINNED_WORLD_REF;
@@ -215,11 +215,13 @@ describe("structural walking skeleton", () => {
       input_checkpoint_ref: `cognate:${commit.position}`,
     });
 
-    // Renderer-neutral surface over the same frame.
-    const surface = projectFrame(frame!);
-    expect(surface.persistent_context.world_ref).toBe(PINNED);
-    expect(surface.blocks.length).toBeGreaterThan(0);
-    expect(JSON.stringify(surface)).not.toContain("<");
+    // Renderer-neutral surface over the same frame, as the in-process route presents it.
+    const surface = projectFrame(frame!, bindingContextOf({ root: process.cwd(), allowFileReads: true }));
+    expect(surface.ok).toBe(true);
+    if (!surface.ok) throw new Error("surface rejected");
+    expect(surface.view.world_ref).toBe(PINNED);
+    expect(surface.view.nodes.length).toBeGreaterThan(0);
+    expect(JSON.stringify(surface.view)).not.toContain("<");
 
     // Close, then read the same facts through independent store connections.
     await app.close();
@@ -348,9 +350,13 @@ describe("structural walking skeleton", () => {
     expect(recordsAfter.map((entry) => entry.record.actor_ref)).toEqual([operator]);
     expect(attempts.find((attempt) => attempt.intent_id === issued.intent.intent_id)).toMatchObject({ outcome: "accepted" });
 
-    // Presentation metadata cannot become the effective observer.
-    const surface = projectFrame(frame);
-    expect(surface.persistent_context.observer_ref).toBe(operator);
+    // Presentation metadata cannot become the effective observer: the surface's own
+    // attribution is the authenticated operator, and the committed record is unchanged.
+    const surface = projectFrame(frame, bindingContextOf({ root: process.cwd(), allowFileReads: true }));
+    expect(surface.ok).toBe(true);
+    if (!surface.ok) throw new Error("surface rejected");
+    expect(surface.surface.blocks.map((block) => block.provenance.attributed_to.actor_ref)).toEqual([operator]);
+    for (const action of surface.surface.actions) expect(action.by.actor_ref).toBe(operator);
     const records = await readIntentRecords(runtime.runtime.store);
     expect(records.at(-1)!.record.actor_ref).toBe(operator);
     expect(records.at(-1)!.record.intent_id).toBe(issued.intent.intent_id);

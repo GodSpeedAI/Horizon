@@ -1,33 +1,58 @@
 # Horizon Current Status
 
-**Revision:** 15 · **Recorded:** 2026-10-20 · **Stage:** T04 settled; spec amended to **1.0.1**; next task **T05**
+**Revision:** 16 · **Recorded:** 2026-10-20 · **Stage:** T05 settled (P2); next task **T06**
 
-**Spec 1.0.1 (`DEC-SPEC-101`):**
-- **New requirement:** `REQ-CMP-001` says a hypothetical comparison never changes world state, grants authority or commits an intent. It was previously only a J05 journey note, and the canonical `.sea` already referenced it.
-- **World unchanged:** `world_ref` stays `6c18d6a6…`.
-- **Plan:** rebound to the new spec hash, with REQ-CMP-001 mapped to T16.
-- **Ledger:** regenerated at 99 requirements and re-frozen as `HORIZON-001-1.0.1@2026-10-20`.
-- **Debt:** D-016 is closed.
+**T05 — one surface, three transports.** `horizon.surface/2` is declared once
+(`src/ui/surface2/grammar.ts`), with one binder, one reducer and one shared
+`horizon.gui-view/1` projection. GUI (`GET /surface`), CLI (`horizon surface` / `horizon act`)
+and MCP (`horizon mcp`) all resolve and commit through `src/ui/surface.ts`, so no transport can
+mean something the others do not.
 
-**T04:** settled (`DEC-T04-06`). T04 is P2, so no independent verdict was required. The only deviation is that the re-freezes had no independent ledger criticism.
+- **A real defect was fixed, not a test.** NE-03 caught a reducer gap: a placement attributed to
+  an `agent` could still be reported as human-authored layout. `downgrade(placement, role,
+  attributedTo)` now caps it at `agent_proposed` (DEC-T05-02).
+- **Equivalence is proven live, not by mock.** `scripts/teeth-t05-equivalence.ts` starts the
+  real server and runs the real CLI, demanding a byte-identical text body. On first run it
+  caught a genuine divergence: MCP folds `.` → `_` in tool names (D-024).
+- **The observer principal** is `os:<user>:<uid>` accepted as an authenticated human, rather
+  than a fabricated `actor:` prefix (DEC-T05-01).
 
-**Verified:** all 12 gate targets exit 0, and so does the recorder.
+**Verified:**
 
-**Frozen pins:**
+| Command | Result |
+| --- | --- |
+| `just gate-t05` | exit 0 |
+| `just verify` | exit 0 |
+| `bun test` | 24 pass / 0 fail, 197 expect() calls |
+| `teeth-t05-boundaries` | ok (14 checks) |
+| `teeth-t05-equivalence` | ok (5 comparisons) |
+| `check-t05-boundaries` | ok (30 files) |
+| `pytest` | 4 passed |
+
+**Prereg:** `T05.prereg.yaml` sha256 `ff36d65b…`, frozen before implementation.
+
+**Frozen pins (unchanged):**
 
 | Artifact | SHA-256 |
 | --- | --- |
-| Spec | `14a42936…` |
+| Spec 1.0.1 | `14a42936…` |
 | Ledger | `68974521…` |
 | Wayfinder | `3a28ed7d…` |
 
 **Open:**
-- `REQ-CASE-002` and `REQ-NAV-005` have no witness until T07.
-- D-019: provider controls.
-- D-020: the `REQ-RES-001` lexical baseline.
+- **PE-08 is PARTIAL.** It names `docs/donors.md` *and* `NOTICE`; `docs/donors.md` is updated and
+  no donor module is imported, but no `NOTICE` file exists (D-022). Because PE-08 is frozen,
+  closing it needs an owner ruling.
+- New debt observed, not fixed: D-022 (`NOTICE`), D-023 (CLI and server contend for one SQLite
+  store), D-024 (MCP tool names fold operation ids), D-025 (`horizon.view` copies the role
+  vocabulary).
+- Earlier: `REQ-CASE-002` and `REQ-NAV-005` unwitnessed until T07; D-019 provider controls;
+  D-020 `REQ-RES-001` lexical baseline.
+- Not bound at T05 (declared in the prereg): Clack and the WebMCP browser transport.
 
-**Next:** T05, which extracts a deterministic closed surface grammar, source bindings and a role reducer.
+**Next:** T06 — build the operational object layer: typed object-set and relationship
+projections on Cognate (depends on T04).
 
 **Spec:** HORIZON-001 v1.0.1, frozen; SHA-256 `14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4`.
 
-**Evidence:** [spec](specs/horizon.agent.spec.yaml), [plan](plans/horizon.plan.yaml), [decisions](reports/horizon-decisions.yaml), [ledger](../requirements/ledger.yaml), [wayfinder](../.wayfinder/answer-key.md), [debt](DEBT.md).
+**Evidence:** [T05 summary](evidence/horizon/T05/SUMMARY.md), [prereg](prereg/horizon/T05.prereg.yaml), [spec](specs/horizon.agent.spec.yaml), [plan](plans/horizon.plan.yaml), [decisions](reports/horizon-decisions.yaml), [ledger](../requirements/ledger.yaml), [wayfinder](../.wayfinder/answer-key.md), [debt](DEBT.md).

@@ -12,6 +12,20 @@ import type { Json } from "@godspeedai/cognate-events";
 import type { RunView } from "@godspeedai/cognate-runtime-api";
 import { buildStructuralFrame, type NavigationFrameV1, type NavigationIntentRecord } from "./domain/frame.ts";
 import { buildCommitIntent, type CommitIntentInput, type CommitIntentOutput } from "./domain/intent.ts";
+import {
+  bindingContextOf,
+  canonicalIntent,
+  composeSurface,
+  frameFromCheckpoint,
+  assessmentOf,
+  intentsEquivalent,
+  projectForRole,
+  type EquivalenceResult,
+  type GuiView,
+  type SurfaceRouteContext,
+} from "./ui/surface.ts";
+import { publishSurfaceSchema, SURFACE_SCHEMA, type SurfaceRole } from "./ui/surface2/grammar.ts";
+import { renderHtml, renderText } from "./ui/surface2/render.ts";
 import type { Server } from "bun";
 
 type HttpServer = Server<unknown>;
@@ -19,6 +33,16 @@ type HttpServer = Server<unknown>;
 /** The frame this application most recently issued and the gates assessed on it. */
 export interface FrameView {
   readonly frame: NavigationFrameV1;
+}
+
+export interface SurfaceIntentRequestBody {
+  readonly transport: "gui" | "cli" | "mcp";
+  readonly role?: unknown;
+  /** GUI: the action the operator activated. */
+  readonly node_id?: unknown;
+  /** CLI/MCP: the operation the caller named. */
+  readonly operation?: unknown;
+  readonly frame_id?: unknown;
 }
 
 export interface IntentCommit {
@@ -41,6 +65,13 @@ export interface HorizonApplication {
   commitNavigationIntent(request: { readonly operationRef: string; readonly intentId?: string }): Promise<IntentCommit>;
   /** Submit a pre-built intent (e.g. one a surface composed): same validation and audit. */
   submitIntent(intent: CommitIntentInput): Promise<IntentCommit>;
+  surface(role?: SurfaceRole): ReturnType<typeof projectForRole>;
+  /** The published `horizon.surface/2` vocabulary, for discovery (PE-01). */
+  surfaceSchema(): ReturnType<typeof publishSurfaceSchema>;
+  commitSurfaceIntent(submission: SurfaceIntentRequestBody): Promise<
+    | { readonly ok: true; readonly result: IntentCommit; readonly bound: EquivalenceResult }
+    | { readonly ok: false; readonly code: string; readonly message: string }
+  >;
   startObservation(commit: IntentCommit): Promise<RunView>;
   researchContract(): ReturnType<typeof requireResearch>;
   startServer(port?: number): HttpServer;
@@ -156,6 +187,80 @@ export async function createApplication(
     });
   }
 
+  /**
+   * The surface routes present. Nothing here reduces or projects for itself: every transport
+   * calls the one seam in `ui/surface.ts`, so GUI, CLI and MCP cannot drift (PE-01/PE-04).
+   *
+   * `allowFileReads` is false for every route: a caller reaching this process over the wire has
+   * not shown it a filesystem permit, so a `file:` source is refused rather than read.
+   */
+  function routeContext(): SurfaceRouteContext {
+    return {
+      root: process.cwd(),
+      allowFileReads: false,
+      // `SemanticRef`s are a closed union; a caller's string is compared after the binder has
+      // already refused anything that is not one of them.
+      resolveEntity: (ref) => world.projection.objects.find((object) => String(object.ref) === ref),
+      ...(research.kind === "research"
+        ? {}
+        : {
+            resolveHorizon: (key) =>
+              key === "horizon.research.health"
+                ? { status: "blocked" as const, reason: `research_source: ${research.code}` }
+                : undefined,
+          }),
+    };
+  }
+
+  /** `horizon.surface/2` for the current frame, projected for one presenting role. */
+  function surfaceFor(role: SurfaceRole): ReturnType<typeof projectForRole> {
+    const { frame } = issueFrame();
+    return projectForRole(composeSurface(frame), role, frame, bindingContextOf(routeContext()));
+  }
+
+  /**
+   * Commit an intent a transport expressed in its own vocabulary, after checking that the
+   * canonical intent is the one the surface offered. A divergent submission (another
+   * operation, frame or actor) is refused rather than "closest-matched" (PE-04/NE-09).
+   */
+  async function commitSurfaceIntent(
+    submission: SurfaceIntentRequestBody,
+  ): Promise<
+    | { readonly ok: true; readonly result: IntentCommit; readonly bound: EquivalenceResult }
+    | { readonly ok: false; readonly code: string; readonly message: string }
+  > {
+    const frame = frames.current();
+    if (frame === null) return { ok: false, code: "stale_surface", message: "SURFACE: no frame is current; request the surface first" };
+    if (typeof submission.frame_id === "string" && submission.frame_id !== frame.frame_id) {
+      return { ok: false, code: "stale_surface", message: `SURFACE: frame ${submission.frame_id} is not the current frame` };
+    }
+    const role: SurfaceRole = submission.role === "agent" || submission.role === "system" ? submission.role : "human";
+    const offered = projectForRole(composeSurface(frame), role, frame, bindingContextOf(routeContext()));
+    if (!offered.ok) return { ok: false, code: offered.code, message: JSON.stringify(offered.issues) };
+    const view: GuiView = offered.view;
+
+    // Every transport is reduced to one canonical intent by the same function; a submission
+    // the projection cannot place is refused rather than "closest-matched" (PE-04/NE-09).
+    const bound: EquivalenceResult =
+      submission.transport === "gui"
+        ? typeof submission.node_id === "string"
+          ? canonicalIntent({ transport: "gui", view, node_id: submission.node_id, role })
+          : { ok: false, code: "unknown_node" }
+        : typeof submission.operation === "string"
+          ? canonicalIntent({ transport: submission.transport, view, operation: submission.operation, role })
+          : { ok: false, code: "operation_not_in_view" };
+    if (!bound.ok) return { ok: false, code: bound.code, message: `SURFACE: ${bound.code}` };
+
+    const match = view.actions.find((action) => action.action_id === bound.intent.action_id);
+    if (match === undefined) return { ok: false, code: "not_offered", message: "SURFACE: the intent names no action" };
+    if (match.affordance !== "available") {
+      // Possibility is not affordance: an operation the frame assessed as blocked, unknown or
+      // conflicted is reported as such, never invoked because it was syntactically well-formed.
+      return { ok: false, code: "not_affordable", message: `SURFACE: ${bound.intent.operation} is ${match.affordance}` };
+    }
+    return { ok: true, result: await commitNavigationIntent({ operationRef: bound.intent.operation }), bound };
+  }
+
   return {
     loaded,
     world,
@@ -167,6 +272,9 @@ export async function createApplication(
     commitNavigationIntent,
     submitIntent,
     startObservation,
+    surface: surfaceFor,
+    surfaceSchema: publishSurfaceSchema,
+    commitSurfaceIntent,
     researchContract: () => requireResearch(research),
     startServer(port = loaded.config.port): HttpServer {
       return Bun.serve({
@@ -203,6 +311,49 @@ export async function createApplication(
               return Response.json({ code: "invalid_argument", message: "INTENT: operation_ref is required" }, { status: 400 });
             }
             return Response.json(await commitNavigationIntent({ operationRef: record.operation_ref }));
+          }
+          if (url.pathname === "/surface") {
+            const role = url.searchParams.get("role");
+            if (role !== null && role !== "human" && role !== "agent" && role !== "system") {
+              return Response.json({ code: "invalid_argument", message: `SURFACE: unknown role '${role}'` }, { status: 400 });
+            }
+            const projection = surfaceFor(role ?? "human");
+            if (!projection.ok) {
+              // Fail closed: a surface its own grammar rejects is a 500, never a best-effort page.
+              return Response.json({ code: projection.code, issues: projection.issues }, { status: 500 });
+            }
+            // `Accept` selects the rendering; every rendering comes from the same projection.
+            const accepts = request.headers.get("accept") ?? "";
+            if (accepts.includes("text/html")) {
+              return new Response(renderHtml(projection.view), { headers: { "content-type": "text/html; charset=utf-8" } });
+            }
+            if (accepts.includes("text/plain")) {
+              return new Response(renderText(projection.view), { headers: { "content-type": "text/plain; charset=utf-8" } });
+            }
+            return Response.json({ schema: SURFACE_SCHEMA, frame: frames.current()?.frame_id, view: projection.view });
+          }
+          if (url.pathname === "/surface/schema") {
+            return Response.json(publishSurfaceSchema());
+          }
+          if (url.pathname === "/surface/intent" && request.method === "POST") {
+            let body: unknown;
+            try {
+              body = await request.json();
+            } catch {
+              return Response.json({ code: "invalid_argument", message: "SURFACE: body is not JSON" }, { status: 400 });
+            }
+            const record = (body ?? {}) as Record<string, unknown>;
+            const transport = record.transport === "gui" || record.transport === "cli" || record.transport === "mcp" ? record.transport : "mcp";
+            const outcome = await commitSurfaceIntent({
+              transport,
+              role: record.role,
+              operation: record.operation,
+              node_id: record.node_id,
+              frame_id: record.frame_id,
+            });
+            return outcome.ok
+              ? Response.json({ ok: true, intent: outcome.bound, committed: outcome.result })
+              : Response.json({ ok: false, code: outcome.code, message: outcome.message }, { status: 409 });
           }
           if (url.pathname === "/") {
             return new Response("Horizon structural skeleton\n", {

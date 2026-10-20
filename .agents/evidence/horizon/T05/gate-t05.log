@@ -1,0 +1,173 @@
+bun run scripts/check-t05-boundaries.ts
+inspected cognate.config.ts
+inspected scripts/check-boundaries.ts
+inspected scripts/check-t05-boundaries.ts
+inspected scripts/check.ts
+inspected scripts/probe-runtime.ts
+inspected scripts/probe-world.ts
+inspected scripts/teeth-t05-boundaries.ts
+inspected scripts/teeth-t05-equivalence.ts
+inspected scripts/teeth.ts
+inspected src/adapters/research.ts
+inspected src/adapters/semantic.ts
+inspected src/agents/health.ts
+inspected src/app.ts
+inspected src/capabilities/navigation-intent.ts
+inspected src/capabilities/semantic.ts
+inspected src/config/load.ts
+inspected src/config/types.ts
+inspected src/domain/frame.ts
+inspected src/domain/intent.ts
+inspected src/main.ts
+inspected src/projections/navigation-context.ts
+inspected src/runtime/create.ts
+inspected src/runtime/required-cognate.ts
+inspected src/ui/surface.ts
+inspected src/ui/surface2/binder.ts
+inspected src/ui/surface2/equivalent.ts
+inspected src/ui/surface2/grammar.ts
+inspected src/ui/surface2/project.ts
+inspected src/ui/surface2/reducer.ts
+inspected src/ui/surface2/render.ts
+T05 boundaries: ok (30 files)
+bun run scripts/teeth-t05-boundaries.ts
+ok   NE-B0 real tree passes (30 files, 6 in the authority)
+ok   NE-B1 second schema version outside the authority
+ok   NE-B2 second block vocabulary outside the authority
+ok   NE-B2c a block-kind record is a vocabulary copy
+ok   NE-B2d a record keyed by the block-kind type is the claim; keyed by string is not
+ok   NE-B2b one or two named kinds are still a selection, not a scrape
+ok   NE-B3 second source-expression pattern outside the authority
+ok   NE-B4 route importing the binder directly
+ok   NE-B5 authority importing Cognate
+ok   NE-B6 authority emitting dynamic code
+ok   NE-B7 renderer outside the authority
+ok   NE-B8 competing authority store
+ok   NE-B9 prose in comments and messages is not flagged
+ok   NE-B9b a real sink beside prose is still caught
+teeth-t05: ok (14 checks)
+bun run scripts/teeth-t05-equivalence.ts
+ok   PE-04 GUI text/plain body is byte-identical to CLI `surface` output
+ok   PE-04 GUI json is a horizon.surface/2 frame carrying one horizon.gui-view/1 projection
+ok   PE-01 an invented role is refused (400), never downgraded to the default
+ok   PE-06 MCP publishes 11 operation tools + 1 view tool, derived from the closed union
+ok   NE-09 GUI (409), MCP (409) and CLI (exit 1) all refuse an unoffered intent
+teeth-t05-equivalence: ok (5 comparisons)
+bun run scripts/check.ts
+check: ok (local_operator, 127.0.0.1:4319, horizon)
+bun run scripts/check-boundaries.ts
+boundaries: ok (.)
+python3 scripts/check-idm-integrity.py
+check-idm-integrity: OK (11 requirement references, 0 tolerated as recorded debt, 11 invariant ids unique)
+python3 scripts/check-acceptance-claims.py
+check-acceptance-claims: OK (4 prohibitions preserved, 0 generic restatements with their subject intact)
+python3 scripts/check-witness-claims.py
+check-witness-claims: OK (197 contracts: 0 generic, 197 authored; no new policy)
+python3 scripts/measure-contract-modals.py --ledger requirements/ledger.yaml --baseline scripts/witness-claims-baseline.txt
+measure-contract-modals: 1 known pre-existing loss(es) in requirements/ledger.yaml (DEBT D-020), not fatal
+  ~ REQ-RES-001: loses prohibition
+bun test
+bun test v1.4.0 (34cbb9a40)
+
+test/config.test.ts:
+(pass) local_operator configuration > accepts a loopback local operator [0.29ms]
+(pass) local_operator configuration > refuses a non-loopback bind [0.11ms]
+(pass) local_operator configuration > refuses shared_remote without a real identity provider [0.02ms]
+(pass) local_operator configuration > keeps operator and agent principals distinct [0.15ms]
+(pass) local_operator configuration > issues a fresh 0600 secret on every launch [0.98ms]
+
+test/surface-negative.test.ts:
+(pass) T05 negative evidence (NE-01…NE-10) > NE-01 rejects executable markup in a human-authored block (falsifier PE-01/PE-05) [4.02ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-02 rejects an agent-supplied value dressed as an authority-bound fact (falsifier PE-02) [0.46ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-03 lets no agent layout op move, pin, resize, close or focus an owner block (falsifier PE-03) [0.51ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-04 refuses a human-authority op for the agent role (falsifier PE-03/PE-06) [0.62ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-05 serves no unescaped markup from the GUI projection (falsifier PE-04) [0.77ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-06 lets no second surface schema validate a route (falsifier PE-01) [1.05ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-07 refuses a remote route's file: source instead of reading it (falsifier PE-02) [0.10ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-08 reports an unanswered authority as blocked, never as a value (falsifier PE-02) [0.04ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-09 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04) [0.33ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-10 attributes no surface to an unattributable observer (falsifier PE-05) [0.53ms]
+
+test/app.test.ts:
+(pass) durable store boundary > the configured store is a Cognate SQLite database that survives a close and reopen [3.58ms]
+(pass) structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen [202.63ms]
+(pass) structural walking skeleton > configured in-memory storage is rejected by construction, with no E2E override [236.38ms]
+(pass) structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable [84.76ms]
+(pass) structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact [60.70ms]
+(pass) structural walking skeleton > an absent research source is a typed absent observation, not a startup failure [39.16ms]
+
+test/acceptance.test.ts:
+(pass) AC-CONFIG-004-01 a configured provider endpoint stays below stable behavior contracts (partial) > typed choices, committed intent and surface blocks are unchanged when the research provider endpoint differs [180.26ms]
+
+test/ui.test.ts:
+(pass) renderer-neutral surface seam > projects a frame without executable markup and with sources on every block [0.43ms]
+(pass) renderer-neutral surface seam > never lets a binding claim an observation the route did not make [0.22ms]
+
+ 24 pass
+ 0 fail
+ 197 expect() calls
+Ran 24 tests across 5 files. [877.00ms]
+uv run --project research pytest -q
+....                                                                     [100%]
+4 passed in 0.03s
+python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
+ledger: 0 error(s) in ledger.yaml
+  ok: 99 requirements, 99 acceptance contracts
+./scripts/check-ledger-freeze.sh
+python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py . --ledger requirements/ledger.yaml
+wayfinder: 0 error(s)
+./scripts/check-ledger-freeze.sh
+bun run scripts/teeth.ts
+blocked missing-cognate-dependency: exit=1
+STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
+blocked in-memory-runtime: exit=1
+17 |   throw new RuntimeBoundaryError(`RUNTIME: ${message}`);
+RuntimeBoundaryError: RUNTIME: local_operator forbids an in-memory runtime; a durable SQLite store is required
+blocked competing-product-model: exit=1
+BOUNDARY: competing canonical model/authority store at product-model/process.yaml
+blocked duplicate-semantic-authority: exit=1
+BOUNDARY: duplicate semantic authority at other/model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+baseline canonical-closure-control: exit=0
+blocked duplicate-canonical-subtree: exit=1
+BOUNDARY: duplicate semantic authority at .sea/alternative/interaction-model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked false-world-ref: exit=1
+19 |   throw new SemanticAdapterError(`SEMANTIC: ${message}`);
+SemanticAdapterError: SEMANTIC: world identity mismatch: expected world:horizon@sha256:0000000000000000000000000000000000000000000000000000000000000000, observed world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0
+baseline isolated-tree-real-runtime: exit=0, passed=6
+blocked fake-runtime-substitution: exit=1, failing=3
+  fails: structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen
+  fails: structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable
+  fails: structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact
+blocked missing-cognate-dependency-metadata: exit=1
+STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
+BOUNDARY: duplicate semantic authority at domain/research-artifacts.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+BOUNDARY: duplicate semantic authority at domain/product-integration-contract.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked missing-cognate-dependency-e2e: exit=1, failing=1
+
+teeth: all attacks blocked
+bash scripts/teeth-ledger-freeze.sh
+BASELINE clean tree verifies
+BLOCKED  frozen ledger edited after freeze -> FAIL: ledger content does not match its freeze_hash (hand edit after freeze?)
+BLOCKED  frozen ledger reverted to candidate -> FAIL: ledger freeze_hash is not frozen: 'candidate'
+BLOCKED  wayfinder body hand-edited -> FAIL: committed wayfinder body is not the projection its generator produces (hand edit?)
+BLOCKED  wayfinder unfrozen -> FAIL: wayfinder validation failed
+BLOCKED  hashed input drifted (ledger policy) -> FAIL: wayfinder validation failed
+BLOCKED  ledger row removed after freeze (ledger structure / projection) -> FAIL: requirement ledger validation failed
+
+teeth: 6 blocked, 0 missed
+python3 scripts/teeth-domainforge-gate.py
+null: exit=0 exit=0 Validation succeeded: 0 violations total
+dangling: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: dangling .sea accepted with no violation
+duplicate: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: duplicate .sea accepted with no violation
+control: exit=1 exit=1 Error: Parse failed for /tmp/tmpv1l1etyy/.sea/interaction/interaction-model.sea: resolved closure failed graph co
+
+tooth: gate discriminates (control fails, and the two blind spots are proven)
+python3 scripts/teeth-idm-integrity.py
+null: exit=0 exit=0 check-idm-integrity: OK (11 requirement references, 0 tolerated as recorded debt, 11 invariant ids uniq
+dangling: exit=1 exit=1 - .sea/interaction/interaction-model.sea:inv_intent_idempotent requirement_ref 'REQ-DOES-NOT-EXIST-999'
+duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmp_f_b3gks/.sea/interaction/interaction-m
+
+tooth: referential integrity is enforced (dangling and duplicate both fail)
+gate-t05: ok — horizon.surface/2 + horizon.gui-view/1 verified across GUI/CLI/MCP

@@ -1,0 +1,23 @@
+ok   NE-B0 real tree passes (30 files, 6 in the authority)
+ok   NE-B1 second schema version outside the authority
+ok   NE-B2 second block vocabulary outside the authority
+ok   NE-B2c a block-kind record is a vocabulary copy
+ok   NE-B2d a record keyed by the block-kind type is the claim; keyed by string is not
+ok   NE-B2b one or two named kinds are still a selection, not a scrape
+ok   NE-B3 second source-expression pattern outside the authority
+ok   NE-B4 route importing the binder directly
+ok   NE-B5 authority importing Cognate
+ok   NE-B6 authority emitting dynamic code
+ok   NE-B7 renderer outside the authority
+ok   NE-B8 competing authority store
+ok   NE-B9 prose in comments and messages is not flagged
+ok   NE-B9b a real sink beside prose is still caught
+teeth-t05: ok (14 checks)
+boundaries exit=0
+ok   PE-04 GUI text/plain body is byte-identical to CLI `surface` output
+ok   PE-04 GUI json is a horizon.surface/2 frame carrying one horizon.gui-view/1 projection
+ok   PE-01 an invented role is refused (400), never downgraded to the default
+ok   PE-06 MCP publishes 11 operation tools + 1 view tool, derived from the closed union
+ok   NE-09 GUI (409), MCP (409) and CLI (exit 1) all refuse an unoffered intent
+teeth-t05-equivalence: ok (5 comparisons)
+equivalence exit=0

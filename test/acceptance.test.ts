@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createApplication } from "../src/app.ts";
-import { projectFrame } from "../src/ui/surface.ts";
+import { bindingContextOf, projectFrame } from "../src/ui/surface.ts";
 import { RESEARCH_COMMAND, horizonDocument, writeConfig } from "./support/config.ts";
 
 /*
@@ -47,7 +47,9 @@ describe("AC-CONFIG-004-01 a configured provider endpoint stays below stable beh
       return {
         choices: current.choices,
         committed: { operation_ref: commit.intent.operation_ref, frame_revision: commit.intent.frame_revision },
-        surface: projectFrame(current),
+        // The projected view is compared, not the raw composition: the view is what every
+        // transport presents, so it is the stable contract an endpoint change must not reach.
+        surface: projectFrame(current, bindingContextOf({ root: process.cwd() })),
         world_ref: current.world_ref,
         research: app.research.status,
         // Read back from the configuration the application actually loaded.
