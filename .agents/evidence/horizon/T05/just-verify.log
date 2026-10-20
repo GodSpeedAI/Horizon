@@ -8,46 +8,48 @@ bun test
 bun test v1.4.0 (34cbb9a40)
 
 test/config.test.ts:
-(pass) local_operator configuration > accepts a loopback local operator [0.29ms]
-(pass) local_operator configuration > refuses a non-loopback bind [0.12ms]
-(pass) local_operator configuration > refuses shared_remote without a real identity provider [0.04ms]
-(pass) local_operator configuration > keeps operator and agent principals distinct [0.14ms]
-(pass) local_operator configuration > issues a fresh 0600 secret on every launch [1.15ms]
+(pass) local_operator configuration > accepts a loopback local operator [0.36ms]
+(pass) local_operator configuration > refuses a non-loopback bind [0.13ms]
+(pass) local_operator configuration > refuses shared_remote without a real identity provider [0.03ms]
+(pass) local_operator configuration > keeps operator and agent principals distinct [0.16ms]
+(pass) local_operator configuration > issues a fresh 0600 secret on every launch [1.21ms]
 
 test/surface-negative.test.ts:
-(pass) T05 negative evidence (NE-01…NE-10) > NE-01 rejects executable markup in a human-authored block (falsifier PE-01/PE-05) [8.90ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-02 rejects an agent-supplied value dressed as an authority-bound fact (falsifier PE-02) [0.90ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-03 lets no agent layout op move, pin, resize, close or focus an owner block (falsifier PE-03) [0.65ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-04 refuses a human-authority op for the agent role (falsifier PE-03/PE-06) [1.11ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-05 serves no unescaped markup from the GUI projection (falsifier PE-04) [0.47ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-06 lets no second surface schema validate a route (falsifier PE-01) [1.71ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-07 refuses a remote route's file: source instead of reading it (falsifier PE-02) [0.10ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-08 reports an unanswered authority as blocked, never as a value (falsifier PE-02) [0.05ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-09 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04) [0.41ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-10 attributes no surface to an unattributable observer (falsifier PE-05) [0.81ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-01 rejects <script>alert(1)</script> and other executable markup at the SCHEMA, with a typed rejection (falsifier PE-05) [7.69ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick fields (.strict()); NE-02/PE-02 then refuses an agent-supplied value dressed as a bound fact, and every typed source (horizon: / semantic: / file: / agent:) resolves to a value or a non-bound status (falsifier PE-01/PE-02) [1.51ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} with no I/O — so no agent layout op (view.move / view.pin / surface.put / human.approve) moves, pins, resizes, closes or focuses an owner block (falsifier PE-03) [1.12ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06) [1.17ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06) [0.95ms]
+(pass) T05 negative evidence (NE-01…NE-10) > PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 projection (falsifier PE-04) [0.58ms]
+(pass) T05 negative evidence (NE-01…NE-10) > PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01) [0.90ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown horizon: source, and records no agent op as human (falsifier PE-02) [0.71ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02) [0.09ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04) [0.80ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-10 escapes an <img onerror=...> value that arrives from an observed source (falsifier PE-05) [0.63ms]
+(pass) T05 negative evidence (NE-01…NE-10) > PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every node and attributes no surface to an unattributable observer (falsifier PE-05) [1.19ms]
 
 test/app.test.ts:
-(pass) durable store boundary > the configured store is a Cognate SQLite database that survives a close and reopen [4.08ms]
-(pass) structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen [333.06ms]
-(pass) structural walking skeleton > configured in-memory storage is rejected by construction, with no E2E override [254.30ms]
-(pass) structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable [104.67ms]
-(pass) structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact [66.72ms]
-(pass) structural walking skeleton > an absent research source is a typed absent observation, not a startup failure [38.28ms]
+(pass) durable store boundary > the configured store is a Cognate SQLite database that survives a close and reopen [8.01ms]
+(pass) structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen [297.19ms]
+(pass) structural walking skeleton > configured in-memory storage is rejected by construction, with no E2E override [285.96ms]
+(pass) structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable [102.23ms]
+(pass) structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact [75.72ms]
+(pass) structural walking skeleton > an absent research source is a typed absent observation, not a startup failure [45.21ms]
 
 test/acceptance.test.ts:
-(pass) AC-CONFIG-004-01 a configured provider endpoint stays below stable behavior contracts (partial) > typed choices, committed intent and surface blocks are unchanged when the research provider endpoint differs [184.07ms]
+(pass) AC-CONFIG-004-01 a configured provider endpoint stays below stable behavior contracts (partial) > typed choices, committed intent and surface blocks are unchanged when the research provider endpoint differs [208.05ms]
 
 test/ui.test.ts:
 (pass) renderer-neutral surface seam > projects a frame without executable markup and with sources on every block [0.35ms]
-(pass) renderer-neutral surface seam > never lets a binding claim an observation the route did not make [0.15ms]
+(pass) renderer-neutral surface seam > never lets a binding claim an observation the route did not make [0.26ms]
 
- 24 pass
+ 26 pass
  0 fail
- 197 expect() calls
-Ran 24 tests across 5 files. [1080.00ms]
+ 261 expect() calls
+Ran 26 tests across 5 files. [1120.00ms]
 uv run --project research pytest -q
 ....                                                                     [100%]
-4 passed in 0.04s
+4 passed in 0.05s
 python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
 ledger: 0 error(s) in ledger.yaml
   ok: 99 requirements, 99 acceptance contracts
@@ -56,7 +58,7 @@ python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py 
 wayfinder: 0 error(s)
 ./scripts/check-ledger-freeze.sh
 bun run scripts/teeth-t05-boundaries.ts
-ok   NE-B0 real tree passes (30 files, 6 in the authority)
+ok   NE-B0 real tree passes (32 files, 6 in the authority)
 ok   NE-B1 second schema version outside the authority
 ok   NE-B2 second block vocabulary outside the authority
 ok   NE-B2c a block-kind record is a vocabulary copy
@@ -70,7 +72,14 @@ ok   NE-B7 renderer outside the authority
 ok   NE-B8 competing authority store
 ok   NE-B9 prose in comments and messages is not flagged
 ok   NE-B9b a real sink beside prose is still caught
-teeth-t05: ok (14 checks)
+ok   NE-B10 NOTICE absent is rejected, not assumed present
+ok   NE-B11 a donor dropped from NOTICE is drift
+ok   NE-B12 an extra donor in NOTICE is drift
+ok   NE-B13 a donor section without a license is not a record
+ok   NE-B14 NOTICE describing Horizon without its declared license is rejected
+ok   NE-B15 a declared license with no LICENSE file is rejected
+ok   NE-B16 a manifest with no license field is not a silent pass
+teeth-t05: ok (21 checks)
 bun run scripts/teeth.ts
 blocked missing-cognate-dependency: exit=1
 STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
@@ -115,13 +124,14 @@ dangling: exit=0 exit=0 Validation succeeded: 0 violations total
 BLIND SPOT CONFIRMED: dangling .sea accepted with no violation
 duplicate: exit=0 exit=0 Validation succeeded: 0 violations total
 BLIND SPOT CONFIRMED: duplicate .sea accepted with no violation
-control: exit=1 exit=1 Error: Parse failed for /tmp/tmpursfae1a/.sea/interaction/interaction-model.sea: resolved closure failed graph co
+control: exit=1 exit=1 Error: Parse failed for /tmp/tmpgi8j6fru/.sea/interaction/interaction-model.sea: resolved closure failed graph co
 
 tooth: gate discriminates (control fails, and the two blind spots are proven)
 python3 scripts/teeth-idm-integrity.py
 null: exit=0 exit=0 check-idm-integrity: OK (11 requirement references, 0 tolerated as recorded debt, 11 invariant ids uniq
 dangling: exit=1 exit=1 - .sea/interaction/interaction-model.sea:inv_intent_idempotent requirement_ref 'REQ-DOES-NOT-EXIST-999'
-duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmpfsz855e7/.sea/interaction/interaction-m
+duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmpbifcjd2v/.sea/interaction/interaction-m
 
 tooth: referential integrity is enforced (dangling and duplicate both fail)
 verify: ok (active frozen artifacts: requirements/ledger.yaml + .wayfinder/answer-key.md)
+verify exit=0

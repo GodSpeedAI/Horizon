@@ -12,6 +12,22 @@
  */
 import { GUI_VIEW_SCHEMA, type GuiView, type ProjectedNode } from "./project";
 
+/**
+ * Who to print for a node, without inventing an actor.
+ *
+ * An agent is rendered as `agent:<ref> acting for <human>` — the delegation is part of the
+ * label, not a footnote, because a reader who sees only `agent` cannot tell whose authority
+ * the work was done under (REQ-UX-006). A human or system node prints its role unchanged.
+ */
+function actorLabel(node: ProjectedNode): string {
+  const attribution = node.attributed_to;
+  if (attribution.role === "agent" && attribution.on_behalf_of_ref !== undefined) {
+    return `agent:${attribution.agent_ref ?? attribution.actor_ref} acting for ${attribution.on_behalf_of_ref}`;
+  }
+  return attribution.role;
+}
+
+
 /** Deterministic CLI text. Stable byte-for-byte for a given view. */
 export function renderText(view: GuiView): string {
   const lines: string[] = [];
@@ -20,7 +36,7 @@ export function renderText(view: GuiView): string {
   for (const node of view.nodes) {
     const value = node.text === undefined ? "" : ` = ${node.text}`;
     lines.push(
-      `- ${node.node_id} (${node.source_kind}/${node.layout}/${node.attributed_to.role})${value}`,
+      `- ${node.node_id} (${node.source_kind}/${node.layout}/${actorLabel(node)})${value}`,
     );
     for (const binding of node.bindings) {
       const state = binding.status === "bound" ? `bound:${binding.observation ?? "unknown"}` : `${binding.status}:${binding.reason ?? binding.awaiting ?? "unknown"}`;
@@ -61,9 +77,11 @@ export function renderHtml(view: GuiView): string {
   body.push("</header>");
   body.push("<main>");
   for (const node of view.nodes) {
-    body.push(`<section data-block="${escapeHtml(node.node_id)}" data-source-kind="${escapeHtml(node.source_kind)}" data-layout="${escapeHtml(node.layout)}">`);
+    body.push(`<section data-block="${escapeHtml(node.node_id)}" data-source-kind="${escapeHtml(node.source_kind)}" data-layout="${escapeHtml(node.layout)}" data-actor-role="${escapeHtml(node.attributed_to.role)}"${node.attributed_to.agent_ref === undefined ? "" : ` data-agent-ref="${escapeHtml(node.attributed_to.agent_ref)}"`}${node.attributed_to.on_behalf_of_ref === undefined ? "" : ` data-acting-for="${escapeHtml(node.attributed_to.on_behalf_of_ref)}"`}>`);
     body.push(`<h2>${escapeHtml(node.label)}</h2>`);
     if (node.text !== undefined) body.push(`<p>${escapeHtml(node.text)}</p>`);
+    // The actor is text the reader sees, not only an attribute the shell might ignore.
+    body.push(`<p data-actor>${escapeHtml(actorLabel(node))}</p>`);
     body.push("<ul>");
     for (const binding of node.bindings) {
       body.push(

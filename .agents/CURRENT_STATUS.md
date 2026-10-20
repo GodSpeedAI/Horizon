@@ -1,6 +1,6 @@
 # Horizon Current Status
 
-**Revision:** 18 · **Recorded:** 2026-10-20 · **Stage:** T05 settled (P2), PE-08 pass; next task **T06**
+**Revision:** 19 · **Recorded:** 2026-10-20 · **Stage:** T05 settled (P2) after claim correction (DEC-T05-08); next task **T06**
 
 **T05 — one surface, three transports.** `horizon.surface/2` is declared once
 (`src/ui/surface2/grammar.ts`), with one binder, one reducer and one shared
@@ -38,18 +38,31 @@ merging `origin/main`, `NOTICE` states Apache-2.0 and `package.json` carries `li
 be the one the `NOTICE` header names, backed by a real `LICENSE` — and teeth NE-B14–NE-B16 show it
 bites. DEC-T05-07 supersedes the incorrect part of DEC-T05-04.
 
+**Settlement corrected (DEC-T05-08).** The owner asked whether T05 was actually settled. The
+audit answered no — not about the properties, which held and were gate-green, but about the
+evidence. The test named `NE-02` asserted provenance laundering, not the preregistered
+`iframe` / `jsx` / `onclick` attack; `NE-03` had no test at all; `NE-04` and `NE-05` were
+labelled onto different tests; and `PE-05` could not be satisfied as written, because
+`projectSurface` dropped `agent_ref` / `on_behalf_of_ref` / `principal_ref`, so no view could
+render an agent as acting for a human. All fixed inside T05's own authority: the prereg-literal
+attacks are asserted, `NE-03` and `NE-10` have their own tests, the projection carries the
+delegation and both renderers print it, and `check-t05-prereg-coverage` fails if any prereg id
+stops being named by a test that names that attack. Its five teeth include the shipped `NE-02`
+mislabel, which it reproduces. T05 remains **settled** on that basis.
+
 **Verified:**
 
 | Command | Result |
 | --- | --- |
 | `just gate-t05` | exit 0 (`gate-t05: ok — horizon.surface/2 + horizon.gui-view/1 verified across GUI/CLI/MCP`) |
 | `just verify` | exit 0 (`verify: ok`) |
-| `bun test` | 24 pass / 0 fail, 197 expect() calls |
+| `bun test` | 26 pass / 0 fail, 261 expect() calls |
+| `check-t05-prereg-coverage` | ok (18 expectations, each named by a test that names its attack) |
+| `teeth-t05-coverage` | ok (5 teeth, incl. the shipped NE-02 mislabel) |
 | `teeth-t05-boundaries` | ok (21 checks, incl. NE-B10–NE-B16) |
-| `teeth-t05-equivalence` | ok (5 comparisons) |
-| `check-t05-boundaries` | ok (30 files) |
-| `pytest` | 4 passed |
-| `sha256sum -c T05/SHA256SUMS` | summary, PE-08 re-run log, frozen prereg all OK |
+| `teeth-t05-equivalence` | ok (6 comparisons, incl. live `/surface` markup check) |
+| `tsc --noEmit` | clean |
+| `sha256sum -c T05/SHA256SUMS` | 5/5 OK |
 
 **Prereg:** `T05.prereg.yaml` sha256 `ff36d65b…`, frozen before implementation and unedited.
 
@@ -69,6 +82,9 @@ bites. DEC-T05-07 supersedes the incorrect part of DEC-T05-04.
   that no gate fetches, so a green gate can describe a tree behind `origin/main`.
 - **D-024** (MCP tool names fold operation ids) and **D-025** (`horizon.view` copies the role
   vocabulary) remain open, both size S.
+- **D-030:** `checkT05Boundaries` keeps findings in module state, so calling it twice in one
+  process merges results. The new coverage check hit this and returns a copy instead; the
+  boundary check still has the hazard.
 - **D-023** latent: the opening-burst window before `busy_timeout` is armed was not observed
   failing; hardening belongs upstream in Cognate (REQ-STACK-010).
 - Earlier: `REQ-CASE-002` and `REQ-NAV-005` unwitnessed until T07; D-019 provider controls;
@@ -77,8 +93,9 @@ bites. DEC-T05-07 supersedes the incorrect part of DEC-T05-04.
   transport.
 
 **Next:** T06 — build the operational object layer: typed object-set and relationship
-projections on Cognate (depends on T04). D-023 does not block it.
+projections on Cognate (depends on T04). Settle the design fork first: **D-002**
+(`listRecords` vs the upstream Cognate gap). D-023 and D-030 do not block it.
 
 **Spec:** HORIZON-001 v1.0.1, frozen; SHA-256 `14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4`.
 
-**Evidence:** [T05 summary](evidence/horizon/T05/SUMMARY.md), [PE-08 re-run](evidence/horizon/T05/pe08-rerun.log), [SHA256SUMS](evidence/horizon/T05/SHA256SUMS), [NOTICE](../NOTICE), [LICENSE](../LICENSE), [donors](../docs/donors.md), [prereg](prereg/horizon/T05.prereg.yaml), [spec](specs/horizon.agent.spec.yaml), [plan](plans/horizon.plan.yaml), [decisions](reports/horizon-decisions.yaml), [ledger](../requirements/ledger.yaml), [wayfinder](../.wayfinder/answer-key.md), [debt](DEBT.md).
+**Evidence:** [T05 summary](evidence/horizon/T05/SUMMARY.md), [gate-t05 log](evidence/horizon/T05/gate-t05.log), [verify log](evidence/horizon/T05/just-verify.log), [PE-08 re-run](evidence/horizon/T05/pe08-rerun.log), [SHA256SUMS](evidence/horizon/T05/SHA256SUMS), [NOTICE](../NOTICE), [LICENSE](../LICENSE), [donors](../docs/donors.md), [prereg](prereg/horizon/T05.prereg.yaml), [spec](specs/horizon.agent.spec.yaml), [plan](plans/horizon.plan.yaml), [decisions](reports/horizon-decisions.yaml), [ledger](../requirements/ledger.yaml), [wayfinder](../.wayfinder/answer-key.md), [debt](DEBT.md).

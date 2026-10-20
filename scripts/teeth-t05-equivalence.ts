@@ -162,7 +162,26 @@ async function main(): Promise<void> {
     }
   });
 
-  console.log("teeth-t05-equivalence: ok (5 comparisons)");
+  // 6. NE-10 over the live route: markup that reaches the route as data is escaped, and the
+  // served view carries no executable attribute. A projection that trusted an observed value
+  // would emit `onerror=`; this asserts on the bytes the route actually sends.
+  await withStore(async (store) => {
+    const server = await startServer(store);
+    try {
+      for (const accept of ["text/html", "application/json"]) {
+        const served = await get(`${server.url}/surface`, accept);
+        const lowered = served.body.toLowerCase();
+        const executable = /<script|onerror\s*=|onload\s*=|onclick\s*=|javascript:/.exec(lowered);
+        if (executable !== null) fail(`NE-10 ${accept} response carried executable markup: ${executable[0]}`);
+        if (served.status !== 200) fail(`NE-10 ${accept} response was ${served.status}`);
+      }
+      ok("NE-10 the live /surface route serves no executable markup under either accept header");
+    } finally {
+      server.stop();
+    }
+  });
+
+  console.log("teeth-t05-equivalence: ok (6 comparisons)");
 }
 
 await main();

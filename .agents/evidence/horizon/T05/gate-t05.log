@@ -2,11 +2,13 @@ bun run scripts/check-t05-boundaries.ts
 inspected cognate.config.ts
 inspected scripts/check-boundaries.ts
 inspected scripts/check-t05-boundaries.ts
+inspected scripts/check-t05-prereg-coverage.ts
 inspected scripts/check.ts
 inspected scripts/probe-runtime.ts
 inspected scripts/probe-world.ts
 inspected scripts/teeth-t05-boundaries.ts
 inspected scripts/teeth-t05-equivalence.ts
+inspected scripts/teeth-t05-prereg-coverage.ts
 inspected scripts/teeth.ts
 inspected src/adapters/research.ts
 inspected src/adapters/semantic.ts
@@ -29,9 +31,31 @@ inspected src/ui/surface2/grammar.ts
 inspected src/ui/surface2/project.ts
 inspected src/ui/surface2/reducer.ts
 inspected src/ui/surface2/render.ts
-T05 boundaries: ok (30 files)
+T05 boundaries: ok (32 files)
+bun run scripts/check-t05-prereg-coverage.ts
+  ok   PE-01: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon.surface/2, .strict()]
+  ok   PE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon:<source>, semantic:<ref>, file:<allowed root>/..., agent:<ref>, agent-supplied]
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>, SCHEMA]
+  ok   NE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [iframe, jsx, onclick, .strict()]
+  ok   NE-03: covered by 'NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  ok   NE-09: covered by 'NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)' (no literal anchors to re-check)
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   PE-06: covered by 'NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   PE-07: proven by 'just gate-t05' (target exists)
+  ok   PE-07: proven by 'just verify' (target exists)
+  ok   PE-08: proven by 'just check-t05', which invokes [check-t05-boundaries.ts]
+
+T05 prereg coverage: ok (each preregistered expectation is named by a test that names its attack)
 bun run scripts/teeth-t05-boundaries.ts
-ok   NE-B0 real tree passes (30 files, 6 in the authority)
+ok   NE-B0 real tree passes (32 files, 6 in the authority)
 ok   NE-B1 second schema version outside the authority
 ok   NE-B2 second block vocabulary outside the authority
 ok   NE-B2c a block-kind record is a vocabulary copy
@@ -45,14 +69,124 @@ ok   NE-B7 renderer outside the authority
 ok   NE-B8 competing authority store
 ok   NE-B9 prose in comments and messages is not flagged
 ok   NE-B9b a real sink beside prose is still caught
-teeth-t05: ok (14 checks)
+ok   NE-B10 NOTICE absent is rejected, not assumed present
+ok   NE-B11 a donor dropped from NOTICE is drift
+ok   NE-B12 an extra donor in NOTICE is drift
+ok   NE-B13 a donor section without a license is not a record
+ok   NE-B14 NOTICE describing Horizon without its declared license is rejected
+ok   NE-B15 a declared license with no LICENSE file is rejected
+ok   NE-B16 a manifest with no license field is not a silent pass
+teeth-t05: ok (21 checks)
 bun run scripts/teeth-t05-equivalence.ts
 ok   PE-04 GUI text/plain body is byte-identical to CLI `surface` output
 ok   PE-04 GUI json is a horizon.surface/2 frame carrying one horizon.gui-view/1 projection
 ok   PE-01 an invented role is refused (400), never downgraded to the default
 ok   PE-06 MCP publishes 11 operation tools + 1 view tool, derived from the closed union
 ok   NE-09 GUI (409), MCP (409) and CLI (exit 1) all refuse an unoffered intent
-teeth-t05-equivalence: ok (5 comparisons)
+ok   NE-10 the live /surface route serves no executable markup under either accept header
+teeth-t05-equivalence: ok (6 comparisons)
+bun run scripts/teeth-t05-prereg-coverage.ts
+  FAIL PE-01: test 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' does not name the prereg attack — missing [.strict()]. Either assert those attacks in that test or retitle it (a title is a claim about what the test proves).
+  FAIL PE-02: test 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown horizon: source, and records no agent op as human (falsifier PE-02)' does not name the prereg attack — missing [semantic:<ref>, agent-supplied]. Either assert those attacks in that test or retitle it (a title is a claim about what the test proves).
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>, SCHEMA]
+  FAIL NE-02: test 'NE-02 rejects an agent-supplied value dressed as a boundary fact' does not name the prereg attack — missing [iframe, jsx, onclick, .strict()]. Either assert those attacks in that test or retitle it (a title is a claim about what the test proves).
+  ok   NE-03: covered by 'NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  ok   NE-09: covered by 'NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)' (no literal anchors to re-check)
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   PE-06: covered by 'NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   PE-07: proven by 'just gate-t05' (target exists)
+  ok   PE-07: proven by 'just verify' (target exists)
+  ok   PE-08: proven by 'just check-t05', which invokes [check-t05-boundaries.ts]
+  ok   NE-C1 the shipped NE-02 mislabel is caught when reintroduced
+  ok   PE-01: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon.surface/2, .strict()]
+  ok   PE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon:<source>, semantic:<ref>, file:<allowed root>/..., agent:<ref>, agent-supplied]
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>, SCHEMA]
+  ok   NE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [iframe, jsx, onclick, .strict()]
+  FAIL NE-03: no test or tooth names this id
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  ok   NE-09: covered by 'NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)' (no literal anchors to re-check)
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   PE-06: covered by 'NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   PE-07: proven by 'just gate-t05' (target exists)
+  ok   PE-07: proven by 'just verify' (target exists)
+  ok   PE-08: proven by 'just check-t05', which invokes [check-t05-boundaries.ts]
+  ok   NE-C2 a preregistered id with no test is rejected
+  ok   PE-01: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon.surface/2, .strict()]
+  ok   PE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon:<source>, semantic:<ref>, file:<allowed root>/..., agent:<ref>, agent-supplied]
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>, SCHEMA]
+  ok   NE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [iframe, jsx, onclick, .strict()]
+  ok   NE-03: covered by 'NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  FAIL NE-09: no test or tooth names this id
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   PE-06: covered by 'NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   PE-07: proven by 'just gate-t05' (target exists)
+  ok   PE-07: proven by 'just verify' (target exists)
+  ok   PE-08: proven by 'just check-t05', which invokes [check-t05-boundaries.ts]
+  ok   NE-C3 renaming an id so it names no expectation is rejected
+  ok   PE-01: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon.surface/2, .strict()]
+  ok   PE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon:<source>, semantic:<ref>, file:<allowed root>/..., agent:<ref>, agent-supplied]
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>, SCHEMA]
+  ok   NE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [iframe, jsx, onclick, .strict()]
+  ok   NE-03: covered by 'NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  ok   NE-09: covered by 'NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)' (no literal anchors to re-check)
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   PE-06: covered by 'NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  FAIL PE-07: gate target 'gate-t05' is not defined in the justfile
+  ok   PE-07: proven by 'just verify' (target exists)
+  ok   PE-08: proven by 'just check-t05', which invokes [check-t05-boundaries.ts]
+  ok   NE-C4 a renamed gate target is rejected
+  ok   PE-01: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon.surface/2, .strict()]
+  ok   PE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon:<source>, semantic:<ref>, file:<allowed root>/..., agent:<ref>, agent-supplied]
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>, SCHEMA]
+  ok   NE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [iframe, jsx, onclick, .strict()]
+  ok   NE-03: covered by 'NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  ok   NE-09: covered by 'NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)' (no literal anchors to re-check)
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   PE-06: covered by 'NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   PE-07: proven by 'just gate-t05' (target exists)
+  ok   PE-07: proven by 'just verify' (target exists)
+  ok   PE-08: proven by 'just check-t05', which invokes [check-t05-boundaries.ts]
+  ok   NE-C0 the repository's real test map is accepted
+teeth-t05-coverage: ok (5 teeth)
 bun run scripts/check.ts
 check: ok (local_operator, 127.0.0.1:4319, horizon)
 bun run scripts/check-boundaries.ts
@@ -70,46 +204,48 @@ bun test
 bun test v1.4.0 (34cbb9a40)
 
 test/config.test.ts:
-(pass) local_operator configuration > accepts a loopback local operator [0.29ms]
-(pass) local_operator configuration > refuses a non-loopback bind [0.11ms]
-(pass) local_operator configuration > refuses shared_remote without a real identity provider [0.02ms]
-(pass) local_operator configuration > keeps operator and agent principals distinct [0.15ms]
-(pass) local_operator configuration > issues a fresh 0600 secret on every launch [0.98ms]
+(pass) local_operator configuration > accepts a loopback local operator [0.43ms]
+(pass) local_operator configuration > refuses a non-loopback bind [2.94ms]
+(pass) local_operator configuration > refuses shared_remote without a real identity provider [0.51ms]
+(pass) local_operator configuration > keeps operator and agent principals distinct [0.78ms]
+(pass) local_operator configuration > issues a fresh 0600 secret on every launch [1.94ms]
 
 test/surface-negative.test.ts:
-(pass) T05 negative evidence (NE-01…NE-10) > NE-01 rejects executable markup in a human-authored block (falsifier PE-01/PE-05) [4.02ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-02 rejects an agent-supplied value dressed as an authority-bound fact (falsifier PE-02) [0.46ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-03 lets no agent layout op move, pin, resize, close or focus an owner block (falsifier PE-03) [0.51ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-04 refuses a human-authority op for the agent role (falsifier PE-03/PE-06) [0.62ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-05 serves no unescaped markup from the GUI projection (falsifier PE-04) [0.77ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-06 lets no second surface schema validate a route (falsifier PE-01) [1.05ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-07 refuses a remote route's file: source instead of reading it (falsifier PE-02) [0.10ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-08 reports an unanswered authority as blocked, never as a value (falsifier PE-02) [0.04ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-09 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04) [0.33ms]
-(pass) T05 negative evidence (NE-01…NE-10) > NE-10 attributes no surface to an unattributable observer (falsifier PE-05) [0.53ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-01 rejects <script>alert(1)</script> and other executable markup at the SCHEMA, with a typed rejection (falsifier PE-05) [9.15ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick fields (.strict()); NE-02/PE-02 then refuses an agent-supplied value dressed as a bound fact, and every typed source (horizon: / semantic: / file: / agent:) resolves to a value or a non-bound status (falsifier PE-01/PE-02) [2.51ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} with no I/O — so no agent layout op (view.move / view.pin / surface.put / human.approve) moves, pins, resizes, closes or focuses an owner block (falsifier PE-03) [1.34ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06) [1.38ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06) [1.67ms]
+(pass) T05 negative evidence (NE-01…NE-10) > PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 projection (falsifier PE-04) [0.56ms]
+(pass) T05 negative evidence (NE-01…NE-10) > PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01) [0.91ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown horizon: source, and records no agent op as human (falsifier PE-02) [0.71ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02) [0.08ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04) [0.61ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-10 escapes an <img onerror=...> value that arrives from an observed source (falsifier PE-05) [0.97ms]
+(pass) T05 negative evidence (NE-01…NE-10) > PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every node and attributes no surface to an unattributable observer (falsifier PE-05) [2.62ms]
 
 test/app.test.ts:
-(pass) durable store boundary > the configured store is a Cognate SQLite database that survives a close and reopen [3.58ms]
-(pass) structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen [202.63ms]
-(pass) structural walking skeleton > configured in-memory storage is rejected by construction, with no E2E override [236.38ms]
-(pass) structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable [84.76ms]
-(pass) structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact [60.70ms]
-(pass) structural walking skeleton > an absent research source is a typed absent observation, not a startup failure [39.16ms]
+(pass) durable store boundary > the configured store is a Cognate SQLite database that survives a close and reopen [7.49ms]
+(pass) structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen [656.58ms]
+(pass) structural walking skeleton > configured in-memory storage is rejected by construction, with no E2E override [413.29ms]
+(pass) structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable [127.20ms]
+(pass) structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact [96.65ms]
+(pass) structural walking skeleton > an absent research source is a typed absent observation, not a startup failure [201.04ms]
 
 test/acceptance.test.ts:
-(pass) AC-CONFIG-004-01 a configured provider endpoint stays below stable behavior contracts (partial) > typed choices, committed intent and surface blocks are unchanged when the research provider endpoint differs [180.26ms]
+(pass) AC-CONFIG-004-01 a configured provider endpoint stays below stable behavior contracts (partial) > typed choices, committed intent and surface blocks are unchanged when the research provider endpoint differs [309.15ms]
 
 test/ui.test.ts:
-(pass) renderer-neutral surface seam > projects a frame without executable markup and with sources on every block [0.43ms]
-(pass) renderer-neutral surface seam > never lets a binding claim an observation the route did not make [0.22ms]
+(pass) renderer-neutral surface seam > projects a frame without executable markup and with sources on every block [0.49ms]
+(pass) renderer-neutral surface seam > never lets a binding claim an observation the route did not make [0.25ms]
 
- 24 pass
+ 26 pass
  0 fail
- 197 expect() calls
-Ran 24 tests across 5 files. [877.00ms]
+ 261 expect() calls
+Ran 26 tests across 5 files. [1.97s]
 uv run --project research pytest -q
 ....                                                                     [100%]
-4 passed in 0.03s
+4 passed in 0.09s
 python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
 ledger: 0 error(s) in ledger.yaml
   ok: 99 requirements, 99 acceptance contracts
@@ -161,13 +297,14 @@ dangling: exit=0 exit=0 Validation succeeded: 0 violations total
 BLIND SPOT CONFIRMED: dangling .sea accepted with no violation
 duplicate: exit=0 exit=0 Validation succeeded: 0 violations total
 BLIND SPOT CONFIRMED: duplicate .sea accepted with no violation
-control: exit=1 exit=1 Error: Parse failed for /tmp/tmpv1l1etyy/.sea/interaction/interaction-model.sea: resolved closure failed graph co
+control: exit=1 exit=1 Error: Parse failed for /tmp/tmpyobvfhvx/.sea/interaction/interaction-model.sea: resolved closure failed graph co
 
 tooth: gate discriminates (control fails, and the two blind spots are proven)
 python3 scripts/teeth-idm-integrity.py
 null: exit=0 exit=0 check-idm-integrity: OK (11 requirement references, 0 tolerated as recorded debt, 11 invariant ids uniq
 dangling: exit=1 exit=1 - .sea/interaction/interaction-model.sea:inv_intent_idempotent requirement_ref 'REQ-DOES-NOT-EXIST-999'
-duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmp_f_b3gks/.sea/interaction/interaction-m
+duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmpqy7pg2dg/.sea/interaction/interaction-m
 
 tooth: referential integrity is enforced (dangling and duplicate both fail)
 gate-t05: ok — horizon.surface/2 + horizon.gui-view/1 verified across GUI/CLI/MCP
+gate exit=0

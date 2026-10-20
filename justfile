@@ -54,6 +54,7 @@ wayfinder:
 # the real CLI rather than trusting a mock). Then the applicable global gates.
 check-t05:
     bun run scripts/check-t05-boundaries.ts
+    bun run scripts/check-t05-prereg-coverage.ts
 
 teeth-t05-boundaries:
     bun run scripts/teeth-t05-boundaries.ts
@@ -61,7 +62,10 @@ teeth-t05-boundaries:
 teeth-t05-equivalence:
     bun run scripts/teeth-t05-equivalence.ts
 
-teeth-t05: teeth-t05-boundaries teeth-t05-equivalence
+teeth-t05-coverage:
+    bun run scripts/teeth-t05-prereg-coverage.ts
+
+teeth-t05: teeth-t05-boundaries teeth-t05-equivalence teeth-t05-coverage
 
 gate-t05: check-t05 teeth-t05 check boundaries idm-integrity acceptance-claims witness-claims contract-modals test ledger wayfinder teeth
     @echo "gate-t05: ok — horizon.surface/2 + horizon.gui-view/1 verified across GUI/CLI/MCP"

@@ -57,7 +57,7 @@ const provenance = {
 
 
 describe("T05 negative evidence (NE-01…NE-10)", () => {
-  test("NE-01 rejects executable markup in a human-authored block (falsifier PE-01/PE-05)", () => {
+  test("NE-01 rejects <script>alert(1)</script> and other executable markup at the SCHEMA, with a typed rejection (falsifier PE-05)", () => {
     const surface = composed();
     // Markup is refused at the grammar, so it can never reach a renderer.
     for (const payload of ["<script>alert(1)</script>", "<img src=x onerror=alert(1)>", "a > b", "<"]) {
@@ -88,8 +88,30 @@ describe("T05 negative evidence (NE-01…NE-10)", () => {
     }
   });
 
-  test("NE-02 rejects an agent-supplied value dressed as an authority-bound fact (falsifier PE-02)", () => {
+  test("NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick fields (.strict()); NE-02/PE-02 then refuses an agent-supplied value dressed as a bound fact, and every typed source (horizon: / semantic: / file: / agent:) resolves to a value or a non-bound status (falsifier PE-01/PE-02)", () => {
     const surface = composed();
+
+    // The prereg's NE-02 attack, verbatim: an unknown block type and executable-looking
+    // fields. Each is refused by the union/discriminator or by `.strict()`.
+    const iframe = parseSurface(withBlock(surface, { id: "rogue", type: "iframe", src: "https://example.test", provenance }));
+    expect(iframe.ok).toBe(false);
+    if (!iframe.ok) {
+      // The rejection names the unknown type, so a caller learns *why* and not only *that*.
+      expect(iframe.issues[0]?.path).toBe("/blocks/0/type");
+      expect(iframe.issues[0]?.message).toMatch(/Invalid discriminator value/);
+      expect(iframe.issues[0]?.message).not.toContain("iframe");
+    }
+    for (const field of ["jsx", "onclick"]) {
+      const executable = parseSurface(
+        withBlock(surface, { id: "orientation", type: "callout", tone: "info", text: "hi", [field]: "<b/>", provenance }),
+      );
+      expect(executable.ok).toBe(false);
+      if (!executable.ok) {
+        // `.strict()` names the smuggled key rather than dropping it silently.
+        expect(executable.issues.map((issue) => issue.message).join(" ")).toContain(field);
+      }
+    }
+
     const disguised = withBlock(surface, {
       id: "orientation",
       type: "callout",
@@ -131,7 +153,7 @@ describe("T05 negative evidence (NE-01…NE-10)", () => {
   });
 
 
-  test("NE-03 lets no agent layout op move, pin, resize, close or focus an owner block (falsifier PE-03)", () => {
+  test("NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} with no I/O — so no agent layout op (view.move / view.pin / surface.put / human.approve) moves, pins, resizes, closes or focuses an owner block (falsifier PE-03)", () => {
     const surface = composed();
     const claimed = withBlock(surface, {
       id: "orientation",
@@ -155,11 +177,33 @@ describe("T05 negative evidence (NE-01…NE-10)", () => {
       expect(claimParsed.issues.map((issue) => issue.message)).toContain("layout authority requires a human attribution");
     }
 
-    // ...and when a document legitimately carries an agent block, reducing it for the agent
-    // never promotes the agent's placement, while the human view keeps the owner's order.
+    // NE-07 — "record an agent op as `human`". An agent cannot launder its attribution into a
+    // human one: reducing the same document for the agent never presents a block as the
+    // agent's own principal, and every recorded role comes from the closed set.
     const parsed = parseSurface(claimed);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
+    const asAgent = reduceSurface(parsed.surface, "agent");
+    for (const block of asAgent.blocks) {
+      expect(["human", "agent", "system"]).toContain(block.provenance.attributed_to.role);
+      expect(block.provenance.attributed_to.principal_ref).not.toBe("agent:rearranger");
+    }
+
+    // PE-03 — the reducer is a pure function of (state, op): the same parsed surface reduces
+    // to the same bytes every time, with no clock, no I/O and no shared mutation, and the
+    // result is stably serializable so two runs can be compared rather than eyeballed.
+    const first = reduceSurface(parsed.surface, "agent");
+    const second = reduceSurface(parsed.surface, "agent");
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+    expect(JSON.parse(JSON.stringify(first))).toEqual(first);
+    // The input is not mutated by reduction: reducing twice from the same document yields
+    // the same document, so a reducer cannot accumulate state into its argument.
+    const before = JSON.stringify(parseSurface(claimed));
+    reduceSurface(parsed.surface, "agent");
+    expect(JSON.stringify(parseSurface(claimed))).toBe(before);
+
+    // ...and when a document legitimately carries an agent block, reducing it for the agent
+    // never promotes the agent's placement, while the human view keeps the owner's order.
     const human = reduceSurface(parsed.surface, "human");
     const agent = reduceSurface(parsed.surface, "agent");
     // The human view presents the owner's order and the document's asserted layout unchanged:
@@ -177,7 +221,7 @@ describe("T05 negative evidence (NE-01…NE-10)", () => {
     expect(agent.notes.some((note) => note.kind === "layout_authority_claimed" && note.target === "orientation")).toBe(true);
   });
 
-  test("NE-04 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)", () => {
+  test("NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)", () => {
     const surface = composed();
     const withConsequential = {
       ...surface,
@@ -201,9 +245,83 @@ describe("T05 negative evidence (NE-01…NE-10)", () => {
     expect(agentReduction.notes.some((note) => note.kind === "action_proposed_not_offered")).toBe(true);
     // The human reduction of the same document does offer it.
     expect(reduceSurface(handBuilt, "human").actions.some((action) => action.operation === "horizon.decide.approve")).toBe(true);
+
+    // The prereg's NE-05 attack, verbatim: an agent sends view.move / view.pin / surface.put
+    // into an owner-pinned slot, or human.approve. None is in the closed operation union, so
+    // none can be offered to *any* role; and the layout claim an agent makes is capped.
+    const view = projectFrame(frameFor(), bindingContextOf(context));
+    expect(view.ok).toBe(true);
+    if (view.ok) {
+      for (const operation of ["view.move", "view.pin", "surface.put", "human.approve"]) {
+        // The op does not exist in the vocabulary: a proposal naming it is never an intent.
+        // `human.approve` is refused as a role mismatch first, since the role gate precedes
+        // the view gate — either way the result is a typed refusal, never a canonical intent.
+        const attempt = canonicalIntent({ transport: "cli", view: view.view, operation: operation as never, role: "agent" });
+        expect(attempt.ok).toBe(false);
+        if (!attempt.ok) expect(["operation_not_in_view", "role_mismatch"]).toContain(attempt.code);
+      }
+      // The owner's pinned foreground is not addressable by an agent through any *offered* op.
+      const agentView = projectForRole(composeSurface(frameFor()), "agent", frameFor(), bindingContextOf(context));
+      expect(agentView.ok).toBe(true);
+      if (agentView.ok) {
+        const agentOps = agentView.view.actions.map((action) => action.operation);
+        for (const ownerOnly of ["horizon.decide.approve", "horizon.decide.reject", "horizon.authorize.confirm"]) {
+          expect(agentOps).not.toContain(ownerOnly);
+        }
+      }
+    }
+
+    // vocabulary calls it, an agent submission must never canonicalise to a human decision.
+    const approveView = projectFrame(frameFor(), bindingContextOf(context));
+    expect(approveView.ok).toBe(true);
+    if (approveView.ok) {
+      expect(canonicalIntent({ transport: "mcp", view: approveView.view, operation: "horizon.decide.approve", role: "agent" })).toEqual({
+        ok: false,
+        code: "role_mismatch",
+      });
+    }
   });
 
-  test("NE-05 serves no unescaped markup from the GUI projection (falsifier PE-04)", () => {
+  test("NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)", () => {
+    const surface = composed();
+
+    // (a) An operation outside the closed union, and (b) an owner-ruling op id that the
+    // frame does not offer: neither is a `HORIZON_OPERATIONS` member, so the grammar's
+    // `z.enum` refuses the action rather than admitting an unaddressable choice.
+    for (const operation of ["horizon.surface.put", "owner.ruling.0001", "horizon.teleport"]) {
+      const smuggled = { ...(surface as unknown as Record<string, unknown>), actions: [{ id: "acted", type: "action", label: "Act", operation, by: { actor_ref: "os:operator:1000", role: "human", principal_ref: "os:operator:1000" } }] };
+      const parsed = parseSurface(smuggled);
+      expect(parsed.ok).toBe(false);
+      if (!parsed.ok) {
+        // The rejection names the action, so which field failed is inspectable.
+        expect(parsed.issues.some((issue) => issue.path.startsWith("/actions"))).toBe(true);
+      }
+    }
+
+    // (c) An agent presenting a consequential operation as its own action is refused at the
+    // grammar, before any reducer sees it — an agent cannot offer a human decision.
+    const agentOffered = {
+      ...(surface as unknown as Record<string, unknown>),
+      actions: [
+        {
+          id: "decide-approve",
+          type: "action",
+          label: "Approve",
+          operation: "horizon.decide.approve",
+          by: { actor_ref: "agent:synthesizer", role: "agent", principal_ref: "os:operator:1000", agent_ref: "agent:synthesizer", on_behalf_of_ref: "os:operator:1000" },
+        },
+      ],
+    };
+    const refused = parseSurface(agentOffered);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      expect(refused.issues.map((issue) => issue.message)).toContain(
+        "an agent MUST NOT present a consequential operation as its own action; it may only propose it",
+      );
+    }
+  });
+
+  test("PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 projection (falsifier PE-04)", () => {
     const view = projectForRole(composeSurface(frameFor()), "human", frameFor(), bindingContextOf(context));
     expect(view.ok).toBe(true);
     if (!view.ok) return;
@@ -217,14 +335,14 @@ describe("T05 negative evidence (NE-01…NE-10)", () => {
     expect(renderText(view.view)).not.toContain("<script");
   });
 
-  test("NE-06 lets no second surface schema validate a route (falsifier PE-01)", () => {
+  test("PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)", () => {
     const surface = composed();
     for (const wrong of ["horizon.surface/1", "horizon.surface/3", "horizon.surface", ""]) {
       expect(parseSurface({ ...surface, schema: wrong }).ok).toBe(false);
     }
     // An unknown block type has no union member: the vocabulary is closed at fifteen.
-    const sixteenth = withBlock(surface, { id: "rogue", type: "iframe", src: "https://example.test", provenance });
-    expect(parseSurface(sixteenth).ok).toBe(false);
+    // (The `iframe` form of this attack is asserted by NE-02; this test keeps to the schema
+    // identity so the two cannot drift into claiming the same thing.)
 
     // Discovery publishes the same closed set the parser enforces, not a wider one.
     const declared = publishSurfaceSchema();
@@ -235,12 +353,60 @@ describe("T05 negative evidence (NE-01…NE-10)", () => {
     expect(parseSurface({ ...surface, extra: "smuggled" }).ok).toBe(false);
   });
 
-  test("NE-07 refuses a remote route's file: source instead of reading it (falsifier PE-02)", () => {
+  test("NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown horizon: source, and records no agent op as human (falsifier PE-02)", () => {
+    // The prereg's NE-04 attack, verbatim: each unsafe expression is refused with a bounded
+    // message, never resolved into a value. Note the second clause of NE-04: an unknown
+    // `horizon:` source is *not* an invalid one. Over the default route that namespace is
+    // declared pending (`horizon: "TA-T06/T07"`), so the binder reports it `blocked` and
+    // carries no value. `blocked` is still a refusal to supply a fact — the property NE-04
+    // asserts — but it is a different, truthful status: `unknown`, never `available`.
+    for (const unsafe of ["javascript:alert(1)", "file:../../etc/passwd", `horizon:${"x".repeat(2000)}`]) {
+      const binding = bindSource(unsafe, bindingContextOf(context));
+      expect(binding.status).toBe("refused");
+      expect(binding.value).toBeNull();
+      expect(JSON.stringify(binding).length).toBeLessThan(4096);
+    }
+    const unknownHorizon = bindSource("horizon:no-such-source", bindingContextOf(context));
+    expect(["blocked", "refused"]).toContain(unknownHorizon.status);
+    expect(unknownHorizon.value).toBeNull();
+    // The typed source vocabulary is closed at four namespaces: each resolves to a value plus
+    // an observation, or to a non-bound status — never to an unstamped string.
+    for (const [expression, namespace] of [
+      ["horizon:health", "horizon"],
+      ["semantic:Case", "semantic"],
+      ["file:specs/exists.md", "file"],
+      ["agent:note", "agent"],
+    ] as const) {
+      const binding = bindSource(expression, bindingContextOf({ root: process.cwd(), allowFileReads: true, agentValues: { note: "supplied" } }));
+      expect(binding.namespace).toBe(namespace);
+      if (binding.status === "bound") {
+        expect(binding.value).not.toBeUndefined();
+        expect(binding.observation).toBeDefined();
+      } else {
+        expect(binding.value).toBeNull();
+      }
+    }
+    // Once the route stops declaring that namespace pending, an unknown key is refused as
+    // `not_found` rather than staying `blocked` — the status follows the observation. The
+    // pending declaration is checked *before* the resolver, so a resolver alone does not
+    // unblock it; both must change. `bindingContextOf` seeds `awaiting.horizon`, and an
+    // explicit `awaiting` entry overrides it (`undefined` clears it).
+    const resolved = bindSource(
+      "horizon:no-such-source",
+      bindingContextOf({ root: process.cwd(), resolveHorizon: () => undefined, awaiting: { horizon: undefined } }),
+    );
+    expect(resolved.status).toBe("refused");
+    expect(resolved.value).toBeNull();
+
+    // Traversal is refused even though `file:` reads are permitted for this route...
+    expect(bindSource("file:specs/../.env", bindingContextOf(context)).status).toBe("refused");
+    // ...and an unrelated `file:` path outside the frozen roots is not addressable at all.
+    expect(bindSource("file:src/config/load.ts", bindingContextOf(context)).status).toBe("refused");
+    // The remote route's bindings are refused with `agent_supplied` false: a refusal is never
+    // dressed as an agent's contribution.
     const remote = bindingContextOf({ root: process.cwd(), allowFileReads: false });
-    const binding = bindSource("file:specs/../.env", remote);
-    expect(binding.status).toBe("refused");
-    expect(binding.agent_supplied).toBe(false);
-    expect(binding.value).toBeNull();
+    expect(bindSource("file:specs/../.env", remote).agent_supplied).toBe(false);
+
     // Traversal is refused for the local route too, whatever the read permission.
     const local = bindSource("file:specs/../.env", bindingContextOf(context));
     expect(local.status).toBe("refused");
@@ -249,7 +415,7 @@ describe("T05 negative evidence (NE-01…NE-10)", () => {
     expect(bindSource("file:src/config/load.ts", bindingContextOf(context)).status).toBe("refused");
   });
 
-  test("NE-08 reports an unanswered authority as blocked, never as a value (falsifier PE-02)", () => {
+  test("NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)", () => {
     const binding = bindSource("horizon:preflight/case-1", bindingContextOf({ root: process.cwd() }));
     expect(binding.status === "blocked" || binding.observation === "unavailable").toBe(true);
     // A non-bound binding never carries a value a caller could mistake for a fact.
@@ -261,7 +427,7 @@ describe("T05 negative evidence (NE-01…NE-10)", () => {
     expect(affordanceOfFrame(frameFor())("horizon.decide.approve")).toBe("unknown");
   });
 
-  test("NE-09 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)", () => {
+  test("NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)", () => {
     const frame = frameFor();
     const projection = projectFrame(frame, bindingContextOf(context));
     expect(projection.ok).toBe(true);
@@ -294,7 +460,40 @@ describe("T05 negative evidence (NE-01…NE-10)", () => {
     expect(intentsEquivalent({ ok: false, code: "unknown_node" }, { ok: false, code: "unknown_node" })).toBe(false);
   });
 
-  test("NE-10 attributes no surface to an unattributable observer (falsifier PE-05)", () => {
+  test("NE-10 escapes an <img onerror=...> value that arrives from an observed source (falsifier PE-05)", () => {
+    // A value an observed source returns is attacker-controlled. It must be escaped at render,
+    // so the payload is present as text and inert as markup.
+    const injected = "<img onerror=alert(1) src=x>";
+    const surface = composed();
+    const parsed = parseSurface(
+      withBlock(surface, { id: "orientation", type: "callout", tone: "info", text: `observed: ${injected}`, provenance }),
+    );
+    // Either the grammar refuses the markup outright, or the renderer escapes it. Both are
+    // safe; silently emitting it is not, and that is what this asserts.
+    if (parsed.ok) {
+      const view = projectSurface(reduceSurface(parsed.surface, "human"), (expression) => bindSource(expression, bindingContextOf(context)));
+      const html = renderHtml(view);
+      expect(html.toLowerCase()).not.toContain("<img");
+      expect(html.toLowerCase()).not.toMatch(/onerror\s*=/);
+      expect(html).toContain("&lt;");
+    } else {
+      expect(parsed.code).toBe("INVALID_SURFACE");
+    }
+    // The escape helper itself: the payload survives as text, never as an element.
+    const escaped = escapeHtml(injected);
+    expect(escaped).not.toContain("<");
+    expect(escaped).toContain("&lt;img");
+    // The CLI renderer is text, not markup: the same value cannot become an element there.
+    const textSurface = composed();
+    const textParsed = parseSurface(withBlock(textSurface, { id: "orientation", type: "callout", tone: "info", text: injected, provenance }));
+    if (textParsed.ok) {
+      const rendered = renderText(projectSurface(reduceSurface(textParsed.surface, "human"), (expression) => bindSource(expression, bindingContextOf(context))));
+      expect(rendered).not.toContain("<img");
+    }
+  });
+
+  test("PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every node and attributes no surface to an unattributable observer (falsifier PE-05)", () => {
+    // NE-10's escaping is asserted by its own test above; here the subject is attribution.
     for (const observerRef of ["anon:visitor", "operator", "os::1000", "os:operator:1000 extra"]) {
       // Either the seam refuses to compose at all, or the composed document fails the grammar.
       expect(projectFrame(frameFor(observerRef), bindingContextOf(context)).ok).toBe(false);
@@ -312,5 +511,20 @@ describe("T05 negative evidence (NE-01…NE-10)", () => {
     const asAgent = projectForRole(composeSurface(frameFor()), "agent", frameFor(), bindingContextOf(context));
     expect(asAgent.ok).toBe(true);
     if (asAgent.ok) expect(asAgent.view.role).toBe("agent");
+
+    // PE-05 — an agent acting for the human is visibly distinct, not merely labelled: the
+    // attribution carries `on_behalf_of_ref` naming the human, plus the agent ref.
+    const agentFacing = projectForRole(composeSurface(frameFor()), "agent", frameFor(), bindingContextOf(context));
+    expect(agentFacing.ok).toBe(true);
+    if (agentFacing.ok) {
+      for (const node of agentFacing.view.nodes) {
+        const attribution = node.attributed_to;
+        expect(attribution.role).toBe("agent");
+        if (attribution.role === "agent") {
+          expect(attribution.agent_ref).toBeDefined();
+          expect(attribution.on_behalf_of_ref).toBeDefined();
+        }
+      }
+    }
   });
 });

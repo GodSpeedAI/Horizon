@@ -18,7 +18,7 @@
  */
 import type { SourceBinding } from "./binder";
 import type { AffordanceStatusOf, ReducedSurface, ReductionNote } from "./reducer";
-import { isConsequential, type LayoutPlacement, type SurfaceBlock, type SurfaceRole } from "./grammar";
+import { isConsequential, type ActorAttribution, type LayoutPlacement, type SurfaceBlock, type SurfaceRole } from "./grammar";
 
 export const GUI_VIEW_SCHEMA = "horizon.gui-view/1" as const;
 
@@ -31,7 +31,18 @@ export interface ProjectedNode {
   readonly tone?: string;
   readonly source_kind: string;
   readonly layout: LayoutPlacement;
-  readonly attributed_to: { readonly actor_ref: string; readonly role: SurfaceRole };
+  /**
+   * Who produced this value. `principal_ref` is the human the work is for; when an agent
+   * produced it, `agent_ref` and `on_behalf_of_ref` are carried too, so the view can render
+   * an agent as visibly distinct rather than only as `role: "agent"` (REQ-UX-006).
+   */
+  readonly attributed_to: {
+    readonly actor_ref: string;
+    readonly role: SurfaceRole;
+    readonly principal_ref?: string;
+    readonly agent_ref?: string;
+    readonly on_behalf_of_ref?: string;
+  };
   /** One entry per source this node's values came from. */
   readonly bindings: readonly SourceBinding[];
 }
@@ -148,6 +159,23 @@ function bindingsFor(block: SurfaceBlock, bind: (expression: string) => SourceBi
  * its own permitted source context (a remote route refuses `file:` reads) and its own frame
  * assessment, while every route produces the same document for the same inputs.
  */
+/**
+ * Flatten an attribution for the view without inventing fields.
+ *
+ * A human or system attribution carries no delegating agent, so those keys are absent rather
+ * than `undefined`; an agent attribution keeps the references that make it visibly distinct.
+ */
+function actorOf(attribution: ActorAttribution): ProjectedNode["attributed_to"] {
+  return {
+    actor_ref: attribution.actor_ref,
+    role: attribution.role,
+    principal_ref: attribution.principal_ref,
+    ...(attribution.agent_ref === undefined ? {} : { agent_ref: attribution.agent_ref }),
+    ...(attribution.on_behalf_of_ref === undefined ? {} : { on_behalf_of_ref: attribution.on_behalf_of_ref }),
+  };
+}
+
+
 export function projectSurface(
   reduced: ReducedSurface,
   bind: (expression: string) => SourceBinding,
@@ -178,7 +206,7 @@ export function projectSurface(
       ...(block.type === "callout" ? { tone: block.tone } : {}),
       source_kind: block.provenance.source_kind,
       layout: block.provenance.layout,
-      attributed_to: { actor_ref: block.provenance.attributed_to.actor_ref, role: block.provenance.attributed_to.role },
+      attributed_to: actorOf(block.provenance.attributed_to),
       bindings,
     });
   }

@@ -136,3 +136,78 @@
     "sha256": "14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4"
   }
 }
+---
+{
+  "schema": "horizon.status/1",
+  "revision": 19,
+  "date": "2026-10-20",
+  "task": "T05",
+  "state": "settled",
+  "rule": "Read status -> choose a dependency-ready task -> confirm spec hash -> preregister -> smallest coherent change -> narrow gate + teeth -> global gates -> independent confirm P3 -> evidence -> status.",
+  "settled": [
+    "REQ-UI-001",
+    "REQ-UI-002",
+    "REQ-UI-003",
+    "REQ-UI-006",
+    "REQ-UI-007",
+    "REQ-UI-008",
+    "REQ-SEC-002",
+    "REQ-SEC-003",
+    "REQ-SEC-004",
+    "REQ-UX-006"
+  ],
+  "summary": "T05 settlement corrected after the owner asked whether it was actually settled. The audit found claim drift, not property drift: the test named NE-02 asserted provenance laundering rather than the preregistered iframe/jsx/onclick attack, NE-03 had no test at all, NE-04 and NE-05 were labelled onto different tests, and PE-05 could not be satisfied as written because projectSurface dropped agent_ref/on_behalf_of_ref/principal_ref so no view could render an agent as acting for a human. All fixed inside T05's own authority. scripts/check-t05-prereg-coverage.ts now fails if any prereg id stops being named by a test that names that attack, and it earned its place by reproducing the shipped NE-02 mislabel as a tooth. T05 stays SETTLED: gate-t05 and verify exit 0, no live vulnerability was found, and the evidence now demonstrates what it previously only asserted. DEC-T05-08 records the correction.",
+  "verified": [
+    "just gate-t05 -> exit 0 ('gate-t05: ok - horizon.surface/2 + horizon.gui-view/1 verified across GUI/CLI/MCP')",
+    "just verify -> exit 0 ('verify: ok (active frozen artifacts: requirements/ledger.yaml + .wayfinder/answer-key.md)')",
+    "bun test -> 26 pass / 0 fail / 261 expect() calls, 5 files",
+    "check-t05-prereg-coverage -> ok (18 expectations, each named by a test that names its attack)",
+    "teeth-t05-prereg-coverage -> ok (5 teeth: shipped NE-02 mislabel, missing NE-03, renamed id, renamed gate target, and the real map accepted)",
+    "teeth-t05-boundaries -> ok (21 checks)",
+    "teeth-t05-equivalence -> ok (6 comparisons, incl. live /surface byte check for executable markup)",
+    "tsc --noEmit -> clean",
+    "sha256sum -c .agents/evidence/horizon/T05/SHA256SUMS -> 5/5 OK",
+    "prereg sha256 ff36d65b578531687f8165950ba38c438dd98a71671c230d59ae48d02bd73019 unchanged"
+  ],
+  "limits": [
+    "The correction changed source inside T05's own authority (src/ui/surface2/project.ts and render.ts gained agent_ref/on_behalf_of_ref/principal_ref). That is a functional change to the projection made during settlement, not a re-design; the grammar, reducer and seam are untouched.",
+    "NE-05's prereg vocabulary (view.move/view.pin/surface.put/human.approve) does not exist in the closed operation union; the test asserts those names are refused as typed non-intents and that the real owner-only ops are never offered to an agent. Substitutions are listed in TITLE_SYNONYMS so the vocabulary mapping is reviewable.",
+    "An unknown horizon: source is blocked (awaiting TA-T06/T07), not refused, over the default route because bindingContextOf declares that namespace pending. Still carries no value, so NE-04's property holds; recorded in SUMMARY rather than smoothed over.",
+    "Clack and the WebMCP browser transport remain unbound at T05 (declared in the prereg).",
+    "D-027 (no end-to-end conflicting layout claim), D-023/D-024/D-025, D-029 (stale-tree gates) and D-030 (module-level state in the boundary check) remain open"
+  ],
+  "next": "T06 - build the operational object layer: typed object-set and relationship projections on Cognate (depends_on T04). Design fork to settle first: D-002 (listRecords vs upstream Cognate gap).",
+  "decisions": [
+    "DEC-T05-01",
+    "DEC-T05-02",
+    "DEC-T05-03",
+    "DEC-T05-04",
+    "DEC-T05-05",
+    "DEC-T05-06",
+    "DEC-T05-07",
+    "DEC-T05-08"
+  ],
+  "evidence": [
+    ".agents/evidence/horizon/T05/SUMMARY.md",
+    ".agents/evidence/horizon/T05/gate-t05.log",
+    ".agents/evidence/horizon/T05/just-verify.log",
+    ".agents/evidence/horizon/T05/SHA256SUMS",
+    ".agents/prereg/horizon/T05.prereg.yaml",
+    "test/surface-negative.test.ts",
+    "scripts/check-t05-prereg-coverage.ts",
+    "scripts/teeth-t05-prereg-coverage.ts",
+    "scripts/teeth-t05-equivalence.ts",
+    "src/ui/surface2/project.ts",
+    "src/ui/surface2/render.ts",
+    "NOTICE",
+    "LICENSE",
+    ".agents/reports/horizon-decisions.yaml",
+    ".agents/DEBT.md"
+  ],
+  "spec": {
+    "id": "HORIZON-001",
+    "version": "1.0.1",
+    "status": "frozen",
+    "sha256": "14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4"
+  }
+}

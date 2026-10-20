@@ -454,6 +454,33 @@ decisions:
       - "LICENSE"
       - ".agents/DEBT.md"
       - "4702ada"
+  - id: DEC-T05-08
+    date: "2026-10-20"
+    task: T05
+    requirement: none (corrects the T05 NE→test map and restores PE-05)
+    decision: >-
+      The owner asked "is T05 settled?" and the audit answered no. Three defects, all of claim rather
+      than of property: (1) the test named NE-02 asserted provenance laundering, not the preregistered
+      iframe/jsx/onclick attack; (2) NE-03 had no test at all and NE-04/NE-05 were labelled onto
+      different tests; (3) PE-05 could not be satisfied as written because projectSurface dropped
+      agent_ref/on_behalf_of_ref/principal_ref, so no view could render an agent as acting for a
+      human. Fixed inside T05's own authority: the prereg-literal attacks are now asserted, NE-03
+      and NE-10 have their own tests, the projection carries the delegation and both renderers print
+      it, and scripts/check-t05-prereg-coverage.ts fails if any prereg id stops being named by a test
+      that names that id's attack. T05 remains SETTLED on that basis; the substantive properties
+      were never in question — gate-t05 and verify were and are green, and no live vulnerability was
+      found. What changed is that the evidence now demonstrates what it claims.
+    reversible: true
+    evidence:
+      - "test/surface-negative.test.ts"
+      - "scripts/check-t05-prereg-coverage.ts"
+      - "scripts/teeth-t05-prereg-coverage.ts"
+      - "src/ui/surface2/project.ts"
+      - "src/ui/surface2/render.ts"
+      - ".agents/evidence/horizon/T05/SUMMARY.md"
+      - "justfile"
+
+
 
 
 open_questions:
