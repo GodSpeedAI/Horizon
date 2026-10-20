@@ -1,4 +1,7 @@
 ---
+
+
+---
 {"revision":1,"recorded_at":"2026-10-19","stage":"plan_authored","summary":"Normative Horizon plan and root agent router committed; no product implementation executed. T00 is first available formation task.","verified":["20 settlement tasks and 40 dependency edges recorded in .agents/plans/horizon.plan.yaml","All 66 requirement IDs from the source spec map to one or more plan tasks; no unknown plan IDs","Eight P3 tasks declare preregistration, adversarial teeth and independent confirmation","The plan pins source SHA-256 and root AGENTS.md names the mandatory canonical topology and Building with Cognate skills"],"limits":["Source spec metadata.status is draft; T00 may inventory but subsequent implementation requires explicit approval/freeze","No code was scaffolded or runtime/live integration tests performed","YAML parsing by an installed parser and external skill path accessibility must be checked at T00"],"next":"T00: load ~/projects/project-topology-architect/skills/project-topology-architect/SKILL.md and verify the frozen ruler before formation","evidence":[".agents/specs/horizon.agent.spec.yaml",".agents/plans/horizon.plan.yaml","AGENTS.md"],"spec":{"id":"HORIZON-001","version":"0.1.0","status":"draft","sha256":"852e85e4a7b3ad613a98f1ef5f5fe6610f4543a9d39c5f58b290ccda170936bc"}}
 ---
 {"revision": 2, "recorded_at": "2026-10-19", "stage": "spec_and_plan_revised", "summary": "Spec HORIZON-001 and plan revised to 0.2.0 after source-grounded adversarial review; no product implementation executed. T00 is first available formation task.", "verified": ["Spec 0.2.0 parses as YAML with 97 unique requirement IDs and six journeys J01–J06", "Plan 0.2.0 parses with 23 tasks and 58 acyclic dependency edges; all 97 requirement IDs map to tasks; no unknown IDs", "Plan pins spec SHA-256 83de3571816e71067dcbe5533d586848a0a82918f0e576fd083c8a2a94666881", "Workspace paths resolved by git remote: SEA-Forge=sea-rs, RealityTrace=sxr, Context Kernel=Context_Kernel, GodSpeed Agent=godspeed_agent", "Cognate origin/main a477933 exports loadSemanticWorld and binds DomainForge 0.21.1 (read via git show; no fetch)"], "limits": ["Source spec metadata.status is draft; T01+ requires explicit owner approval/freeze of SHA 83de3571816e71067dcbe5533d586848a0a82918f0e576fd083c8a2a94666881", "Local cognate and domainforge checkouts lag their remotes", "Product Actualizer is AGPL-3.0; code reuse awaits owner licensing decision", "WarpRoom disposition deferred to owner", "No code scaffolded and no runtime or live integration tests performed"], "next": "T00: load ~/projects/project-topology-architect/skills/project-topology-architect/SKILL.md, verify the ruler, record drift, licensing, developmental-rule home and research migration manifest", "evidence": [".agents/specs/horizon.agent.spec.yaml", ".agents/plans/horizon.plan.yaml", ".agents/reports/horizon-spec-adversarial-review.md", ".agents/reports/horizon-product-integration-register.yaml", "AGENTS.md"], "spec": {"id": "HORIZON-001", "version": "0.2.0", "status": "draft", "sha256": "83de3571816e71067dcbe5533d586848a0a82918f0e576fd083c8a2a94666881"}}
@@ -203,6 +206,75 @@
     "LICENSE",
     ".agents/reports/horizon-decisions.yaml",
     ".agents/DEBT.md"
+  ],
+  "spec": {
+    "id": "HORIZON-001",
+    "version": "1.0.1",
+    "status": "frozen",
+    "sha256": "14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4"
+  }
+}
+
+---
+{
+  "schema": "horizon.status/1",
+  "revision": 20,
+  "date": "2026-10-20",
+  "task": "T06",
+  "state": "settled",
+  "rule": "Read status -> choose a dependency-ready task -> confirm spec hash -> preregister -> smallest coherent change -> narrow gate + teeth -> global gates -> independent confirm P3 -> evidence -> status.",
+  "settled": [
+    "REQ-WORLD-001",
+    "REQ-WORLD-002",
+    "REQ-WORLD-003",
+    "REQ-WORLD-005",
+    "REQ-SAFE-003",
+    "REQ-WORLD-006",
+    "REQ-WORLD-007"
+  ],
+  "summary": "T06 settled as a Horizon-owned typed operational object projection on Cognate's public Projection API (DEC-T05-10), after verifying the pinned 0.6.1 surface in the installed tree rather than from skill prose. Objects, links and lineage fold from durable events into `horizon.operational-objects` and are read through `readProjectionSnapshot`, so checkpoint and rows come from one statement. Query, scope, five-way outcome distinction and bounded two-relationship traversal are implemented; no fork of Cognate and no second object store. The prereg was shape-checked before any code existed (10 positive + 9 negative structural members) using the check the T05 frozen file fails. Evidence found four defects that design review had not: a wrong-world write was accepted (NE-07), SemanticRef rejected real dotted namespaces, an empty projection was reported as unavailable, and the NE-09 determinism test was weaker than its title (a rebuild comparison cannot detect an order-dependent query when the store already returns ordered rows). One mutant was found to be a no-op and was replaced rather than counted. Proof level stays P2: 8 mutation teeth show the named tests reject those specific violations; no independent replay was performed and none is implied.",
+  "verified": {
+    "check_t06": "0 (shape 10+9 structural; linkage 19/19)",
+    "teeth_t06": "0 (shape teeth 6/6, mutation teeth 8/8, each caught by a failing assertion)",
+    "gate_t06": "0",
+    "just_verify": "0",
+    "gate_t05": "0 (no regression)",
+    "bun_test": "45 pass / 0 fail (7 files, 458 expect())",
+    "tsc": "clean",
+    "spec_sha256_unchanged": true,
+    "t05_prereg_sha256_unchanged": "ff36d65b578531687f8165950ba38c438dd98a71671c230d59ae48d02bd73019"
+  },
+  "limits": [
+    "P2, builder with adversarial teeth. Independent replay is a separate, unperformed asset.",
+    "Fixture evidence: events are recorded by the fixture, not produced by MLflow/GitHub or any live system. `integration_level` is `fixture` on every object. Unavailable and blocked are simulated by name.",
+    "Horizon's scope decision is a query filter, not an authorization ruling; SEA-Forge was not consulted at T06.",
+    "Reads filter in process over whole projections, so cost scales with projection size; no scale claim and no index.",
+    "Mutation teeth prove detection of the eight enumerated mutations only, not of arbitrary violations."
+  ],
+  "next": "T07 — depends on T02, T05 and T06 (all settled). D-023 does not block it: reclassified latent, busy_timeout supplied upstream. Carry D-002's upstream query gaps (no predicate query, no traversal, no version-aware query API) as an upstream report, not local work.",
+  "decisions": ["DEC-T05-09", "DEC-T05-10", "DEC-T06-01", "DEC-T06-02", "DEC-T06-03"],
+  "evidence": ".agents/evidence/horizon/T06/SUMMARY.md",
+  "changed": [
+    ".agents/prereg/horizon/T06.prereg.yaml",
+    ".agents/prereg/horizon/T05.prereg.interpretation.yaml",
+    "src/domain/operational.ts",
+    "src/projections/operational-objects.ts",
+    "src/adapters/operational-objects.ts",
+    "test/support/operational-fixture.ts",
+    "test/operational-objects.test.ts",
+    "test/operational-objects-negative.test.ts",
+    "scripts/check-prereg-shape.ts",
+    "scripts/teeth-t06-shape.ts",
+    "scripts/check-t06-prereg-coverage.ts",
+    "scripts/teeth-t06-mutation.ts",
+    "scripts/check-t05-prereg-coverage.ts",
+    "scripts/teeth-t05-prereg-coverage.ts",
+    "scripts/teeth-t05-mutation.ts",
+    "test/surface-negative.test.ts",
+    "justfile",
+    ".agents/evidence/horizon/T05/SUMMARY.md",
+    ".agents/evidence/horizon/T06/",
+    ".agents/reports/horizon-decisions.yaml"
   ],
   "spec": {
     "id": "HORIZON-001",

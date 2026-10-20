@@ -1,0 +1,239 @@
+preregistration:
+  id: T06.prereg
+  task: T06
+  title: Operational object layer — typed object-set and relationship projections on Cognate
+  recorded_at: "2026-10-20T00:00:00Z"
+  recorded_before_artifacts: true
+
+  # Shape contract, learned from the T05 structural defect (DEC-T05-09):
+  #   - every expectation is a member of positive_expectations / negative_expectations;
+  #   - no `- id:` line ever appears inside a block scalar;
+  #   - every backticked literal in an `expectation`/`attack`/`expected` field is an anchor a
+  #     test title must name (check-t06-prereg-shape + check-t06-prereg-coverage).
+  # The design-level explanation is in the `notes` block at the end, deliberately OUTSIDE the
+  # expectation sequences so it cannot be mistaken for one.
+
+  claim: >-
+    A real pinned Horizon semantic model can be joined to durable typed operational fixtures such
+    that object sets can be filtered, and at least two declared relationships traversed, with
+    source provenance, scope boundaries and reproducible checkpoint identities — while empty,
+    no-match, denied, blocked and unavailable remain distinguishable and an unauthorized observer
+    is disclosed nothing.
+
+  upstream_pins:
+    - id: cognate
+      version: 0.6.1
+      artifacts:
+        - "@godspeedai/cognate-projections"
+        - "@godspeedai/cognate-events"
+        - "@godspeedai/cognate-store-sqlite"
+        - "@godspeedai/cognate-domainforge"
+      inspected: .agents/evidence/horizon/T06/pinned-api-inspection.log
+    - id: domainforge
+      note: >-
+        Semantic identity is read through Horizon's existing `loadWorld` adapter, which pins the
+        closure hash into `world_ref`. T06 does not re-implement the loader.
+    - id: horizon-spec
+      version: 1.0.1
+      sha256: 14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+
+  settles:
+    - REQ-WORLD-001
+    - REQ-WORLD-002
+    - REQ-WORLD-003
+    - REQ-WORLD-005
+    - REQ-SAFE-003
+    - REQ-WORLD-006
+    - REQ-WORLD-007
+
+  positive_expectations:
+    - id: PE-01
+      expectation: >-
+        Object identity is typed and stable. Every projected operational object carries a
+        DomainForge semantic id it was instantiated from, and its operational identity is
+        distinct from that semantic id with its own `object_ref`. Two objects of the same
+        semantic type are distinguishable, and one object cannot be projected twice.
+    - id: PE-02
+      expectation: >-
+        Relationship integrity holds. Every link names a declared relation type from the pinned
+        world and both endpoints resolve to projected objects. A link whose type is undeclared, or
+        whose endpoint is absent, is refused rather than stored and skipped.
+    - id: PE-03
+      expectation: >-
+        Every object, set and link exposes provenance: owning `product`, `connector`,
+        `checkpoint_ref`, checkpoint age and `integration_level` (REQ-WORLD-007). A fixture
+        recorded through a named connector reports that connector, not a default.
+    - id: PE-04
+      expectation: >-
+        Checkpoint consistency. A result's `checkpoint_ref` names the Cognate commit position
+        plus the projection names and versions read. A query answered from a projection state that
+        does not match the requested checkpoint is refused, not silently answered from a newer
+        state.
+    - id: PE-05
+      expectation: >-
+        Object queries are scoped and authorized. A query is answered only over the observer's
+        authorized object set; authorization is evaluated per query, and the same query from two
+        observers with different authority yields different, correctly-scoped result sets.
+    - id: PE-06
+      expectation: >-
+        Traversal is deterministic, bounded and checkpoint-consistent across at least two
+        declared relationships. The same query at the same checkpoint returns byte-identical
+        results regardless of insertion order, and an unbounded traversal request is refused
+        with a typed limit error rather than truncated silently.
+    - id: PE-07
+      expectation: >-
+        The five outcomes are distinct: an `empty` projection, a `no-match` filter, a `denied`
+        scope, a `blocked` connector and an `unavailable` source each yield their own status. A
+        downstream failure is never reported as an empty result.
+    - id: PE-08
+      expectation: >-
+        Recovery from a stale or mismatched projection checkpoint. On a `rebuild_required`
+        checkpoint or a mismatched projection version the layer reports the condition and rebuilds
+        from durable events; it never reinterprets stored state under a new version, and it never
+        serves a result whose claimed checkpoint is ahead of its rows.
+    - id: PE-09
+      expectation: >-
+        The semantic, operational and lineage graphs keep distinct identities and semantics
+        (REQ-WORLD-005). A semantic import edge is never returned as an operational link, and
+        lineage is a separate relation from operational linkage.
+    - id: PE-10
+      expectation: >-
+        Observer state is preserved across the query surface: focus, object-set selection,
+        observer and world are carried on the result so the next surface can continue from it
+        (REQ-WORLD-003).
+
+  negative_expectations:
+    - id: NE-01
+      attack: >-
+        Change the observer role to one with no object access and query the full object set.
+      expected: >-
+        The query returns `denied` with no objects, and no field of the refusal discloses an
+        object identity, a count, or an object type the observer may not see.
+    - id: NE-02
+      attack: >-
+        Query while the source is down, and separately while a connector is blocked, so no rows
+        come back from either.
+      expected: >-
+        The status is `unavailable` and `blocked` respectively, never `empty` and never
+        `no-match`; each names which source or connector is responsible.
+    - id: NE-03
+      attack: >-
+        Request a traversal with no depth or no result bound over a cyclic relationship.
+      expected: >-
+        A typed limit refusal before any traversal work, naming the missing or exceeded bound; the
+        cycle never terminates silently by truncation.
+    - id: NE-04
+      attack: >-
+        Record a link whose relation type is not declared in the pinned world, and a link whose
+        endpoint object is absent.
+      expected: >-
+        Both are refused with a typed error at record time; neither is stored, and neither is
+        silently dropped so that a later traversal sees a half-link.
+    - id: NE-05
+      attack: >-
+        Query at a checkpoint that does not match the projection's stored state, and query after
+        the projection version has changed without a rebuild.
+      expected: >-
+        `rebuild_required` or a checkpoint-mismatch refusal; no result set is returned, and
+        stored state is never reinterpreted under the new version.
+    - id: NE-06
+      attack: >-
+        Submit a semantic import edge, or a lineage record, into the operational link set.
+      expected: >-
+        The operational link set refuses both by kind; a semantic import edge is never returned
+        as an operational link.
+    - id: NE-07
+      attack: >-
+        Instantiate an object against a semantic id that does not exist in the pinned world, and
+        against a semantic wiki whose world_ref does not match the pinned world.
+      expected: >-
+        Both refused with a typed error naming the mismatch; no orphan object is created and no
+        object is attributed to the wrong world.
+    - id: NE-08
+      attack: >-
+        Present an object set whose rows come from two different checkpoint positions, by reading
+        rows while another process folds a projection.
+      expected: >-
+        Either the rows and the checkpoint are consistent, or the read is refused; a result set is
+        never assembled from rows of two positions while claiming one checkpoint.
+    - id: NE-09
+      attack: >-
+        Replay the same durable events in a different insertion order, or rebuild from position
+        zero, and compare results at the same checkpoint.
+      expected: >-
+        Identical results; a difference is a failure of determinism, not an acceptable variance.
+
+
+  falsifier: >-
+    Any of the following refutes the claim: a result set that cannot be reproduced at a stated
+    checkpoint; an operational link with an undeclared relation type or a missing endpoint; a
+    denied observer learning any object identity; an empty result standing in for an unavailable
+    or blocked source; a traversal that returns different results for the same query at the same
+    checkpoint; an import edge returned as an operational link; a rebuild that reinterprets
+    stored state instead of replaying events.
+
+  known_confounds:
+    - >-
+      Fixture evidence is not live settlement. T06 records operational objects by committing
+      durable events to a real Cognate SQLite store and reading projections back through the
+      pinned public API. That establishes the projection, query, traversal and checkpoint
+      behaviour. It does NOT establish that MLflow, GitHub or any real external system produces
+      those events: no live connector is bound at T06, so "connector unavailable" is simulated by
+      refusing to answer, not by taking a real system down.
+    - >-
+      Authorization is evaluated by Horizon against a fixture-provided scope. SEA-Forge is the
+      authority for consequential invocation and is not consulted at T06; a Horizon scope decision
+      here is a query filter, not an authorization ruling.
+    - >-
+      Horizon reads whole projections and filters in-process because Cognate 0.6.1 offers no
+      predicate query. Cost therefore scales with projection size; no scale claim is made.
+    - >-
+      RuVector is not used at T06. If it is added later it must stay derived and rebuildable, and
+      no T06 result may depend on it.
+    - >-
+      The mutation teeth prove that named tests detect the specific mutations enumerated; they do
+      not prove detection of arbitrary violations. P2 evidence, not P3.
+
+  evidence_plan:
+    - .agents/evidence/horizon/T06/SUMMARY.md
+    - .agents/evidence/horizon/T06/gate-t06.log
+    - .agents/evidence/horizon/T06/just-verify.log
+    - .agents/evidence/horizon/T06/teeth-t06.log
+    - .agents/evidence/horizon/T06/teeth-t06-mutation.log
+    - .agents/evidence/horizon/T06/pinned-api-inspection.log
+
+  redesign_trigger: >-
+    Live operational instance semantics cannot be projected without inventing a second ontology or
+    an object identity incompatible with DomainForge semantic ids; or bounded traversal over
+    whole-projection reads cannot answer the J01 journey within the measured fixture without a
+    second mutable object store.
+
+  confirmation_condition: >-
+    Builder demonstrates every registered positive and negative expectation with retained exact
+    commands and output, records exact pinned-API behaviour observed rather than assumed, and
+    distinguishes fixture evidence from live settlement. T06 is P2: builder proof plus
+    adversarial teeth, including mutation teeth that break the implementation and require the
+    named test to fail. Independent replay is a separate, non-blocking asset and is not implied.
+
+  notes:
+    design_decision: >-
+      Horizon-owned typed operational object projection on Cognate's public `Projection` API.
+      Semantic identity from DomainForge via the existing `loadWorld` adapter; durable operational
+      state in Cognate; no fork, patch or re-implementation of Cognate. Recorded as DEC-T05-10.
+    read_primitives_verified:
+      - readProjectionSnapshot(name) — checkpoint and rows from one statement
+      - listProjection(name) — all state ordered by key
+      - getProjection(name) — checkpoint only
+      - "ProjectionRunner.catchUp / retry / rebuild, with rebuild_required on version change"
+    upstream_gaps_to_report:
+      - No predicate query beyond top-level equality (DurableStore.listRecords).
+      - No relationship traversal in the store.
+      - No projection-version-aware query API at the store boundary.
+    graph_separation: >-
+      Semantic import graph (DomainForge), operational relation graph (this projection) and
+      lineage (separate relation kind) are three distinct structures with distinct ids. A
+      cross-graph reference is an explicit, typed reference, never a shared identity.
+    proof_level: >-
+      P2 is the target and the ceiling for this task. Passing additional tests does not raise it;
+      independent replay would be a separate asset.
+

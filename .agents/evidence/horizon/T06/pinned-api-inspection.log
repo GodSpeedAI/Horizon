@@ -1,0 +1,64 @@
+# T06 prerequisite: pinned Cognate API surface inspected in the installed tree
+date: 2026-10-20T15:26:08-04:00
+
+## pinned versions
+  cognate-projections        "version": "0.6.1",
+  cognate-events             "version": "0.6.1",
+  cognate-store-sqlite       "version": "0.6.1",
+  cognate-domainforge        "version": "0.6.1",
+
+## @godspeedai/cognate-projections — the public Projection contract (DEC input)
+import type { Json, StoredEvent } from "@godspeedai/cognate-events";
+
+/** Read access to projection state inside a batch; reflects writes made earlier in the same batch. */
+export interface ProjectionState {
+  get(key: string): Json | undefined;
+}
+
+export interface ProjectionWrite {
+  readonly key: string;
+  /** `null` deletes the key. */
+  readonly value: Json | null;
+}
+
+/**
+ * A deterministic derivation from events (spec §11). `apply` must depend only on the event and state:
+ * nondeterministic inputs (clock, randomness, model output, remote responses) must already be recorded as events.
+ */
+export interface Projection {
+  readonly name: string;
+  /** Code version; a stored checkpoint with another version must be rebuilt, never silently reinterpreted. */
+  readonly version: string;
+  apply(event: StoredEvent, state: ProjectionState): readonly ProjectionWrite[] | Promise<readonly ProjectionWrite[]>;
+}
+
+export type CatchUpResult =
+  | { readonly status: "ok"; readonly position: number; readonly applied: number }
+  | { readonly status: "error"; readonly position: number; readonly error: { readonly position: number; readonly eventId: string; readonly message: string } }
+  | { readonly status: "rebuild_required"; readonly storedVersion: string };
+
+## ProjectionRunner: catchUp / retry / rebuild, rebuild_required on version change
+/home/sprime01/projects/Horizon/node_modules/@godspeedai/cognate-projections/src/runner.ts:32:  /** Serializes every run (manual catchUp/retry/rebuild and live-triggered runs) so they never overlap. */
+/home/sprime01/projects/Horizon/node_modules/@godspeedai/cognate-projections/src/runner.ts:54:  /** Delete derived state and checkpoint, then rebuild from position 0. */
+/home/sprime01/projects/Horizon/node_modules/@godspeedai/cognate-projections/src/runner.ts:55:  rebuild(): Promise<CatchUpResult> {
+/home/sprime01/projects/Horizon/node_modules/@godspeedai/cognate-projections/src/runner.ts:123:      return { status: "rebuild_required", storedVersion: checkpoint.version };
+/home/sprime01/projects/Horizon/node_modules/@godspeedai/cognate-projections/src/types.ts:28:  | { readonly status: "rebuild_required"; readonly storedVersion: string };
+
+## @godspeedai/cognate-events DurableStore — projection reads available without forking
+221:  getProjection(name: string): Promise<ProjectionCheckpoint | undefined>;
+225:  readProjection(name: string, key: string): Promise<Json | undefined>;
+227:  listProjection(name: string): Promise<{ readonly key: string; readonly value: Json }[]>;
+230:   * rows (DEBT-021). Optional — `readProjectionSnapshotFallback` composes the same guarantee from
+231:   * `getProjection` + `listProjection` for stores without a native snapshot read.
+233:  readProjectionSnapshot?(name: string): Promise<ProjectionSnapshot>;
+235:  resetProjection(name: string): Promise<void>;
+
+## DurableStore.listRecords — the only typed query is top-level equality (CLAIM-005 / D-002)
+  getRecord(collection: string, id: string): Promise<StoredRecord | undefined>;
+  /** Records whose top-level fields equal every `where` entry, ordered by id (code-point order). */
+  listRecords(collection: string, where?: { readonly [field: string]: string | number | boolean | null }): Promise<StoredRecord[]>;
+
+
+## store-sqlite: busy_timeout is armed AFTER journal_mode (D-023 residual window)
+129:  db.exec("PRAGMA journal_mode = WAL");
+135:  db.exec("PRAGMA busy_timeout = 5000");

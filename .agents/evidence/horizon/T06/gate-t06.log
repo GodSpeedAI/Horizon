@@ -1,0 +1,213 @@
+bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/T06.prereg.yaml
+  ok   .agents/prereg/horizon/T06.prereg.yaml: 10 positive + 9 negative expectations are structural members
+  ok   .agents/prereg/horizon/T06.prereg.yaml: no id is declared only as text, and every id token resolves to a member
+prereg shape: ok
+bun run scripts/check-t06-prereg-coverage.ts
+  ok   PE-01: a test names the id and [object_ref]
+  ok   PE-02: covered by a test that names the id (the prereg states no literal anchors to re-check)
+  ok   PE-03: a test names the id and [product, connector, checkpoint_ref, integration_level]
+  ok   PE-04: a test names the id and [checkpoint_ref]
+  ok   PE-05: covered by a test that names the id (the prereg states no literal anchors to re-check)
+  ok   PE-06: covered by a test that names the id (the prereg states no literal anchors to re-check)
+  ok   PE-07: a test names the id and [empty, no-match, denied, blocked, unavailable]
+  ok   PE-08: a test names the id and [rebuild_required]
+  ok   PE-09: covered by a test that names the id (the prereg states no literal anchors to re-check)
+  ok   PE-10: covered by a test that names the id (the prereg states no literal anchors to re-check)
+  ok   NE-01: a test names the id and [denied]
+  ok   NE-02: a test names the id and [unavailable, blocked, empty, no-match]
+  ok   NE-03: covered by a test that names the id (the prereg states no literal anchors to re-check)
+  ok   NE-04: covered by a test that names the id (the prereg states no literal anchors to re-check)
+  ok   NE-05: a test names the id and [rebuild_required]
+  ok   NE-06: covered by a test that names the id (the prereg states no literal anchors to re-check)
+  ok   NE-07: covered by a test that names the id (the prereg states no literal anchors to re-check)
+  ok   NE-08: covered by a test that names the id (the prereg states no literal anchors to re-check)
+  ok   NE-09: covered by a test that names the id (the prereg states no literal anchors to re-check)
+
+T06 prereg linkage: ok (19 registered expectations, each named by a test that names its anchors)
+  NOTE: linkage only. Whether the assertions reject a violating implementation is
+        proven separately by `bun run scripts/teeth-t06-mutation.ts`.
+bun run scripts/teeth-t06-shape.ts
+  ok   NE-S1 the T05 folded-scalar defect is rejected
+  ok   NE-S2 a sequence section replaced by a string is rejected
+  ok   NE-S3 a typo'd section key is rejected
+  ok   NE-S4 a duplicate id is rejected
+  ok   NE-S5 a referenced-but-unregistered id is rejected
+  ok   NE-S0 the real T06 preregistration is accepted
+teeth-t06-shape: ok (6 teeth)
+bun run scripts/teeth-t06-mutation.ts
+  ok   M1 a denied scope answers with an empty set instead of denying → caught by the NE-01 test
+  ok   M2 an unavailable source is reported as an empty result → caught by the NE-02 test
+  ok   M3 traversal accepts a missing bound and proceeds unbounded → caught by the NE-03 test
+  ok   M4 the recorder accepts a dangling link endpoint → caught by the NE-04 test
+  ok   M5 a mismatched checkpoint is answered from the current state → caught by the NE-05 test
+  ok   M6 the recorder accepts a semantic import edge as an operational link → caught by the NE-06 test
+  ok   M7 an object may be recorded into a world it was not validated against → caught by the NE-07 test
+  ok   M8 object queries return store order instead of `object_ref` order → caught by the NE-09 test
+teeth-t06-mutation: ok (8 mutants, each caught by a failing assertion in the test that claims the property)
+bun test
+bun test v1.4.0 (34cbb9a40)
+
+test/operational-objects.test.ts:
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-01 objects keep a DomainForge semantic_ref distinct from their object_ref, and one object is projected once [48.75ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-02 every link names a declared relation type and both endpoints resolve to projected objects [39.40ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-03 every object carries product, connector, checkpoint_ref, integration_level and checkpoint age [37.21ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-04 checkpoint_ref names the Cognate commit position plus the projection names and versions read [39.61ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-05 the same query from two observers with different authority yields different, correctly-scoped sets [35.88ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-06 traversal is deterministic and bounded across two relationships (journey.covers + entity.governed_by) [38.88ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-07 empty, no-match, denied, blocked and unavailable are five distinct outcomes [37.57ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-08 a stale or mismatched projection version reports rebuild_required instead of reinterpreting state [43.49ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-09 the semantic, operational and lineage graphs keep distinct identities and semantics [69.65ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-10 focus, object-set selection, observer and world are carried on the result for the next surface [43.86ms]
+
+test/config.test.ts:
+(pass) local_operator configuration > accepts a loopback local operator [0.31ms]
+(pass) local_operator configuration > refuses a non-loopback bind [0.09ms]
+(pass) local_operator configuration > refuses shared_remote without a real identity provider [0.03ms]
+(pass) local_operator configuration > keeps operator and agent principals distinct [0.36ms]
+(pass) local_operator configuration > issues a fresh 0600 secret on every launch [1.06ms]
+
+test/surface-negative.test.ts:
+(pass) T05 negative evidence (NE-01…NE-10) > NE-01 rejects <script>alert(1)</script> and other executable markup at the SCHEMA, with a typed rejection (falsifier PE-05) [3.08ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick fields (.strict()); NE-02/PE-02 then refuses an agent-supplied value dressed as a bound fact, and every typed source (horizon: / semantic: / file: / agent:) resolves to a value or a non-bound status (falsifier PE-01/PE-02) [1.31ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} with no I/O — so no agent layout op (view.move / view.pin / surface.put / human.approve) moves, pins, resizes, closes or focuses an owner block (falsifier PE-03) [0.71ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06) [0.91ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06) [2.04ms]
+(pass) T05 negative evidence (NE-01…NE-10) > PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 projection (falsifier PE-04) [1.78ms]
+(pass) T05 negative evidence (NE-01…NE-10) > PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01) [2.27ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown horizon: source, and records no agent op as human (falsifier PE-02) [0.73ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02) [0.11ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04) [0.41ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-10 escapes an <img onerror=...> value that arrives from an observed source (falsifier PE-05) [0.45ms]
+(pass) T05 negative evidence (NE-01…NE-10) > PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every node and attributes no surface to an unattributable observer (falsifier PE-05) [0.66ms]
+
+test/app.test.ts:
+(pass) durable store boundary > the configured store is a Cognate SQLite database that survives a close and reopen [2.65ms]
+(pass) structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen [216.44ms]
+(pass) structural walking skeleton > configured in-memory storage is rejected by construction, with no E2E override [240.48ms]
+(pass) structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable [93.36ms]
+(pass) structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact [63.00ms]
+(pass) structural walking skeleton > an absent research source is a typed absent observation, not a startup failure [37.55ms]
+
+test/operational-objects-negative.test.ts:
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-01 a denied observer learns nothing: no object, no count, no type in the refusal [38.79ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-02 a down source is unavailable and a blocked connector is blocked, never empty or no-match [38.06ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-03 an unbounded traversal is refused before any work, naming the missing bound [35.15ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-04 an undeclared relation type and a dangling endpoint are both refused at record time [36.69ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-05 a mismatched checkpoint is refused and a changed projection version reports rebuild_required, never answered [35.31ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-06 a semantic import edge and a lineage record are refused by the operational link set [37.61ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-07 an object for an undeclared semantic type or the wrong world is refused, leaving no orphan [38.04ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-08 a result set is never assembled from rows of two checkpoint positions [38.58ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-09 the same events rebuilt from position zero produce identical results at the same checkpoint [37.76ms]
+
+test/acceptance.test.ts:
+(pass) AC-CONFIG-004-01 a configured provider endpoint stays below stable behavior contracts (partial) > typed choices, committed intent and surface blocks are unchanged when the research provider endpoint differs [187.36ms]
+
+test/ui.test.ts:
+(pass) renderer-neutral surface seam > projects a frame without executable markup and with sources on every block [0.24ms]
+(pass) renderer-neutral surface seam > never lets a binding claim an observation the route did not make [0.11ms]
+
+ 45 pass
+ 0 fail
+ 458 expect() calls
+Ran 45 tests across 7 files. [1.69s]
+uv run --project research pytest -q
+....                                                                     [100%]
+4 passed in 0.03s
+bun run scripts/check.ts
+check: ok (local_operator, 127.0.0.1:4319, horizon)
+bun run scripts/check-boundaries.ts
+boundaries: ok (.)
+python3 scripts/check-idm-integrity.py
+check-idm-integrity: OK (11 requirement references, 0 tolerated as recorded debt, 11 invariant ids unique)
+python3 scripts/check-acceptance-claims.py
+check-acceptance-claims: OK (4 prohibitions preserved, 0 generic restatements with their subject intact)
+python3 scripts/check-witness-claims.py
+check-witness-claims: OK (197 contracts: 0 generic, 197 authored; no new policy)
+python3 scripts/measure-contract-modals.py --ledger requirements/ledger.yaml --baseline scripts/witness-claims-baseline.txt
+measure-contract-modals: 1 known pre-existing loss(es) in requirements/ledger.yaml (DEBT D-020), not fatal
+  ~ REQ-RES-001: loses prohibition
+python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
+ledger: 0 error(s) in ledger.yaml
+  ok: 99 requirements, 99 acceptance contracts
+./scripts/check-ledger-freeze.sh
+python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py . --ledger requirements/ledger.yaml
+wayfinder: 0 error(s)
+./scripts/check-ledger-freeze.sh
+bun run scripts/teeth-t05-boundaries.ts
+ok   NE-B0 real tree passes (40 files, 6 in the authority)
+ok   NE-B1 second schema version outside the authority
+ok   NE-B2 second block vocabulary outside the authority
+ok   NE-B2c a block-kind record is a vocabulary copy
+ok   NE-B2d a record keyed by the block-kind type is the claim; keyed by string is not
+ok   NE-B2b one or two named kinds are still a selection, not a scrape
+ok   NE-B3 second source-expression pattern outside the authority
+ok   NE-B4 route importing the binder directly
+ok   NE-B5 authority importing Cognate
+ok   NE-B6 authority emitting dynamic code
+ok   NE-B7 renderer outside the authority
+ok   NE-B8 competing authority store
+ok   NE-B9 prose in comments and messages is not flagged
+ok   NE-B9b a real sink beside prose is still caught
+ok   NE-B10 NOTICE absent is rejected, not assumed present
+ok   NE-B11 a donor dropped from NOTICE is drift
+ok   NE-B12 an extra donor in NOTICE is drift
+ok   NE-B13 a donor section without a license is not a record
+ok   NE-B14 NOTICE describing Horizon without its declared license is rejected
+ok   NE-B15 a declared license with no LICENSE file is rejected
+ok   NE-B16 a manifest with no license field is not a silent pass
+teeth-t05: ok (21 checks)
+bun run scripts/teeth.ts
+blocked missing-cognate-dependency: exit=1
+STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
+blocked in-memory-runtime: exit=1
+17 |   throw new RuntimeBoundaryError(`RUNTIME: ${message}`);
+RuntimeBoundaryError: RUNTIME: local_operator forbids an in-memory runtime; a durable SQLite store is required
+blocked competing-product-model: exit=1
+BOUNDARY: competing canonical model/authority store at product-model/process.yaml
+blocked duplicate-semantic-authority: exit=1
+BOUNDARY: duplicate semantic authority at other/model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+baseline canonical-closure-control: exit=0
+blocked duplicate-canonical-subtree: exit=1
+BOUNDARY: duplicate semantic authority at .sea/alternative/interaction-model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked false-world-ref: exit=1
+19 |   throw new SemanticAdapterError(`SEMANTIC: ${message}`);
+SemanticAdapterError: SEMANTIC: world identity mismatch: expected world:horizon@sha256:0000000000000000000000000000000000000000000000000000000000000000, observed world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0
+baseline isolated-tree-real-runtime: exit=0, passed=6
+blocked fake-runtime-substitution: exit=1, failing=3
+  fails: structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen
+  fails: structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable
+  fails: structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact
+blocked missing-cognate-dependency-metadata: exit=1
+STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
+BOUNDARY: duplicate semantic authority at domain/research-artifacts.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+BOUNDARY: duplicate semantic authority at domain/product-integration-contract.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked missing-cognate-dependency-e2e: exit=1, failing=1
+
+teeth: all attacks blocked
+bash scripts/teeth-ledger-freeze.sh
+BASELINE clean tree verifies
+BLOCKED  frozen ledger edited after freeze -> FAIL: ledger content does not match its freeze_hash (hand edit after freeze?)
+BLOCKED  frozen ledger reverted to candidate -> FAIL: ledger freeze_hash is not frozen: 'candidate'
+BLOCKED  wayfinder body hand-edited -> FAIL: committed wayfinder body is not the projection its generator produces (hand edit?)
+BLOCKED  wayfinder unfrozen -> FAIL: wayfinder validation failed
+BLOCKED  hashed input drifted (ledger policy) -> FAIL: wayfinder validation failed
+BLOCKED  ledger row removed after freeze (ledger structure / projection) -> FAIL: requirement ledger validation failed
+
+teeth: 6 blocked, 0 missed
+python3 scripts/teeth-domainforge-gate.py
+null: exit=0 exit=0 Validation succeeded: 0 violations total
+dangling: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: dangling .sea accepted with no violation
+duplicate: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: duplicate .sea accepted with no violation
+control: exit=1 exit=1 Error: Parse failed for /tmp/tmpfzer_f0n/.sea/interaction/interaction-model.sea: resolved closure failed graph co
+
+tooth: gate discriminates (control fails, and the two blind spots are proven)
+python3 scripts/teeth-idm-integrity.py
+null: exit=0 exit=0 check-idm-integrity: OK (11 requirement references, 0 tolerated as recorded debt, 11 invariant ids uniq
+dangling: exit=1 exit=1 - .sea/interaction/interaction-model.sea:inv_intent_idempotent requirement_ref 'REQ-DOES-NOT-EXIST-999'
+duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmpv345s75x/.sea/interaction/interaction-m
+
+tooth: referential integrity is enforced (dangling and duplicate both fail)
+gate-t06: ok — operational object layer on Cognate's public Projection API
+exit=0

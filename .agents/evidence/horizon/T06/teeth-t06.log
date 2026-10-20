@@ -1,0 +1,18 @@
+bun run scripts/teeth-t06-shape.ts
+  ok   NE-S1 the T05 folded-scalar defect is rejected
+  ok   NE-S2 a sequence section replaced by a string is rejected
+  ok   NE-S3 a typo'd section key is rejected
+  ok   NE-S4 a duplicate id is rejected
+  ok   NE-S5 a referenced-but-unregistered id is rejected
+  ok   NE-S0 the real T06 preregistration is accepted
+teeth-t06-shape: ok (6 teeth)
+bun run scripts/teeth-t06-mutation.ts
+  ok   M1 a denied scope answers with an empty set instead of denying → caught by the NE-01 test
+  ok   M2 an unavailable source is reported as an empty result → caught by the NE-02 test
+  ok   M3 traversal accepts a missing bound and proceeds unbounded → caught by the NE-03 test
+  ok   M4 the recorder accepts a dangling link endpoint → caught by the NE-04 test
+  ok   M5 a mismatched checkpoint is answered from the current state → caught by the NE-05 test
+  ok   M6 the recorder accepts a semantic import edge as an operational link → caught by the NE-06 test
+  ok   M7 an object may be recorded into a world it was not validated against → caught by the NE-07 test
+  ok   M8 object queries return store order instead of `object_ref` order → caught by the NE-09 test
+teeth-t06-mutation: ok (8 mutants, each caught by a failing assertion in the test that claims the property)

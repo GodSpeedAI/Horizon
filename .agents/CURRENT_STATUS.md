@@ -1,6 +1,6 @@
 # Horizon Current Status
 
-**Revision:** 19 · **Recorded:** 2026-10-20 · **Stage:** T05 settled (P2) after claim correction (DEC-T05-08); next task **T06**
+**Revision:** 20 · **Recorded:** 2026-10-20 · **Stage:** T06 settled (P2) on the Cognate public Projection API; next task **T07**
 
 **T05 — one surface, three transports.** `horizon.surface/2` is declared once
 (`src/ui/surface2/grammar.ts`), with one binder, one reducer and one shared
@@ -96,6 +96,62 @@ mislabel, which it reproduces. T05 remains **settled** on that basis.
 projections on Cognate (depends on T04). Settle the design fork first: **D-002**
 (`listRecords` vs the upstream Cognate gap). D-023 and D-030 do not block it.
 
+---
+
+## Revision 20 — T06 settled (operational object layer)
+
+**T06 — the operational object layer.** Objects, links and lineage are folded from durable Cognate
+events into `horizon.operational-objects` and read back through the public store API, so
+`checkpoint_ref` and rows come from one statement. Built only on
+`@godspeedai/cognate-projections` / `cognate-events` (DEC-T05-10); no fork, no patch, no second
+object store (REQ-WORLD-006). The pinned 0.6.1 surface was inspected in the installed tree before
+any code (`T06/pinned-api-inspection.log`), not taken from skill prose.
+
+- **D-002 settled.** The gap is *query*, not *state*: `readProjectionSnapshot`,
+  `listProjection` and `ProjectionRunner.rebuild` already exist. The three genuine upstream gaps —
+  no predicate query beyond top-level equality, no traversal, no version-aware query API — are
+  reported upstream and **not** worked around with a local query engine.
+- **D-023 does not block T06 or T07.** Reclassified latent; `busy_timeout` is supplied by the
+  pinned store. Not touched.
+- **Five outcomes stay five.** `empty`, `no-match`, `denied`, `blocked` and `unavailable` are
+  distinct, and the refusals are built from the request so a denial cannot leak a count
+  (NE-01). A blocked connector degrades a readable answer visibly instead of impersonating
+  an empty world.
+- **Three graphs stay three.** The operational relation vocabulary is Horizon's own; the world's
+  semantic import edges are never returned as operational links, and lineage is a separate record
+  kind that traversal cannot reach (REQ-WORLD-005).
+- **Shape before code.** The T06 prereg was parsed with `check-prereg-shape` *before* any
+  implementation existed: 10 positive + 9 negative structural members. The same check re-derives
+  the T05 defect (`PE-06..PE-08` inside the folded scalar) and fails it.
+
+**What the evidence found that design review did not:**
+
+1. A **wrong-world write was accepted** — the semantic type was checked against the declared
+   world, but the requested world was never compared to it. NE-07 caught it; all three recorders
+   now guard it.
+2. `SemanticRef` **rejected real dotted namespaces** (`horizon.products.strategist::…`), and the
+   projection recorded an *error row* rather than failing. It surfaced later as a dangling link.
+3. An **empty projection was reported as `unavailable`**, because Cognate commits no checkpoint
+   when it folded no events. Corrected: no checkpoint means `empty`.
+4. The **NE-09 determinism test was weaker than its title**: comparing a rebuild cannot detect an
+   order-dependent query when the store already returns ordered rows. It now asserts the mechanism
+   (answer equals sorted `object_ref`s regardless of row order) and M8 confirms it bites.
+5. One mutant was a **no-op** and was replaced rather than counted.
+
+**Proof level: P2, unchanged by the extra green tests.** `teeth-t06-mutation` shows 8 specific
+violations are each caught by a **failing assertion** in the test that claims the property. It does
+not show that an arbitrary violation would be caught, and no independent replay was performed.
+
+**Fixture, not settlement.** The events are recorded by the fixture. `integration_level` says
+`fixture` on every object; "unavailable" and "blocked" are simulated by name, not by taking a
+system down. Horizon's scope decision is a query filter, not an authorization ruling — SEA-Forge
+was not consulted.
+
+- **Open:** D-024, D-025, D-030 unchanged (size S, out of scope). No live connector; traversal is
+  a whole-projection read (fine for the fixture, an upstream ask for a large world).
+
+**Next:** T07 — depends on T02, T05 and T06, all settled. Carry D-002's upstream report.
+
 **Spec:** HORIZON-001 v1.0.1, frozen; SHA-256 `14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4`.
 
-**Evidence:** [T05 summary](evidence/horizon/T05/SUMMARY.md), [gate-t05 log](evidence/horizon/T05/gate-t05.log), [verify log](evidence/horizon/T05/just-verify.log), [PE-08 re-run](evidence/horizon/T05/pe08-rerun.log), [SHA256SUMS](evidence/horizon/T05/SHA256SUMS), [NOTICE](../NOTICE), [LICENSE](../LICENSE), [donors](../docs/donors.md), [prereg](prereg/horizon/T05.prereg.yaml), [spec](specs/horizon.agent.spec.yaml), [plan](plans/horizon.plan.yaml), [decisions](reports/horizon-decisions.yaml), [ledger](../requirements/ledger.yaml), [wayfinder](../.wayfinder/answer-key.md), [debt](DEBT.md).
+**Evidence:** [T06 summary](evidence/horizon/T06/SUMMARY.md), [gate-t06](evidence/horizon/T06/gate-t06.log), [verify](evidence/horizon/T06/just-verify.log), [teeth](evidence/horizon/T06/teeth-t06.log), [mutation teeth](evidence/horizon/T06/teeth-t06-mutation.log), [pinned API](evidence/horizon/T06/pinned-api-inspection.log), [T05 regression](evidence/horizon/T06/t05-regression.log), [T06 prereg](prereg/horizon/T06.prereg.yaml), [T05 prereg](prereg/horizon/T05.prereg.yaml), [T05 interpretation](prereg/horizon/T05.prereg.interpretation.yaml), [T05 summary](evidence/horizon/T05/SUMMARY.md), [spec](specs/horizon.agent.spec.yaml), [plan](plans/horizon.plan.yaml), [decisions](reports/horizon-decisions.yaml), [ledger](../requirements/ledger.yaml), [wayfinder](../.wayfinder/answer-key.md), [debt](DEBT.md).

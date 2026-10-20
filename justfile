@@ -52,6 +52,11 @@ wayfinder:
 # grammar, a route that binds for itself, or a renderer beside the authority) and the live
 # cross-transport equivalence (`teeth-t05-equivalence`, which starts the real server and runs
 # the real CLI rather than trusting a mock). Then the applicable global gates.
+#
+# `check-t05-prereg-coverage` proves *linkage* only (each registered expectation is named by a
+# test that names its anchors). `teeth-t05-mutation` proves strength: it breaks a property and
+# requires the named test to fail. The two are deliberately separate targets so neither result
+# can be read as the other.
 check-t05:
     bun run scripts/check-t05-boundaries.ts
     bun run scripts/check-t05-prereg-coverage.ts
@@ -62,10 +67,32 @@ teeth-t05-boundaries:
 teeth-t05-equivalence:
     bun run scripts/teeth-t05-equivalence.ts
 
-teeth-t05-coverage:
+teeth-t05-coverage: teeth-t05-prereg-coverage
+teeth-t05-prereg-coverage:
     bun run scripts/teeth-t05-prereg-coverage.ts
 
-teeth-t05: teeth-t05-boundaries teeth-t05-equivalence teeth-t05-coverage
+teeth-t05-mutation:
+    bun run scripts/teeth-t05-mutation.ts
+
+teeth-t05: teeth-t05-boundaries teeth-t05-equivalence teeth-t05-prereg-coverage teeth-t05-mutation
+
+# T06: the operational object layer. The shape check runs first because a preregistration whose
+# expectations a parser cannot see would make every count below meaningless (DEC-T05-09). Coverage
+# proves linkage; mutation proves strength; neither stands for the other.
+check-t06:
+    bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/T06.prereg.yaml
+    bun run scripts/check-t06-prereg-coverage.ts
+
+teeth-t06-shape:
+    bun run scripts/teeth-t06-shape.ts
+
+teeth-t06-mutation:
+    bun run scripts/teeth-t06-mutation.ts
+
+teeth-t06: teeth-t06-shape teeth-t06-mutation
+
+gate-t06: check-t06 teeth-t06 test check boundaries idm-integrity acceptance-claims witness-claims contract-modals ledger wayfinder teeth
+    @echo "gate-t06: ok — operational object layer on Cognate's public Projection API"
 
 gate-t05: check-t05 teeth-t05 check boundaries idm-integrity acceptance-claims witness-claims contract-modals test ledger wayfinder teeth
     @echo "gate-t05: ok — horizon.surface/2 + horizon.gui-view/1 verified across GUI/CLI/MCP"
@@ -110,10 +137,6 @@ gate-t04: check boundaries idm-integrity acceptance-claims witness-claims contra
 
 freeze-t04:
     ./scripts/freeze-formation.sh
-
-gate-t06:
-    @echo "gate-t06: not implemented; fails closed until T06 settles"
-    @exit 1
 
 gate-t07:
     @echo "gate-t07: not implemented; fails closed until T07 settles"
