@@ -171,13 +171,14 @@
 - Closure: add an `acceptance_evidence` binding per requirement (path plus test name) to the ledger schema, emitted by the generator from `evaluated_by`, and validate it in `just wayfinder`. Size M.
 
 
-## D-022 There is no NOTICE file, though T05's prereg names one (2026-10-20)
+## D-022 — RESOLVED — There is no NOTICE file, though T05's prereg names one (2026-10-20)
 - Date: 2026-10-20
-- Location: repository root (`NOTICE` absent), `.agents/prereg/horizon/T05.prereg.yaml` PE-08, `docs/donors.md`
+- Location: repository root (`NOTICE`), `.agents/prereg/horizon/T05.prereg.yaml` PE-08, `docs/donors.md`
 - Debt: PE-08 expects donor-derived vocabulary to be recorded in `docs/donors.md` **and** `NOTICE`. `docs/donors.md` exists and is current; no `NOTICE` file exists at the root and no code or check references one, so the second half of the expectation cannot be satisfied as written. Whether Apache-2.0 redistribution of the vendored Cognate closure requires one was not verified here.
 - Evidence: `ls NOTICE` -> no such file; no reference to `NOTICE` in `src/`, `scripts/` or `docs/`.
 - Confidence: high (directly observed absence)
 - Closure: either author a root `NOTICE` covering the vendored Apache-2.0 closure and link it from `docs/donors.md`, or amend PE-08 to name `docs/donors.md` alone. Both need owner sign-off because PE-08 is frozen. Size S.
+- Resolution (2026-10-20, owner ruling): plan rule `horizon.plan.yaml:77` makes a `NOTICE` entry an expected output of copying donor material, so the owner authorized authoring it rather than amending frozen PE-08. `NOTICE` now records, per donor, the name, license, pinned source commit or package version and what was borrowed, and `docs/donors.md` links to it. `check-t05-boundaries.ts` now fails if the two lists disagree or a section lacks License/Source/Borrowed, verified by attack (absent NOTICE, dropped donor, missing License). PE-08 re-run separately: PASS. See `DEC-T05-04`/`DEC-T05-05` and `.agents/evidence/horizon/T05/pe08-rerun.log`. Horizon itself still declares no license (no root `LICENSE`, no `package.json` license field); that is a separate gap, logged as D-026.
 
 ## D-023 CLI and server processes contend for one SQLite store (2026-10-20)
 - Date: 2026-10-20
@@ -186,6 +187,7 @@
 - Evidence: `bun run src/main.ts surface` and `bun run src/main.ts schema` against one `HORIZON_STORE`; the second exited 1 with `SQLiteError: database is locked` at `openSqliteStore`.
 - Confidence: high (directly observed)
 - Closure: set `busy_timeout` on open, or keep store paths per-process. Size S.
+- Reclassified 2026-10-20 (latent, does not block T06/T07): does not reproduce on the settled tree. `bun run src/main.ts surface` beside a live `server`, two processes started simultaneously, and six concurrent processes against one fresh `HORIZON_STORE` all exited 0 with zero lock errors. The pinned `cognate-store-sqlite` 0.6.1 already issues `PRAGMA busy_timeout = 5000` (`src/index.ts:135`), so the retry the closure asked for is supplied upstream. Residual window: `busy_timeout` is set *after* `PRAGMA journal_mode = WAL` (`:129`), so a burst that all opens an un-migrated store at once could still collide before the timeout is armed. That window was not observed failing. Horizon does not patch the vendored store (REQ-STACK-010); hardening belongs upstream in Cognate. See `DEC-T05-06`.
 
 ## D-024 MCP tool names fold the closed operation id, so identity is lost (2026-10-20)
 - Date: 2026-10-20
@@ -202,3 +204,20 @@
 - Evidence: code reading of `mcpTools`; `SURFACE_ROLES` in `grammar.ts` is the authority; the view tool repeats the three role strings literally.
 - Confidence: medium (code reading, not observed failing)
 - Closure: build the `horizon.view` descriptor from `SURFACE_ROLES` and `GUI_VIEW_SCHEMA`. Size S.
+
+
+## D-026 Horizon declares no license of its own (2026-10-20)
+- Date: 2026-10-20
+- Location: repository root (no `LICENSE`), `package.json` (no `license` field), `NOTICE`
+- Debt: The root `NOTICE` created for PE-08 records donor obligations but cannot state Horizon's own terms, because the repository declares none: there is no root `LICENSE` file and `package.json` has no `license` field. `docs/donors.md` records that Product Actualizer is Apache-2.0 and that donor material was relicensed by the owner, but Horizon's own outbound license is unstated, so a consumer cannot tell what Horizon grants. Found while authoring `NOTICE`; not fabricating terms here because license choice is an owner decision.
+- Evidence: `ls LICENSE` -> no such file; `grep license package.json` -> no match; the `NOTICE` header states the absence explicitly rather than implying a grant.
+- Confidence: high (directly observed absence)
+- Closure: owner picks Horizon's license, adds root `LICENSE` and a `package.json` `license` field, then updates the `NOTICE` header. Size S.
+
+## D-027 No end-to-end journey exercises a conflicting human/agent layout claim (2026-10-20)
+- Date: 2026-10-20
+- Location: `behavioral/journeys/J02.yaml`, `.agents/plans/horizon.plan.yaml` T04 (`Exercise positive, blocked, unknown, conflicted, cancelled and contradicted routes`), `src/ui/surface2/reduce.ts` (`downgrade`)
+- Debt: T05's NE-03 found that agent attribution was reported as a human-authored layout, and the fix caps a claimed layout at `agent_proposed`. That cap is currently proven only by a unit test that drives the reducer directly. No canonical journey contains a case where a human and an agent claim the same layout, so the end-to-end path — two claims arriving from a real source through the binder and reducer, and the agent's being visibly capped rather than silently dropped or silently winning — is unproven. J02 as written has no layout-claim conflict at all, so this is not merely unexercised: the case is not planned.
+- Evidence: `behavioral/journeys/J02.yaml` contains no human/agent conflict or layout claim; `.sea/interaction/interaction-model.sea` mentions `conflicted` only as an availability value and `concurrency_conflict` only for reused intent ids; T05 `SUMMARY.md` records the gap under unknowns.
+- Confidence: high (checked J02 and the canonical IDM for the case; it is absent)
+- Closure: add the conflicting-claim route to the J02 journey fixtures and an end-to-end assertion at the transport boundary (human claim winning, agent claim capped at `agent_proposed`, both retained with provenance), then point `just gate-t06` or the J02 gate at it. Files likely touched: `behavioral/journeys/J02.yaml`, `.sea` if the route is canonical, `test/surface-negative.test.ts`, a journey fixture. Size M.
