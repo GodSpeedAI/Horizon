@@ -1,6 +1,6 @@
-# T05 evidence pins. Updated 2026-10-20: PE-08 re-run (NOTICE, DEC-T05-04), gate-t05 + verify exit 0. Re-pinned 2026-10-20 after the D-028 license correction. Re-pinned again 2026-10-20 after the NE-map correction (DEC-T05-08): NE-02/NE-03/NE-04/NE-05/NE-10 assert their prereg attacks, PE-05 projection fix, check-t05-prereg-coverage added, gate-t05 + verify exit 0 on the final tree.
-3302f9f1c7e1fa120781b19769c76e95d4eaeaf39b8b6ad257a26ed7bf74c729  .agents/evidence/horizon/T05/SUMMARY.md
-edf13661c18c3c7d5ef5bd1cf47e11b3a605b3cf7a1b52af854aac0e1e2c8cd7  .agents/evidence/horizon/T05/gate-t05.log
-18bc34d190ea454ba460051c2090d5c938c97677e0a77d022b3274cd8bd8bd9f  .agents/evidence/horizon/T05/just-verify.log
+# T05 evidence pins. Updated 2026-10-20: PE-08 re-run (NOTICE, DEC-T05-04), gate-t05 + verify exit 0. Re-pinned 2026-10-20 after the D-028 license correction. Re-pinned again 2026-10-20 after the NE-map correction (DEC-T05-08): NE-02/NE-03/NE-04/NE-05/NE-10 assert their prereg attacks, PE-05 projection fix, check-t05-prereg-coverage added, gate-t05 + verify exit 0 on the final tree. Re-pinned 2026-10-20 for the evidence-fidelity correction: the NE-02 assertion asserts the requirement instead of the absence of the submitted value, check-t05-prereg-coverage parses YAML and labels recovery, teeth-t05-mutation added, gate-t05 + verify exit 0 on the final tree. The frozen prereg below is unchanged and is still the authority.
+24aa9ad13cc6711094ce632d78551b2c3cf528745b7ff87c70cb44899c5f4049  .agents/evidence/horizon/T05/SUMMARY.md
+395b686c7c91e32d1c28d95a29d33b55f0bedd4adc3c32f69846bafba3b82d8f  .agents/evidence/horizon/T05/gate-t05.log
+5b58ec0cd88f6afb10a5b0c312f7e40299d8517ade2a1f95905c3ce7b3897ac5  .agents/evidence/horizon/T05/just-verify.log
 49902ca39179efd7cca8b26026b5593e679bcecb0688cecc092104375a23c390  .agents/evidence/horizon/T05/pe08-rerun.log
 ff36d65b578531687f8165950ba38c438dd98a71671c230d59ae48d02bd73019  .agents/prereg/horizon/T05.prereg.yaml

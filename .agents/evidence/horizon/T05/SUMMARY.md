@@ -11,12 +11,16 @@ closed by this revision and recorded so the settlement is auditable rather than 
   by a real `LICENSE` — with teeth NE-B14–NE-B16. PE-08 stays a pass because it is now
   demonstrated, not because the earlier evidence stands. DEC-T05-07 supersedes DEC-T05-04's
   licence finding.
-- **The NE→test map had drifted.** Ten tests were labelled NE-01…NE-10, but only NE-02's label
-  was wrong at the start of this correction: the test named `NE-02` asserted provenance
-  laundering, not the preregistered `iframe` / `jsx` / `onclick` attack, which was covered only
-  by accident (an unused variable in NE-06). Every other label matched its prereg attack text,
-  and five IDs (NE-01, NE-02, NE-06, NE-08, NE-10) each collapsed several attacks into one test.
-  `just gate-t05` proves the property held on the whole; nothing here was a live vulnerability.
+- **The NE→test map had drifted.** The audit ran twice on different days and reached different
+  counts, so the record states both rather than picking one: the first pass found **five** drifted
+  labels (NE-02, NE-03, NE-04, NE-05, NE-10), and the correction pass verified that **only
+  NE-02's label was wrong at the start of that correction** — test names are what changed between
+  the passes. The authoritative account is the second: NE-03 and NE-10 had no test at all, NE-04
+  and NE-05 were labelled onto tests that asserted *different* attacks (human-authority ops and
+  markup), and the test named `NE-02` asserted provenance laundering rather than the
+  preregistered `iframe` / `jsx` / `onclick` attack. NE-01, NE-06, NE-08 and NE-10 each collapsed
+  several prereg attacks into one test. `just gate-t05` was green throughout, so nothing here was
+  a live vulnerability — but a green gate was not evidence that these attacks were tested.
   The prereg-literal attacks are now asserted, and
   `scripts/check-t05-prereg-coverage.ts` fails if a test stops naming the attack the prereg
   states.

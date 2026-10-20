@@ -96,10 +96,21 @@ describe("T05 negative evidence (NE-01…NE-10)", () => {
     const iframe = parseSurface(withBlock(surface, { id: "rogue", type: "iframe", src: "https://example.test", provenance }));
     expect(iframe.ok).toBe(false);
     if (!iframe.ok) {
-      // The rejection names the unknown type, so a caller learns *why* and not only *that*.
-      expect(iframe.issues[0]?.path).toBe("/blocks/0/type");
-      expect(iframe.issues[0]?.message).toMatch(/Invalid discriminator value/);
-      expect(iframe.issues[0]?.message).not.toContain("iframe");
+      // FROZEN: "Rejection names the unknown block type". Zod does not echo the submitted
+      // value back, so "names" is met structurally, not literally: the JSON pointer addresses
+      // the field that carries the unknown type, and the message enumerates the legal set, so
+      // a caller can see *which* field was wrong and *what* was allowed.
+      //
+      // This test previously asserted `not.toContain("iframe")`, which recorded the absence of
+      // the value as if it were the property, and would have passed on a rejection that named
+      // nothing at all. The assertions below are the requirement; the absence of the echo is
+      // incidental and is not asserted.
+      const issue = iframe.issues.find((candidate) => candidate.path.endsWith("/type"));
+      expect(issue?.path).toBe("/blocks/0/type");
+      expect(issue?.message).toMatch(/Invalid discriminator value/);
+      // Every legal block type is named, so the message is a closed-set description, not a
+      // generic "invalid input". Asserting the whole set means a dropped member fails here.
+      for (const blockType of BLOCK_TYPES) expect(issue?.message).toContain(`'${blockType}'`);
     }
     for (const field of ["jsx", "onclick"]) {
       const executable = parseSurface(

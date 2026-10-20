@@ -1,0 +1,15 @@
+issue                                       shipped (incl. inversion)  shipped minus inversion  new
+naming diagnostic (real implementation)                          pass                     pass  pass
+blanking diagnostic (mutant M2)                                  FAIL                     FAIL  FAIL
+
+Reading:
+  - The shipped assertion failed the *real* diagnostic only because of its inverted clause.
+    Its substantive clause (pointer + /Invalid discriminator value/) detected the blanking
+    mutant, so NE-02's unknown-type half WAS exercised by the shipped test. The inversion
+    added no detection, and made the test's own comment ('names the unknown type') false.
+  - The new assertions are strictly stronger than the shipped one minus the inversion: they
+    also reject a diagnostic that names only part of the legal set.
+  - Residual, not quantified here: NE-01's markup loop does `if (frame.ok) continue;` after
+    `expect(parsed.ok).toBe(false)`, so an accepting implementation skips the remaining
+    assertions in that iteration. The toBe(false) still fails, so the test is not vacuous,
+    but the follow-on diagnostic assertions are guarded rather than always run.

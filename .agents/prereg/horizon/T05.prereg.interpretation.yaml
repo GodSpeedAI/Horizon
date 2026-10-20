@@ -1,0 +1,129 @@
+# T05 prereg — structural interpretation
+#
+# This file does NOT replace, amend or re-read the frozen preregistration. The frozen artifact
+# `.agents/prereg/horizon/T05.prereg.yaml` stands unedited at
+# sha256 ff36d65b578531687f8165950ba38c438dd98a71671c230d59ae48d02bd73019 and is the
+# authoritative record of what was predicted before implementation.
+#
+# This file exists because that artifact has a *structural* defect: three positive expectations
+# are not registered members of `positive_expectations`. They are lines of the folded scalar
+# `confirmation_condition`, so a YAML parser cannot see them.
+#
+# The defect was found by the owner on 2026-10-20 and confirmed by parsing (evidence:
+# `.agents/evidence/horizon/T05/finding-prereg-structure.log`). It is recorded here so that:
+#
+#   1. the prediction is readable by a machine without editing the artifact;
+#   2. nobody can claim PE-06/07/08 were "registered expectations in the parsed YAML" — they
+#      were authored, predicted, and met, but they were not structurally members; and
+#   3. the defect is visible to the next task instead of being reintroduced in T06.
+
+interpretation:
+  of: .agents/prereg/horizon/T05.prereg.yaml
+  of_sha256: ff36d65b578531687f8165950ba38c438dd98a71671c230d59ae48d02bd73019
+  authority: >-
+    Owner, 2026-10-20. The owner directed that the frozen file must not be modified, that the
+    original artifact must be preserved, and that a separately versioned interpretation be
+    provided and authorized at the appropriate level. This file is that interpretation. It is
+    authored by the builder under that direction, not by the builder on its own initiative.
+  does_not_change: >-
+    Nothing here alters what was predicted or what is required. The text of PE-06, PE-07 and
+    PE-08 is reproduced verbatim from the frozen scalar; only its *shape* is corrected.
+
+  defect:
+    kind: yaml-structure
+    summary: >-
+      `preregistration.confirmation_condition` is a folded `>-` scalar. The three `- id:` /
+      `expectation:` blocks for PE-06..PE-08 were written onto indented lines that the fold
+      absorbed, so they are text inside the string rather than items of a sequence.
+    observed:
+      parsed_positive_expectations: 5        # PE-01 .. PE-05
+      parsed_negative_expectations: 10       # NE-01 .. NE-10, correctly structured
+      swallowed_ids: [PE-06, PE-07, PE-08]
+      confirmation_condition_type: str
+      confirmation_condition_length: 1077
+    consequence: >-
+      A tool that parses the file (this project's coverage check now does) sees five positive
+      expectations. The earlier version of that check scanned lines with a regular expression
+      and therefore counted all eight — by luck of text layout, not by the file's structure.
+      Both readings were wrong in a way that favoured the builder, which is why the defect is
+      recorded rather than worked around quietly.
+
+  registered_expectations:
+    positive:
+      - id: PE-01
+        member: true
+      - id: PE-02
+        member: true
+      - id: PE-03
+        member: true
+      - id: PE-04
+        member: true
+      - id: PE-05
+        member: true
+      # Verbatim from the frozen `confirmation_condition` scalar. `member: false` means a YAML
+      # parser does not see this as an expectation; it does not mean the expectation is weaker.
+      - id: PE-06
+        member: false
+        recovered_from: confirmation_condition
+        expectation: >-
+          The MCP tool list is derived from the same schemas; it publishes the closed
+          vocabulary and the op union, contains no owner-ruling op for the agent role, and a
+          call with a schema, authority or discovery-only rejection is observed to fail
+          closed. The shared-disabled default and loopback HTTP are retained.
+      - id: PE-07
+        member: false
+        recovered_from: confirmation_condition
+        expectation: >-
+          `just gate-t05` exists, runs type check, the T05 test files, the T05 teeth and the
+          global applicable gates, and exits 0; `just verify` remains green.
+      - id: PE-08
+        member: false
+        recovered_from: confirmation_condition
+        expectation: >-
+          Any donor-derived vocabulary or structure is recorded in `docs/donors.md` and
+          `NOTICE`, and the boundary checks still reject a competing model/authority store.
+    negative:
+      # Structurally registered in the frozen file; listed for completeness so a reader does not
+      # have to consult two documents to know the shape.
+      - { id: NE-01, member: true }
+      - { id: NE-02, member: true }
+      - { id: NE-03, member: true }
+      - { id: NE-04, member: true }
+      - { id: NE-05, member: true }
+      - { id: NE-06, member: true }
+      - { id: NE-07, member: true }
+      - { id: NE-08, member: true }
+      - { id: NE-09, member: true }
+      - { id: NE-10, member: true }
+
+  # One expectation whose wording is satisfied structurally rather than literally. Recorded here
+  # because "unproven" and "satisfied by a different mechanism" are different verdicts and the
+  # reader deserves to be told which one applies.
+  reading_notes:
+    - id: NE-02
+      clause: Rejection names the unknown block type
+      verdict: met structurally
+      detail: >-
+        The rejection is a JSON-pointer issue at `/blocks/0/type` whose message enumerates all
+        fifteen legal block types. The submitted value (`iframe`) is not echoed. "Names the
+        unknown block type" is therefore met by pointing at the type field and closing the set,
+        not by quoting the invalid input. Evidence:
+        `.agents/evidence/horizon/T05/finding-ne02-diagnostic.log`.
+      previous_test_defect: >-
+        The T05 test asserted `expect(message).not.toContain("iframe")` and called that the
+        requirement. That inverts the check: it records the absence of the value and would pass
+        on a rejection that named nothing at all. The assertion was replaced with the
+        requirement itself (pointer + full legal set), and a mutation tooth proves the
+        replacement rejects a generic message.
+    - id: NE-02
+      clause: and the unknown property; `.strict()` never ignores it
+      verdict: met
+      detail: >-
+        `jsx` and `onclick` are refused with `Unrecognized key(s) in object: 'jsx'` /
+        `'onclick'` at `/blocks/0`. The property is named literally.
+
+  t06_requirement: >-
+    T06's preregistration must place every expectation in a structured sequence and must be
+    proven structurally before implementation: the T06 shape check rejects a file whose ids
+    appear only as text, and a tooth plants exactly the T05-shaped defect.
+

@@ -1,0 +1,4 @@
+  ok   M1 the closed union accepts a sixteenth block type → caught by the NE-02 test
+  ok   M2 the rejection keeps its pointer but names nothing → caught by the NE-02 test
+  ok   M3 a callout silently drops smuggled keys instead of refusing them → caught by the NE-02 test
+teeth-t05-mutation: ok (3 mutants, each caught by the test that claims the property)

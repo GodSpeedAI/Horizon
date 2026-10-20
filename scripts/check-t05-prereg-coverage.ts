@@ -1,27 +1,38 @@
 #!/usr/bin/env bun
 /**
- * T05 prereg → test coverage.
+ * T05 prereg → test *linkage*.
  *
- * The claim T05 settles is not "there are ten tests named NE-01…NE-10". It is that each
- * preregistered expectation was *demonstrated*. A test title is a claim about what the test
- * proves, so it can drift from the prereg while the gate stays green — as it did in T05, where
- * the test named `NE-02` asserted provenance laundering and the preregistered `iframe` /
- * `jsx` / `onclick` attack went untested until it was noticed by reading the file.
+ * ## What this check proves, exactly
  *
- * This check closes that gap structurally rather than by review:
+ * It proves **linkage**, not strength:
  *
- *   1. Every expectation id in the frozen prereg has a test whose name contains the id.
- *   2. The test name also names the *anchors* the prereg states — the backticked literals in
- *      the attack/expectation text (`iframe`, `jsx`, `onclick`, `javascript:...`, …). A
- *      retitled test therefore cannot quietly claim an id whose attack it does not cover.
- *   3. Extra tests are allowed and unchecked: this proves coverage, not minimality.
+ *   1. Every expectation id the frozen prereg declares has a test whose name contains the id.
+ *   2. That test's name also names the *anchors* the prereg states — the backticked literals in
+ *      the attack/expectation text (`iframe`, `jsx`, `onclick`, …).
+ *   3. The prereg is read with a real YAML parser, and every `PE-`/`NE-` id the file mentions
+ *      anywhere must appear as a structured member of `positive_expectations` or
+ *      `negative_expectations`. An id that exists only as prose in a scalar is not a
+ *      registered expectation, and is reported rather than silently counted.
+ *
+ * ## What it does NOT prove
+ *
+ * A title is a claim. This check cannot tell whether the assertions *inside* the test reject a
+ * violating implementation — a test that names `NE-02` and `iframe` in its title but asserts
+ * nothing about either passes here. It also cannot see a test whose title is accurate while
+ * its assertions check something adjacent (the failure mode that motivated this check: NE-02
+ * asserted the *absence* of the submitted value rather than the diagnostic).
+ *
+ * That half is covered separately, by `teeth-t05-mutation.ts`, which mutates the implementation
+ * and requires the named test to *fail*. Overstating this file's results is the exact error it
+ * was written to catch, so the summary line it prints says "linkage", not "verified".
  *
  * Anchors are read from the prereg at run time, so amending the prereg in a future task adds
- * required anchors automatically. The prereg is frozen after this task, which is exactly why
- * the anchors are extracted rather than hand-copied into the check.
+ * required anchors automatically.
  */
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { parse as parseYaml } from "yaml";
 
 const PREREG = ".agents/prereg/horizon/T05.prereg.yaml";
 const TEST_FILES = ["test/surface-negative.test.ts"];
@@ -67,6 +78,9 @@ const GATE_PROVEN: Readonly<Record<string, { readonly targets: readonly string[]
   "PE-08": { targets: ["check-t05"], needs: ["check-t05-boundaries.ts"] },
 };
 
+/** Sidecar that recovers expectations the frozen file declares only as scalar text. */
+const INTERPRETATION = ".agents/prereg/horizon/T05.prereg.interpretation.yaml";
+
 interface Expectation {
   readonly id: string;
   readonly text: string;
@@ -74,6 +88,8 @@ interface Expectation {
 
 export interface CoverageResult {
   readonly ok: boolean;
+  /** Expectations the check actually examined: parsed members plus recovered ones. */
+  readonly registered: number;
   /** Every line the check emitted, `ok` and `FAIL`, so a tooth can assert *why* it failed. */
   readonly messages: readonly string[];
 }
@@ -94,39 +110,60 @@ function fail(message: string): void {
 
 
 /**
- * Pull `id` / attack-or-expectation pairs out of the prereg without a YAML dependency.
+ * Read the prereg with a real YAML parser and return every registered expectation.
  *
- * The prereg is authored in one consistent shape (`- id: NE-0N` followed by `attack:` or
- * `expectation:`), and that shape is asserted elsewhere. Reading it this way keeps this check
- * free of a parser whose own version could change under us; if the shape ever changes, the
- * "no expectations parsed" guard fails loudly instead of passing on an empty set.
+ * This replaces an earlier hand-rolled line scanner. The scanner mattered: the frozen T05
+ * file's `confirmation_condition` folded scalar swallows the `PE-06` / `PE-07` / `PE-08`
+ * `- id:` lines as *text*, so a parser sees five positive expectations where the author
+ * registered eight. The scanner counted all eight by reading lines; the parser does not. Both
+ * behaviours are wrong to trust silently, so this function does three things:
+ *
+ *   - enumerates ids from the parsed structure (the authoritative set), and
+ *   - finds ids that appear anywhere else in the document as `<PE|NE>-NN` text, and
+ *   - returns both, so `checkPreregCoverage` can insist they agree.
+ *
+ * The frozen artifact is never edited; a disagreement is reported.
  */
-function expectations(source: string): Expectation[] {
-  const found: Expectation[] = [];
-  const lines = source.split("\n");
-  for (let index = 0; index < lines.length; index += 1) {
-    const idMatch = /^\s*-\s+id:\s*([A-Z]+-\d+)\s*$/.exec(lines[index] ?? "");
-    if (idMatch === null) continue;
-    const id = idMatch[1] as string;
-    let text = "";
-    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
-      const line = lines[cursor] ?? "";
-      if (/^\s*-\s+id:/.test(line)) break;
-      const field = /^\s+(attack|expectation):\s*(.*)$/.exec(line);
-      if (field === null) continue;
-      const parts = [field[2] ?? ""];
-      // A `>-` block: take the indented continuation lines.
-      for (let further = cursor + 1; further < lines.length; further += 1) {
-        const next = lines[further] ?? "";
-        if (next.trim() === "" || /^\s*-\s+id:/.test(next) || /^\s{0,4}[a-z_]+:/.test(next)) break;
-        parts.push(next.trim());
-      }
-      text = parts.join(" ");
-      break;
-    }
-    found.push({ id, text });
+export function parsePrereg(source: string): {
+  readonly registered: Expectation[];
+  readonly unregistered: string[];
+  readonly parseError: string | null;
+} {
+  let document: unknown;
+  try {
+    document = Bun.YAML.parse(source);
+  } catch (error) {
+    return { registered: [], unregistered: [], parseError: (error as Error).message };
   }
-  return found;
+  const prereg = (document as { preregistration?: Record<string, unknown> } | null)?.preregistration;
+  if (prereg === undefined || prereg === null) {
+    return { registered: [], unregistered: [], parseError: "no `preregistration` mapping at the document root" };
+  }
+
+  const registered: Expectation[] = [];
+  for (const section of ["positive_expectations", "negative_expectations"] as const) {
+    const entries = prereg[section];
+    if (entries === undefined) continue;
+    if (!Array.isArray(entries)) {
+      return { registered: [], unregistered: [], parseError: `preregistration.${section} is not a sequence` };
+    }
+    for (const entry of entries) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const record = entry as Record<string, unknown>;
+      const id = typeof record["id"] === "string" ? record["id"] : undefined;
+      if (id === undefined) continue;
+      const text = (record["attack"] ?? record["expectation"] ?? "") as string;
+      registered.push({ id, text: typeof text === "string" ? text : "" });
+    }
+  }
+
+  const ids = new Set(registered.map((expectation) => expectation.id));
+  const unregistered: string[] = [];
+  for (const match of source.matchAll(/\b((?:PE|NE)-\d+)\b/g)) {
+    const id = match[1] as string;
+    if (!ids.has(id) && !unregistered.includes(id)) unregistered.push(id);
+  }
+  return { registered, unregistered, parseError: null };
 }
 
 /** The backticked literals a test title must name to claim this expectation. */
@@ -179,6 +216,49 @@ function gateProof(id: string, binding: { readonly targets: readonly string[]; r
 }
 
 /**
+ * Try to recover one unregistered id from the interpretation sidecar.
+ *
+ * Returns `"ok"` and appends the expectation when the sidecar restates it, and a reason string
+ * otherwise. Every condition is checked, because an interpretation that has drifted from the
+ * artifact it interprets is worse than none: the frozen file's hash must match the hash the
+ * sidecar quotes, the id must be present in the sidecar as a *non-member* recovered from a named
+ * section, and the sidecar must carry the expectation text.
+ */
+function recoverFromInterpretation(root: string, id: string, into: Expectation[]): string {
+  const file = path.join(root, INTERPRETATION);
+  if (!existsSync(file)) return `${INTERPRETATION} does not exist`;
+  const source = readFileSync(file, "utf8");
+  const frozenHash = createHash("sha256").update(readFileSync(path.join(root, PREREG))).digest("hex");
+  let sidecar: unknown;
+  try {
+    sidecar = Bun.YAML.parse(source);
+  } catch (error) {
+    return `${INTERPRETATION} does not parse: ${(error as Error).message}`;
+  }
+  const interpretation = (sidecar as { interpretation?: Record<string, unknown> } | null)?.interpretation;
+  if (interpretation === undefined || interpretation === null) return `${INTERPRETATION} has no interpretation mapping`;
+  if (interpretation["of_sha256"] !== frozenHash) {
+    return `${INTERPRETATION} interprets sha256 ${String(interpretation["of_sha256"])}, but the frozen file is ${frozenHash}`;
+  }
+  const positive = (interpretation["registered_expectations"] as { positive?: unknown } | undefined)?.positive;
+  const entries = Array.isArray(positive) ? positive : [];
+  const entry = entries.find((candidate) => (candidate as { id?: unknown }).id === id) as
+    | { member?: unknown; recovered_from?: unknown; expectation?: unknown }
+    | undefined;
+  if (entry === undefined) return `${INTERPRETATION} does not recover it`;
+  if (entry.member !== false) return `${INTERPRETATION} lists it without member: false, so it claims to be structural`;
+  if (typeof entry.recovered_from !== "string" || entry.recovered_from === "") {
+    return `${INTERPRETATION} does not say which scalar swallowed it`;
+  }
+  if (typeof entry.expectation !== "string" || entry.expectation.trim() === "") {
+    return `${INTERPRETATION} recovers it without restating the expectation text`;
+  }
+  into.push({ id, text: entry.expectation });
+  ok(`${id}: registered in the frozen file only as text (${entry.recovered_from}); recovered by ${INTERPRETATION}`);
+  return "ok";
+}
+
+/**
  * Check one tree. Parameterised by root so the teeth can plant a drift in a throwaway copy
  * and assert this function names it; `main` calls it on the real tree.
  */
@@ -187,8 +267,27 @@ export function checkPreregCoverage(root: string = process.cwd()): CoverageResul
   messages.length = 0;
   const at = (relative: string): string => path.join(root, relative);
   const prereg = readFileSync(at(PREREG), "utf8");
-  const expected = expectations(prereg);
-  if (expected.length === 0) {
+  const parsed = parsePrereg(prereg);
+  const expected = [...parsed.registered];
+
+  // Recover expectations the frozen file declares only as scalar text, but *only* through the
+  // sidecar that quotes the frozen hash. Recovery is a separate, labelled verdict — never
+  // silently merged into the parsed set, which is exactly how PE-06/07/08 came to look covered.
+  const unregistered: string[] = [];
+  if (parsed.parseError !== null) {
+    fail(`${PREREG}: could not be parsed as YAML — ${parsed.parseError}`);
+  }
+  for (const id of parsed.unregistered) {
+    const recovered = recoverFromInterpretation(root, id, expected);
+    if (recovered === "ok") continue;
+    unregistered.push(id);
+    fail(
+      `${PREREG}: ${id} appears as text but is not a registered member of ` +
+        `positive_expectations/negative_expectations, and ${recovered}. A YAML parser cannot ` +
+        `see it, so it is not covered by this check.`,
+    );
+  }
+  if (parsed.parseError === null && expected.length === 0) {
     fail(`${PREREG}: no expectations parsed — the file shape changed, so this check cannot prove anything`);
   }
 
@@ -226,7 +325,7 @@ export function checkPreregCoverage(root: string = process.cwd()): CoverageResul
 
   // A copy: the module buffers are reused by the next call, so handing them out by reference
   // would make a caller read the following run's messages.
-  return { ok: failures.length === 0, messages: [...messages] };
+  return { ok: failures.length === 0, registered: expected.length, messages: [...messages] };
 }
 
 if (import.meta.main) {
@@ -236,6 +335,8 @@ if (import.meta.main) {
     for (const failure of failures) console.error(`  - ${failure}`);
     process.exit(1);
   }
-  console.log(`\nT05 prereg coverage: ok (each preregistered expectation is named by a test that names its attack)`);
+  console.log(`\nT05 prereg linkage: ok (${result.registered} registered expectations, each named by a test that names its anchors)`);
+  console.log("  NOTE: linkage only. Whether the assertions reject a violating implementation is");
+  console.log("        proven separately by `bun run scripts/teeth-t05-mutation.ts`.");
 }
 

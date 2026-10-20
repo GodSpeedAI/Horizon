@@ -480,7 +480,120 @@ decisions:
       - ".agents/evidence/horizon/T05/SUMMARY.md"
       - "justfile"
 
+  - id: DEC-T05-09
+    date: "2026-10-20"
+    task: T05
+    requirement: REQ-SAFE-003
+    decision: >-
+      The frozen T05 preregistration has a YAML structural defect: PE-06, PE-07 and PE-08 are not
+      members of `positive_expectations`. Their `- id:` / `expectation:` lines were indented inside
+      the folded `>-` scalar `confirmation_condition` and were absorbed as text, so a YAML parser
+      sees five positive expectations where the author registered eight. The frozen artifact is
+      NOT edited. The defect is recorded, and the prediction is made machine-readable through a
+      separately versioned interpretation at `.agents/prereg/horizon/T05.prereg.interpretation.yaml`
+      which quotes the frozen sha256 and restates PE-06/07/08 verbatim with `member: false`.
+    rationale:
+      - "Owner direction (2026-10-20): do not modify the frozen file; preserve the original artifact; record the structural defect; provide a separately versioned interpretation authorized at the appropriate level."
+      - "The coverage check now parses with Bun.YAML and must either find each id as a registered member, recover it from the hash-pinned interpretation, or fail. It no longer counts scalar text as registration. The three cases are reported differently on purpose: 'registered', 'recovered', and 'absent' are not the same claim."
+      - "Both readings before this decision were wrong in the builder's favour: a regex line scanner counted all eight; a strict parser would have seen five and silently dropped three predictions."
+    reversible: true
+    evidence:
+      - ".agents/prereg/horizon/T05.prereg.yaml (frozen, unedited; sha256 ff36d65b…3019)"
+      - ".agents/prereg/horizon/T05.prereg.interpretation.yaml"
+      - ".agents/evidence/horizon/T05/finding-prereg-structure.log"
+      - "scripts/check-t05-prereg-coverage.ts"
+      - "scripts/teeth-t05-prereg-coverage.ts (NE-C6, NE-C7, NE-C8)"
 
+  - id: DEC-T05-10
+    date: "2026-10-20"
+    task: T05
+    requirement: REQ-WORLD-001
+    decision: >-
+      T06 will be built as a Horizon-owned typed operational object projection on Cognate's public
+      `Projection` API. Horizon does not fork, patch or re-implement Cognate to obtain generic
+      object querying. `DurableStore` already provides the read primitives this needs —
+      `readProjectionSnapshot(name)` (checkpoint and rows from one statement, so the checkpoint can
+      never be ahead of the rows), `listProjection(name)` (all state, ordered by key) and
+      `getProjection(name)` — and `ProjectionRunner` supplies `catchUp` / `retry` / `rebuild` with
+      `rebuild_required` on a version change. Semantic identity comes from DomainForge, operational
+      state from Cognate, and the semantic, operational and lineage graphs stay distinct.
+    rationale:
+      - "D-002 is settled: the gap is generic typed querying (filters beyond top-level equality, relationship traversal), not durable state. CLAIM-005 in the frozen spec states the same and names REQ-WORLD-006's required evidence."
+      - "Verified against the pinned 0.6.1 sources, not against skill prose: `.agents/evidence/horizon/T06/pinned-api-inspection.log`."
+      - "The genuine deficiencies to report upstream are: no non-equality or scoped predicate query, no traversal, and no projection-version-aware query API. Those are framework gaps, not reasons for a shadow framework."
+      - "Cost accepted: Horizon reads whole projections and filters in-process. That is bounded by projection size, so traversal must be bounded by depth and result count, and a large-world scale claim is out of scope for T06."
+    reversible: true
+    evidence:
+      - ".agents/evidence/horizon/T06/pinned-api-inspection.log"
+      - "node_modules/@godspeedai/cognate-projections/src/types.ts"
+      - "node_modules/@godspeedai/cognate-events/src/types.ts:176-235"
+      - ".agents/DEBT.md D-002"
+
+
+
+  - id: DEC-T06-01
+    date: "2026-10-20"
+    task: T06
+    requirement: REQ-WORLD-006
+    decision: >-
+      The operational object layer is a projection, not a store, and the outcome set is closed at
+      five values. Objects, links and lineage are folded from durable Cognate events by
+      `horizon.operational-objects` (via the public `Projection` interface) and read back through
+      `readProjectionSnapshot`, so checkpoint and rows come from one statement. Horizon adds no
+      mutable object database of its own.
+    rationale:
+      - "REQ-WORLD-006 requires typed Cognate projections keyed by DomainForge semantic IDs with no separate mutable object store; DEC-T05-10 chose the mechanism, this fixes the read model."
+      - "The composite checkpoint is commit position plus projection name and version, because a position alone cannot reproduce a result after a version bump."
+      - "`empty`, `no-match`, `denied`, `blocked` and `unavailable` are five facts. Collapsing any two is a false claim, and NE-01/NE-02 and the M1/M2 mutants exist to keep them apart."
+      - "A projection with no checkpoint is `empty`, not `unavailable`: Cognate's runner commits no checkpoint when it folded no events, so requiring one reported a healthy empty store as a source failure (found by PE-07)."
+      - "Reads filter in process because the pinned store offers no predicate query. Cost scales with projection size; no scale claim is made and no index was invented."
+    reversible: true
+    evidence:
+      - "src/domain/operational.ts"
+      - "src/projections/operational-objects.ts"
+      - "src/adapters/operational-objects.ts"
+      - ".agents/evidence/horizon/T06/SUMMARY.md"
+      - ".agents/evidence/horizon/T06/pinned-api-inspection.log"
+
+  - id: DEC-T06-02
+    date: "2026-10-20"
+    task: T06
+    requirement: REQ-WORLD-005
+    decision: >-
+      The semantic import graph, the operational relation graph and lineage are three structures
+      with distinct identities and distinct edge kinds. A link declares `graph: operational`;
+      lineage is a separate record type keyed by observation; the operational relation vocabulary
+      (`journey.covers`, `entity.governed_by`, `host.serves`, `entity.lineage_of`) is declared by
+      Horizon and is NOT derived from the world's semantic `relation` declarations.
+    rationale:
+      - "REQ-WORLD-005 requires distinct identities and semantics; reusing `flow.from` as an operational link would make one name mean two things."
+      - "The recorder refuses an unknown relation type, a non-operational graph marker and a dangling endpoint *before* commit, so a half-link can never exist for a traversal to discover."
+      - "Traversal searches only the operational index, so lineage and import edges are unreachable by construction rather than by a filter that could be forgotten."
+    reversible: true
+    evidence:
+      - "src/projections/operational-objects.ts"
+      - "test/support/operational-fixture.ts"
+      - "test/operational-objects-negative.test.ts (NE-06)"
+
+  - id: DEC-T06-03
+    date: "2026-10-20"
+    task: T06
+    requirement: REQ-WORLD-002
+    decision: >-
+      Traversal is breadth-first over the operational link index, requires explicit `max_depth`
+      and `max_objects`, and is refused before any work when either is absent. It is not a general
+      graph query and does not attempt to be: the pinned store provides no traversal, and building
+      one would be a second query engine (which DEC-T05-10 rules out).
+    rationale:
+      - "An unbounded traversal over a cyclic relationship does not terminate by choice, so the bound is a precondition rather than an option."
+      - "An exceeded bound is refused rather than truncated, because a truncated answer looks like a complete one."
+      - "Edge buckets and frontiers are sorted by relation type then target ref, so the visit order is a function of the graph and not of insertion order."
+      - "Durable fixture evidence only. A large-world traversal would need an index or an upstream API; that is recorded as an upstream ask (D-002), not worked around locally."
+    reversible: true
+    evidence:
+      - "src/adapters/operational-objects.ts (traverse)"
+      - "test/operational-objects.test.ts (PE-06)"
+      - "test/operational-objects-negative.test.ts (NE-03)"
 
 
 open_questions:

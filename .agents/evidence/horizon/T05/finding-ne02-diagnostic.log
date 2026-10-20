@@ -1,0 +1,8 @@
+  path=/blocks/0/type message=Invalid discriminator value. Expected 'metric' | 'callout' | 'table' | 'tree' | 'timeline' | 'graph' | 'chart' | 'compare' | 'media' | 'document' | 'entity' | 'preflight' | 'progress' | 'ask' | 'form'
+
+FROZEN NE-02 expected: 'Rejection names the unknown block type and the unknown property'
+  - pointer at the type field            : YES
+  - message enumerates the legal set     : YES
+  - message literally contains 'iframe'  : NO
+jsx: [{"path":"/blocks/0","message":"Unrecognized key(s) in object: 'jsx'"}]
+onclick: [{"path":"/blocks/0","message":"Unrecognized key(s) in object: 'onclick'"}]

@@ -1,0 +1,6 @@
+sha256: ff36d65b578531687f8165950ba38c438dd98a71671c230d59ae48d02bd73019
+positive_expectations is a list of 5 members: ['PE-01', 'PE-02', 'PE-03', 'PE-04', 'PE-05']
+confirmation_condition is a str of 1077 chars
+id lines swallowed by confirmation_condition: ['PE-06', 'PE-07', 'PE-08']
+negative_expectations: list 10 ['NE-01', 'NE-02', 'NE-03', 'NE-04', 'NE-05', 'NE-06', 'NE-07', 'NE-08', 'NE-09', 'NE-10']
+RESULT: positive ids visible to a YAML parser = 5 ; ids only present as scalar text = ['PE-06', 'PE-07', 'PE-08']
