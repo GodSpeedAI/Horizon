@@ -1,0 +1,202 @@
+preregistration:
+  id: T07.prereg
+  task: T07
+  title: Deterministic navigation and observer-relative affordance controller
+  recorded_at: "2026-10-20T00:00:00Z"
+  recorded_before_artifacts: true
+
+  claim: >-
+    A pure selector can derive an observer-relative case and a set of typed candidate moves from
+    pinned semantic and operational facts, assess every move against the seven canonical
+    affordance gates, and emit an immutable revisioned frame in which possible, available,
+    blocked, unknown and conflicted paths stay distinct. Only an eligible move may be presented
+    as spendable, a single primary move exists only for a material deviation, and no gate value or
+    UI control ever grants authority.
+
+  upstream_pins:
+    - id: horizon-spec
+      version: 1.0.1
+      sha256: 14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    - id: canonical-idm
+      artifact: .sea/interaction/interaction-model.sea
+      note: >-
+        AffordanceStatus, GateKey, AuthorityOutcome, ReversibilityClass and NavigationResponsibility
+        are read from the canonical IDM; REQ-NAV-001..007, REQ-CASE-001..003 and REQ-OUT-001..002
+        govern the controller.
+    - id: behavioral-ir
+      artifact: behavioral/journeys/J01..J06.yaml
+      note: >-
+        The T07 controller reproduces the T02 IS2/IS3/IS8 gate semantics rather than inventing a
+        second vocabulary: likely_allow and deferred_to_invocation pass without granting,
+        requires_approval is pending, denied blocks, and unreachable or unknown block as unknown.
+    - id: operational-layer
+      artifact: src/adapters/operational-objects.ts
+      note: >-
+        The source adapter reads the T06 projection and derives read-only inspection candidates.
+        It records no consequential authority because no SEA-Forge evaluation exists at T07.
+
+  settles:
+    - REQ-NAV-001
+    - REQ-NAV-002
+    - REQ-NAV-003
+    - REQ-NAV-004
+    - REQ-NAV-005
+    - REQ-NAV-006
+    - REQ-NAV-007
+    - REQ-CASE-001
+    - REQ-CASE-002
+    - REQ-CASE-003
+    - REQ-OUT-001
+    - REQ-OUT-002
+
+  positive_expectations:
+    - id: PE-01
+      expectation: >-
+        A declared operation is possible until it is assessed. Only a move whose gates all pass is
+        available; blocked, unknown and conflicted are distinct outcomes and are never reported as
+        availability. The frame keeps the possible list separate from the assessed choices.
+    - id: PE-02
+      expectation: >-
+        An assessed move carries exactly the seven canonical gate keys: visibility, reach, payment,
+        authority, capability, recovery and settlement_access. A missing key or an extra key is
+        refused rather than defaulted.
+    - id: PE-03
+      expectation: >-
+        Only an eligible assessment is spendable. A blocked path still names its first blocker and,
+        when one is known, a reachable prerequisite; the blocked reason is not reduced to a boolean.
+    - id: PE-04
+      expectation: >-
+        The frame always offers observer discretion: inspect alternatives, defer, reframe or
+        disagree. An optional-only case is presented as an owner choice and no primary is forced.
+    - id: PE-05
+      expectation: >-
+        Context selection requests only fields that are unresolved. A field already present in the
+        context or facts is reported as resolved and is never asked for again.
+    - id: PE-06
+      expectation: >-
+        The authority gate accepts exactly six authority outcomes. likely_allow and
+        deferred_to_invocation pass without granting, requires_approval is pending, denied blocks,
+        and unreachable or unknown block as unknown. The frame declares that no gate grants
+        authority.
+    - id: PE-07
+      expectation: >-
+        Every consequential choice carries its reversibility class, payment estimate or not-required
+        marker, expected evidence and escalation behavior before any commitment can be reviewed.
+    - id: PE-08
+      expectation: >-
+        A case is derived from authoritative fact references and a declared direction. Derivation
+        refuses a missing world anchor, purpose or direction, and the case carries no second
+        ontology: only refs, statements and deviation flags.
+    - id: PE-09
+      expectation: >-
+        A material deviation yields at most one primary move, chosen only from available moves. An
+        optional-only case yields no primary move and records owner choice as the decision.
+    - id: PE-10
+      expectation: >-
+        Settlement reachable and should settle now are separate frame facts. should_settle_now is
+        true only when settlement is reachable, a material deviation exists and an authorized
+        judgment reference is supplied.
+    - id: PE-11
+      expectation: >-
+        Every frame identifies the observer, tenant, pinned world, checkpoint or explicit unknown,
+        focus, view mode and allowed choices. Every choice binds a typed operation and its current
+        affordance assessment, and carries the basis refs that support it.
+    - id: PE-12
+      expectation: >-
+        Frames are immutable and revisioned. A revision can only advance through the revise path, a
+        stale revision is refused, and UI enablement never grants authority.
+
+  negative_expectations:
+    - id: NE-01
+      attack: >-
+        Offer an unauthorized high-value operation first in the candidate order, ahead of every
+        authorized move.
+      expected: >-
+        Ranking must not rescue it. It is eliminated from spendable options and cannot become the
+        primary move regardless of its position.
+    - id: NE-02
+      attack: >-
+        Force a primary move on an optional-only case.
+      expected: >-
+        The frame reports owner choice, primary_choice_ref is null, and no move is marked primary.
+    - id: NE-03
+      attack: >-
+        Supply a blocked gate without a material reason.
+      expected: >-
+        The assessment still names a first blocker and, where known, a reachable prerequisite; a
+        reasonless blocked gate is refused.
+    - id: NE-04
+      attack: >-
+        Present unknown authority as if the path were available.
+      expected: >-
+        The move is unknown, not available, and is absent from spendable options.
+    - id: NE-05
+      attack: >-
+        Treat requires_approval or deferred_to_invocation as unknown, or treat either as a grant.
+      expected: >-
+        requires_approval is blocked pending approval; deferred_to_invocation is a known pass that
+        explicitly does not grant authority.
+    - id: NE-06
+      attack: >-
+        Supply a gate map with an extra key or with a missing canonical key.
+      expected: >-
+        Gate validation refuses the move before assessment.
+    - id: NE-07
+      attack: >-
+        Derive a case without a world anchor or without a declared direction.
+      expected: >-
+        Case derivation refuses the input instead of inventing an anchor.
+    - id: NE-08
+      attack: >-
+        Request should settle now while omitting or rejecting the authorized judgment.
+      expected: >-
+        should_settle_now stays false and the frame names the missing authorized judgment.
+    - id: NE-09
+      attack: >-
+        Mark a blocked choice as enabled in a submitted UI surface or caller payload.
+      expected: >-
+        The choice remains blocked, spendable stays false, and the enablement is ignored as
+        authority.
+    - id: NE-10
+      attack: >-
+        Mutate a frozen frame in place.
+      expected: >-
+        The mutation fails; a new revision is produced only through the revise path.
+    - id: NE-11
+      attack: >-
+        Submit a choice against an old frame revision after a focus or checkpoint change.
+      expected: >-
+        The stale revision is refused and the caller is told to refresh.
+
+  falsifier: >-
+    Rank an unauthorized high-value action first, and if it survives as spendable or as the primary
+    move the controller has collapsed prediction into fact.
+
+  known_confounds:
+    - Mocks and fixture-only results are not live settlement evidence.
+    - Pinned external API and skill versions may differ from prose documentation.
+    - T07 has no SEA-Forge evaluation channel, so authority inputs are typed records supplied by a
+      caller; the controller proves gate semantics, not live authorization.
+    - Payment amounts and units remain unresolved in the source (OQ-IDM-02); the controller carries
+      estimates and provenance without letting them change a gate.
+
+  evidence_plan:
+    - Run the prereg shape and coverage checks before implementation and again in the gate.
+    - Run positive and negative behavioral tests through bun.
+    - Run mutation teeth that break one named property at a time.
+    - Run the global verify target and retain exact output.
+    - Record decisions in .agents/reports/horizon-decisions.yaml and evidence in .agents/evidence/horizon/T07/.
+
+  redesign_trigger: >-
+    Affordance state cannot be derived from independent sources without collapsing prediction into
+    fact, or a case cannot be derived without introducing a competing ontology.
+
+  confirmation_condition: >-
+    The builder demonstrates every positive and negative expectation with stable evidence, the
+    mutation teeth reject each named violation, and plausible alternate failures are documented.
+
+  notes: >-
+    The controller is pure and source-agnostic. The adapter that reads the T06 projection derives
+    only read-only inspection moves and records no consequential authority. A second case database
+    is explicitly out of scope: a case is a derived value over fact references and a declared
+    direction, not stored state.

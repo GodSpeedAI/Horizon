@@ -596,6 +596,86 @@ decisions:
       - "test/operational-objects-negative.test.ts (NE-03)"
 
 
+  - id: DEC-T07-01
+    date: "2026-10-20"
+    task: T07
+    requirement: REQ-NAV-006
+    decision: >-
+      The T07 controller is pure and source-agnostic. It reads no clock, store or network; authority
+      arrives as a typed evaluation record, and the frame declares `grants_authority: false`. T07
+      has no SEA-Forge channel, so the controller proves gate semantics, not live authorization.
+      A caller cannot turn a gate value into permission: likely_allow is non-granting and the
+      commit path remains a separate typed intent.
+    rationale:
+      - "REQ-NAV-006 makes every authority value non-granting; a controller that called SEA-Forge would also be a second authorization path."
+      - "REQ-OUT-002 forbids UI enablement from becoming authority; purity is what makes that checkable."
+      - "The T02 behavioral proof already fixes the same vocabulary; reusing it avoids a second semantics."
+    reversible: true
+    evidence:
+      - "src/domain/navigation.ts (assessAffordance, buildNavigationFrame)"
+      - "test/navigation-controller.test.ts (PE-06, PE-12)"
+      - "test/navigation-negative.test.ts (NE-04, NE-05, NE-09)"
+
+  - id: DEC-T07-02
+    date: "2026-10-20"
+    task: T07
+    requirement: REQ-NAV-002
+    decision: >-
+      Gate outcomes map as follows. likely_allow and deferred_to_invocation pass; requires_approval
+      is blocked with an approval prerequisite; denied blocks; unreachable and unknown block as
+      unknown. A non-pass gate must carry a material reason. Recovery unknown blocks only an
+      irreversible or unknown-reversibility move, matching the IDM's stated unknown behavior.
+      Scalar pass/fail aliases are not accepted: the gate map has exactly the seven canonical keys
+      and every entry is a structured assessment.
+    rationale:
+      - "The T02 engine already distinguishes pass, pending, blocked and unknown authority; using different names here would be a second vocabulary."
+      - "A bare boolean would hide the reason and prerequisite REQ-NAV-003 requires."
+      - "Recovery is the one gate whose unknown behavior is conditional in the canonical IDM."
+    reversible: true
+    evidence:
+      - "src/domain/navigation.ts (assertGates, assessAffordance)"
+      - "behavioral/proof/engine.py (AUTHORITY_PASS/PENDING/BLOCK)"
+      - ".sea/interaction/interaction-model.sea (gate_recovery)"
+
+  - id: DEC-T07-03
+    date: "2026-10-20"
+    task: T07
+    requirement: REQ-CASE-001
+    decision: >-
+      A Case is a derived value over authoritative fact references and a declared direction. It is
+      never stored, and unknown keys are refused, so it cannot grow into an entity/class ontology.
+      The source adapter reads the T06 projection and derives only read-only inspection moves; it
+      does not invent a consequential move, authority evaluation or payment estimate. An absent
+      focus is reported as a material operational deviation with no fabricated repair.
+    rationale:
+      - "REQ-CASE-001 forbids a competing ontology; a typed derived value has no place to keep one."
+      - "T07 has no live authority source, so a consequential candidate would have to invent its gates."
+      - "The focus-missing fact is an observation at a checkpoint, not a prediction of what should happen."
+    reversible: true
+    evidence:
+      - "src/domain/navigation.ts (deriveCase)"
+      - "src/adapters/navigation.ts (deriveOperationalNavigation)"
+      - "test/navigation-source.test.ts"
+
+  - id: DEC-T07-04
+    date: "2026-10-20"
+    task: T07
+    requirement: REQ-OUT-001
+    decision: >-
+      T07 adds `horizon.navigation/2` as an additive frame and leaves T04/T05's
+      `horizon.navigation-frame/1` untouched. The structural frame continues to serve the existing
+      surface seam; the navigation frame carries the fuller affordance, case and settlement facts.
+      Merging them now would force a T05 surface revision with no requirement demanding it.
+    rationale:
+      - "T05's surface contract is frozen and settled; an additive type avoids re-opening it."
+      - "REQ-OUT-001 needs fields the structural frame does not carry (gate assessments, case, settlement)."
+      - "The controller can later feed the surface seam without either side owning the other."
+    reversible: true
+    evidence:
+      - "src/domain/navigation.ts (NAVIGATION_SCHEMA)"
+      - "src/domain/frame.ts (unchanged v1)"
+      - "just gate-t05"
+
 open_questions:
 
   - id: OQ-001

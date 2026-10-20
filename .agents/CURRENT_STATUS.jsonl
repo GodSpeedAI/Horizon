@@ -283,3 +283,75 @@
     "sha256": "14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4"
   }
 }
+---
+{
+  "schema": "horizon.status/1",
+  "revision": 21,
+  "recorded_at": "2026-10-20T23:27:56Z",
+  "task": "T07",
+  "state": "settled",
+  "stage": "T07 settled (P2, builder with adversarial teeth); next dependency-ready task T08",
+  "settled": [
+    "REQ-NAV-001",
+    "REQ-NAV-002",
+    "REQ-NAV-003",
+    "REQ-NAV-004",
+    "REQ-NAV-005",
+    "REQ-NAV-006",
+    "REQ-NAV-007",
+    "REQ-CASE-001",
+    "REQ-CASE-002",
+    "REQ-CASE-003",
+    "REQ-OUT-001",
+    "REQ-OUT-002"
+  ],
+  "summary": "T07 settled as a pure observer-relative navigation controller (`horizon.navigation/2`) with an additive frame that leaves T04/T05's `horizon.navigation-frame/1` untouched (DEC-T07-04). Exactly the seven canonical gates are assessed; possible, available, blocked, unknown and conflicted stay distinct; only an available move is spendable. Authority uses the T02 vocabulary: likely_allow and deferred_to_invocation pass without granting, requires_approval is blocked with an approval prerequisite, denied blocks, and unreachable/unknown block as unknown (DEC-T07-02). A Case is a derived value over authoritative fact refs and a declared direction, with unknown keys refused and `ontology: null`, so it cannot become a second ontology (DEC-T07-03). Material deviation yields at most one primary from the available set; optional-only yields none. Settlement reachable and should-settle-now are separate, the latter requiring an authorized judgment. Frames are frozen and revisioned; stale revisions, blocked choices and UI enablement are refused rather than trusted. The source adapter reads the T06 projection and derives only read-only inspection moves: no consequential authority, payment or repair is invented (DEC-T07-01). The prereg was shape-checked before implementation (12 positive + 11 negative) and frozen at sha256 96e36c73. Proof level stays P2: 11 mutation teeth show the named tests reject those specific violations; no independent replay was performed and none is implied.",
+  "verified": {
+    "check_t07": "0 (shape 12+11; coverage 23 expectations linked)",
+    "teeth_t07_mutation": "0 (11/11 mutants caught by a failing assertion)",
+    "gate_t07": "0",
+    "just_verify": "0",
+    "bun_test": "70 pass / 0 fail (10 files, 612 expect())",
+    "navigation_tests": "25 pass / 0 fail (3 files, 154 expect())",
+    "check": "0",
+    "spec_sha256_unchanged": true,
+    "t07_prereg_sha256": "96e36c736937a7813bf80598c053362f9c2e8cdab371a9e96cef9398168bf2b1"
+  },
+  "limits": [
+    "P2, builder with adversarial teeth. Independent replay is a separate, unperformed asset.",
+    "Authority is a typed input, not a live SEA-Forge evaluation. T07 proves gate semantics, not live authorization.",
+    "The source adapter reads fixture-produced T06 rows; integration_level stays `fixture` and no product system produced the events.",
+    "Payment amounts and units remain unresolved (OQ-IDM-02); estimates carry provenance and never change a gate.",
+    "The frame is not yet consumed by the Clack renderer (T08) or GUI (T09); no renderer parity is claimed.",
+    "Mutation teeth prove detection of the eleven enumerated violations only, not of arbitrary defects."
+  ],
+  "next": "T08 — depends on T07 (settled). Earliest ready task. T09 also becomes ready (T07 + T03) and is not the earlier task in the plan.",
+  "decisions": [
+    "DEC-T07-01",
+    "DEC-T07-02",
+    "DEC-T07-03",
+    "DEC-T07-04"
+  ],
+  "evidence": ".agents/evidence/horizon/T07/SUMMARY.md",
+  "changed": [
+    ".agents/prereg/horizon/T07.prereg.yaml",
+    "src/domain/navigation.ts",
+    "src/adapters/navigation.ts",
+    "test/navigation-controller.test.ts",
+    "test/navigation-negative.test.ts",
+    "test/navigation-source.test.ts",
+    "scripts/check-t07-prereg-coverage.ts",
+    "scripts/teeth-t07-mutation.ts",
+    "justfile",
+    ".agents/evidence/horizon/T07/",
+    ".agents/reports/horizon-decisions.yaml",
+    ".agents/CURRENT_STATUS.jsonl",
+    ".agents/CURRENT_STATUS.md"
+  ],
+  "spec": {
+    "id": "HORIZON-001",
+    "version": "1.0.1",
+    "status": "frozen",
+    "sha256": "14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4"
+  }
+}

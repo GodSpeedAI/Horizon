@@ -138,9 +138,19 @@ gate-t04: check boundaries idm-integrity acceptance-claims witness-claims contra
 freeze-t04:
     ./scripts/freeze-formation.sh
 
-gate-t07:
-    @echo "gate-t07: not implemented; fails closed until T07 settles"
-    @exit 1
+# T07: the navigation controller. Shape first, then linkage, then strength. The mutation teeth run
+# the named test against a broken controller, so a passing coverage count is never read as proof.
+check-t07:
+    bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/T07.prereg.yaml
+    bun run scripts/check-t07-prereg-coverage.ts
+
+teeth-t07-mutation:
+    bun run scripts/teeth-t07-mutation.ts
+
+teeth-t07: teeth-t07-mutation
+
+gate-t07: check-t07 teeth-t07 test check boundaries idm-integrity acceptance-claims witness-claims contract-modals ledger wayfinder teeth
+    @echo "gate-t07: ok — deterministic navigation and observer-relative affordance controller"
 
 gate-t08:
     @echo "gate-t08: not implemented; fails closed until T08 settles"
