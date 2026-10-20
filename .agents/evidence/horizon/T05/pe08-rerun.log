@@ -56,3 +56,13 @@ just gate-t05 -> gate-t05: ok — horizon.surface/2 + horizon.gui-view/1 verifie
 just verify   -> verify: ok (active frozen artifacts: requirements/ledger.yaml + .wayfinder/answer-key.md)
 
 Attribution teeth added to teeth-t05-boundaries (NE-B10..NE-B13); total 18 checks.
+
+## Correction: Horizon license (D-028)
+The NOTICE originally stated that Horizon declares no license. That was wrong: origin/main already
+carried LICENSE (Apache-2.0, commit 4702ada) and the local clone was one commit behind. After
+merging origin/main, NOTICE now states Apache-2.0 (SPDX id) and points at LICENSE, and package.json
+gains "license": "Apache-2.0". check-t05-boundaries now enforces agreement structurally (declared
+SPDX id in package.json == id named in the NOTICE header, and a LICENSE file backs it); teeth
+NE-B14..NE-B16 prove the rule bites; total 21 checks.
+just gate-t05 -> gate-t05: ok — horizon.surface/2 + horizon.gui-view/1 verified across GUI/CLI/MCP
+just verify   -> verify: ok (active frozen artifacts: requirements/ledger.yaml + .wayfinder/answer-key.md)

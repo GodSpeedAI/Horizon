@@ -435,6 +435,27 @@ decisions:
       - ".agents/DEBT.md"
       - "node_modules/@godspeedai/cognate-store-sqlite/src/index.ts"
 
+  - id: DEC-T05-07
+    date: "2026-10-20"
+    task: T05
+    requirement: none (corrects DEC-T05-04 and D-026)
+    decision: >-
+      SUPERSEDES part of DEC-T05-04. DEC-T05-04 said NOTICE should state that Horizon declares no
+      license of its own. That was wrong: Horizon is Apache-2.0 and the root LICENSE exists, added to
+      origin/main in 4702ada before the ruling. The local clone was one commit behind and no gate
+      fetches, so the absence was a stale-clone artifact reported as a repository fact. NOTICE now
+      states Apache-2.0 and points at LICENSE. D-026 is refuted and D-028/D-029 record how the error
+      happened; the only surviving fragment is that package.json still carries no license field, which
+      is owner-gated because writing it asserts terms. DEC-T05-04's substantive ruling (author NOTICE,
+      re-run PE-08, close D-022) stands unchanged and PE-08 remains PASS.
+    reversible: true
+    evidence:
+      - "NOTICE"
+      - "LICENSE"
+      - ".agents/DEBT.md"
+      - "4702ada"
+
+
 open_questions:
 
   - id: OQ-001

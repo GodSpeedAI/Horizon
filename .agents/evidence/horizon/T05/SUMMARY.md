@@ -55,7 +55,8 @@ on first run (MCP names fold `.` → `_`), which the comparison now asserts expl
 - The reducer's agent-attribution cap is exercised by unit tests; no end-to-end journey has
   yet driven a conflicting human/agent layout claim (J02 territory, later task). Recorded as
   DEBT D-027 after confirming J02 does not contain the case.
-- Horizon declares no license of its own (D-026). The `NOTICE` header states that absence
-  rather than implying a grant.
+- Horizon's own license is Apache-2.0 (root `LICENSE`). The `NOTICE` states that and points at it.
+  An earlier version of this line claimed the opposite (D-026); that was a stale-clone error, corrected
+  in D-028, not a repository finding.
 - PE-08's `NOTICE` half was unachievable as written; resolved by owner ruling (D-022,
   DEC-T05-04) and re-run in isolation — see `pe08-rerun.log`.

@@ -102,7 +102,7 @@ function plant(files: Readonly<Record<string, string>>): string {
   // so they are carried over as-is; otherwise every planted tree would also be an "absent
   // NOTICE" tree and the acceptance teeth could never tell an unrelated failure from the one
   // they name. The attribution rule gets its own teeth below.
-  for (const relative of ["NOTICE", "docs/donors.md"]) {
+  for (const relative of ["NOTICE", "docs/donors.md", "LICENSE", "package.json"]) {
     const source = path.join(ROOT, relative);
     if (!fs.existsSync(source)) continue;
     const target = path.join(dir, relative);
@@ -236,6 +236,40 @@ const ATTR_TEETH: readonly { readonly id: string; readonly mutate: (dir: string)
       fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace(/^License:/m, "Licence:"));
     },
     expect: /records no License line/,
+  },
+  {
+    // D-028: the exact error that shipped. NOTICE denied a license while LICENSE existed. Caught
+    // structurally - the header no longer carries the license package.json declares.
+    id: "NE-B14 NOTICE describing Horizon without its declared license is rejected",
+    mutate: (dir) => {
+      const file = path.join(dir, "NOTICE");
+      const original = fs.readFileSync(file, "utf8");
+      const text = original.replace(
+        /Horizon is licensed under[^\n]*\n[^\n]*\n/,
+        "Horizon's own license has not been declared in this repository: there is no root\nLICENSE file.\n",
+      );
+      // A mutation that silently no-ops would make this tooth pass vacuously.
+      if (text === original) throw new Error("NE-B14 could not rewrite the NOTICE header; the tooth is stale");
+      fs.writeFileSync(file, text);
+    },
+    expect: /header does not name Horizon's declared license/,
+  },
+  {
+    // The mirror: a declared license with no LICENSE file to back it.
+    id: "NE-B15 a declared license with no LICENSE file is rejected",
+    mutate: (dir) => fs.rmSync(path.join(dir, "LICENSE"), { force: true }),
+    expect: /declares ".*" but no root LICENSE file exists/,
+  },
+  {
+    // The gap is also a failure: NOTICE cannot be checked against a manifest that says nothing.
+    id: "NE-B16 a manifest with no license field is not a silent pass",
+    mutate: (dir) => {
+      const file = path.join(dir, "package.json");
+      const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+      delete manifest.license;
+      fs.writeFileSync(file, JSON.stringify(manifest, null, 2));
+    },
+    expect: /package\.json: declares no license field/,
   },
 ];
 for (const tooth of ATTR_TEETH) {

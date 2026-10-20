@@ -1,15 +1,14 @@
 Horizon
 Copyright GodSpeed AI
 
-This product includes vocabulary and structural patterns derived from the
+Horizon is licensed under the Apache License, Version 2.0 (SPDX: Apache-2.0). The
+full terms are in the root `LICENSE` file.
+
+This product also includes vocabulary and structural patterns derived from the
 projects listed below. No donor source file is copied into this repository and
 no donor package is imported at runtime, except where a row says otherwise. The
 human-readable account of what was and was not borrowed is `docs/donors.md`;
 this file is its legal summary.
-
-Horizon's own license has not been declared in this repository: there is no root
-LICENSE file and package.json sets no `license` field. This NOTICE therefore
-records donor obligations only and grants nothing on Horizon's behalf.
 
 Each entry records the donor name, its license, the pinned source commit or
 package version this repository was derived against, and what was borrowed.

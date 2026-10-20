@@ -1,4 +1,4 @@
-# T05 evidence pins. Updated 2026-10-20: PE-08 re-run (NOTICE, DEC-T05-04), gate-t05 + verify exit 0.
-4dd86700a7fe8ac730a25c28fc0da309590c239e0be90511d353ffd2893e0474  .agents/evidence/horizon/T05/SUMMARY.md
-c9f561f7727f3703cc5e34cb1c491ba2f6100dd7799a5794f15876994a24c405  .agents/evidence/horizon/T05/pe08-rerun.log
+# T05 evidence pins. Updated 2026-10-20: PE-08 re-run (NOTICE, DEC-T05-04), gate-t05 + verify exit 0. Re-pinned 2026-10-20 after the D-028 license correction.
+e28df885d243d0be1184f56a356cda0ffea3b7f277991a686e789f36aceb4c06  .agents/evidence/horizon/T05/SUMMARY.md
+49902ca39179efd7cca8b26026b5593e679bcecb0688cecc092104375a23c390  .agents/evidence/horizon/T05/pe08-rerun.log
 ff36d65b578531687f8165950ba38c438dd98a71671c230d59ae48d02bd73019  .agents/prereg/horizon/T05.prereg.yaml

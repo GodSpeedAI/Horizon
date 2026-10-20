@@ -479,7 +479,41 @@ function checkAttributionAgreement(root: string): string[] {
     if (!/^Borrowed/m.test(section.text)) failures.push(`NOTICE: "${section.name}" does not state what was borrowed`);
   }
 
+  // D-028 shipped a NOTICE stating Horizon declares no license while the repository was
+  // Apache-2.0. Nothing compared NOTICE's claim about this repository with the repository.
+  // The statement is made structural instead of prose-matched: package.json names the SPDX id,
+  // and NOTICE must repeat exactly that id beside a LICENSE file that exists. Prose matching was
+  // tried first and rejected - it fired on its own explanatory comment and missed paraphrase.
+  const licensePath = path.join(root, "LICENSE");
+  const declaredLicense = readDeclaredLicense(root);
+  if (declaredLicense === null) {
+    failures.push("package.json: declares no license field, so NOTICE cannot be checked against it");
+  } else if (!fs.existsSync(licensePath)) {
+    failures.push(`package.json: declares "${declaredLicense}" but no root LICENSE file exists`);
+  } else {
+    // The header precedes the first donor banner; donor sections may name their own licenses.
+    const header = noticeText.split(/^=+$/m)[0] ?? "";
+    if (!header.includes(declaredLicense)) {
+      failures.push(
+        `NOTICE: header does not name Horizon's declared license "${declaredLicense}" recorded in package.json`,
+      );
+    }
+  }
+
   return failures;
+}
+
+/** The package's own SPDX id, or null when the field is absent or not a plain id. */
+function readDeclaredLicense(root: string): string | null {
+  const manifestPath = path.join(root, "package.json");
+  if (!fs.existsSync(manifestPath)) return null;
+  try {
+    const manifest: unknown = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const value = (manifest as { license?: unknown }).license;
+    return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 if (import.meta.main) {

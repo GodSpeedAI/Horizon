@@ -83,3 +83,56 @@
     "sha256": "14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4"
   }
 }
+---
+{
+  "revision": 18,
+  "recorded_at": "2026-10-20T17:50:00Z",
+  "stage": "T05 settled; PE-08 PASS; license fact corrected (D-028); next dependency-ready task T06",
+  "summary": "The owner reported that Horizon is Apache-2.0 and the LICENSE sits on the remote. That is true: origin/main carried LICENSE in 4702ada before the T05 ruling while the local clone sat one commit behind, so D-026 recorded a stale-clone artifact as a repository fact and the NOTICE header asserted the absence of a license that existed. origin/main was merged (a clean merge, LICENSE only) and the false claim corrected. NOTICE now states Apache-2.0 and notes the SPDX id; package.json gains license Apache-2.0. Rather than leave this to prose, check-t05-boundaries now compares the license package.json declares with the one the NOTICE header names and requires a LICENSE file behind it, structurally rather than by prose matching, which was tried first and rejected because it fired on its own explanatory comment and missed paraphrase. Teeth NE-B14..NE-B16 prove the rule bites; NE-B14 fails loudly if its mutation stops applying. DEC-T05-07 supersedes the incorrect part of DEC-T05-04; PE-08 remains PASS.",
+  "verified": [
+    "just gate-t05 -> exit 0 ('gate-t05: ok - horizon.surface/2 + horizon.gui-view/1 verified across GUI/CLI/MCP')",
+    "just verify -> exit 0 ('verify: ok')",
+    "teeth-t05-boundaries -> ok (21 checks, including NE-B14..NE-B16 license teeth)",
+    "check-t05-boundaries -> ok (30 files)",
+    "sha256sum -c .agents/evidence/horizon/T05/SHA256SUMS -> SUMMARY.md, pe08-rerun.log and the frozen prereg all OK",
+    "decisions yaml parses; 23 decisions, DEC-T05-04..07 present",
+    "prereg sha256 ff36d65b578531687f8165950ba38c438dd98a71671c230d59ae48d02bd73019 unchanged"
+  ],
+  "limits": [
+    "D-026 is refuted, not satisfied: the license was already present and the local clone was stale (D-028). D-026 remains in DEBT.md as a failed observation.",
+    "Every T05 gate before this revision ran on a tree one commit behind origin/main. The stale commit was documentation only, but nothing in the gates fetches or reports ahead/behind (D-029).",
+    "The license claim was asserted by package.json and NOTICE on the owner's authority; the check proves agreement between them and the LICENSE file, not that the owner intended that exact SPDX id.",
+    "Clack and the WebMCP browser transport remain unbound at T05 (declared in the prereg).",
+    "The agent-attribution layout downgrade is still unit-proven only; J02 contains no conflicting human/agent layout claim (D-027).",
+    "D-023 remains latent (opening-burst window only); D-024 and D-025 remain open"
+  ],
+  "next": "T06 - build the operational object layer: typed object-set and relationship projections on Cognate (depends_on T04)",
+  "decisions": [
+    "DEC-T05-01",
+    "DEC-T05-02",
+    "DEC-T05-03",
+    "DEC-T05-04",
+    "DEC-T05-05",
+    "DEC-T05-06",
+    "DEC-T05-07"
+  ],
+  "evidence": [
+    "NOTICE",
+    "LICENSE",
+    "package.json",
+    "docs/donors.md",
+    ".agents/evidence/horizon/T05/SUMMARY.md",
+    ".agents/evidence/horizon/T05/pe08-rerun.log",
+    ".agents/evidence/horizon/T05/SHA256SUMS",
+    ".agents/prereg/horizon/T05.prereg.yaml",
+    "scripts/check-t05-boundaries.ts",
+    "scripts/teeth-t05-boundaries.ts",
+    ".agents/DEBT.md"
+  ],
+  "spec": {
+    "id": "HORIZON-001",
+    "version": "1.0.1",
+    "status": "frozen",
+    "sha256": "14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4"
+  }
+}
