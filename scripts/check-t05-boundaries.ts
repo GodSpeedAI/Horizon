@@ -410,7 +410,76 @@ export function checkT05Boundaries(root: string): BoundaryResult {
   }
   if (renderers.length === 0) failures.push(`${UI_AUTHORITY}: no shared renderer found; text/HTML routes would diverge`);
 
+  failures.push(...checkAttributionAgreement(root));
+
   return { ok: failures.length === 0, failures, inspected: [...sources.keys()] };
+}
+
+/**
+ * PE-08 requires donor-derived vocabulary to be recorded in BOTH `docs/donors.md` and the
+ * root `NOTICE`. Two hand-maintained lists drift, and a drifted attribution record is worse
+ * than none because it looks maintained. This pairs them mechanically: every donor heading in
+ * `docs/donors.md` must appear in `NOTICE` and the reverse, so neither can quietly drop one.
+ *
+ * Donor identity is the project name in the `## ` heading, not the whole line: heading text is
+ * prose and prose is allowed to change. In `NOTICE` a donor is a line-at-start `Name:` field,
+ * which is why the banner is `Name: <url>` and never prose.
+ */
+function checkAttributionAgreement(root: string): string[] {
+  const failures: string[] = [];
+  const noticePath = path.join(root, "NOTICE");
+  const donorsPath = path.join(root, "docs", "donors.md");
+
+  if (!fs.existsSync(noticePath)) {
+    return ["NOTICE: missing at the repository root; PE-08 requires it to record donor-derived vocabulary"];
+  }
+  if (!fs.existsSync(donorsPath)) {
+    return ["docs/donors.md: missing; PE-08 requires it to record donor-derived vocabulary"];
+  }
+
+  const donors = new Set(
+    fs
+      .readFileSync(donorsPath, "utf8")
+      .split("\n")
+      .filter((line) => line.startsWith("## "))
+      .map((line) => line.slice(3).trim())
+      .filter((name) => name.length > 0),
+  );
+
+  // Sections are delimited by the ====== rule, and a banner is the first `Name: <url>` line
+  // inside one. Anchoring at line start keeps prose such as "License: Apache-2.0" from being
+  // mistaken for a donor.
+  const noticeText = fs.readFileSync(noticePath, "utf8");
+  const sections = noticeText
+    .split(/^=+$/m)
+    .flatMap((section) => {
+      const banner = /^([A-Z][^:\n]*):\s+(?:https?:\/\/\S|<[^>\n]+>)/m.exec(section);
+      return banner ? [{ name: banner[1]!.trim(), text: section }] : [];
+    });
+  const notice = new Set(sections.map((section) => section.name));
+
+  if (donors.size === 0) failures.push("docs/donors.md: declares no donor, so the attribution record proves nothing");
+  if (notice.size === 0) failures.push("NOTICE: names no donor, so the attribution record proves nothing");
+
+  for (const name of donors) {
+    if (!notice.has(name)) failures.push(`NOTICE: does not name donor "${name}" recorded in docs/donors.md`);
+  }
+  for (const name of notice) {
+    if (!donors.has(name)) failures.push(`docs/donors.md: does not record donor "${name}" named in NOTICE`);
+  }
+
+  // A NOTICE without a license and a pinned source per donor is an attribution stub, not a
+  // record. Checked only for donors both files agree on, so this reports shape, not drift.
+  for (const section of sections) {
+    if (!donors.has(section.name)) continue;
+    if (!/^License:/m.test(section.text)) failures.push(`NOTICE: "${section.name}" records no License line`);
+    if (!/^(Source commit|Source):/m.test(section.text)) {
+      failures.push(`NOTICE: "${section.name}" records no pinned source commit or package version`);
+    }
+    if (!/^Borrowed/m.test(section.text)) failures.push(`NOTICE: "${section.name}" does not state what was borrowed`);
+  }
+
+  return failures;
 }
 
 if (import.meta.main) {

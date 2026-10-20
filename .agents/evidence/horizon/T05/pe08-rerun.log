@@ -1,0 +1,58 @@
+# PE-08 re-run after the owner ruling on 2026-10-20 (NOTICE created).
+# Scope: PE-08 only. Not a new gate run; see gate-t05.log for the settled gate.
+
+## PE-08 text (frozen prereg)
+    - id: PE-08
+      expectation: >-
+        Any donor-derived vocabulary or structure is recorded in `docs/donors.md` and
+        `NOTICE`, and the boundary checks still reject a competing model/authority store.
+
+## NOTICE present at repo root
+-rw-r--r-- 1 sprime01 sprime01 3005 Oct 20 12:12 NOTICE
+
+## docs/donors.md references NOTICE
+3:The legal summary of these obligations is the root [`NOTICE`](../NOTICE) file. This
+5:did not borrow; the two must stay in agreement, and `just check-t05` fails if the NOTICE
+
+## Donor names agree (docs/donors.md ## headings <-> NOTICE banners)
+## Product Actualizer
+## Cognate
+## DomainForge
+--
+Product Actualizer: https://github.com/SPRIME01/Product-Actualizer
+Cognate: https://github.com/GodSpeedAI/Cognate
+DomainForge: https://github.com/GodSpeedAI/DomainForge
+
+## check-t05-boundaries (includes attribution agreement)
+exit=0
+T05 boundaries: ok (30 files)
+
+## Teeth: the agreement check rejects a broken record
+Each attack mutates a copy of the record, expects failure, and restores the original.
+
+A. NOTICE absent            -> expect a missing-NOTICE failure
+   rc=1
+FAIL NOTICE: missing at the repository root; PE-08 requires it to record donor-derived vocabulary
+
+B. NOTICE drops a donor     -> expect drift both ways
+   rc=1
+FAIL NOTICE: does not name donor "DomainForge" recorded in docs/donors.md
+FAIL docs/donors.md: does not record donor "OtherDonor" named in NOTICE
+
+C. NOTICE omits License     -> expect a shape failure
+   rc=1
+FAIL NOTICE: "Cognate" records no License line
+
+D. none (restored)          -> expect pass
+   rc=0
+T05 boundaries: ok (30 files)
+
+## Re-gates after the check/teeth change
+A first gate-t05 run failed for an environmental reason, not a defect: a server left listening on
+port 4319 by the D-023 probe made src/main.ts print EADDRINUSE. The stray process was killed and
+the gates were re-run clean.
+
+just gate-t05 -> gate-t05: ok — horizon.surface/2 + horizon.gui-view/1 verified across GUI/CLI/MCP
+just verify   -> verify: ok (active frozen artifacts: requirements/ledger.yaml + .wayfinder/answer-key.md)
+
+Attribution teeth added to teeth-t05-boundaries (NE-B10..NE-B13); total 18 checks.

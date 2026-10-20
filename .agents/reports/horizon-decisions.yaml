@@ -382,8 +382,61 @@ decisions:
     evidence:
       - "scripts/teeth-t05-equivalence.ts"
       - ".agents/evidence/horizon/T05/teeth-t05.log"
+  - id: DEC-T05-04
+    date: "2026-10-20"
+    task: T05
+    requirement: none (T05 prereg PE-08; plan rule horizon.plan.yaml:77)
+    decision: >-
+      OWNER RULING: create the root NOTICE now. Plan rule horizon.plan.yaml:77 ("Copied files keep
+      attribution and a NOTICE entry") makes the file an expected output, so authorizing it does not
+      manufacture settlement evidence for PE-08. NOTICE carries a Horizon header and, for each donor in
+      docs/donors.md, its name, license, pinned source commit or package version, and what was borrowed
+      (vocabulary/structure only, no imported code), matching docs/donors.md. docs/donors.md now
+      references NOTICE. PE-08 is re-run on its own (not a new gate run) and upgraded from PARTIAL to
+      PASS; D-022 is closed. The NOTICE states that Horizon declares no license of its own (no root
+      LICENSE, no package.json license field) and grants nothing on Horizon's behalf; that gap is
+      recorded separately rather than closed by assumption.
+    reversible: true
+    evidence:
+      - "NOTICE"
+      - "docs/donors.md"
+      - "scripts/check-t05-boundaries.ts"
+      - ".agents/evidence/horizon/T05/pe08-rerun.log"
+      - ".agents/evidence/horizon/T05/SUMMARY.md"
+
+  - id: DEC-T05-05
+    date: "2026-10-20"
+    task: T05
+    requirement: none (T05 prereg PE-08)
+    decision: >-
+      PE-08 names two lists that must agree, so check-t05-boundaries now pairs them mechanically instead
+      of trusting two hand-maintained files: every `## ` heading in docs/donors.md must appear as a
+      NOTICE banner and the reverse, and every donor both agree on must carry License, a pinned source
+      commit or version, and a Borrowed statement. The check was verified by attack, not by inspection:
+      absent NOTICE, a dropped donor, and a missing License line each fail; the restored record passes.
+    reversible: true
+    evidence:
+      - "scripts/check-t05-boundaries.ts"
+      - ".agents/evidence/horizon/T05/pe08-rerun.log"
+
+  - id: DEC-T05-06
+    date: "2026-10-20"
+    task: T05
+    requirement: none (debt disposition)
+    decision: >-
+      D-023 (CLI and server contending for one SQLite store) does NOT reproduce on the settled tree: six
+      concurrent processes against one HORIZON_STORE all exited 0 with zero lock errors, and the pinned
+      cognate-store-sqlite 0.6.1 already applies `PRAGMA busy_timeout = 5000`, though only after
+      `journal_mode = WAL`. It is therefore not a blocker for T06 or T07 and is reclassified as latent
+      rather than active, with the residual opening-burst window recorded rather than closed. Horizon
+      does not patch the vendored store (REQ-STACK-010); any hardening belongs upstream in Cognate.
+    reversible: true
+    evidence:
+      - ".agents/DEBT.md"
+      - "node_modules/@godspeedai/cognate-store-sqlite/src/index.ts"
 
 open_questions:
+
   - id: OQ-001
     raised: "2026-10-19"
     task: T04

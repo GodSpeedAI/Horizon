@@ -31,3 +31,55 @@
 
 ---
 {"revision": 16, "recorded_at": "2026-10-20T15:40:00Z", "stage": "T05 settled (P2, builder with adversarial teeth); next dependency-ready task T06", "summary": "One closed grammar horizon.surface/2, one binder, one reducer and one shared horizon.gui-view/1 projection now serve GUI, CLI and MCP through a single seam (src/ui/surface.ts), and just gate-t05 is commissioned. NE-03 found a real reducer defect rather than a test defect: an agent attribution claiming human layout authority could still be reported as human-authored, so downgrade() now caps such a placement at agent_proposed. Cross-transport equivalence is proven live (scripts/teeth-t05-equivalence.ts starts the real server and runs the real CLI, demanding a byte-identical text body); it caught a real MCP naming divergence on first run that the check now asserts explicitly (D-024). PE-08 is PARTIAL: docs/donors.md is updated but no NOTICE file exists.", "verified": ["just gate-t05 -> exit 0 (.agents/evidence/horizon/T05/gate-t05.log)", "just verify -> exit 0 (.agents/evidence/horizon/T05/just-verify.log)", "bun test -> 24 pass / 0 fail / 197 expect() calls across 5 files", "teeth-t05-boundaries -> ok (14 checks); teeth-t05-equivalence -> ok (5 comparisons)", "check-t05-boundaries -> ok (30 files); pytest -> 4 passed", "prereg sha256 ff36d65b578531687f8165950ba38c438dd98a71671c230d59ae48d02bd73019 (frozen before implementation)"], "limits": ["PE-08 PARTIAL: PE-08 names docs/donors.md AND NOTICE; no NOTICE exists (D-022, needs owner ruling because PE-08 is frozen)", "Clack and the WebMCP browser transport are not bound at T05 (declared in the prereg)", "The agent-attribution layout downgrade is unit-proven only; no end-to-end journey has driven a conflicting human/agent layout claim yet (J02 territory)", "New debt observed, not fixed: D-022 NOTICE absent; D-023 CLI/server contend for one SQLite store; D-024 MCP tool names fold operation ids; D-025 horizon.view copies the role vocabulary"], "next": "T06 — build the operational object layer: typed object-set and relationship projections on Cognate (depends_on T04; T07 follows)", "decisions": ["DEC-T05-01", "DEC-T05-02", "DEC-T05-03"], "evidence": [".agents/evidence/horizon/T05/SUMMARY.md", ".agents/evidence/horizon/T05/gate-t05.log", ".agents/evidence/horizon/T05/just-verify.log", ".agents/evidence/horizon/T05/teeth-t05.log", ".agents/evidence/horizon/T05/donor-inventory.log", ".agents/prereg/horizon/T05.prereg.yaml", "src/ui/surface2/", "scripts/check-t05-boundaries.ts", "scripts/teeth-t05-boundaries.ts", "scripts/teeth-t05-equivalence.ts", ".agents/DEBT.md"], "spec": {"id": "HORIZON-001", "version": "1.0.1", "status": "frozen", "sha256": "14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4"}}
+---
+{
+  "revision": 17,
+  "recorded_at": "2026-10-20T16:45:00Z",
+  "stage": "T05 settled; PE-08 PASS after owner ruling; next dependency-ready task T06",
+  "summary": "The owner ruled on PE-08: plan rule horizon.plan.yaml:77 makes a NOTICE entry an expected output of copying donor material, so a root NOTICE was authored rather than PE-08 amended. NOTICE records, per donor in docs/donors.md, the name, license, pinned source commit or package version and what was borrowed, and docs/donors.md now links to it. Rather than trusting two hand-maintained lists, check-t05-boundaries now fails on any disagreement between them or on a section lacking License/Source/Borrowed, with four new teeth (NE-B10..NE-B13) proving it bites. PE-08 was re-run in isolation and passes. D-022 is closed. D-023 was re-tested and does not reproduce: six concurrent processes on one HORIZON_STORE all exited 0 because the pinned cognate-store-sqlite already sets busy_timeout, so it is reclassified latent and does not block T06 or T07.",
+  "verified": [
+    "just gate-t05 -> exit 0, 'gate-t05: ok - horizon.surface/2 + horizon.gui-view/1 verified across GUI/CLI/MCP'",
+    "just verify -> exit 0 ('verify: ok')",
+    "teeth-t05-boundaries -> ok (18 checks, including NE-B10..NE-B13 attribution teeth)",
+    "check-t05-boundaries -> ok (30 files)",
+    "sha256sum -c .agents/evidence/horizon/T05/SHA256SUMS -> SUMMARY.md, pe08-rerun.log and the frozen prereg all OK",
+    "prereg sha256 ff36d65b578531687f8165950ba38c438dd98a71671c230d59ae48d02bd73019 unchanged (frozen prereg not edited)",
+    "spec sha256 14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4 still matches the plan binding"
+  ],
+  "limits": [
+    "PE-08 passed only after an owner ruling: a NOTICE did not exist at settlement time and was authorized on 2026-10-20 (DEC-T05-04)",
+    "Clack and the WebMCP browser transport are not bound at T05 (declared out of scope in the prereg; owner accepted the partial cross-transport equivalence)",
+    "The agent-attribution layout downgrade is unit-proven only; J02 contains no conflicting human/agent layout claim, so no end-to-end proof exists (D-027)",
+    "Horizon declares no license of its own - no root LICENSE, no package.json license field - so NOTICE grants nothing on Horizon's behalf (D-026)",
+    "D-023 does not reproduce but retains a latent opening-burst window because busy_timeout is set after journal_mode = WAL; not fixed in-repo (REQ-STACK-010, upstream in Cognate)",
+    "Open debt not fixed: D-024 MCP tool names fold operation ids; D-025 horizon.view copies the role vocabulary; D-026; D-027"
+  ],
+  "next": "T06 - build the operational object layer: typed object-set and relationship projections on Cognate (depends_on T04; T07 follows); D-023 does not block it",
+  "decisions": [
+    "DEC-T05-01",
+    "DEC-T05-02",
+    "DEC-T05-03",
+    "DEC-T05-04",
+    "DEC-T05-05",
+    "DEC-T05-06"
+  ],
+  "evidence": [
+    "NOTICE",
+    "docs/donors.md",
+    ".agents/evidence/horizon/T05/SUMMARY.md",
+    ".agents/evidence/horizon/T05/pe08-rerun.log",
+    ".agents/evidence/horizon/T05/SHA256SUMS",
+    ".agents/evidence/horizon/T05/gate-t05.log",
+    ".agents/evidence/horizon/T05/just-verify.log",
+    ".agents/prereg/horizon/T05.prereg.yaml",
+    "scripts/check-t05-boundaries.ts",
+    "scripts/teeth-t05-boundaries.ts",
+    ".agents/DEBT.md"
+  ],
+  "spec": {
+    "id": "HORIZON-001",
+    "version": "1.0.1",
+    "status": "frozen",
+    "sha256": "14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4"
+  }
+}

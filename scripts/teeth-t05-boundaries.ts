@@ -98,6 +98,17 @@ function plant(files: Readonly<Record<string, string>>): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t05-tooth-"));
   fs.mkdirSync(path.join(dir, "src/ui/surface2"), { recursive: true });
   fs.writeFileSync(path.join(dir, "src/ui/surface2/render.ts"), realRender);
+  // A planted tree isolates ONE violation. The attribution rule (PE-08) reads two root files,
+  // so they are carried over as-is; otherwise every planted tree would also be an "absent
+  // NOTICE" tree and the acceptance teeth could never tell an unrelated failure from the one
+  // they name. The attribution rule gets its own teeth below.
+  for (const relative of ["NOTICE", "docs/donors.md"]) {
+    const source = path.join(ROOT, relative);
+    if (!fs.existsSync(source)) continue;
+    const target = path.join(dir, relative);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(source, target);
+  }
   for (const [relative, content] of Object.entries(files)) {
     const target = path.join(dir, relative);
     fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -187,5 +198,61 @@ try {
   fs.rmSync(proseSinkDir, { recursive: true, force: true });
 }
 
-console.log(failures === 0 ? `teeth-t05: ok (${TEETH.length + 3} checks)` : `teeth-t05: ${failures} failure(s)`);
+// 5. The attribution rule (PE-08) must bite. Two lists that are supposed to agree drift into
+//    looking maintained; so each way they can disagree is a tooth, and a donor section that
+//    states no license or no borrowed material is not a record.
+const ATTR_TEETH: readonly { readonly id: string; readonly mutate: (dir: string) => void; readonly expect: RegExp }[] = [
+  {
+    id: "NE-B10 NOTICE absent is rejected, not assumed present",
+    mutate: (dir) => fs.rmSync(path.join(dir, "NOTICE"), { force: true }),
+    expect: /NOTICE: missing at the repository root/,
+  },
+  {
+    id: "NE-B11 a donor dropped from NOTICE is drift",
+    mutate: (dir) => {
+      const file = path.join(dir, "NOTICE");
+      const text = fs.readFileSync(file, "utf8");
+      // Rename the banner's donor so it no longer matches docs/donors.md. Picking the name from
+      // docs/donors.md keeps the tooth honest if the donor set changes.
+      const donor = /^## (.+)$/m.exec(fs.readFileSync(path.join(dir, "docs/donors.md"), "utf8"))?.[1];
+      if (!donor) throw new Error("no donor heading to drift");
+      fs.writeFileSync(file, text.replace(new RegExp(`^${donor}:`, "m"), "SomeOtherProject:"));
+    },
+    expect: /does not name donor/,
+  },
+  {
+    id: "NE-B12 an extra donor in NOTICE is drift",
+    mutate: (dir) => {
+      const file = path.join(dir, "NOTICE");
+      const text = fs.readFileSync(file, "utf8");
+      fs.writeFileSync(file, `${text}\n==============================================================================\nUnrecorded Donor: https://example.invalid/donor\n\nLicense: Apache-2.0\nSource commit: deadbeef\nBorrowed: nothing\n`);
+    },
+    expect: /does not record donor .*named in NOTICE/,
+  },
+  {
+    id: "NE-B13 a donor section without a license is not a record",
+    mutate: (dir) => {
+      const file = path.join(dir, "NOTICE");
+      fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace(/^License:/m, "Licence:"));
+    },
+    expect: /records no License line/,
+  },
+];
+for (const tooth of ATTR_TEETH) {
+  const dir = plant({});
+  try {
+    tooth.mutate(dir);
+    const result = checkT05Boundaries(dir);
+    if (result.ok || !result.failures.some((failure) => tooth.expect.test(failure))) {
+      failures += 1;
+      report(`FAIL ${tooth.id}: ${result.ok ? "accepted" : `wrong reason: ${result.failures.join("; ")}`}`);
+    } else {
+      report(`ok   ${tooth.id}`);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log(failures === 0 ? `teeth-t05: ok (${TEETH.length + ATTR_TEETH.length + 3} checks)` : `teeth-t05: ${failures} failure(s)`);
 process.exit(failures === 0 ? 0 : 1);

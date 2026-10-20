@@ -1,5 +1,10 @@
 # Donor attribution
 
+The legal summary of these obligations is the root [`NOTICE`](../NOTICE) file. This
+document is the detailed, change-by-change account of what Horizon borrowed and explicitly
+did not borrow; the two must stay in agreement, and `just check-t05` fails if the NOTICE
+names a donor that this file does not, or the reverse.
+
 ## Product Actualizer
 
 - Source: `SPRIME01/Product-Actualizer`, donor commit `c9df8d2`, Apache-2.0.

@@ -1,0 +1,61 @@
+Horizon
+Copyright GodSpeed AI
+
+This product includes vocabulary and structural patterns derived from the
+projects listed below. No donor source file is copied into this repository and
+no donor package is imported at runtime, except where a row says otherwise. The
+human-readable account of what was and was not borrowed is `docs/donors.md`;
+this file is its legal summary.
+
+Horizon's own license has not been declared in this repository: there is no root
+LICENSE file and package.json sets no `license` field. This NOTICE therefore
+records donor obligations only and grants nothing on Horizon's behalf.
+
+Each entry records the donor name, its license, the pinned source commit or
+package version this repository was derived against, and what was borrowed.
+
+==============================================================================
+Product Actualizer: https://github.com/SPRIME01/Product-Actualizer
+
+License: Apache-2.0 (owner relicense, 2026-10-19)
+Source commit: c9df8d2
+Borrowed (vocabulary and structure only; no imported code):
+
+  - Structural vocabulary at T04: deterministic source references, a closed
+    surface model, persistent navigation context, and pure projection from
+    typed state. Horizon's implementation is an independent TypeScript
+    derivation; no donor file was copied verbatim.
+
+  - Surface vocabulary as data at T05: responsibility names, intent names,
+    layout-placement names and tone names, transcribed into
+    src/ui/surface2/grammar.ts (RESPONSIBILITIES, SURFACE_INTENTS,
+    LAYOUT_PLACEMENTS, TONES). These are data, not donor code. Horizon validates
+    them with its own schemas.
+
+Not borrowed: Product Actualizer's Product Model, router, approval engine,
+reducer, server process, second authoritative state store, or its
+loopback/local-token trust model.
+
+==============================================================================
+Cognate: https://github.com/GodSpeedAI/Cognate
+
+License: Apache-2.0
+Source commit: a477933a1ddf1a8bcd64b4e762ccbb56e5fbd7d5 (version 0.6.1)
+Borrowed: the `cognate create` starter was generated with the pinned Cognate
+CLI, and its vendored package closure is committed under `.cognate/vendor/` and
+depended on directly. Unlike the other donors, Cognate packages are imported at
+runtime; they are retained in full under their own Apache-2.0 LICENSE files
+inside each package directory. Horizon-owned application code replaces the
+starter example domain and test.
+
+==============================================================================
+DomainForge: https://github.com/GodSpeedAI/DomainForge
+
+License: Apache-2.0
+Source: TypeScript binding `@godspeedai/domainforge` version 0.21.1 (pinned
+package version; consumed only through `@godspeedai/cognate-domainforge`, also
+0.6.1 and Apache-2.0, whose full license text is retained in its package
+directory).
+Borrowed: nothing is copied into this repository. DomainForge is used only
+through the Cognate DomainForge adapter for semantic projection and identity
+verification.

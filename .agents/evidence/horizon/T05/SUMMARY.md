@@ -25,7 +25,8 @@ implementation.
 | PE-05 | pass | NE-01/NE-10: markup rejected at grammar, escaped at render, anchors carry only `data-*`; no surface attributed to an unattributable observer. |
 | PE-06 | pass | MCP publishes 11 operation tools + 1 view tool, derived from `HORIZON_OPERATIONS`; unoffered intents refused 409 on GUI and MCP, exit 1 on CLI. |
 | PE-07 | pass | `just gate-t05` and `just verify` both exit 0 (logs retained). |
-| PE-08 | partial | `docs/donors.md` records T05 reuse and no donor module is imported (`grep product-actualizer src/` → 0). **No `NOTICE` file exists**, so the second half of the expectation is unmet — DEBT D-022. |
+| PE-08 | **pass** (re-run 2026-10-20) | `docs/donors.md` records T05 reuse and no donor module is imported (`grep product-actualizer src/` → 0). A root `NOTICE` now records each donor's name, license, pinned source commit or package version and what was borrowed, and `docs/donors.md` links to it; `check-t05-boundaries` fails if either list drops a donor or a section lacks License/Source/Borrowed (three attacks bite). Was partial until the owner ruling (DEC-T05-04) authorized the file; see D-022. |
+
 
 ## Negative evidence (NE-01…NE-10)
 
@@ -52,5 +53,9 @@ on first run (MCP names fold `.` → `_`), which the comparison now asserts expl
 
 - Clack and the WebMCP browser transport are not bound at T05 (declared in the prereg).
 - The reducer's agent-attribution cap is exercised by unit tests; no end-to-end journey has
-  yet driven a conflicting human/agent layout claim (J02 territory, later task).
-- PE-08's `NOTICE` half is unachievable as written (D-022).
+  yet driven a conflicting human/agent layout claim (J02 territory, later task). Recorded as
+  DEBT D-027 after confirming J02 does not contain the case.
+- Horizon declares no license of its own (D-026). The `NOTICE` header states that absence
+  rather than implying a grant.
+- PE-08's `NOTICE` half was unachievable as written; resolved by owner ruling (D-022,
+  DEC-T05-04) and re-run in isolation — see `pe08-rerun.log`.
