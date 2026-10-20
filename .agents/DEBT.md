@@ -213,6 +213,24 @@
 - Evidence: `ls LICENSE` -> no such file; `grep license package.json` -> no match; the `NOTICE` header states the absence explicitly rather than implying a grant.
 - Confidence: high (directly observed absence)
 - Closure: owner picks Horizon's license, adds root `LICENSE` and a `package.json` `license` field, then updates the `NOTICE` header. Size S.
+- Resolution (2026-10-20, same day): NOT REPRODUCIBLE — see D-028. The repository does have a root `LICENSE` (Apache-2.0, added on the remote in `4702ada`); this entry observed a locally stale clone, not an unlicensed repository. Treat D-026 as refuted. The one part that survives is that `package.json` still declares no `license` field.
+## D-028 D-026 was a false positive: the local clone was stale, not unlicensed (2026-10-20)
+- Date: 2026-10-20
+- Location: `.agents/DEBT.md` D-026; repository root `LICENSE`; `NOTICE`; `docs/donors.md`
+- Debt: D-026 recorded that Horizon declares no license, and the `NOTICE` header was authored to state that absence. Both were wrong. The owner had added `LICENSE` (Apache-2.0) to the remote at least an hour earlier, but the local clone sat one commit behind and nothing forced a fetch, so the absence observed locally was a local-clone artifact reported as a repository fact. Left uncorrected, the `NOTICE` would have carried a false statement about Horizon's own terms into a file whose entire purpose is legal accuracy. D-026 stays in this log as a failed observation rather than being deleted.
+- Evidence: `git fetch origin` reported `main ... [origin/main: ahead 4, behind 1]`; `4702ada Create LICENSE` (`SPRIME01`, Tue Oct 20 12:14:44 2026 -0400) adds 201 lines whose first lines are `Apache License / Version 2.0, January 2004`. Before the pull, `ls LICENSE` returned no such file. After merging `origin/main`, `LICENSE` exists locally.
+- Confidence: high (directly observed, then directly refuted by the fetch)
+- Closure: Done in the correcting commit — `NOTICE` now states Apache-2.0 and points at `LICENSE`. Still open: `package.json` has no `license` field, so tooling that reads the manifest alone cannot detect the license; adding `"license": "Apache-2.0"` is owner-gated because it asserts terms. Size S.
+
+## D-029 Local state can be stale relative to origin, and nothing forced a fetch (2026-10-20)
+- Date: 2026-10-20
+- Location: repository-wide; the T05 verification loop (`just verify`, `just gate-t05`) and the evidence recorded from it
+- Debt: Every T05 gate ran against a working tree one commit behind `origin/main`. The gates verify the tree, not the branch that will be pushed, so "verified" was true of local state and could have diverged silently from the shared branch. This time the divergence was a documentation fact (D-028); a source or spec divergence would have the same blind spot with worse consequences.
+- Evidence: `git branch -vv` showed `[origin/main: ahead 4, behind 1]` only because the status line prints the upstream count; no gate or hook reported it. The stale commit was user-visible only because the owner said so.
+- Confidence: medium (the staleness is directly observed; the general risk of a stale-tree green gate is a code/process reading, not an observed failure)
+- Closure: Have `just verify` (or a pre-commit check) report ahead/behind and refuse to report green when behind on a fetched remote. Files likely touched: `justfile`, a small `scripts/check-sync.ts`. Size S.
+
+
 
 ## D-027 No end-to-end journey exercises a conflicting human/agent layout claim (2026-10-20)
 - Date: 2026-10-20
