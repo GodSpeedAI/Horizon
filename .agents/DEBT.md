@@ -169,3 +169,36 @@
 - Evidence: `requirements/ledger.yaml` rows carry `proof` (gate commands) and `acceptance` (ids), no evidence reference; the `.sea` invariants all read `evidence_class: "declared"`.
 - Confidence: medium (code and schema reading, not observed failing a gate)
 - Closure: add an `acceptance_evidence` binding per requirement (path plus test name) to the ledger schema, emitted by the generator from `evaluated_by`, and validate it in `just wayfinder`. Size M.
+
+
+## D-022 There is no NOTICE file, though T05's prereg names one (2026-10-20)
+- Date: 2026-10-20
+- Location: repository root (`NOTICE` absent), `.agents/prereg/horizon/T05.prereg.yaml` PE-08, `docs/donors.md`
+- Debt: PE-08 expects donor-derived vocabulary to be recorded in `docs/donors.md` **and** `NOTICE`. `docs/donors.md` exists and is current; no `NOTICE` file exists at the root and no code or check references one, so the second half of the expectation cannot be satisfied as written. Whether Apache-2.0 redistribution of the vendored Cognate closure requires one was not verified here.
+- Evidence: `ls NOTICE` -> no such file; no reference to `NOTICE` in `src/`, `scripts/` or `docs/`.
+- Confidence: high (directly observed absence)
+- Closure: either author a root `NOTICE` covering the vendored Apache-2.0 closure and link it from `docs/donors.md`, or amend PE-08 to name `docs/donors.md` alone. Both need owner sign-off because PE-08 is frozen. Size S.
+
+## D-023 CLI and server processes contend for one SQLite store (2026-10-20)
+- Date: 2026-10-20
+- Location: `src/runtime/create.ts` (`openSqliteStore`), `src/main.ts`
+- Debt: Two Horizon processes pointed at the same `HORIZON_STORE` race on `PRAGMA journal_mode = WAL` and one dies with `SQLiteError: database is locked (SQLITE_BUSY)`. It does not block T05 — `scripts/teeth-t05-equivalence.ts` gives each process its own store — but an operator running `horizon surface` beside a live server sees a hard crash rather than a retry.
+- Evidence: `bun run src/main.ts surface` and `bun run src/main.ts schema` against one `HORIZON_STORE`; the second exited 1 with `SQLiteError: database is locked` at `openSqliteStore`.
+- Confidence: high (directly observed)
+- Closure: set `busy_timeout` on open, or keep store paths per-process. Size S.
+
+## D-024 MCP tool names fold the closed operation id, so identity is lost (2026-10-20)
+- Date: 2026-10-20
+- Location: `src/ui/surface2/render.ts` (`mcpTools`)
+- Debt: Tool names are `operation.replaceAll(".", "_")`, so `horizon.health` is published as `horizon_health`. A consumer cannot recover the closed operation id from the name without re-deriving the fold, and no field on the descriptor carries the original id. The equivalence tooth must re-apply the same transformation, so it verifies a naming convention rather than an identity.
+- Evidence: `bun run src/main.ts mcp` emits `horizon_health`, `horizon_research_health`, … against a grammar union of `horizon.health`, `horizon.research.health`, ….
+- Confidence: high (directly observed in output)
+- Closure: add an explicit `operation` field to each descriptor so middleware and the check compare identity, not spelling. Size S.
+
+## D-025 The `horizon.view` MCP tool is hand-listed and copies the role vocabulary (2026-10-20)
+- Date: 2026-10-20
+- Location: `src/ui/surface2/render.ts` (`mcpTools`, first element)
+- Debt: The eleven operation tools are derived from `HORIZON_OPERATIONS`, but `horizon.view` is a literal with a hand-written `inputSchema` naming `["agent", "human", "system"]` — a second copy of the role vocabulary. A role added to the grammar would leave the MCP view tool advertising a stale set while every check stayed green.
+- Evidence: code reading of `mcpTools`; `SURFACE_ROLES` in `grammar.ts` is the authority; the view tool repeats the three role strings literally.
+- Confidence: medium (code reading, not observed failing)
+- Closure: build the `horizon.view` descriptor from `SURFACE_ROLES` and `GUI_VIEW_SCHEMA`. Size S.
