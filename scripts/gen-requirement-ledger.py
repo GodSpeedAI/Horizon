@@ -184,6 +184,19 @@ def _restate_clause(text, first=False):
         # "MUST NOT" and "MUST never" are prohibitions, not positive obligations.
         body = re.sub(r"^(never|not)\s+", "", body)
         return f"{subject} {be} never observed to {body}."
+    if modal == "MAY":
+        # A permission is not an outcome: "MAY be reachable" permits reachability, so
+        # restating it as "is observed to be reachable" would require it instead.
+        return f"{subject} may be observed to {body}."
+    if modal == "SHOULD":
+        # A soft obligation is not an outcome either: "SHOULD respond within 300 ms" would
+        # become a hard requirement if restated as "is observed to respond".
+        return f"{subject} should be observed to {body}."
+    # A lowercase "not" with a restored subject is still a prohibition ("adapters MUST not
+    # create ..."), and restating it positively would invert the clause (F2 class).
+    lowered = re.match(r"not\s+(.*)$", body, re.S)
+    if lowered:
+        return f"{subject} {be} never observed to {lowered.group(1).strip().rstrip('.')}."
     if re.match(r"(never|always)\s+", body):
         body = re.sub(r"^(never|always)\s+", "", body)
         return f"{subject} {be} never observed to {body}."
@@ -202,7 +215,13 @@ _SELF_TEST = (
     ("DomainForge alone MUST own canonical semantic compilation.",
      "DomainForge alone is observed to own canonical semantic compilation."),
     ("A product MAY be reachable as a hosted surface; a hosted surface MUST NOT run inside Horizon's trust boundary.",
-     "A product is observed to be reachable as a hosted surface. A hosted surface is never observed to run inside Horizon's trust boundary."),
+     "A product may be observed to be reachable as a hosted surface. A hosted surface is never observed to run inside Horizon's trust boundary."),
+    # Criticism round 1: a lowercase "not" is still a prohibition once the subject is restored.
+    ("Cognate MUST own app events; adapters MUST not create a second authoritative event history.",
+     "Cognate is observed to own app events. Adapters are never observed to create a second authoritative event history."),
+    # Criticism round 1: a soft obligation is not an outcome either.
+    ("Read-only navigation interactions SHOULD respond within 300 ms p95.",
+     "Read-only navigation interactions should be observed to respond within 300 ms p95."),
 )
 
 
@@ -216,6 +235,12 @@ def self_test():
     inverted = restate("REQ-TEST", "X MUST NOT be treated as approval")
     if "never observed" not in inverted or inverted.startswith("Observed in the runtime's own terms"):
         raise SystemExit(f"restate() dropped a prohibition: {inverted!r}")
+    # Criticism round 1, second defect class: a permission or a soft obligation is not an
+    # outcome. Dropping the modal turns a MAY or a SHOULD into a MUST.
+    for text, modal_word in (("X MAY be reachable.", "may be observed"), ("X SHOULD respond.", "should be observed")):
+        restated = restate("REQ-TEST", text)
+        if modal_word not in restated:
+            raise SystemExit(f"restate() strengthened {text!r} into a hard obligation: {restated!r}")
 
 
 

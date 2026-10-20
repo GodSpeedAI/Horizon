@@ -32,7 +32,7 @@ Each claim names its proof. Your job is to attack the proof, not to accept it.
 | C2 | Configuration is exercised through application construction, with no store override; `HORIZON_STORE=:memory:` is rejected on the E2E path. | `test/app.test.ts` (`configured in-memory storage is rejected by construction`), `test/support/config.ts`. Check for a hidden override. |
 | C3 | The promised frame→typed intent→run→checkpoint path exists: a typed `CommitNavigationIntent` is built from the issued frame, committed through Cognate, recorded in the durable log, and used to start the observation run. | `src/domain/intent.ts`, `src/capabilities/navigation-intent.ts`, `src/app.ts`, `test/app.test.ts`. Check that the typed intent is not a thin alias for a JSON cast, and that the checkpoint is observed rather than fabricated. |
 | C4 | The generator preserves normative polarity and subject; a self-test fails generation if it does not; the candidate ledger repairs all four inverted contracts and restores subjects on the generic ones. | `scripts/gen-requirement-ledger.py` (`restate`, `self_test`), `scripts/check-acceptance-claims.py`, candidate `ledger.yaml`. Try requirement phrasings that invert or lose meaning. |
-| C5 | The three underdetermined contracts are bound to witnesses, and the bindings add no policy, threshold or requirement. | `scripts/ledger-policy.candidate.yaml`, `test/acceptance.test.ts`, candidate `REVIEW.md`. Check the binding against the frozen requirement text. |
+| C5 | The three underdetermined contracts restate their requirement verbatim; what the witness supplies is recorded separately and is never restated as policy; the composer refuses an entry that declares introduced policy. | `scripts/ledger-policy.candidate.yaml` (`witness_supplies`, `introduced`), `scripts/apply-candidate-revision.py`, `test/acceptance.test.ts`, candidate `REVIEW.md`, `.agents/evidence/horizon/T04/criticism-round1.md`. The first draft of these three added a materiality predicate, a prescribed construction path and an unratified "frame vocabulary"; check whether revision 2 really removed them, and whether `evaluateDeviation` now follows the spec's own algorithm (`derive_navigation_frame`, INV-01) or merely swapped inventions. |
 | C6 | Referential integrity and invariant-id uniqueness are checked, the two DomainForge blind spots are demonstrated, and an undefined type is still rejected. | `scripts/check-idm-integrity.py`, `scripts/teeth-idm-integrity.py`, `scripts/teeth-domainforge-gate.py`, `scripts/idm-integrity-debt.yaml`. Try a dangling reference the debt list does not cover. |
 | C7 | Research is optional at startup and degraded observably; research-dependent operations fail closed; unrelated read-only startup and operations continue. | `src/app.ts`, `src/adapters/research.ts`, `test/app.test.ts`. Try a research command that hangs, emits malformed JSON, or exits 0 with a wrong contract. |
 | C8 | `just verify` is T04's complete gate and includes the adversarial teeth; `gate-t04` additionally checks the candidate contracts; `acceptance-claims-frozen` is honestly red. | `justfile`. Look for a target that returns green with a required check skipped. |
@@ -50,6 +50,8 @@ just boundaries
 just idm-integrity
 just acceptance-claims
 just acceptance-claims-frozen      # expected RED on the active ledger; confirm it is red for the right reason
+just witness-claims               # no NEW policy in any contract; 9 inherited findings are DEBT D-020
+just contract-modals              # no changed contract drops a modal; contract-modals-frozen is RED by design
 just test
 just ledger
 just wayfinder
@@ -58,6 +60,11 @@ just verify
 just gate-t04
 bash .agents/evidence/horizon/T04/run-gates.sh
 ```
+
+`just witness-claims` and `just contract-modals` take a baseline from
+`scripts/witness-claims-baseline.txt` so that inherited defects do not fail a gate while a new
+one does. Judge that baseline yourself: if a baselined entry is really a defect in code this
+revision authored, the claim that "no new policy was introduced" is false.
 
 Also re-run your own NE-01 … NE-05 against **both** `7b4d110` and the current tree, and say
 explicitly which commit/tree each command tested. The builder's re-run of the five NEs on

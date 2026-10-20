@@ -2,40 +2,37 @@ bun test
 bun test v1.4.0 (34cbb9a40)
 
 test/config.test.ts:
-(pass) local_operator configuration > accepts a loopback local operator [0.51ms]
-(pass) local_operator configuration > refuses a non-loopback bind [0.12ms]
+(pass) local_operator configuration > accepts a loopback local operator [0.39ms]
+(pass) local_operator configuration > refuses a non-loopback bind [0.22ms]
 (pass) local_operator configuration > refuses shared_remote without a real identity provider [0.03ms]
-(pass) local_operator configuration > keeps operator and agent principals distinct [0.15ms]
-(pass) local_operator configuration > issues a fresh 0600 secret on every launch [1.38ms]
+(pass) local_operator configuration > keeps operator and agent principals distinct [0.16ms]
+(pass) local_operator configuration > issues a fresh 0600 secret on every launch [1.19ms]
 
 test/app.test.ts:
-(pass) durable store boundary > the configured store is a Cognate SQLite database that survives a close and reopen [3.69ms]
-(pass) structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen [203.88ms]
-(pass) structural walking skeleton > configured in-memory storage is rejected by construction, with no E2E override [240.39ms]
-(pass) structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable [83.49ms]
-(pass) structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact [62.73ms]
-(pass) structural walking skeleton > an absent research source is a typed absent observation, not a startup failure [41.46ms]
+(pass) durable store boundary > the configured store is a Cognate SQLite database that survives a close and reopen [4.72ms]
+(pass) structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen [237.93ms]
+(pass) structural walking skeleton > configured in-memory storage is rejected by construction, with no E2E override [252.28ms]
+(pass) structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable [82.37ms]
+(pass) structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact [68.98ms]
+(pass) structural walking skeleton > an absent research source is a typed absent observation, not a startup failure [37.60ms]
 
 test/acceptance.test.ts:
-(pass) AC-CASE-002-01 next primary move responds to material deviation > an undertaken deviation is answered by naming the operation that deviated [0.11ms]
-(pass) AC-CASE-002-01 next primary move responds to material deviation > a completed outcome counts as an undertaken deviation [0.03ms]
-(pass) AC-CASE-002-01 next primary move responds to material deviation > a refused outcome counts as an undertaken deviation
-(pass) AC-CASE-002-01 next primary move responds to material deviation > a failed outcome counts as an undertaken deviation
-(pass) AC-CASE-002-01 next primary move responds to material deviation > a contradicted outcome counts as an undertaken deviation
-(pass) AC-CASE-002-01 next primary move responds to material deviation > no deviation and only optional choices names no primary move [0.01ms]
-(pass) AC-CASE-002-01 next primary move responds to material deviation > an undertaken deviation that names nothing is refused, not silently accepted [0.06ms]
+(pass) AC-CASE-002-01 next primary move responds to material deviation > a deviation is answered by the first available move, which reports what it responds to [0.11ms]
+(pass) AC-CASE-002-01 next primary move responds to material deviation > a blocked choice is not a primary move even when it deviated (possibility is not an affordance) [0.05ms]
+(pass) AC-CASE-002-01 next primary move responds to material deviation > no deviation and only optional choices names no primary move [0.02ms]
+(pass) AC-CASE-002-01 next primary move responds to material deviation > an undertaken deviation that names nothing is refused, not silently accepted [0.12ms]
 (pass) AC-NAV-005-01 the controller does not ask for context the frame can resolve > each reference class the frame carries is resolved from the frame [0.11ms]
-(pass) AC-NAV-005-01 the controller does not ask for context the frame can resolve > an unknown checkpoint is not resolvable, and a conflicting value is not claimed [0.03ms]
-(pass) AC-CONFIG-004-01 configured provider endpoints stay below stable behavior contracts > typed choices, intent ids and surface blocks are unchanged; only provider configuration differs [156.01ms]
+(pass) AC-NAV-005-01 the controller does not ask for context the frame can resolve > an unknown checkpoint is not resolvable, and a conflicting value is not claimed [0.04ms]
+(pass) AC-CONFIG-004-01 configured provider endpoints stay below stable behavior contracts > typed choices, intent ids and surface blocks are unchanged when the configured endpoint and credential differ [161.70ms]
 
 test/ui.test.ts:
-(pass) renderer-neutral surface seam > projects a frame without executable markup and with sources on every block [0.17ms]
-(pass) renderer-neutral surface seam > marks agent-supplied values as agent sources [0.09ms]
+(pass) renderer-neutral surface seam > projects a frame without executable markup and with sources on every block [0.13ms]
+(pass) renderer-neutral surface seam > marks agent-supplied values as agent sources [0.08ms]
 
- 23 pass
+ 20 pass
  0 fail
  125 expect() calls
-Ran 23 tests across 4 files. [849.00ms]
+Ran 20 tests across 4 files. [1044.00ms]
 uv run --project research pytest -q
 ....                                                                     [100%]
 4 passed in 0.03s

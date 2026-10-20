@@ -1,0 +1,14 @@
+contract-modals-frozen: the ACTIVE frozen ledger drops modals in several contracts (DEBT D-020); expected to fail until T04-CR-001 is authorized and re-frozen
+python3 scripts/measure-contract-modals.py --ledger requirements/ledger.yaml
+measure-contract-modals: FAILED — requirements/ledger.yaml: 10 contract(s) drop a modal
+- REQ-CASE-003: loses soft obligation
+- REQ-INT-004: loses prohibition
+- REQ-NAV-002: loses exact key set (exactly)
+- REQ-RES-001: loses prohibition
+- REQ-SEC-005: loses prohibition
+- REQ-STACK-006: loses prohibition
+- REQ-STACK-011: loses restriction (only)
+- REQ-STACK-012: loses prohibition
+- REQ-STACK-014: loses prohibition
+- REQ-UI-006: loses prohibition
+error: recipe `contract-modals-frozen` failed on line 40 with exit code 1

@@ -230,3 +230,34 @@ decisions:
       - ".agents/candidates/horizon/T04-CR-001/REVIEW.md"
       - ".agents/evidence/horizon/T04/verdicts/codex-root-20261019-7b4d110.md"
       - ".agents/evidence/horizon/T04/REMEDIATION.md"
+
+  - id: DEC-T04-04
+    date: "2026-10-19"
+    task: T04
+    requirement: REQ-VERIFY-002
+    decision: >-
+      T04-CR-001 is revised to revision 2 and remains PREPARED, NOT APPLIED. The owner deferred
+      the authorization decision and directed that fresh independent criticism of the candidate
+      proceed first. That criticism (criticism round 1, a build-session record, not an independent
+      verdict) found four defects in the first draft: a materiality predicate with its own list of
+      outcomes in AC-CASE-002-01, a prescribed "exercise through construction" reading plus a claim
+      about provider records that nothing observed in AC-CONFIG-004-01, an unratified "pinned frame
+      vocabulary" in AC-NAV-005-01, and -- found by reviewing every regenerated contract -- the same
+      prohibition-inversion class recurring in REQ-STACK-002. A second pass added REQ-RES-004,
+      REQ-STACK-013, REQ-WORLD-008 and REQ-NAV-003/STACK-009 (MAY restated as an absolute) and
+      REQ-UX-009 (SHOULD restated as a MUST). All are corrected: the three named contracts now restate
+      their requirement verbatim with the witness input stated separately, the witnesses were
+      rewritten to the spec's own algorithm or to configuration the application actually reads, and
+      the generator preserves MAY and SHOULD and treats a lowercase "not" as a prohibition.
+    rationale:
+      - "The owner's instruction: preserve MUST, MUST NOT, MAY and SHOULD exactly in meaning; a witness may supply an input but may not restate policy as though ratified."
+      - "Ratification is never automatic: no contract carries a 'potentially-ratified' hold, because that would read as a proposed spec amendment while the ruler is frozen at 1.0.0."
+      - "The active frozen artifacts are untouched (six pins byte-identical), so no inverted prohibition is recorded as accepted risk and T04 is not settled."
+    reversible: true
+    evidence:
+      - ".agents/evidence/horizon/T04/criticism-round1.md"
+      - ".agents/candidates/horizon/T04-CR-001/CANDIDATE.yaml"
+      - ".agents/candidates/horizon/T04-CR-001/REVIEW.md"
+      - "scripts/check-witness-claims.py"
+      - "scripts/measure-contract-modals.py"
+      - ".agents/DEBT.md"

@@ -1,0 +1,39 @@
+# check-witness-claims.py baseline (DEBT D-020, 2026-10-19).
+#
+# These findings are present in the ACTIVE frozen ledger and are NOT fixed by candidate
+# T04-CR-001. They are listed so the check reports them without failing, while any *new*
+# finding fails. Do not add an entry to accept a defect introduced by code this revision
+# authored: fix or withdraw that code instead.
+#
+# Format: <ledger file name>: <symbol>: <REQ id>: <finding>
+# - requirements/ledger.yaml: the active frozen ledger
+# - ledger.yaml: the candidate ledger (same defect, inherited, untouched by this revision)
+requirements/ledger.yaml: check-contract: REQ-CASE-003: the requirement uses SHOULD; the contract drops or strengthens it
+requirements/ledger.yaml: check-contract: REQ-CASE-003: the requirement uses SHOULD; the contract drops or strengthens it
+# The candidate repairs this one (it restates "should settle now"); the entry is kept so the
+# finding is not reported as new if a future regeneration reintroduces it.
+ledger.yaml: check-contract: REQ-CASE-003: the requirement uses SHOULD; the contract drops or strengthens it
+requirements/ledger.yaml: check-contract: REQ-DEV-001: adds the quantifier 'every'
+requirements/ledger.yaml: check-contract: REQ-NAV-002: drops the requirement's 'exactly'
+requirements/ledger.yaml: check-contract: REQ-STACK-004: adds the quantifier 'every'
+requirements/ledger.yaml: check-contract: REQ-STACK-011: adds the quantifier 'exactly'
+ledger.yaml: check-contract: REQ-DEV-001: adds the quantifier 'every'
+ledger.yaml: check-contract: REQ-NAV-002: drops the requirement's 'exactly'
+ledger.yaml: check-contract: REQ-STACK-004: adds the quantifier 'every'
+ledger.yaml: check-contract: REQ-STACK-011: adds the quantifier 'exactly'
+
+# Modal losses measured by scripts/measure-contract-modals.py (same DEBT D-020 entries).
+requirements/ledger.yaml: check-modals: REQ-CASE-003: loses soft obligation
+requirements/ledger.yaml: check-modals: REQ-INT-004: loses prohibition
+requirements/ledger.yaml: check-modals: REQ-NAV-002: loses exact key set (exactly)
+requirements/ledger.yaml: check-modals: REQ-RES-001: loses prohibition
+requirements/ledger.yaml: check-modals: REQ-SEC-005: loses prohibition
+requirements/ledger.yaml: check-modals: REQ-STACK-006: loses prohibition
+requirements/ledger.yaml: check-modals: REQ-STACK-011: loses restriction (only)
+requirements/ledger.yaml: check-modals: REQ-STACK-012: loses prohibition
+requirements/ledger.yaml: check-modals: REQ-STACK-014: loses prohibition
+requirements/ledger.yaml: check-modals: REQ-UI-006: loses prohibition
+ledger.yaml: check-modals: REQ-NAV-002: loses exact key set (exactly)
+ledger.yaml: check-modals: REQ-RES-001: loses prohibition
+ledger.yaml: check-modals: REQ-STACK-011: loses restriction (only)
+ledger.yaml: check-modals: REQ-STACK-014: loses prohibition

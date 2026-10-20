@@ -3,11 +3,16 @@ version: 1
 # Candidate revision T04-CR-001 (2026-10-19, prepared, NOT applied).
 #
 # The frozen acceptance contracts for these three requirements supplied no decisive
-# observation (T04 verdict F3). Each entry below binds the *existing* requirement to a
-# concrete witness or an explicitly bound evaluation rule. None adds a normative
-# requirement, a materiality threshold, or product policy: where the ruler is silent
-# (what counts as "material"), the contract binds evaluation to an input supplied by the
-# witness but names only what the requirement itself requires of that input.
+# observation (T04 verdict F3). Each entry below restates what the requirement already
+# requires as a ranked set of observations, and binds evaluation to an existing witness.
+#
+# Correction (criticism round 1, `.agents/evidence/horizon/T04/criticism-round1.md`):
+# the first draft of these overrides and witnesses introduced policy the ruler does not
+# carry -- a materiality predicate with its own list of outcomes, a requirement that
+# provider configuration be "exercised through construction", a named "guaranteeing
+# revision", a "pinned frame vocabulary", and a positive restatement of the MAY in
+# REQ-NAV-003. Each corrected rule below is a verbatim restatement of the requirement;
+# every `introduced` term is recorded empty so the next reviewer can check the claim.
 #
 # Applying an authorized freeze composes this file over `scripts/ledger-policy.yaml` (and
 # re-appends `evaluated_by` last); see `.agents/candidates/horizon/T04-CR-001/`.
@@ -23,17 +28,83 @@ evaluated_by:
     - "test/acceptance.test.ts :: AC-NAV-005-01"
 
 overrides:
-  REQ-CASE-002: >-
-    For a frame whose recorded deviation input is `undertaken` -- a listed operation has
-    completed, been refused, failed, or returned evidence that contradicts its new state --
-    the next primary move responds to that operation by name; for a frame whose recorded
-    deviation input is `none` and whose every choice is optional, no primary move is named.
-  REQ-CONFIG-004: >-
-    For the same world and frame revision, changing a configured provider endpoint, credential,
-    timeout or scope leaves the typed choices, intent ids and surface blocks unchanged; only
-    provider configuration records differ.
-  REQ-NAV-005: >-
-    Against the pinned frame vocabulary, a prompt whose requested context is derivable
-    from a reference already present in the frame -- the checkpoint ref, the world ref,
-    an operation_ref or the focus ref -- is never issued; the frame resolves it and
-    records the reference it resolved from.
+  # Ruler (frozen, verbatim): "The next primary move MUST respond to material deviation;
+  # no primary recommendation is required when only optional choices remain."
+  # What the witness supplies and the contract does NOT restate: the spec's own reference
+  # algorithm (`derive_navigation_frame`) and `.sea` INV-01 define "material deviation" as
+  # a move that is not a visible reachable, payable, governable, settleable path, and the
+  # algorithm selects the *first available* such move. No outcome list
+  # (completed/refused/failed/contradicted) is added: the requirement names none.
+  REQ-CASE-002:
+    rule: >-
+      The next primary move responds to material deviation. No primary recommendation is
+      required when only optional choices remain.
+    witness_supplies: >-
+      Which operations deviated from a visible settleable path on a supplied frame, and that
+      frame's ordered typed choices.
+    introduced: []
+  # Ruler (frozen, verbatim): "Configured provider endpoints, credentials, timeouts and
+  # scope MUST remain below stable behavior contracts."
+  # The witness's assertion that configuration is exercised through application
+  # construction is not policy and is not restated here; it could only be ratified by
+  # amending the frozen ruler at a new version.
+  REQ-CONFIG-004:
+    rule: >-
+      Configured provider endpoints, credentials, timeouts and scope remain below stable
+      behavior contracts.
+    witness_supplies: >-
+      Typed choices, intent ids and surface blocks read from an application constructed under
+      two different provider configurations.
+    introduced: []
+  # Ruler (frozen, verbatim): "Predictive estimates MAY inform payment, consequence or
+  # ranking only after governed activation: a frozen preregistered held-out criterion,
+  # retained evaluation evidence and an authorized promotion. Active, heuristic and
+  # disabled estimator states MUST be visible, and estimates MUST NOT change hard-gate
+  # outcomes."
+  # The frozen generic restatement kept all three modals; the first draft of this override
+  # turned the permission into an absolute (criticism round 1). The activation sequence is
+  # the ruler's own, not one this revision chose.
+  REQ-RES-004:
+    rule: >-
+      Predictive estimates may be observed to inform payment, consequence or ranking only after
+      governed activation: a frozen preregistered held-out criterion, retained evaluation evidence
+      and an authorized promotion. Active, heuristic and disabled estimator states are observed to
+      be visible, and estimates are never observed to change hard-gate outcomes.
+    witness_supplies: >-
+      Nothing beyond a frame and a pinned world; no witness binds this contract yet (the frozen
+      contract already stated the requirement correctly).
+    introduced: []
+  # Ruler (frozen, verbatim): "An active world MUST be selected through a DomainForge world
+  # alias pinned to an immutable world_ref; a candidate-versus-active semantic diff MAY be a
+  # Horizon-derived read-only view but MUST NOT mint or verify identity."
+  REQ-WORLD-008:
+    rule: >-
+      An active world is observed to be selected through a DomainForge world alias pinned to an
+      immutable world_ref. A candidate-versus-active semantic diff may be observed to be a
+      Horizon-derived read-only view but is never observed to mint or verify identity.
+    witness_supplies: >-
+      Nothing beyond a pinned world; no witness binds this contract yet (the frozen contract
+      already stated the requirement correctly).
+    introduced: []
+  # Ruler (frozen, verbatim): "A product with its own UI MAY be reachable as a hosted surface
+  # via deep links that carry focus refs in and return typed intents or focus out; a hosted
+  # surface MUST NOT run inside Horizon's trust boundary or acquire Horizon authority."
+  REQ-STACK-013:
+    rule: >-
+      A product with its own UI may be observed to be reachable as a hosted surface via deep links
+      that carry focus refs in and return typed intents or focus out. A hosted surface is never
+      observed to run inside Horizon's trust boundary or acquire Horizon authority.
+    witness_supplies: >-
+      Nothing beyond a pinned world; no witness binds this contract yet (the frozen contract
+      already stated the requirement correctly).
+    introduced: []
+  # Ruler (frozen, verbatim): "The navigation controller MUST avoid asking for context it
+  # can resolve without user burden."
+  # The narrowest of the three: the witness supplies which references a frame carries, a
+  # set the ruler does not enumerate.
+  REQ-NAV-005:
+    rule: >-
+      The navigation controller avoids asking for context it can resolve without user burden.
+    witness_supplies: >-
+      The reference classes a supplied frame carries (checkpoint, world, operation, focus).
+    introduced: []

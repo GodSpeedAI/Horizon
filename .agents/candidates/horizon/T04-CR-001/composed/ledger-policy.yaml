@@ -79,16 +79,21 @@ overrides:
     SEA-Forge-covered action bindings, RealityTrace evidence hooks) is individually observable, an unproven
     facet is absent rather than assumed, and the product's reported integration level follows exactly
     the facets proven.
-  REQ-CASE-002: For a frame whose recorded deviation input is `undertaken` -- a listed operation has completed,
-    been refused, failed, or returned evidence that contradicts its new state -- the next primary move
-    responds to that operation by name; for a frame whose recorded deviation input is `none` and whose
-    every choice is optional, no primary move is named.
-  REQ-CONFIG-004: For the same world and frame revision, changing a configured provider endpoint, credential,
-    timeout or scope leaves the typed choices, intent ids and surface blocks unchanged; only provider
-    configuration records differ.
-  REQ-NAV-005: Against the pinned frame vocabulary, a prompt whose requested context is derivable from
-    a reference already present in the frame -- the checkpoint ref, the world ref, an operation_ref or
-    the focus ref -- is never issued; the frame resolves it and records the reference it resolved from.
+  REQ-CASE-002: The next primary move responds to material deviation. No primary recommendation is required
+    when only optional choices remain.
+  REQ-CONFIG-004: Configured provider endpoints, credentials, timeouts and scope remain below stable behavior
+    contracts.
+  REQ-RES-004: 'Predictive estimates may be observed to inform payment, consequence or ranking only after
+    governed activation: a frozen preregistered held-out criterion, retained evaluation evidence and an
+    authorized promotion. Active, heuristic and disabled estimator states are observed to be visible,
+    and estimates are never observed to change hard-gate outcomes.'
+  REQ-WORLD-008: An active world is observed to be selected through a DomainForge world alias pinned to
+    an immutable world_ref. A candidate-versus-active semantic diff may be observed to be a Horizon-derived
+    read-only view but is never observed to mint or verify identity.
+  REQ-STACK-013: A product with its own UI may be observed to be reachable as a hosted surface via deep
+    links that carry focus refs in and return typed intents or focus out. A hosted surface is never observed
+    to run inside Horizon's trust boundary or acquire Horizon authority.
+  REQ-NAV-005: The navigation controller avoids asking for context it can resolve without user burden.
 evaluated_by:
   REQ-CASE-002:
   - 'test/acceptance.test.ts :: AC-CASE-002-01'

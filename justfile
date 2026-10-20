@@ -22,6 +22,23 @@ idm-integrity:
 acceptance-claims:
     python3 scripts/check-acceptance-claims.py --ledger .agents/candidates/horizon/T04-CR-001/ledger.yaml --require-candidate
 
+# A contract can keep its polarity and still add policy (a MAY or SHOULD made absolute, a
+# behaviour, authority or quantifier the requirement does not name). This check fails on a
+# NEW finding; findings already in the frozen ledger are DEBT D-020 and are reported only.
+witness-claims:
+    python3 scripts/check-witness-claims.py
+
+# The mechanical measure behind the check: which contracts drop a requirement's modal.
+# The four findings below are pre-existing (DEBT D-020) and inherited unchanged from the
+# frozen ledger; this target reports them and fails only on a modal loss the candidate
+# introduces. `contract-modals-frozen` shows the same losses on the active ledger.
+contract-modals:
+    python3 scripts/measure-contract-modals.py --ledger .agents/candidates/horizon/T04-CR-001/ledger.yaml --baseline scripts/witness-claims-baseline.txt
+
+contract-modals-frozen:
+    @echo "contract-modals-frozen: the ACTIVE frozen ledger drops modals in several contracts (DEBT D-020); expected to fail until T04-CR-001 is authorized and re-frozen"
+    python3 scripts/measure-contract-modals.py --ledger requirements/ledger.yaml
+
 acceptance-claims-frozen:
     @echo "acceptance-claims-frozen: the ACTIVE frozen ledger does not preserve its prohibitions; expected to fail until T04-CR-001 is authorized and re-frozen"
     python3 scripts/check-acceptance-claims.py
@@ -73,7 +90,7 @@ gate-t03:
     python3 scripts/check-ui-traceability.py
     python3 scripts/teeth-ui-traceability.py
 
-gate-t04: check boundaries idm-integrity acceptance-claims test ledger wayfinder teeth
+gate-t04: check boundaries idm-integrity acceptance-claims witness-claims test ledger wayfinder teeth
     @echo "gate-t04: ok — active frozen artifacts verified; T04-CR-001 candidate contracts verified; T04 settlement still requires an independent verdict"
 
 freeze-t04:

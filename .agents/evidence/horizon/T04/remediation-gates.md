@@ -14,6 +14,8 @@ outbound TCP blocked) for the whole run; nothing here needed a download except t
 | `just idm-integrity` | active `.sea` + frozen spec | referential and identity integrity of the canonical model |
 | `just acceptance-claims` | **candidate** T04-CR-001 ledger + frozen spec | the candidate must preserve the four prohibitions |
 | `just acceptance-claims-frozen` | **active frozen** ledger | expected to fail until T04-CR-001 is authorized; kept red on purpose |
+| `just witness-claims` | active + **candidate** ledgers, frozen spec | a contract may not add policy; 9 inherited findings baselined (D-020), a new one fails |
+| `just contract-modals` | **candidate** ledger | no changed contract drops a modal its requirement carries; `contract-modals-frozen` is red on purpose |
 | `just test` | active `src/**`, `test/**`, `research/` | behavioural tests, including the witness tests |
 | `just ledger` | active frozen ledger + freeze checker | freeze integrity (ledger, spec, plan, policy) |
 | `just wayfinder` | active frozen Wayfinder + freeze checker | projection integrity |
@@ -89,8 +91,43 @@ f00b060d4f27a1dc727ad34a50b099efa881a665e7c4ba308c2429b22ec05eb2  .wayfinder/ans
 1c3909e51c509b60634dc5f4dba7dc29c3c58bc883a0134cf2861ac23bb1eec1  .sea/interaction/interaction-model.sea
 ```
 
-Every hash matches the value recorded in `CURRENT_STATUS` revision 9 (and the ledger,
+Every hash matches the value recorded in `CURRENT_STATUS` revisions 9–11 (and the ledger,
 Wayfinder, spec and `.sea` also match the reviewed commit `7b4d110`).
+
+## Round 2 — after criticism round 1 corrected the candidate
+
+Re-run on the complete tree after every source, script, candidate and documentation edit of
+this round. Recorder: `bash .agents/evidence/horizon/T04/run-gates.sh`.
+
+| Target | Exit | Note |
+| --- | --- | --- |
+| check | 0 | |
+| boundaries | 0 | |
+| idm-integrity | 0 | 1 tolerated `REQ-CMP-001` (D-016) |
+| acceptance-claims | 0 | candidate preserves the four prohibitions |
+| acceptance-claims-frozen | **1** | expected: the active ledger is still inverted (D-015) |
+| witness-claims | 0 | 9 inherited findings baselined (D-020); a new one fails |
+| contract-modals | 0 | 4 inherited losses baselined; a changed contract that loses a modal fails |
+| contract-modals-frozen | **1** | expected: the active ledger drops 10 modals |
+| test | 0 | 20 Bun pass / 0 fail, pytest 4 passed |
+| ledger | 0 | |
+| wayfinder | 0 | |
+| teeth | 0 | |
+| verify | 0 | |
+| gate-t04 | 0 | |
+| **recorder** | **1** | because two targets are honestly red |
+
+Teeth demonstrated by mutation and reverted in the same session:
+
+- removing the generator's `MAY` branch → `restate() self-test failed …` (generation aborts);
+- `evaluateDeviation` returning the deviated operation even when blocked → `AC-CASE-002-01` fails;
+- a surface that exposes the configured endpoint → `AC-CONFIG-004-01` fails;
+- a reintroduced SHOULD→MUST in the candidate ledger → `just contract-modals` exits 1, naming
+  `REQ-UX-009`.
+
+Reproducibility: re-running `apply-candidate-revision.py` and `gen-wayfinder.py` reproduces the
+candidate ledger, Wayfinder and `composed/prereg.patch` byte-for-byte (`sha256sum -c` OK), and
+`git apply --check composed/prereg.patch` exits 0 with the prereg untouched.
 
 ## Environmental limits
 

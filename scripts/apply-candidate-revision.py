@@ -57,8 +57,22 @@ def main(argv):
     missing = sorted(set(overlay["overrides"]) - set(requirement_texts))
     if missing:
         raise SystemExit(f"candidate overrides requirements the frozen spec does not declare: {missing}")
+    # An overlay entry states its restated rule, the input the witness supplies, and the
+    # policy it introduces. The ledger carries the rule only; a witness-supplied input is
+    # never policy, and a non-empty `introduced` is exactly the defect this revision
+    # corrects, so it is refused rather than composed.
+    flattened = {}
+    for rid, entry in overlay["overrides"].items():
+        if not isinstance(entry, dict) or set(entry) != {"rule", "witness_supplies", "introduced"}:
+            raise SystemExit(f"{rid}: an overlay entry must carry exactly rule, witness_supplies, introduced")
+        introduced = [term for term in (entry["introduced"] or []) if str(term).strip()]
+        if introduced:
+            raise SystemExit(f"{rid}: the candidate introduces policy the ruler does not carry: {introduced}")
+        if not str(entry["rule"]).strip() or not str(entry["witness_supplies"]).strip():
+            raise SystemExit(f"{rid}: empty rule or witness_supplies")
+        flattened[rid] = " ".join(str(entry["rule"]).split())
     composed = dict(frozen)
-    composed["overrides"] = {**(frozen.get("overrides") or {}), **overlay["overrides"]}
+    composed["overrides"] = {**(frozen.get("overrides") or {}), **flattened}
     if "evaluated_by" in frozen:
         raise SystemExit("frozen policy unexpectedly carries evaluated_by; refusing to compose silently")
     composed["evaluated_by"] = overlay["evaluated_by"]

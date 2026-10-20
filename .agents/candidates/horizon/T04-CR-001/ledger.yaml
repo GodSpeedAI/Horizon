@@ -12,7 +12,7 @@ generated_from:
   - .sea/interaction/research-artifacts.sea
   - .sea/interaction/product-integration-contract.sea
   policy: .agents/candidates/horizon/T04-CR-001/composed/ledger-policy.yaml
-  policy_sha256: 2678666977b85d19e868dff68553bfbdebb1edbe5dbd52a77ab32b98be181ef2
+  policy_sha256: e54d86be904558cc473b95880682b12ca2eeeea3437400c9f387e942d3a92860
   generator: scripts/gen-requirement-ledger.py
 population: 'candidate at T04. At freeze, scripts/freeze-formation.sh replaces freeze_hash with the sha256 of this document with the marker normalised to ''candidate'' (fragment digest: a document cannot contain its own whole-file sha256). The Wayfinder freeze header''s hashes block is authoritative: it records the whole-file sha256 of this ledger as written. scripts/check-ledger-freeze.sh verifies both and their agreement.'
 unmapped_requirements: []
@@ -4721,7 +4721,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-CASE-002-01
   requirement: REQ-CASE-002
-  expected: For a frame whose recorded deviation input is `undertaken` -- a listed operation has completed, been refused, failed, or returned evidence that contradicts its new state -- the next primary move responds to that operation by name; for a frame whose recorded deviation input is `none` and whose every choice is optional, no primary move is named.
+  expected: The next primary move responds to material deviation. No primary recommendation is required when only optional choices remain.
   gate_command: *id004
   status: candidate
 - id: AC-CASE-003-01
@@ -4746,7 +4746,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-CONFIG-004-01
   requirement: REQ-CONFIG-004
-  expected: For the same world and frame revision, changing a configured provider endpoint, credential, timeout or scope leaves the typed choices, intent ids and surface blocks unchanged; only provider configuration records differ.
+  expected: Configured provider endpoints, credentials, timeouts and scope remain below stable behavior contracts.
   gate_command: *id009
   status: candidate
 - id: AC-CONFIG-010-01
@@ -4836,7 +4836,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-NAV-003-01
   requirement: REQ-NAV-003
-  expected: Only eligible paths are observed to be recommended as spendable. Blocked paths are observed to expose material reasons and reachable prerequisites where known.
+  expected: Only eligible paths may be observed to be recommended as spendable. Blocked paths are observed to expose material reasons and reachable prerequisites where known.
   gate_command: *id027
   status: candidate
 - id: AC-NAV-004-01
@@ -4846,7 +4846,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-NAV-005-01
   requirement: REQ-NAV-005
-  expected: Against the pinned frame vocabulary, a prompt whose requested context is derivable from a reference already present in the frame -- the checkpoint ref, the world ref, an operation_ref or the focus ref -- is never issued; the frame resolves it and records the reference it resolved from.
+  expected: The navigation controller avoids asking for context it can resolve without user burden.
   gate_command: *id029
   status: candidate
 - id: AC-NAV-006-01
@@ -4896,7 +4896,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-RES-004-01
   requirement: REQ-RES-004
-  expected: 'Predictive estimates are observed to inform payment, consequence or ranking only after governed activation: a frozen preregistered held-out criterion, retained evaluation evidence and an authorized promotion. Active, heuristic and disabled estimator states are observed to be visible, and estimates MUST NOT change hard-gate outcomes.'
+  expected: 'Predictive estimates may be observed to inform payment, consequence or ranking only after governed activation: a frozen preregistered held-out criterion, retained evaluation evidence and an authorized promotion. Active, heuristic and disabled estimator states are observed to be visible, and estimates are never observed to change hard-gate outcomes.'
   gate_command: *id039
   status: candidate
 - id: AC-RES-005-01
@@ -4976,7 +4976,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-STACK-002-01
   requirement: REQ-STACK-002
-  expected: Cognate is observed to own app events/capability invocation/projection state. Adapters are observed to not create a second authoritative event history.
+  expected: Cognate is observed to own app events/capability invocation/projection state. Adapters are never observed to create a second authoritative event history.
   gate_command: *id055
   status: candidate
 - id: AC-STACK-003-01
@@ -5011,7 +5011,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-STACK-009-01
   requirement: REQ-STACK-009
-  expected: Only a SEA-Forge allow disposition with a matching invocation grant (bound to the exact action, targets, world_ref and unexpired) is observed to permit a side effect. Deny, escalate, boundary, degraded and any unrecognized disposition is observed to produce no effect and a visible typed status.
+  expected: Only a SEA-Forge allow disposition with a matching invocation grant (bound to the exact action, targets, world_ref and unexpired) may be observed to permit a side effect. Deny, escalate, boundary, degraded and any unrecognized disposition is observed to produce no effect and a visible typed status.
   gate_command: *id062
   status: candidate
 - id: AC-STACK-010-01
@@ -5031,7 +5031,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-STACK-013-01
   requirement: REQ-STACK-013
-  expected: A product with its own UI is observed to be reachable as a hosted surface via deep links that carry focus refs in and return typed intents or focus out. A hosted surface is never observed to run inside Horizon's trust boundary or acquire Horizon authority.
+  expected: A product with its own UI may be observed to be reachable as a hosted surface via deep links that carry focus refs in and return typed intents or focus out. A hosted surface is never observed to run inside Horizon's trust boundary or acquire Horizon authority.
   gate_command: *id066
   status: candidate
 - id: AC-STACK-014-01
@@ -5121,7 +5121,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-UX-009-01
   requirement: REQ-UX-009
-  expected: Read-only navigation interactions are observed to respond within 300 ms p95 on the local_operator profile. Operations exceeding 1 s are observed to show progress tied to real events and remain cancellable where the owner supports cancellation.
+  expected: Read-only navigation interactions should be observed to respond within 300 ms p95 on the local_operator profile. Operations exceeding 1 s are observed to show progress tied to real events and remain cancellable where the owner supports cancellation.
   gate_command: *id084
   status: candidate
 - id: AC-UX-010-01
@@ -5201,6 +5201,6 @@ acceptance_contracts:
   status: candidate
 - id: AC-WORLD-008-01
   requirement: REQ-WORLD-008
-  expected: An active world is observed to be selected through a DomainForge world alias pinned to an immutable world_ref. A candidate-versus-active semantic diff is observed to be a Horizon-derived read-only view but MUST NOT mint or verify identity.
+  expected: An active world is observed to be selected through a DomainForge world alias pinned to an immutable world_ref. A candidate-versus-active semantic diff may be observed to be a Horizon-derived read-only view but is never observed to mint or verify identity.
   gate_command: *id100
   status: candidate

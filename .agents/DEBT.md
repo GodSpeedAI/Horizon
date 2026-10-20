@@ -142,3 +142,27 @@
 - Evidence: run output `acceptance-claims-frozen exit=0` beside `just-acceptance-claims-frozen.log` ending with "recipe failed on line 27 with exit code 1".
 - Confidence: high (directly observed)
 - Closure: capture `status=$?` before reassigning `rc` (done in this session) and never summarise a target's status without capturing it first. Size S.
+
+## D-019 REQ-CONFIG-004 names provider controls Horizon does not have (2026-10-19)
+- Date: 2026-10-19
+- Location: `.agents/specs/horizon.agent.spec.yaml:576` (`REQ-CONFIG-004`), `src/config/types.ts:21` (`HorizonConfig`), `test/acceptance.test.ts` (`AC-CONFIG-004-01`)
+- Debt: The frozen requirement says "Configured provider endpoints, credentials, timeouts and scope MUST remain below stable behavior contracts", but `HorizonConfig` declares no provider endpoint, timeout or scope: the closest real controls are `bind_host`, `port`, `secrets.path` and `identity.source`. The corrected witness (criticism round 1) therefore exercises the endpoint and credential path it can observe and states plainly that configurable provider timeouts and scopes are unproven. Nothing in the ledger should claim they are covered until the runtime has such controls.
+- Evidence: `HorizonConfig` has no provider field; the first draft of the witness compared two object literals neither application read, and the shipped `config/horizon.toml` declares no provider section.
+- Confidence: high (directly observed in code and config)
+- Closure: either declare the provider controls the requirement assumes, or amend REQ-CONFIG-004 in a new frozen spec version to name the controls Horizon actually has. Size M.
+
+## D-020 Pre-existing contracts add or drop policy relative to their requirement (2026-10-19)
+- Date: 2026-10-19
+- Location: `requirements/ledger.yaml` (`REQ-CASE-003`, `REQ-DEV-001`, `REQ-NAV-002`, `REQ-STACK-004`, `REQ-STACK-011`), inheriting into `.agents/candidates/horizon/T04-CR-001/ledger.yaml`
+- Debt: Outside the contracts this revision corrected, five acceptance contracts still do not preserve their requirement's meaning: `REQ-CASE-003` drops the `SHOULD` in "should settle now"; `REQ-NAV-002` replaces "exactly the canonical keys" with "any key outside ... is rejected"; `REQ-DEV-001` and `REQ-STACK-004` add "every"; `REQ-STACK-011` adds "exactly" and rewrites "Joins the world only through the contract" as facet observability. `REQ-RES-001` and `REQ-STACK-014` restate prohibitions as positive outcomes ("runs as a Python process", "continues to operate") and are measured by `scripts/measure-contract-modals.py`. These are the same defect class as criticism round 1, but they predate the candidate and are untouched by it, so they are recorded rather than silently repaired.
+- Evidence: `python3 scripts/check-witness-claims.py` reports them as known findings (`scripts/witness-claims-baseline.txt`); `just contract-modals-frozen` reports the modal losses on the active ledger.
+- Confidence: high (directly observed and reproduced mechanically)
+- Closure: repair each in the owning task's contract work (or in a follow-up candidate revision) with a witness that observes the requirement's own words; do not promote a baseline entry to acceptance. Size M.
+
+## D-021 The requirements author has no committed artifact witnesses (2026-10-19)
+- Date: 2026-10-19
+- Location: `.wayfinder/answer-key.md`, `requirements/ledger.yaml`
+- Debt: All 98 requirements are marked `evidence_class: "declared"` with `status: "active"` in the canonical `.sea`, and the frozen ledger records no acceptance-evidence binding per requirement; the Wayfinder lists only the gate command. A contractual acceptance claim can therefore cite a gate that exercises a different behavior. The candidate revision's witness bindings live in the candidate policy only and are not represented per requirement in the ledger.
+- Evidence: `requirements/ledger.yaml` rows carry `proof` (gate commands) and `acceptance` (ids), no evidence reference; the `.sea` invariants all read `evidence_class: "declared"`.
+- Confidence: medium (code and schema reading, not observed failing a gate)
+- Closure: add an `acceptance_evidence` binding per requirement (path plus test name) to the ledger schema, emitted by the generator from `evaluated_by`, and validate it in `just wayfinder`. Size M.

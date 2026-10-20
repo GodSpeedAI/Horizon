@@ -4,6 +4,7 @@ candidate_revision:
   prepared_at: "2026-10-19"
   prepared_by: builder (this remediation session)
   status: prepared-awaiting-owner-authorization
+  revision: 2 (corrected after criticism round 1; see .agents/evidence/horizon/T04/criticism-round1.md)
   source_verdict: .agents/evidence/horizon/T04/verdicts/codex-root-20261019-7b4d110.md
   active_freeze_untouched: true
   active_pins:
@@ -19,8 +20,10 @@ candidate_revision:
       generic contract that lost its subject and every prohibition left unrestated.
     - >-
       F3 (S2): AC-CASE-002-01, AC-CONFIG-004-01 and AC-NAV-005-01 were underdetermined.
-      Each is bound to a witness or an explicitly bound evaluation rule that adds no
-      policy, threshold or new requirement.
+      Each now restates its requirement verbatim; what the witness supplies is stated
+      separately and none of it is restated as policy. Criticism round 1 showed the first
+      draft of these three introduced a materiality predicate, a prescribed construction
+      path and an unratified "frame vocabulary"; all three are corrected.
     - >-
       F4 (S2): the prereg's pin_revision.verified_by cites "0 violations" as verification.
       The gate is blind to a dangling requirement_ref and a duplicated invariant_id, so the
@@ -42,9 +45,18 @@ candidate_revision:
     normative_policy_added: false
     world_ref_changed: false
     claim: >-
-      Every changed contract restates the same requirement text with its polarity and
-      subject preserved, or binds an existing requirement to an observable. No new
-      requirement, threshold or product policy is introduced.
+      Every changed contract restates the same requirement text with its subject, polarity and
+      modal preserved, or binds an existing requirement to an input the witness supplies (never
+      restated as policy). No new requirement, threshold or product policy is introduced.
+    checked_by:
+      - "scripts/check-witness-claims.py — fails on a new permission-negated, SHOULD-strengthened, quantifier-added or prohibition-unrestated contract (9 pre-existing findings baselined, DEBT D-020)"
+      - "scripts/measure-contract-modals.py --ledger <candidate> — no changed contract drops a modal (the active ledger drops 10)"
+      - "scripts/gen-requirement-ledger.py self_test — prohibition, lowercase 'not', MAY and SHOULD restatement are locked"
+    known_exception: >-
+      REQ-UX-009 restates a SHOULD as "should be observed to respond" so the soft obligation is
+      not strengthened; the active ledger's generic form already turned it into a hard one, and
+      this revision does not adopt that. Review question 9 asks whether that phrasing is the
+      right way to keep a SHOULD soft.
   affected_pins_and_plan:
     ledger_sha256: changes (whole-file digest recorded by the new Wayfinder freeze)
     ledger_fragment_digest: changes
@@ -73,3 +85,11 @@ candidate_revision:
       The 94 remaining generic contracts are not individually re-authored. Polarity and
       subject are checked mechanically; per-requirement observables remain the owning tasks'
       work (DEBT D-012), now with a binding witness requirement for new overrides.
+    - >-
+      REQ-CONFIG-004's "timeouts and scope" cannot be exercised: HorizonConfig declares no
+      provider timeout or scope field (DEBT D-019). The witness states this instead of
+      asserting coverage.
+    - >-
+      Nine pre-existing findings outside the contracts this revision changes are recorded and
+      baselined as DEBT D-020, not fixed: repairing them is owning-task contract work and
+      would enlarge the freeze surface beyond what the verdict required.
