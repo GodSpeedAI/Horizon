@@ -10,7 +10,7 @@ This document is the **cold-agent router**, not a second specification, implemen
 - **Execution route:** [`.agents/plans/horizon.plan.yaml`](.agents/plans/horizon.plan.yaml) (`HORIZON-PLAN-001`). Use its DAG, preregistrations, task gates, evidence and falsifiers—not a linear to-do list.
 - **Mutable execution state:** `.agents/CURRENT_STATUS.jsonl` and its `.agents/CURRENT_STATUS.md` mirror. Follow [`.agents/AGENTS.md`](.agents/AGENTS.md) for exact append/update semantics.
 - **FIRST REQUIRED SKILL:** read **`~/projects/project-topology-architect/skills/project-topology-architect/SKILL.md`** from the executing machine, then its Greenfield Formation references. T00 begins here, *before* repo scaffolding, code, UI or agent implementation. This owner-designated location is authoritative for skill loading. If unavailable, report the blocker; don't quietly substitute an older vendored copy.
-- The normative spec is **approved and frozen at 1.0.0** (owner, 2026-10-19). T00 MUST verify its SHA-256 matches `.agents/plans/horizon.plan.yaml` `source.spec.sha256`; on mismatch, **T01 and implementation tasks MUST NOT proceed**. Never edit a frozen spec in place: propose a new version for owner approval and rebind the plan.
+- The normative spec is **approved and frozen at 1.0.1** (owner, 2026-10-19; 1.0.1 amendment adding REQ-CMP-001, 2026-10-20). T00 MUST verify its SHA-256 matches `.agents/plans/horizon.plan.yaml` `source.spec.sha256`; on mismatch, **T01 and implementation tasks MUST NOT proceed**. Never edit a frozen spec in place: propose a new version for owner approval and rebind the plan.
 
 ## 2. Repository and workspace map
 

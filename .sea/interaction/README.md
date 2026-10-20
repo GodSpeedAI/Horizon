@@ -2,8 +2,8 @@
 
 Canonical semantic source for Horizon's observer-relative navigation world.
 Derived in T01 (topology P1) from the frozen spec
-`.agents/specs/horizon.agent.spec.yaml` (1.0.0, sha256
-`75cfc1ce…434130`) and the plan `.agents/plans/horizon.plan.yaml`.
+`.agents/specs/horizon.agent.spec.yaml` (1.0.1, sha256
+`14a42936…3324a4`) and the plan `.agents/plans/horizon.plan.yaml`.
 
 ## Files
 

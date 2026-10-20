@@ -4,7 +4,7 @@ bun test v1.4.0 (34cbb9a40)
  14 pass
  0 fail
  111 expect() calls
-Ran 14 tests across 4 files. [1062.00ms]
+Ran 14 tests across 4 files. [1.61s]
 uv run --project research pytest -q
 ....                                                                     [100%]
 4 passed in 0.04s

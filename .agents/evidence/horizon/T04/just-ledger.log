@@ -1,4 +1,4 @@
 python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
 ledger: 0 error(s) in ledger.yaml
-  ok: 98 requirements, 98 acceptance contracts
+  ok: 99 requirements, 99 acceptance contracts
 ./scripts/check-ledger-freeze.sh

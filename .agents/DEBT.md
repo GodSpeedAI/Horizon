@@ -124,12 +124,13 @@
 - Closure: close this entry when a new freeze replaces the inverted contracts. Do not close it on the strength of the generator fix alone.
 - Status: CLOSED 2026-10-20 for the frozen artifacts: T04-CR-001 revision 3 applied and re-frozen (`T04-CR-001@2026-10-20`, DEC-T04-06).
 
-## D-016 Canonical `.sea` binds an invariant to a requirement that does not exist (2026-10-19)
+## D-016 — RESOLVED — Canonical `.sea` binds an invariant to a requirement that does not exist (2026-10-19)
 - Location: `.sea/interaction/interaction-model.sea:728` (`inv_simulation_never_changes_world` → `REQ-CMP-001`)
 - Debt: The frozen spec declares no `REQ-CMP-*` requirement (98 requirements, none CMP). The invariant restates the J05_compare journey note, which is not bound to a requirement id. Found while adding the referential-integrity check; the ledger census could not see it because instance bindings are keyed by `requirement_ref` and a dangling one silently binds nothing.
 - Evidence: `python3 scripts/check-idm-integrity.py` reports the dangling reference; it is tolerated only because `scripts/idm-integrity-debt.yaml` lists that exact triple.
 - Confidence: high (directly observed)
 - Closure: decide whether the spec should declare the requirement or the model should re-bind INV-10; either path changes the canonical world and therefore `world_ref`, so it needs a new freeze. Until then the debt entry must stay, and any *new* dangling reference fails `gate-t01`. Size M.
+- Status: CLOSED 2026-10-20: spec 1.0.1 declares REQ-CMP-001 (DEC-SPEC-101); world_ref unchanged; the integrity exception is removed.
 
 ## D-017 `bun run scripts/teeth.ts` depends on the caller's environment (2026-10-19)
 - Location: `scripts/teeth.ts` (isolated-tree attacks), `justfile` (`teeth`)

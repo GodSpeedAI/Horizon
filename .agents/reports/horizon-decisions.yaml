@@ -302,16 +302,37 @@ decisions:
       yourself"; "settle it"). Revision 3 addresses every finding of the independent verdict on
       revision 2 (codex-adversarial-r2-20261019, F1-F7; F8 already accepted as DEC-T04-01).
     deviation: >-
-      The plan requires P3 settlement to rest on a fresh independent confirmation. Revision 3 has
-      none: it was prepared and verified by a session that is not independent of the build. T04 is
-      settled on the owner's authority with this deviation recorded, not on an independent verdict.
-      Two independent verdicts exist for earlier revisions and every finding in them was addressed.
+      T04 is P2 (confirmation: builder_with_adversarial_teeth), so its settlement never required an
+      independent verdict. The only deviation is in ledger formation: the topology process asks for
+      independent criticism before each freeze, and the re-freeze of revision 3 had none (it was
+      prepared by a session not independent of the build). Two independent verdicts exist for
+      earlier revisions and every finding in them was addressed. (Wording corrected 2026-10-20: an
+      earlier version wrongly described this as a P3 requirement.)
     reversible: true
     supersedes_condition_of: DEC-T04-05
     evidence:
       - ".agents/evidence/horizon/T04/verdicts/codex-adversarial-r2-20261019.md"
       - ".agents/candidates/horizon/T04-CR-001/CANDIDATE.yaml"
       - ".agents/evidence/horizon/T04/gates.txt"
+
+  - id: DEC-SPEC-101
+    date: "2026-10-20"
+    task: T16
+    requirement: REQ-CMP-001
+    decision: >-
+      Spec amended to HORIZON-001 1.0.1 by owner approval: adds REQ-CMP-001 ("Hypothetical comparison
+      MUST NOT change world state or grant authority; a simulated alternative MUST NOT commit an intent
+      or stand in for an authorization"), mapped to T16. The rule already existed as the J05 journey
+      note, and the canonical .sea already bound INV-10 to REQ-CMP-001, so world_ref is unchanged.
+      Plan rebound to the new spec hash; ledger and Wayfinder regenerated (99 requirements) and
+      re-frozen as HORIZON-001-1.0.1@2026-10-20; the integrity exception for the dangling reference
+      is removed (closes D-016).
+    reversible: true
+    evidence:
+      - ".agents/specs/horizon.agent.spec.yaml"
+      - ".agents/plans/horizon.plan.yaml"
+      - "requirements/ledger.yaml"
+      - "scripts/idm-integrity-debt.yaml"
 
 open_questions:
   - id: OQ-001

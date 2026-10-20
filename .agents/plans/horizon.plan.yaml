@@ -15,10 +15,10 @@ source:
     intended_repository_path: ".agents/specs/horizon.agent.spec.yaml"
     artifact_name: "horizon.agent.spec.yaml"
     spec_id: "HORIZON-001"
-    spec_version: "1.0.0"
-    sha256: "75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130"
+    spec_version: "1.0.1"
+    sha256: "14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4"
     authority: "normative"
-    current_status: "approved and frozen by the owner on 2026-10-19; T01+ may proceed once T00 verifies this SHA-256"
+    current_status: "approved and frozen by the owner on 2026-10-19; amended to 1.0.1 (adds REQ-CMP-001, mapped to T16) and re-frozen on 2026-10-20"
   implementation_brief:
     intended_repository_path: ".agents/reports/implementation-context.md"
     authority: "non_normative_execution_context"
@@ -1258,6 +1258,7 @@ tasks:
     settles:
       - "REQ-NAV-004"
       - "REQ-SAFE-005"
+      - "REQ-CMP-001"
     changes: "Pinned baseline and bounded alternatives can be compared with explicit assumptions, unknowns, payment and uncertainty without real-world mutation."
     proves: "No simulated result is presented as observed, settlement, or authorization to execute."
     does_not_prove: "Does not prove calibrated organizational prediction or full-fledged simulation."
@@ -1715,8 +1716,8 @@ handoff_contract:
     - "Next executable task ID or 'none — plan settled' after final T19 only."
   settled_next_action_rule: "Only after T19 independently confirms all required proof may next action say 'none — plan settled'; otherwise report earliest dependency-ready unsettled task."
 traceability:
-  spec_requirement_count: 98
-  mapped_requirement_count: 98
+  spec_requirement_count: 99
+  mapped_requirement_count: 99
   unmapped_requirements: []
   unknown_plan_requirement_ids: []
   requirement_to_tasks:
@@ -1728,6 +1729,8 @@ traceability:
     "REQ-CASE-003":
       - "T07"
       - "T17"
+    "REQ-CMP-001":
+      - "T16"
     "REQ-CONFIG-001":
       - "T04"
     "REQ-CONFIG-002":

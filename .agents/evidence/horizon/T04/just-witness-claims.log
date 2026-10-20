@@ -1,2 +1,2 @@
 python3 scripts/check-witness-claims.py
-check-witness-claims: OK (196 contracts: 0 generic, 196 authored; no new policy)
+check-witness-claims: OK (197 contracts: 0 generic, 197 authored; no new policy)

@@ -12,15 +12,15 @@ For the agent implementing Horizon. This note routes; it does not restate the sp
 
 | Input | State |
 |---|---|
-| Spec `.agents/specs/horizon.agent.spec.yaml` | HORIZON-001 1.0.0, **approved and frozen**; SHA-256 `75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130`. Do not edit; propose a new version instead. |
-| Plan `.agents/plans/horizon.plan.yaml` | 1.0.0, ready; 23 tasks, 58 edges, all 98 requirements mapped. Execute by DAG, not task number. |
+| Spec `.agents/specs/horizon.agent.spec.yaml` | HORIZON-001 1.0.1, **approved and frozen**; SHA-256 `14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4` (1.0.1 adds REQ-CMP-001). Do not edit; propose a new version instead. |
+| Plan `.agents/plans/horizon.plan.yaml` | 1.0.0, ready; 23 tasks, 58 edges, all 99 requirements mapped. Execute by DAG, not task number. |
 | Review `.agents/reports/horizon-spec-adversarial-review.md` | Why the spec says what it says; grounded API facts per subsystem. |
 | Product register `.agents/reports/horizon-product-integration-register.yaml` | Product dispositions and first-wave products (research subsystem, Strategist). T00 confirms. |
 | Debt `.agents/DEBT.md` | Upstream gaps: SEA-Forge has no authority preview, Cognate has no object query, stale Cognate skill, missing Gauntlet and Context Kernel adapters. |
 
 ## Decisions already made by the owner
 
-- Spec approved and frozen (1.0.0).
+- Spec approved and frozen (1.0.0; amended to 1.0.1 on 2026-10-20).
 - Product Actualizer is Apache-2.0 (commit `c9df8d2` in that repo). Cockpit code may be copied with attribution.
 - One-way dependency: every product and stack owner, SEA-Forge included, must work without Horizon (REQ-STACK-014).
 - WarpRoom joins as a second-wave product through its own MCP and REST surfaces.

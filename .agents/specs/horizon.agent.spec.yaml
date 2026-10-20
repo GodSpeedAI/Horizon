@@ -7,18 +7,20 @@ metadata:
   id: HORIZON-001
   title: Horizon — observer-relative operational navigation environment
   status: frozen
-  version: "1.0.0"
+  version: "1.0.1"
   approval:
     approved_by: owner (GodSpeed AI)
     approved_on: "2026-10-19"
-    frozen_on: "2026-10-19"
+    frozen_on: "2026-10-20"
+    amendments:
+      - { version: "1.0.1", approved_by: owner, approved_on: "2026-10-20", change: "adds REQ-CMP-001" }
     freeze_rule: >-
       This file is immutable while frozen. Any change in meaning or acceptance requires a
       new version, explicit owner approval, a new SHA-256 and a plan rebind. The binding
       hash is recorded in .agents/plans/horizon.plan.yaml and .agents/CURRENT_STATUS.jsonl,
       not here, because a file cannot contain its own hash.
   created: "2026-10-19"
-  revised: "2026-10-19"
+  revised: "2026-10-20"
   revision_note: >-
     0.2.0 grounds every subsystem claim against workspace source (see
     .agents/reports/horizon-spec-adversarial-review.md), corrects workspace paths,
@@ -27,6 +29,9 @@ metadata:
     profiles, J06 Develop journey and normative operator UX requirements.
     1.0.0 records the Product Actualizer Apache-2.0 relicense, adds the one-way
     dependency rule (REQ-STACK-014), and is approved and frozen by the owner.
+    1.0.1 adds REQ-CMP-001, promoting the J05 journey rule that hypothetical comparison never
+    changes world state or grants authority to a requirement. The canonical .sea already binds
+    INV-10 to REQ-CMP-001; REQ-SAFE-005 covers only presentation, not mutation or authority.
   scope: >-
     The Horizon application contract across semantic-world exploration, purposeful
     cases, affordance-based navigation, governed action, evidence, developmental
@@ -715,6 +720,7 @@ core_behavior_requirements:
     - { id: "REQ-NAV-004", text: "The observer MUST retain discretion to inspect alternatives, defer, reframe or disagree with the representation." }
     - { id: "REQ-NAV-005", text: "The navigation controller MUST avoid asking for context it can resolve without user burden." }
     - { id: "REQ-NAV-006", text: "The authority gate MUST take one of likely_allow, requires_approval, deferred_to_invocation, denied, unreachable or unknown. likely_allow requires a non-granting SEA-Forge evaluation; deferred_to_invocation means SEA-Forge is reachable and the exact operation is policy-covered but no preview exists; denied, unreachable and unknown block availability. No gate value grants authority." }
+    - { id: "REQ-CMP-001", text: "Hypothetical comparison MUST NOT change world state or grant authority; a simulated alternative MUST NOT commit an intent or stand in for an authorization." }
     - { id: "REQ-NAV-007", text: "Before any consequential commitment the observer MUST see the operation's reversibility class, payment, expected evidence and what happens if authority escalates." }
   presentation_and_atomic_ui:
     - { id: "REQ-UI-001", text: "A closed versioned declarative surface schema MUST separate agents from executable UI code." }

@@ -3,12 +3,11 @@ check: ok (local_operator, 127.0.0.1:4319, horizon)
 bun run scripts/check-boundaries.ts
 boundaries: ok (.)
 python3 scripts/check-idm-integrity.py
-check-idm-integrity: OK (11 requirement references, 1 tolerated as recorded debt, 11 invariant ids unique)
-- debt: .sea/interaction/interaction-model.sea:inv_simulation_never_changes_world requirement_ref 'REQ-CMP-001' (see scripts/idm-integrity-debt.yaml)
+check-idm-integrity: OK (11 requirement references, 0 tolerated as recorded debt, 11 invariant ids unique)
 python3 scripts/check-acceptance-claims.py
 check-acceptance-claims: OK (4 prohibitions preserved, 0 generic restatements with their subject intact)
 python3 scripts/check-witness-claims.py
-check-witness-claims: OK (196 contracts: 0 generic, 196 authored; no new policy)
+check-witness-claims: OK (197 contracts: 0 generic, 197 authored; no new policy)
 python3 scripts/measure-contract-modals.py --ledger requirements/ledger.yaml --baseline scripts/witness-claims-baseline.txt
 measure-contract-modals: 1 known pre-existing loss(es) in requirements/ledger.yaml (DEBT D-020), not fatal
   ~ REQ-RES-001: loses prohibition
@@ -18,13 +17,13 @@ bun test v1.4.0 (34cbb9a40)
  14 pass
  0 fail
  111 expect() calls
-Ran 14 tests across 4 files. [882.00ms]
+Ran 14 tests across 4 files. [1112.00ms]
 uv run --project research pytest -q
 ....                                                                     [100%]
-4 passed in 0.03s
+4 passed in 0.04s
 python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
 ledger: 0 error(s) in ledger.yaml
-  ok: 98 requirements, 98 acceptance contracts
+  ok: 99 requirements, 99 acceptance contracts
 ./scripts/check-ledger-freeze.sh
 python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py . --ledger requirements/ledger.yaml
 wayfinder: 0 error(s)
@@ -73,13 +72,13 @@ dangling: exit=0 exit=0 Validation succeeded: 0 violations total
 BLIND SPOT CONFIRMED: dangling .sea accepted with no violation
 duplicate: exit=0 exit=0 Validation succeeded: 0 violations total
 BLIND SPOT CONFIRMED: duplicate .sea accepted with no violation
-control: exit=1 exit=1 Error: Parse failed for /tmp/tmpi8qeaycr/.sea/interaction/interaction-model.sea: resolved closure failed graph co
+control: exit=1 exit=1 Error: Parse failed for /tmp/tmpm2rk2w2e/.sea/interaction/interaction-model.sea: resolved closure failed graph co
 
 tooth: gate discriminates (control fails, and the two blind spots are proven)
 python3 scripts/teeth-idm-integrity.py
-null: exit=0 exit=0 - debt: .sea/interaction/interaction-model.sea:inv_simulation_never_changes_world requirement_ref 'REQ-
+null: exit=0 exit=0 check-idm-integrity: OK (11 requirement references, 0 tolerated as recorded debt, 11 invariant ids uniq
 dangling: exit=1 exit=1 - .sea/interaction/interaction-model.sea:inv_intent_idempotent requirement_ref 'REQ-DOES-NOT-EXIST-999'
-duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmp3b23dn_4/.sea/interaction/interaction-m
+duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmpmgmyl99v/.sea/interaction/interaction-m
 
 tooth: referential integrity is enforced (dangling and duplicate both fail)
 gate-t04: ok — frozen artifacts (T04-CR-001@2026-10-20) verified
