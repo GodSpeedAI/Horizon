@@ -9,21 +9,22 @@ only the executable substrate and its boundaries.
 | --- | --- | --- | --- |
 | Configuration | `src/config/` | Parse and validate `config/horizon.toml`; issue per-launch secret; derive operator/agent principals from the trusted local boundary. | Bun TOML, OS session |
 | Semantic adapter | `src/adapters/semantic.ts` | Read the canonical `.sea` source map and project it through `loadSemanticWorld`; assert the pinned DomainForge world identity. | `@godspeedai/cognate-domainforge`, `domain/` |
-| Research adapter | `src/adapters/research.ts` | Invoke the Python subsystem's typed process contract and validate its health envelope. | `research/` |
-| Domain | `src/domain/` | Typed navigation frame and choices. No I/O, runtime or adapter imports. | none |
+| Research adapter | `src/adapters/research.ts` | Invoke the Python subsystem's typed process contract and validate its health envelope. A failed or absent subsystem is a typed degraded observation (`research_unavailable`), never a startup prerequisite; research-dependent operations fail closed. | `research/` |
+| Domain | `src/domain/` | Typed navigation frame, typed `CommitNavigationIntent` intent and `NavigationIntentRecord`, and the pure contract witnesses (`contracts.ts`). No I/O, runtime or adapter imports. | none |
 | UI seam | `src/ui/` | Pure projection from a frame to a closed surface model with explicit source references. No executable markup. | `src/domain` |
-| Capability | `src/capabilities/` | Expose the loaded semantic projection as a read-only Cognate capability. | `src/adapters/semantic` |
-| Agent | `src/agents/` | Deterministic structural health run; invokes the semantic capability and emits its observation. | runtime API |
+| Capability | `src/capabilities/` | Expose the loaded semantic projection as a read-only Cognate capability, and `horizon.navigation.intent.commit` (the typed intent, validated against the frame the application issued). Committed `NavigationIntentRecord`s and refused attempts are appended to Cognate's durable log. | `src/adapters/semantic`, `src/domain` |
+| Agent | `src/agents/` | Deterministic structural observation run, started from a committed intent; invokes the semantic capability and emits its observation. | runtime API |
 | Projection | `src/projections/` | Tenant-partitioned `horizon.navigation-context` projection over `run.started`. | projection API |
 | Runtime | `src/runtime/` | Compose the real Cognate runtime over a durable SQLite store; local policy and action gates. | Cognate runtime |
 | Application | `src/app.ts`, `src/main.ts` | Composition root, HTTP health surface and process lifecycle. | all of the above |
 | Research subsystem | `research/` | Independent uv project with a lock file, typed JSON contract and pytest gate. No ML logic. | Python 3.12+ |
-| Verification | `scripts/`, `justfile` | Type/config check, boundary checks, adversarial teeth, scoped gates. | Bun, Python, DomainForge CLI |
+| Verification | `scripts/`, `justfile` | Type/config check, boundary checks, IDM reference integrity, acceptance-claim polarity, adversarial teeth (including a memory-only runtime fake in an isolated tree), scoped gates. `just verify` is T04's complete gate. | Bun, Python, DomainForge CLI |
 
 ## One-way dependencies
 
 `domain` ← `ui`; `domain` ← `app`. `adapters` → domain/external APIs. `capabilities` →
-adapters. `agents` → runtime API. `runtime` → capabilities/agents/projections. `app` →
+adapters/domain; they write only through Cognate's own store. `agents` → runtime API and
+domain. `runtime` → capabilities/agents/projections. `app` →
 config/world/adapters/runtime. `config` does not import adapters, runtime or UI. `domain`
 does not import adapters, runtime or capabilities. `ui` does not import adapters or runtime.
 

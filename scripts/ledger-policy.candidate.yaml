@@ -1,0 +1,39 @@
+version: 1
+
+# Candidate revision T04-CR-001 (2026-10-19, prepared, NOT applied).
+#
+# The frozen acceptance contracts for these three requirements supplied no decisive
+# observation (T04 verdict F3). Each entry below binds the *existing* requirement to a
+# concrete witness or an explicitly bound evaluation rule. None adds a normative
+# requirement, a materiality threshold, or product policy: where the ruler is silent
+# (what counts as "material"), the contract binds evaluation to an input supplied by the
+# witness but names only what the requirement itself requires of that input.
+#
+# Applying an authorized freeze composes this file over `scripts/ledger-policy.yaml` (and
+# re-appends `evaluated_by` last); see `.agents/candidates/horizon/T04-CR-001/`.
+
+# The witnesses the candidate entries are evaluated by. Each maps to an implemented test
+# that carries the same id; `scripts/check-acceptance-claims.py` verifies the test exists.
+evaluated_by:
+  REQ-CASE-002:
+    - "test/acceptance.test.ts :: AC-CASE-002-01"
+  REQ-CONFIG-004:
+    - "test/acceptance.test.ts :: AC-CONFIG-004-01"
+  REQ-NAV-005:
+    - "test/acceptance.test.ts :: AC-NAV-005-01"
+
+overrides:
+  REQ-CASE-002: >-
+    For a frame whose recorded deviation input is `undertaken` -- a listed operation has
+    completed, been refused, failed, or returned evidence that contradicts its new state --
+    the next primary move responds to that operation by name; for a frame whose recorded
+    deviation input is `none` and whose every choice is optional, no primary move is named.
+  REQ-CONFIG-004: >-
+    For the same world and frame revision, changing a configured provider endpoint, credential,
+    timeout or scope leaves the typed choices, intent ids and surface blocks unchanged; only
+    provider configuration records differ.
+  REQ-NAV-005: >-
+    Against the pinned frame vocabulary, a prompt whose requested context is derivable
+    from a reference already present in the frame -- the checkpoint ref, the world ref,
+    an operation_ref or the focus ref -- is never issued; the frame resolves it and
+    records the reference it resolved from.

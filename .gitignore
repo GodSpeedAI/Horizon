@@ -18,6 +18,9 @@ __pycache__/
 .venv/
 research/.venv/
 
+# Whatever the JolliMemory tooling records locally (telemetry queue, machine identity).
+.jolli/
+
 # Scratch space and OS/editor noise
 .tmp/
 tmp/

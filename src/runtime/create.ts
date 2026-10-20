@@ -1,8 +1,8 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { Caller } from "@godspeedai/cognate-runtime-api";
+import type { AgentDefinition, Caller } from "@godspeedai/cognate-runtime-api";
 import { createRuntime, type ActionPolicy, type Runtime } from "@godspeedai/cognate-runtime-bun";
-import type { Policy } from "@godspeedai/cognate-kernel-api";
+import type { Component, Policy } from "@godspeedai/cognate-kernel-api";
 import type { HorizonConfig } from "../config/types.ts";
 import type { LoadedWorld } from "../adapters/semantic.ts";
 import { healthAgent } from "../agents/health.ts";
@@ -17,10 +17,13 @@ function fail(message: string): never {
   throw new RuntimeBoundaryError(`RUNTIME: ${message}`);
 }
 
+/** Capabilities the structural skeleton resolves. Anything else is denied (spec §32). */
+const READ_ONLY_CAPABILITIES = new Set(["horizon.semantics.world", "horizon.navigation.intent.commit"]);
+
 const policy: Policy = {
   authorize(request) {
-    if (request.capability.id === "horizon.semantics.world" && (request.actor.kind === "user" || request.actor.kind === "agent")) {
-      return { allow: true, policyId: "horizon.local.read-only-semantics", reason: "read-only semantic projection" };
+    if (READ_ONLY_CAPABILITIES.has(request.capability.id) && (request.actor.kind === "user" || request.actor.kind === "agent")) {
+      return { allow: true, policyId: "horizon.local.read-only-semantics", reason: "read-only semantic projection or intent commit" };
     }
     return { allow: false, policyId: "horizon.local.default-deny", reason: "capability is not part of the structural skeleton" };
   },
@@ -40,6 +43,7 @@ const actions: ActionPolicy = {
 export interface HorizonRuntime {
   readonly runtime: Runtime;
   readonly caller: Caller;
+  readonly storePath: string;
 }
 
 export function assertStoreBoundary(config: HorizonConfig, storePath: string): string {
@@ -59,17 +63,24 @@ export function assertStoreBoundary(config: HorizonConfig, storePath: string): s
 export async function createHorizonRuntime(
   config: HorizonConfig,
   world: LoadedWorld,
-  options: { readonly storePath?: string; readonly caller: Caller },
+  options: {
+    readonly storePath?: string;
+    readonly caller: Caller;
+    /** Extra components; the application injects its typed-intent component here. */
+    readonly components?: readonly Component[];
+    /** Agent definitions; the application injects its intent-bound observation agent here. */
+    readonly agents?: readonly AgentDefinition[];
+  },
 ): Promise<HorizonRuntime> {
   const storePath = assertStoreBoundary(config, options.storePath ?? config.runtime_store);
   const runtime = await createRuntime({
     store: storePath,
     policy,
     actions,
-    agents: [healthAgent],
-    components: [semanticWorldComponent(world)],
+    agents: options.agents ?? [healthAgent],
+    components: [semanticWorldComponent(world), ...(options.components ?? [])],
     projections: [{ projection: navigationContextProjection, public: true }],
     tickMs: 5,
   });
-  return { runtime, caller: options.caller };
+  return { runtime, caller: options.caller, storePath };
 }

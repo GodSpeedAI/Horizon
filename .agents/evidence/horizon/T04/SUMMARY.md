@@ -60,10 +60,23 @@ changes the DomainForge closure hash, so `world_ref` moved:
 - original `world:horizon@sha256:b0f31fcc…d602cd24ca1`
 - revised  `world:horizon@sha256:6c18d6a6…412309f0`
 
-Verified by `domainforge validate --application` (0 violations) and `scripts/world-ref.py`.
+Verified by `domainforge validate --application` and `scripts/world-ref.py`.
 The pre-re-pin `just test` failure was the semantic adapter correctly rejecting the stale
 pin; it is recorded as a fixed prerequisite defect, not erased. Structure and operations
 did not change. Full rationale in the prereg `pin_revision` block.
+
+**Correction (2026-10-19, after the independent verdict F4).** This section previously
+cited "0 violations" as verification of the pin correction. Vivisection showed
+`validate --application` reports `0 violations` and exit 0 for BOTH a `requirement_ref`
+naming a nonexistent id and a duplicated `invariant_id`
+(`scripts/teeth-domainforge-gate.py`, now in `just teeth`). The pin revision is
+independently reproducible (the verdict re-derived both `b0f31fcc…` and `6c18d6a6…` from
+the source diff), but "0 violations" is **compilation and symbol-resolution evidence only**.
+It is not evidence of referential or identity integrity, and it must not be cited as such.
+Referential integrity is now checked by `scripts/check-idm-integrity.py` (which found one
+dangling reference, `REQ-CMP-001`, recorded in `scripts/idm-integrity-debt.yaml`).
+The prereg's `pin_revision.verified_by` still carries the overclaim; correcting a frozen
+artifact is candidate revision **T04-CR-001**.
 
 ## Positive observations
 
@@ -79,7 +92,13 @@ did not change. Full rationale in the prereg `pin_revision` block.
 
 ## Teeth (preregistered negative expectations)
 
-Each blocked with a bounded diagnostic and no green fallback — see per-case logs.
+Each blocked with a bounded diagnostic — see per-case logs. **Correction (2026-10-19):**
+the boundary and adapter probes block their chosen inputs, but the preregistered
+*structural E2E* condition did not hold for every NE: the unchanged E2E passed with removed
+dependency metadata and with an in-memory environment configuration. The verdict reproduced
+both. `scripts/teeth.ts` now requires the E2E to fail against a memory-only fake runtime
+(blocked) and records, rather than asserts, the metadata-only case, which
+`check-boundaries.ts` is the enforcing route for.
 
 | NE | Attack | Result | Log |
 |---|---|---|---|
@@ -132,6 +151,20 @@ Mechanically complete and honest; **not** settled as T04. Outstanding:
    satisfied retroactively — the freeze has already happened. Either the owner accepts
    post-freeze criticism as meeting PE-01 with a recorded rationale, or PE-01 is restated
    in the prereg and formation is re-frozen.
+
+**Remediation after the independent verdict (`codex-root-20261019-7b4d110`, 2026-10-19).**
+The claim "honest source-to-intent-to-projection round-trip" is now literally true in the
+implementation and its proof: the E2E issues a frame, commits a typed
+`CommitNavigationIntent` intent, starts the observation run from that committed intent,
+asserts the run's checkpoint/correlation/intent provenance, closes the application, and
+reads the events, the `NavigationIntentRecord` and the projection back through fresh store
+connections and a reopened application. It also **fails** when the Cognate runtime is
+replaced by a memory-only fake (`scripts/teeth.ts`: control passes 6/6, fake fails 3).
+The finding → change → proof record is `REMEDIATION.md`; the frozen-artifact findings
+(erased prohibitions, underdetermined contracts, the "0 violations" overclaim) are
+candidate revision **T04-CR-001** in `.agents/candidates/horizon/T04-CR-001/`.
+T04 is still **not** settled: the owner must decide on T04-CR-001 and a fresh independent
+verification of this remediation must run.
 
 
 - `structural walking skeleton > boots the canonical world, real runtime, projection and

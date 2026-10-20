@@ -76,6 +76,13 @@
 - Confidence: high (directly observed)
 - Closure: **added a tooth**, `scripts/teeth-domainforge-gate.py`, invoked from `just teeth`. It asserts the null tree passes, the control (undefined instance type) fails, and the two blind spots are *demonstrated* rather than assumed. Standing rule until DomainForge can see these: no task may cite "0 violations" as evidence of referential or identity integrity. The `world_ref`/`semantic_closure_hash` pin plus `check-idm-coverage.py` remain the real integrity controls. Size S (tooth done); upstream DomainForge gap is theirs.
 
+## D-014 Module-resolution swap needs an isolated dependency tree (2026-10-19)
+- Location: `node_modules/@godspeedai/cognate-runtime-bun` (installed tree; no repository file)
+- Debt: Bun resolves a dependency by its on-disk package directory, not by preload order, so the T04 fake-runtime tooth cannot substitute `createRuntime` through `--preload` in this checkout. Building the discriminating attack requires an isolated dependency tree in a temporary directory. During the first attempt the installed package directory was briefly moved out of this repository into `/tmp`; it was restored within the same step and verified (version `0.6.1`, 14 source files, tests green), but a concurrent process would have failed. Do not mutate the shared `node_modules` to build an attack; copy the tree instead.
+- Evidence: `bun --preload <fake>.ts -e 'await import("@godspeedai/cognate-runtime-bun")'` reported the real `createRuntime`; `mv node_modules/@godspeedai/cognate-runtime-bun /tmp/... && mv` back, then `ls .../src | wc -l` = 14 and `bun test` green.
+- Confidence: high (directly observed)
+- Closure: keep attack tooling confined to temporary copies of `package.json` + `node_modules`; if the tooth later needs a real module swap, vendor a second copy under a distinct path rather than moving the installed one. Size S.
+
 ## D-013 DomainForge diagnostic semantics asserted from partial source reading
 - Location: `../domainforge/domainforge-core/src/module/resolver.rs`
 - Debt: D-011 vivisection concluded the `--application` diagnostics are APP014 (symbol/import resolution) and APP015 (parse) from a grep of `resolver.rs` and `--help`, not from a diagnostic reference. The conclusion is behaviourally confirmed by the tooth (control fails, dangling/duplicate pass), but the *classification* of which diagnostic class covers what is not sourced from a spec.
@@ -91,3 +98,47 @@
 - Evidence: T04 ledger census: 85 of 98 rows use the source-fidelity predicate; the generic restatement appears 72 times.
 - Confidence: medium
 - Closure: replace generic restatements with per-requirement observables as each owning task (T05+) is implemented, tightening the ledger policy so new rows cannot regress to the generic form. Size L.
+
+### D-012 (continued) — the generic form also dropped subjects and left prohibitions unrestated
+- Date: 2026-10-19
+- Location: `scripts/gen-requirement-ledger.py` (`restate`), `requirements/ledger.yaml`
+- Debt: Besides the four reversed prohibitions (D-015), the old `restate()` stripped everything before `MUST` and then removed the modal, so many contracts lost their subject ("Adapters is observed to not create…") and 35 clauses keep a raw normative modal inside a restatement ("…and operations MUST carry a checkpoint reference"). The generator is fixed and self-tested; the frozen ledger still carries the old text until T04-CR-001 is authorized.
+- Evidence: clause census in `.agents/evidence/horizon/T04/REMEDIATION.md`; `scripts/check-acceptance-claims.py` reports 65 failures against the frozen ledger and 0 against the candidate.
+- Confidence: high (directly observed)
+- Closure: covered by candidate revision T04-CR-001 for the frozen artifacts; per-requirement observables remain D-012's own work. Size S for the generator (done), L for the remaining contracts.
+
+## D-015 Frozen acceptance contracts invert four prohibitions (2026-10-19)
+- Location: `requirements/ledger.yaml` (`AC-INT-004-01`, `AC-STACK-006-01`, `AC-STACK-012-01`, `AC-UI-006-01`), `.wayfinder/answer-key.md`, `scripts/gen-requirement-ledger.py`
+- Debt: The generator stripped `MUST NOT`, so four frozen contracts prescribe the behaviour their requirements forbid (approval misrepresentation, receipt-as-settlement, product adoption of Horizon's stack, owner-layout seizure). A downstream implementation could satisfy the oracle by violating the ruler. Found by the independent T04 verdict (F2, severity S1), not by the builder or the freeze gates.
+- Evidence: verdict `codex-root-20261019-7b4d110` §F2; `scripts/check-acceptance-claims.py` fails against the frozen ledger naming all four.
+- Confidence: high (directly observed by the reviewer and re-derived here)
+- Closure: generator fixed with a self-test; frozen artifacts require candidate revision T04-CR-001 and an owner-authorized re-freeze. Do not treat any of the four as settled until then. Size M.
+
+### D-015 (continued) — resolved status
+- Date: 2026-10-19
+- Location: `.agents/candidates/horizon/T04-CR-001/`
+- Debt: (status only, no new defect) The generator fix and the candidate revision are in place and verified; the *frozen* contracts are still inverted until the owner authorizes the re-freeze.
+- Evidence: `just acceptance-claims` passes on the candidate; `just acceptance-claims-frozen` fails on the active ledger, by design.
+- Confidence: high
+- Closure: close this entry when a new freeze replaces the inverted contracts. Do not close it on the strength of the generator fix alone.
+
+## D-016 Canonical `.sea` binds an invariant to a requirement that does not exist (2026-10-19)
+- Location: `.sea/interaction/interaction-model.sea:728` (`inv_simulation_never_changes_world` → `REQ-CMP-001`)
+- Debt: The frozen spec declares no `REQ-CMP-*` requirement (98 requirements, none CMP). The invariant restates the J05_compare journey note, which is not bound to a requirement id. Found while adding the referential-integrity check; the ledger census could not see it because instance bindings are keyed by `requirement_ref` and a dangling one silently binds nothing.
+- Evidence: `python3 scripts/check-idm-integrity.py` reports the dangling reference; it is tolerated only because `scripts/idm-integrity-debt.yaml` lists that exact triple.
+- Confidence: high (directly observed)
+- Closure: decide whether the spec should declare the requirement or the model should re-bind INV-10; either path changes the canonical world and therefore `world_ref`, so it needs a new freeze. Until then the debt entry must stay, and any *new* dangling reference fails `gate-t01`. Size M.
+
+## D-017 `bun run scripts/teeth.ts` depends on the caller's environment (2026-10-19)
+- Location: `scripts/teeth.ts` (isolated-tree attacks), `justfile` (`teeth`)
+- Debt: The fake-runtime and missing-dependency attacks build a temporary dependency tree by copying `node_modules` (~135 MB, roughly two copies per run) and depend on three ambient facts: the repository has an installed `node_modules`, absolute paths recorded in `node_modules` resolve back to this checkout, and the pinned world is reachable through `domain/`. On a machine without `node_modules` the teeth fail closed rather than silently pass, but they are slow (minutes) and not portable to a fresh clone without `setup`.
+- Evidence: `bun run scripts/teeth.ts` copies `node_modules` twice per run; first attempt failed with `ENOENT … /tmp/…/domain` until the `domain/` symlink was followed with `realpathSync`.
+- Confidence: high (directly observed)
+- Closure: replace the copy with a hard-linked or overlay install, or vendor one second copy of `@godspeedai/cognate-runtime-bun`. Size S.
+
+## D-018 Recorder printed success for every failing target (2026-10-19)
+- Location: `.agents/evidence/horizon/T04/run-gates.sh`
+- Debt: `echo "$t exit=$?"` ran after `rc=1`, so `$?` was the preceding `echo`'s status: every target reported `exit=0` regardless of failure. The first remediation run printed `acceptance-claims-frozen exit=0` for a target that exits 1. This is the class of defect the repo's "no false green" rule targets, in the recorder rather than in a gate.
+- Evidence: run output `acceptance-claims-frozen exit=0` beside `just-acceptance-claims-frozen.log` ending with "recipe failed on line 27 with exit code 1".
+- Confidence: high (directly observed)
+- Closure: capture `status=$?` before reassigning `rc` (done in this session) and never summarise a target's status without capturing it first. Size S.

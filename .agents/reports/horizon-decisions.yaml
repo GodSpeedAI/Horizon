@@ -205,3 +205,28 @@ decisions:
     evidence:
       - "scripts/teeth-domainforge-gate.py"
       - ".agents/DEBT.md#D-011"
+
+  - id: DEC-T04-03
+    date: "2026-10-19"
+    task: T04
+    requirement: REQ-VERIFY-002
+    decision: >-
+      T04-CR-001 is PREPARED, not applied. The independent verdict (codex-root-20261019-7b4d110)
+      found four material defects in frozen artifacts: the frozen ledger and Wayfinder invert
+      four prohibitions (F2, S1); three contracts are underdetermined (F3, S2); and the prereg's
+      pin_revision.verified_by cites "0 violations" as verification (F4, S2). The exact proposed
+      changes, witnesses, affected hashes and the re-freeze process are recorded in
+      .agents/candidates/horizon/T04-CR-001/ (CANDIDATE.yaml, REVIEW.md, composed/prereg.patch).
+      The active frozen spec, preregistration, ledger, Wayfinder and canonical world are unchanged.
+      Applying it requires the owner's explicit authorization (a new freeze id and fresh,
+      context-isolated independent criticism of the candidate inputs).
+    rationale:
+      - "Changing only the generator would fix future ledgers and leave the frozen oracles wrong; the verdict says so explicitly."
+      - "The generator fix is landed now because it is mutable code, and a self-test plus check-acceptance-claims.py prevents recurrence."
+      - "The ruler is not edited: no requirement is added, removed or reworded, and world_ref is unchanged, so no plan rebind is needed."
+    reversible: true
+    evidence:
+      - ".agents/candidates/horizon/T04-CR-001/CANDIDATE.yaml"
+      - ".agents/candidates/horizon/T04-CR-001/REVIEW.md"
+      - ".agents/evidence/horizon/T04/verdicts/codex-root-20261019-7b4d110.md"
+      - ".agents/evidence/horizon/T04/REMEDIATION.md"

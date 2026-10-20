@@ -1,0 +1,5206 @@
+# Horizon requirement ledger (generated) — see scripts/gen-requirement-ledger.py
+ledger_version: 1
+project: Horizon
+freeze_hash: candidate
+generated_from:
+  spec: .agents/specs/horizon.agent.spec.yaml
+  spec_sha256: 75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  plan: .agents/plans/horizon.plan.yaml
+  plan_sha256: 282e73bccdb4d75f813979bd21da2a61b60c3ed393d6f8a48fb688d2878bb815
+  semantic_sources:
+  - .sea/interaction/interaction-model.sea
+  - .sea/interaction/research-artifacts.sea
+  - .sea/interaction/product-integration-contract.sea
+  policy: .agents/candidates/horizon/T04-CR-001/composed/ledger-policy.yaml
+  policy_sha256: 2678666977b85d19e868dff68553bfbdebb1edbe5dbd52a77ab32b98be181ef2
+  generator: scripts/gen-requirement-ledger.py
+population: 'candidate at T04. At freeze, scripts/freeze-formation.sh replaces freeze_hash with the sha256 of this document with the marker normalised to ''candidate'' (fragment digest: a document cannot contain its own whole-file sha256). The Wayfinder freeze header''s hashes block is authoritative: it records the whole-file sha256 of this ledger as written. scripts/check-ledger-freeze.sh verifies both and their agreement.'
+unmapped_requirements: []
+requirements:
+- id: REQ-CASE-001
+  title: REQ-CASE-001
+  statement: A Case MUST remain a purpose-relative derived view anchored in authoritative facts and declared direction, not a competing ontology.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.case_and_development[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CaseRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'a Case stays a derived view: it references world_ref and does not mint identity'
+    invariant_source: family
+  acceptance:
+  - AC-CASE-001-01
+  proof: &id003
+  - just gate-t02
+  - just gate-t07
+  settling_tasks:
+  - T02
+  - T07
+  mutable_surfaces: &id001
+  - src/**
+  - test/**
+  - scripts/**
+  - justfile
+  - config/**
+  frozen_surfaces: &id002
+  - .agents/specs/**
+  - .agents/plans/**
+  - .agents/prereg/**
+  - requirements/ledger.yaml
+  - .wayfinder/**
+  - scripts/ledger-policy.yaml
+  dependencies:
+  - REQ-GOAL-001
+  - REQ-SAFE-003
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-STACK-001
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-004
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-CASE-002
+  title: REQ-CASE-002
+  statement: The next primary move MUST respond to material deviation; no primary recommendation is required when only optional choices remain.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.case_and_development[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CaseRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'a Case stays a derived view: it references world_ref and does not mint identity'
+    invariant_source: family
+  acceptance:
+  - AC-CASE-002-01
+  proof: &id004
+  - just gate-t07
+  settling_tasks:
+  - T07
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-SAFE-003
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-CASE-003
+  title: REQ-CASE-003
+  statement: Settlement reachable and should settle now MUST be separate; the latter requires an authorized judgment.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.case_and_development[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CaseRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'a Case stays a derived view: it references world_ref and does not mint identity'
+    invariant_source: family
+  acceptance:
+  - AC-CASE-003-01
+  proof: &id005
+  - just gate-t07
+  - just gate-t17
+  settling_tasks:
+  - T07
+  - T17
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-OUT-003
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-STACK-006
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-CONFIG-001
+  title: REQ-CONFIG-001
+  statement: Observer identity and service authority MUST come from an authenticated trusted boundary, never from presentation metadata.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.configuration_and_input_contract.resolution_rules[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationContext
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
+    invariant_source: family
+  acceptance:
+  - AC-CONFIG-001-01
+  proof: &id006
+  - just gate-t04
+  settling_tasks:
+  - T04
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-UI-005
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-CONFIG-002
+  title: REQ-CONFIG-002
+  statement: Semantic world selection MUST pin a valid DomainForge world_ref, and operations MUST carry a checkpoint reference.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.configuration_and_input_contract.resolution_rules[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationContext
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
+    invariant_source: family
+  acceptance:
+  - AC-CONFIG-002-01
+  proof: &id007
+  - just gate-t04
+  settling_tasks:
+  - T04
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-UI-005
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-CONFIG-003
+  title: REQ-CONFIG-003
+  statement: Adapter absence or inability to prove a required hard gate MUST be explicit and fail closed for the affected action.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.configuration_and_input_contract.resolution_rules[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationContext
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
+    invariant_source: family
+  acceptance:
+  - AC-CONFIG-003-01
+  proof: &id008
+  - just gate-t04
+  settling_tasks:
+  - T04
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-UI-005
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-CONFIG-004
+  title: REQ-CONFIG-004
+  statement: Configured provider endpoints, credentials, timeouts and scope MUST remain below stable behavior contracts.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.configuration_and_input_contract.resolution_rules[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationContext
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
+    invariant_source: family
+  acceptance:
+  - AC-CONFIG-004-01
+  proof: &id009
+  - just gate-t04
+  settling_tasks:
+  - T04
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-UI-005
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-CONFIG-010
+  title: REQ-CONFIG-010
+  statement: Read-only startup MUST identify accessible semantic world, observer and supported projection capabilities.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.configuration_and_input_contract.startup_preflight.requirements[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationContext
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
+    invariant_source: family
+  acceptance:
+  - AC-CONFIG-010-01
+  proof: &id010
+  - just gate-t04
+  settling_tasks:
+  - T04
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-UI-005
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-CONFIG-011
+  title: REQ-CONFIG-011
+  statement: Consequential invocation MUST revalidate target, actor, world revision, authority and settlement prerequisites.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.configuration_and_input_contract.startup_preflight.requirements[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationContext
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
+    invariant_source: family
+  acceptance:
+  - AC-CONFIG-011-01
+  proof: &id011
+  - just gate-t11
+  settling_tasks:
+  - T11
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-CONFIG-012
+  title: REQ-CONFIG-012
+  statement: Preflight failure MUST block only dependent operations and retain unrelated read-only affordances.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.configuration_and_input_contract.startup_preflight.requirements[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationContext
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
+    invariant_source: family
+  acceptance:
+  - AC-CONFIG-012-01
+  proof: &id012
+  - just gate-t11
+  settling_tasks:
+  - T11
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-DEV-001
+  title: REQ-DEV-001
+  statement: Failure, contradictions, recovery, payment and orchestration burden MUST remain available to developmental evaluation.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.case_and_development[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ExperimentRun
+    entity_source: .sea/interaction/research-artifacts.sea
+    invariant: Observed evidence, operational settlement and developmental capability assessment remain distinct; a receipt is not settlement.
+    invariant_source: sea:INV-07
+  acceptance:
+  - AC-DEV-001-01
+  proof: &id013
+  - just gate-t17
+  settling_tasks:
+  - T17
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-STACK-006
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-DEV-002
+  title: REQ-DEV-002
+  statement: Durable capability MUST NOT be claimed without repeated settlement under variation and transfer/recovery evidence.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.case_and_development[4]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ExperimentRun
+    entity_source: .sea/interaction/research-artifacts.sea
+    invariant: a developmental claim is scored separately from the operational outcome
+    invariant_source: family
+  acceptance:
+  - AC-DEV-002-01
+  proof: &id014
+  - just gate-t17
+  settling_tasks:
+  - T17
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-STACK-006
+  critic_predicate: evasion
+  status: candidate
+- id: REQ-DEV-003
+  title: REQ-DEV-003
+  statement: Developmental settlement scoring and capability-promotion rules MUST have exactly one authoritative implementation. If ported from GodSpeed Agent, its golden fixtures and tests are the conformance oracle and the superseded implementation is retired for that function; inherited thresholds migrate as provenance-bearing configuration, never silently changed.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.case_and_development[5]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ExperimentRun
+    entity_source: .sea/interaction/research-artifacts.sea
+    invariant: Developmental interpretation is evaluated separately from operational settlement.
+    invariant_source: sea:INV-11
+  acceptance:
+  - AC-DEV-003-01
+  proof: &id015
+  - just gate-t17
+  settling_tasks:
+  - T17
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-STACK-006
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-GOAL-001
+  title: REQ-GOAL-001
+  statement: Horizon MUST provide a navigable shared semantic and operational world independent of chat.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.requirements.goals[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationContext
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: purpose is carried by context, not inferred from presentation
+    invariant_source: family
+  acceptance:
+  - AC-GOAL-001-01
+  proof: &id016
+  - just gate-t01
+  - just gate-t14
+  settling_tasks:
+  - T01
+  - T14
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-004
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-GOAL-002
+  title: REQ-GOAL-002
+  statement: Horizon MUST derive contextual interactions from source-grounded objects, relationships, cases, and capabilities.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.requirements.goals[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationContext
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: purpose is carried by context, not inferred from presentation
+    invariant_source: family
+  acceptance:
+  - AC-GOAL-002-01
+  proof: &id017
+  - just gate-t02
+  settling_tasks:
+  - T02
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-001
+  - REQ-STACK-001
+  - REQ-WORLD-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-GOAL-003
+  title: REQ-GOAL-003
+  statement: Horizon MUST preserve behavioral equivalence between sequential Clack and richer atomic GUI projections.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.requirements.goals[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationContext
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: purpose is carried by context, not inferred from presentation
+    invariant_source: family
+  acceptance:
+  - AC-GOAL-003-01
+  proof: &id018
+  - just gate-t03
+  - just gate-t08
+  settling_tasks:
+  - T03
+  - T08
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-GOAL-004
+  title: REQ-GOAL-004
+  statement: Horizon MUST maintain separate governance, execution, evidence, operational settlement, and developmental claims.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.requirements.goals[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationContext
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: purpose is carried by context, not inferred from presentation
+    invariant_source: family
+  acceptance:
+  - AC-GOAL-004-01
+  proof: &id019
+  - just gate-t17
+  - just gate-t19
+  settling_tasks:
+  - T17
+  - T19
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-INT-003
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-OUT-004
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-STACK-001
+  - REQ-STACK-004
+  - REQ-STACK-005
+  - REQ-STACK-006
+  - REQ-STACK-011
+  - REQ-STACK-012
+  - REQ-STACK-013
+  - REQ-UI-004
+  - REQ-UI-007
+  - REQ-UX-001
+  - REQ-UX-002
+  - REQ-UX-003
+  - REQ-UX-004
+  - REQ-UX-007
+  - REQ-UX-010
+  - REQ-UX-012
+  - REQ-VERIFY-001
+  - REQ-VERIFY-003
+  - REQ-WORLD-004
+  - REQ-WORLD-007
+  - REQ-WORLD-008
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-GOAL-005
+  title: REQ-GOAL-005
+  statement: Horizon MUST preserve navigation context across focus changes, renderer changes, interruption, and replay.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.requirements.goals[4]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationContext
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: purpose is carried by context, not inferred from presentation
+    invariant_source: family
+  acceptance:
+  - AC-GOAL-005-01
+  proof: &id020
+  - just gate-t04
+  - just gate-t18
+  settling_tasks:
+  - T04
+  - T18
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-005
+  - REQ-UI-006
+  - REQ-UX-001
+  - REQ-UX-004
+  - REQ-UX-005
+  - REQ-UX-006
+  - REQ-UX-007
+  - REQ-UX-008
+  - REQ-UX-009
+  - REQ-UX-010
+  - REQ-UX-011
+  - REQ-UX-012
+  - REQ-VERIFY-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-INT-001
+  title: REQ-INT-001
+  statement: Every canonical journey MUST project the IS1–IS8 Behavioral IR responsibilities and identify unresolved bindings explicitly.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.interactions[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationIntentRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an intent is a typed choice committed against a frame revision, not an API call
+    invariant_source: family
+  acceptance:
+  - AC-INT-001-01
+  proof: &id021
+  - just gate-t02
+  settling_tasks:
+  - T02
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-001
+  - REQ-STACK-001
+  - REQ-WORLD-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-INT-002
+  title: REQ-INT-002
+  statement: The GUI MUST preserve persistent case/world/focus context while Clack presents one next meaningful decision at a time.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.interactions[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationIntentRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an intent is a typed choice committed against a frame revision, not an API call
+    invariant_source: family
+  acceptance:
+  - AC-INT-002-01
+  proof: &id022
+  - just gate-t03
+  - just gate-t08
+  settling_tasks:
+  - T03
+  - T08
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-INT-003
+  title: REQ-INT-003
+  statement: Actions MUST use stable semantic IDs, frame revision checks and idempotency keys.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.interactions[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationIntentRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: Duplicate navigation intent ids must not duplicate external side effects.
+    invariant_source: sea:INV-08
+  acceptance:
+  - AC-INT-003-01
+  proof: &id023
+  - just gate-t15
+  - just gate-t18
+  settling_tasks:
+  - T15
+  - T18
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-005
+  - REQ-UI-006
+  - REQ-UX-001
+  - REQ-UX-004
+  - REQ-UX-005
+  - REQ-UX-006
+  - REQ-UX-007
+  - REQ-UX-008
+  - REQ-UX-009
+  - REQ-UX-010
+  - REQ-UX-011
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-INT-004
+  title: REQ-INT-004
+  statement: An answer, choice or confirmation MUST NOT be misrepresented as independent approval or a world mutation.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.interactions[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationIntentRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an intent is a typed choice committed against a frame revision, not an API call
+    invariant_source: family
+  acceptance:
+  - AC-INT-004-01
+  proof: &id024
+  - just gate-t11
+  settling_tasks:
+  - T11
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-NAV-001
+  title: REQ-NAV-001
+  statement: Horizon MUST distinguish possible, available, blocked, unknown and conflicted paths before ranking.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.navigation_and_affordances[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: AffordanceAssessment
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: A represented possibility is not an affordance until a reachable, payable, governable, settleable path is visible.
+    invariant_source: sea:INV-01
+  acceptance:
+  - AC-NAV-001-01
+  proof: &id025
+  - just gate-t07
+  settling_tasks:
+  - T07
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-SAFE-003
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: semantic-fidelity
+  status: candidate
+- id: REQ-NAV-002
+  title: REQ-NAV-002
+  statement: Affordance gates MUST use exactly the canonical keys visibility, reach, payment, authority, capability, recovery and settlement_access.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.navigation_and_affordances[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: AffordanceAssessment
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: Affordance gates use exactly the canonical keys visibility, reach, payment, authority, capability, recovery and settlement_access.
+    invariant_source: sea:INV-02
+  acceptance:
+  - AC-NAV-002-01
+  proof: &id026
+  - just gate-t07
+  settling_tasks:
+  - T07
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-SAFE-003
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: semantic-fidelity
+  status: candidate
+- id: REQ-NAV-003
+  title: REQ-NAV-003
+  statement: Only eligible paths MAY be recommended as spendable; blocked paths MUST expose material reasons and reachable prerequisites where known.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.navigation_and_affordances[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: AffordanceAssessment
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an affordance is assessed on its gates before any commitment, never on possibility
+    invariant_source: family
+  acceptance:
+  - AC-NAV-003-01
+  proof: &id027
+  - just gate-t07
+  settling_tasks:
+  - T07
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-SAFE-003
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-NAV-004
+  title: REQ-NAV-004
+  statement: The observer MUST retain discretion to inspect alternatives, defer, reframe or disagree with the representation.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.navigation_and_affordances[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: AffordanceAssessment
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an affordance is assessed on its gates before any commitment, never on possibility
+    invariant_source: family
+  acceptance:
+  - AC-NAV-004-01
+  proof: &id028
+  - just gate-t02
+  - just gate-t07
+  - just gate-t16
+  settling_tasks:
+  - T02
+  - T07
+  - T16
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-001
+  - REQ-SAFE-003
+  - REQ-SAFE-004
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-STACK-001
+  - REQ-STACK-005
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-004
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-NAV-005
+  title: REQ-NAV-005
+  statement: The navigation controller MUST avoid asking for context it can resolve without user burden.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.navigation_and_affordances[4]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: AffordanceAssessment
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an affordance is assessed on its gates before any commitment, never on possibility
+    invariant_source: family
+  acceptance:
+  - AC-NAV-005-01
+  proof: &id029
+  - just gate-t07
+  settling_tasks:
+  - T07
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-SAFE-003
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-NAV-006
+  title: REQ-NAV-006
+  statement: The authority gate MUST take one of likely_allow, requires_approval, deferred_to_invocation, denied, unreachable or unknown. likely_allow requires a non-granting SEA-Forge evaluation; deferred_to_invocation means SEA-Forge is reachable and the exact operation is policy-covered but no preview exists; denied, unreachable and unknown block availability. No gate value grants authority.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.navigation_and_affordances[5]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: AffordanceAssessment
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: No authority gate value grants authority; likely_allow requires a non-granting evaluation.
+    invariant_source: sea:INV-03
+  acceptance:
+  - AC-NAV-006-01
+  proof: &id030
+  - just gate-t07
+  - just gate-t11
+  settling_tasks:
+  - T07
+  - T11
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-002
+  - REQ-GOAL-005
+  - REQ-INT-001
+  - REQ-SAFE-003
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-SEC-006
+  - REQ-STACK-002
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-NAV-007
+  title: REQ-NAV-007
+  statement: Before any consequential commitment the observer MUST see the operation's reversibility class, payment, expected evidence and what happens if authority escalates.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.navigation_and_affordances[6]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: AffordanceAssessment
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: Before a consequential commitment the observer sees reversibility, payment, expected evidence and escalation behaviour.
+    invariant_source: sea:INV-04
+  acceptance:
+  - AC-NAV-007-01
+  proof: &id031
+  - just gate-t07
+  - just gate-t09
+  settling_tasks:
+  - T07
+  - T09
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-002
+  - REQ-GOAL-003
+  - REQ-INT-001
+  - REQ-INT-002
+  - REQ-SAFE-003
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-OUT-001
+  title: REQ-OUT-001
+  statement: Every frame MUST identify observer, pinned semantic world, operational checkpoint or explicit unknown, current focus, view mode, and allowed choices.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.outcome_contract.output_produced.requirements[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: OperationRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an operation's outcome is recorded with its settlement reference, not inferred from intent
+    invariant_source: family
+  acceptance:
+  - AC-OUT-001-01
+  proof: &id032
+  - just gate-t07
+  settling_tasks:
+  - T07
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-SAFE-003
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-OUT-002
+  title: REQ-OUT-002
+  statement: Every choice MUST bind a typed semantic operation and its current affordance assessment; it MUST NOT gain authority from UI enablement.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.outcome_contract.output_produced.requirements[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: OperationRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an operation's outcome is recorded with its settlement reference, not inferred from intent
+    invariant_source: family
+  acceptance:
+  - AC-OUT-002-01
+  proof: &id033
+  - just gate-t07
+  settling_tasks:
+  - T07
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-SAFE-003
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-OUT-003
+  title: REQ-OUT-003
+  statement: Each consequential attempt MUST preserve predeclared expectations, authorization correlation, execution references, and observation status.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.outcome_contract.output_produced.requirements[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: OperationRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an operation's outcome is recorded with its settlement reference, not inferred from intent
+    invariant_source: family
+  acceptance:
+  - AC-OUT-003-01
+  proof: &id034
+  - just gate-t11
+  - just gate-t13
+  - just gate-t15
+  settling_tasks:
+  - T11
+  - T13
+  - T15
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SAFE-003
+  - REQ-SEC-006
+  - REQ-STACK-002
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-OUT-004
+  title: REQ-OUT-004
+  statement: Both renderers MUST project the same behavior without duplicating source-of-truth rules or creating a second approval path.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.outcome_contract.output_produced.requirements[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: OperationRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an operation's outcome is recorded with its settlement reference, not inferred from intent
+    invariant_source: family
+  acceptance:
+  - AC-OUT-004-01
+  proof: &id035
+  - just gate-t09
+  - just gate-t18
+  settling_tasks:
+  - T09
+  - T18
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-001
+  - REQ-UX-004
+  - REQ-UX-007
+  - REQ-UX-009
+  - REQ-UX-010
+  - REQ-UX-012
+  - REQ-VERIFY-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-RES-001
+  title: REQ-RES-001
+  statement: The GodSpeed Agent Python research infrastructure (dataset adapters, corpora builders, calibration pipeline, preregistered experiment matrices, shadow and guarded evaluation, predictive model port) MUST be carried into Horizon as a Python research subsystem behind typed, versioned process contracts invoked via Cognate capabilities. Horizon MUST NOT reimplement ML training or evaluation in TypeScript.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.research_and_learning[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ExperimentRun
+    entity_source: .sea/interaction/research-artifacts.sea
+    invariant: a run's claim is scoped to its preregistered hypothesis and dataset
+    invariant_source: family
+  acceptance:
+  - AC-RES-001-01
+  proof: &id036
+  - just gate-t21
+  settling_tasks:
+  - T21
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-005
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-RES-002
+  title: REQ-RES-002
+  statement: Research artifacts (datasets and corpora, preregistrations, experiment runs, results and verdicts, models, shadow evaluations) MUST be navigable world objects with content-hash provenance. Migrated results MUST keep their original claim level and verdict and MUST NOT be upgraded by migration.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.research_and_learning[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ExperimentRun
+    entity_source: .sea/interaction/research-artifacts.sea
+    invariant: a run's claim is scoped to its preregistered hypothesis and dataset
+    invariant_source: family
+  acceptance:
+  - AC-RES-002-01
+  proof: &id037
+  - just gate-t21
+  settling_tasks:
+  - T21
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-005
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-RES-003
+  title: REQ-RES-003
+  statement: Starting a research run MUST be a consequential governed operation with a compute/payment gate and a preregistration frozen before execution; long runs use Gauntlet or a bounded Cognate execution world, and results become evidence, not settlement by assertion.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.research_and_learning[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ExperimentRun
+    entity_source: .sea/interaction/research-artifacts.sea
+    invariant: a run's claim is scoped to its preregistered hypothesis and dataset
+    invariant_source: family
+  acceptance:
+  - AC-RES-003-01
+  proof: &id038
+  - just gate-t21
+  settling_tasks:
+  - T21
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-005
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-RES-004
+  title: REQ-RES-004
+  statement: 'Predictive estimates MAY inform payment, consequence or ranking only after governed activation: a frozen preregistered held-out criterion, retained evaluation evidence and an authorized promotion. Active, heuristic and disabled estimator states MUST be visible, and estimates MUST NOT change hard-gate outcomes.'
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.research_and_learning[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ExperimentRun
+    entity_source: .sea/interaction/research-artifacts.sea
+    invariant: a run's claim is scoped to its preregistered hypothesis and dataset
+    invariant_source: family
+  acceptance:
+  - AC-RES-004-01
+  proof: &id039
+  - just gate-t21
+  settling_tasks:
+  - T21
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-005
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-RES-005
+  title: REQ-RES-005
+  statement: Settled, failed and contradicted Horizon episodes MUST be exportable to the research subsystem as versioned, scope-filtered datasets with provenance and without secrets or cross-scope leakage.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.research_and_learning[4]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ExperimentRun
+    entity_source: .sea/interaction/research-artifacts.sea
+    invariant: a run's claim is scoped to its preregistered hypothesis and dataset
+    invariant_source: family
+  acceptance:
+  - AC-RES-005-01
+  proof: &id040
+  - just gate-t17
+  - just gate-t21
+  settling_tasks:
+  - T17
+  - T21
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-005
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-RES-006
+  title: REQ-RES-006
+  statement: Existing agent workflows using the cybernetic_nav MCP tools and godspeed-nav CLI MUST receive an explicit mapping to Horizon equivalents or a documented deprecation; no tool may silently disappear or change meaning.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.research_and_learning[5]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ExperimentRun
+    entity_source: .sea/interaction/research-artifacts.sea
+    invariant: a run's claim is scoped to its preregistered hypothesis and dataset
+    invariant_source: family
+  acceptance:
+  - AC-RES-006-01
+  proof: &id041
+  - just gate-t21
+  settling_tasks:
+  - T21
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-005
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-RES-007
+  title: REQ-RES-007
+  statement: Migrated ledgers, data and reports MUST preserve append-only history, original timestamps and content hashes; large data MUST be referenced by hash and location rather than committed to the repository.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.research_and_learning[6]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ExperimentRun
+    entity_source: .sea/interaction/research-artifacts.sea
+    invariant: a run's claim is scoped to its preregistered hypothesis and dataset
+    invariant_source: family
+  acceptance:
+  - AC-RES-007-01
+  proof: &id042
+  - just gate-t21
+  settling_tasks:
+  - T21
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-005
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-SAFE-001
+  title: REQ-SAFE-001
+  statement: Horizon MUST fail closed on unknown runtime authorization, unsafe world revision or unreconciled duplicate commit.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.failure_model_and_recovery.safe_failure_requirements[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationIntentRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: safety limits act on the committed intent record and its reversibility class
+    invariant_source: family
+  acceptance:
+  - AC-SAFE-001-01
+  proof: &id043
+  - just gate-t11
+  - just gate-t15
+  settling_tasks:
+  - T11
+  - T15
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-SAFE-002
+  title: REQ-SAFE-002
+  statement: Horizon MUST preserve immutable expectation, evidence and error history during recovery and reframing.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.failure_model_and_recovery.safe_failure_requirements[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationIntentRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: safety limits act on the committed intent record and its reversibility class
+    invariant_source: family
+  acceptance:
+  - AC-SAFE-002-01
+  proof: &id044
+  - just gate-t13
+  settling_tasks:
+  - T13
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-SAFE-001
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-SAFE-003
+  title: REQ-SAFE-003
+  statement: Horizon MUST distinguish source unavailable, access denied, empty result and no matching object.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.failure_model_and_recovery.safe_failure_requirements[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationIntentRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: safety limits act on the committed intent record and its reversibility class
+    invariant_source: family
+  acceptance:
+  - AC-SAFE-003-01
+  proof: &id045
+  - just gate-t06
+  settling_tasks:
+  - T06
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-SEC-006
+  - REQ-STACK-001
+  - REQ-STACK-002
+  - REQ-WORLD-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-SAFE-004
+  title: REQ-SAFE-004
+  statement: Horizon MUST permit valid read-only navigation and diagnostics when an unrelated executor is unavailable.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.failure_model_and_recovery.safe_failure_requirements[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationIntentRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: safety limits act on the committed intent record and its reversibility class
+    invariant_source: family
+  acceptance:
+  - AC-SAFE-004-01
+  proof: &id046
+  - just gate-t10
+  - just gate-t19
+  settling_tasks:
+  - T10
+  - T19
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-DEV-001
+  - REQ-DEV-002
+  - REQ-DEV-003
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-INT-003
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-OUT-004
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-005
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-STACK-001
+  - REQ-STACK-004
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-011
+  - REQ-STACK-012
+  - REQ-STACK-013
+  - REQ-UI-004
+  - REQ-UX-001
+  - REQ-UX-002
+  - REQ-UX-003
+  - REQ-UX-004
+  - REQ-UX-007
+  - REQ-UX-010
+  - REQ-UX-012
+  - REQ-VERIFY-001
+  - REQ-VERIFY-003
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-004
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  - REQ-WORLD-008
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-SAFE-005
+  title: REQ-SAFE-005
+  statement: Horizon MUST prevent a candidate, historical view or simulated outcome being presented as current observed fact.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.failure_model_and_recovery.safe_failure_requirements[4]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationIntentRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: safety limits act on the committed intent record and its reversibility class
+    invariant_source: family
+  acceptance:
+  - AC-SAFE-005-01
+  proof: &id047
+  - just gate-t13
+  - just gate-t16
+  settling_tasks:
+  - T13
+  - T16
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SAFE-001
+  - REQ-SAFE-004
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-005
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-007
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  critic_predicate: evasion
+  status: candidate
+- id: REQ-SEC-001
+  title: REQ-SEC-001
+  statement: Renderer and model-proposed actions MUST NOT bypass Cognate capability and SEA-Forge invocation checks.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.security_safety_trust_boundaries.mandatory_requirements[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ObserverActor
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: trust decisions resolve to the actor reference, not to payload fields
+    invariant_source: family
+  acceptance:
+  - AC-SEC-001-01
+  proof: &id048
+  - just gate-t11
+  settling_tasks:
+  - T11
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-SEC-002
+  title: REQ-SEC-002
+  statement: Agent, human and system presentation roles MUST remain separated in transport and reducer enforcement.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.security_safety_trust_boundaries.mandatory_requirements[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ObserverActor
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: trust decisions resolve to the actor reference, not to payload fields
+    invariant_source: family
+  acceptance:
+  - AC-SEC-002-01
+  proof: &id049
+  - just gate-t05
+  settling_tasks:
+  - T05
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-SEC-003
+  title: REQ-SEC-003
+  statement: All untrusted source and UI strings MUST be schema-validated, scoped, and escaped; no arbitrary executable markup may be submitted.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.security_safety_trust_boundaries.mandatory_requirements[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ObserverActor
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: trust decisions resolve to the actor reference, not to payload fields
+    invariant_source: family
+  acceptance:
+  - AC-SEC-003-01
+  proof: &id050
+  - just gate-t05
+  settling_tasks:
+  - T05
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-SEC-004
+  title: REQ-SEC-004
+  statement: Multi-user or remote deployments MUST NOT reuse Product Actualizer loopback-token trust assumptions unchanged.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.security_safety_trust_boundaries.mandatory_requirements[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ObserverActor
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: trust decisions resolve to the actor reference, not to payload fields
+    invariant_source: family
+  acceptance:
+  - AC-SEC-004-01
+  proof: &id051
+  - just gate-t05
+  - just gate-t19
+  settling_tasks:
+  - T05
+  - T19
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-DEV-001
+  - REQ-DEV-002
+  - REQ-DEV-003
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-INT-003
+  - REQ-NAV-004
+  - REQ-OUT-003
+  - REQ-OUT-004
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-005
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-STACK-001
+  - REQ-STACK-002
+  - REQ-STACK-004
+  - REQ-STACK-005
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-011
+  - REQ-STACK-012
+  - REQ-STACK-013
+  - REQ-UI-004
+  - REQ-UX-001
+  - REQ-UX-002
+  - REQ-UX-003
+  - REQ-UX-004
+  - REQ-UX-007
+  - REQ-UX-010
+  - REQ-UX-012
+  - REQ-VERIFY-001
+  - REQ-VERIFY-003
+  - REQ-VERIFY-004
+  - REQ-WORLD-004
+  - REQ-WORLD-007
+  - REQ-WORLD-008
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-SEC-005
+  title: REQ-SEC-005
+  statement: Credential and private reference material MUST never be exposed through shared UI context, logs or evidence.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.security_safety_trust_boundaries.mandatory_requirements[4]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ObserverActor
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: trust decisions resolve to the actor reference, not to payload fields
+    invariant_source: family
+  acceptance:
+  - AC-SEC-005-01
+  proof: &id052
+  - just gate-t11
+  settling_tasks:
+  - T11
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: evasion
+  status: candidate
+- id: REQ-SEC-006
+  title: REQ-SEC-006
+  statement: 'Initial conformance targets the local_operator profile: loopback-bound, per-launch secrets, operator identity from the OS session, and agent principals distinct from the human. shared_remote MUST NOT be enabled without a real identity provider at Cognate''s authenticate boundary; conformance claims MUST name their profile.'
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.security_safety_trust_boundaries.mandatory_requirements[5]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: ObserverActor
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: trust decisions resolve to the actor reference, not to payload fields
+    invariant_source: family
+  acceptance:
+  - AC-SEC-006-01
+  proof: &id053
+  - just gate-t04
+  - just gate-t19
+  settling_tasks:
+  - T04
+  - T19
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-003
+  - REQ-DEV-001
+  - REQ-DEV-002
+  - REQ-DEV-003
+  - REQ-GOAL-001
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-INT-003
+  - REQ-NAV-004
+  - REQ-OUT-003
+  - REQ-OUT-004
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-005
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-STACK-001
+  - REQ-STACK-004
+  - REQ-STACK-005
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-011
+  - REQ-STACK-012
+  - REQ-STACK-013
+  - REQ-UI-004
+  - REQ-UI-005
+  - REQ-UI-007
+  - REQ-UX-001
+  - REQ-UX-002
+  - REQ-UX-003
+  - REQ-UX-004
+  - REQ-UX-007
+  - REQ-UX-010
+  - REQ-UX-012
+  - REQ-VERIFY-001
+  - REQ-VERIFY-003
+  - REQ-VERIFY-004
+  - REQ-WORLD-004
+  - REQ-WORLD-007
+  - REQ-WORLD-008
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-STACK-001
+  title: REQ-STACK-001
+  statement: DomainForge alone MUST own canonical semantic compilation and world_ref identity.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: DomainForge alone owns canonical semantic compilation and world_ref identity.
+    invariant_source: sea:INV-06
+  acceptance:
+  - AC-STACK-001-01
+  proof: &id054
+  - just gate-t01
+  - just gate-t14
+  settling_tasks:
+  - T01
+  - T14
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-004
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: semantic-fidelity
+  status: candidate
+- id: REQ-STACK-002
+  title: REQ-STACK-002
+  statement: Cognate MUST own app events/capability invocation/projection state; adapters MUST not create a second authoritative event history.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
+    invariant_source: family
+  acceptance:
+  - AC-STACK-002-01
+  proof: &id055
+  - just gate-t04
+  settling_tasks:
+  - T04
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-UI-005
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-STACK-003
+  title: REQ-STACK-003
+  statement: SEA-Forge MUST authorize each consequential invocation; preflight MUST NOT substitute for invocation authorization.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
+    invariant_source: family
+  acceptance:
+  - AC-STACK-003-01
+  proof: &id056
+  - just gate-t11
+  settling_tasks:
+  - T11
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-STACK-004
+  title: REQ-STACK-004
+  statement: Gauntlet MUST be used only for tasks that require bounded long-horizon work and MUST freeze and preserve its Reference.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
+    invariant_source: family
+  acceptance:
+  - AC-STACK-004-01
+  proof: &id057
+  - just gate-t12
+  settling_tasks:
+  - T12
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-STACK-005
+  title: REQ-STACK-005
+  statement: Context Kernel results MUST remain scoped/cited and MUST NOT be interpreted as canonical organizational truth.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[4]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
+    invariant_source: family
+  acceptance:
+  - AC-STACK-005-01
+  proof: &id058
+  - just gate-t10
+  settling_tasks:
+  - T10
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SAFE-003
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-STACK-006
+  title: REQ-STACK-006
+  statement: RealityTrace delivery receipts MUST NOT be treated as evidence derivation or settlement.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[5]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
+    invariant_source: family
+  acceptance:
+  - AC-STACK-006-01
+  proof: &id059
+  - just gate-t13
+  settling_tasks:
+  - T13
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-SAFE-001
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-STACK-007
+  title: REQ-STACK-007
+  statement: Operational obligation settlement and GodSpeed developmental interpretation MUST be separately referenced.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[6]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
+    invariant_source: family
+  acceptance:
+  - AC-STACK-007-01
+  proof: &id060
+  - just gate-t13
+  - just gate-t17
+  settling_tasks:
+  - T13
+  - T17
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-001
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-STACK-008
+  title: REQ-STACK-008
+  statement: Every cross-system episode MUST preserve correlation through observer/world/case/intent/authority/execution/evidence/settlement refs.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[7]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
+    invariant_source: family
+  acceptance:
+  - AC-STACK-008-01
+  proof: &id061
+  - just gate-t19
+  settling_tasks:
+  - T19
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-003
+  - REQ-DEV-001
+  - REQ-DEV-002
+  - REQ-DEV-003
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-INT-003
+  - REQ-NAV-004
+  - REQ-OUT-003
+  - REQ-OUT-004
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-005
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-STACK-001
+  - REQ-STACK-004
+  - REQ-STACK-005
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-011
+  - REQ-STACK-012
+  - REQ-STACK-013
+  - REQ-UI-004
+  - REQ-UI-007
+  - REQ-UX-001
+  - REQ-UX-002
+  - REQ-UX-003
+  - REQ-UX-004
+  - REQ-UX-007
+  - REQ-UX-010
+  - REQ-UX-012
+  - REQ-VERIFY-001
+  - REQ-VERIFY-003
+  - REQ-VERIFY-004
+  - REQ-WORLD-004
+  - REQ-WORLD-007
+  - REQ-WORLD-008
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-STACK-009
+  title: REQ-STACK-009
+  statement: Only a SEA-Forge allow disposition with a matching invocation grant (bound to the exact action, targets, world_ref and unexpired) MAY permit a side effect; deny, escalate, boundary, degraded and any unrecognized disposition MUST produce no effect and a visible typed status.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[8]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
+    invariant_source: family
+  acceptance:
+  - AC-STACK-009-01
+  proof: &id062
+  - just gate-t11
+  settling_tasks:
+  - T11
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-STACK-010
+  title: REQ-STACK-010
+  statement: Horizon MUST reach SEA-Forge, Gauntlet, RealityTrace, Context Kernel and the research subsystem only through Cognate capabilities or Cognate-owned adapters; the navigation controller and renderers MUST NOT hold a second client to an authority or evidence owner.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[9]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
+    invariant_source: family
+  acceptance:
+  - AC-STACK-010-01
+  proof: &id063
+  - just gate-t11
+  - just gate-t19
+  settling_tasks:
+  - T11
+  - T19
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-DEV-001
+  - REQ-DEV-002
+  - REQ-DEV-003
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-INT-003
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-004
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-005
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-STACK-001
+  - REQ-STACK-002
+  - REQ-STACK-004
+  - REQ-STACK-005
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-011
+  - REQ-STACK-012
+  - REQ-STACK-013
+  - REQ-UI-004
+  - REQ-UI-007
+  - REQ-UX-001
+  - REQ-UX-002
+  - REQ-UX-003
+  - REQ-UX-004
+  - REQ-UX-010
+  - REQ-UX-012
+  - REQ-VERIFY-001
+  - REQ-VERIFY-003
+  - REQ-VERIFY-004
+  - REQ-WORLD-004
+  - REQ-WORLD-007
+  - REQ-WORLD-008
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-STACK-011
+  title: REQ-STACK-011
+  statement: 'A product joins the world only through the product integration contract: a DomainForge module for its types, links and operations; a read connector emitting provenance-bearing observations into Cognate; capability bindings for actions, each covered by SEA-Forge policy; and optional RealityTrace evidence hooks. Its integration level (visible, queryable, actionable, evidenced) MUST be derived from which facets are proven.'
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[10]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
+    invariant_source: family
+  acceptance:
+  - AC-STACK-011-01
+  proof: &id064
+  - just gate-t20
+  settling_tasks:
+  - T20
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-003
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-STACK-012
+  title: REQ-STACK-012
+  statement: Products MUST NOT be required to adopt Horizon's language, storage or UI; non-TypeScript products integrate through process, CLI, MCP or Connect boundaries owned by Cognate.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[11]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
+    invariant_source: family
+  acceptance:
+  - AC-STACK-012-01
+  proof: &id065
+  - just gate-t20
+  settling_tasks:
+  - T20
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-003
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-STACK-013
+  title: REQ-STACK-013
+  statement: A product with its own UI MAY be reachable as a hosted surface via deep links that carry focus refs in and return typed intents or focus out; a hosted surface MUST NOT run inside Horizon's trust boundary or acquire Horizon authority.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[13]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
+    invariant_source: family
+  acceptance:
+  - AC-STACK-013-01
+  proof: &id066
+  - just gate-t20
+  settling_tasks:
+  - T20
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-003
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-STACK-014
+  title: REQ-STACK-014
+  statement: 'Dependency MUST be one-way: every stack owner (DomainForge, Cognate, SEA-Forge, Gauntlet, RealityTrace, Context Kernel) and every joined product MUST remain fully operable without Horizon. Horizon MUST NOT require changes that make a product depend on Horizon, and integration MUST use each product''s own public surfaces; a product unaware of Horizon is a valid product.'
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.integration[12]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: CognateHost
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
+    invariant_source: family
+  acceptance:
+  - AC-STACK-014-01
+  proof: &id067
+  - just gate-t19
+  - just gate-t20
+  settling_tasks:
+  - T19
+  - T20
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-DEV-001
+  - REQ-DEV-002
+  - REQ-DEV-003
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-INT-003
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-OUT-004
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-005
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-001
+  - REQ-STACK-003
+  - REQ-STACK-004
+  - REQ-STACK-005
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-UI-004
+  - REQ-UI-007
+  - REQ-UX-001
+  - REQ-UX-002
+  - REQ-UX-003
+  - REQ-UX-004
+  - REQ-UX-007
+  - REQ-UX-010
+  - REQ-UX-012
+  - REQ-VERIFY-001
+  - REQ-VERIFY-003
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-004
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-008
+  critic_predicate: evasion
+  status: candidate
+- id: REQ-UI-001
+  title: REQ-UI-001
+  statement: A closed versioned declarative surface schema MUST separate agents from executable UI code.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.presentation_and_atomic_ui[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: SurfaceSpecRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: A surface specification is closed declarative presentation, never an authority or business record; no raw executable UI code is allowed.
+    invariant_source: sea:INV-09
+  acceptance:
+  - AC-UI-001-01
+  proof: &id068
+  - just gate-t05
+  settling_tasks:
+  - T05
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UI-002
+  title: REQ-UI-002
+  statement: Schema validation MUST reject unknown blocks, unauthorized actions, invalid refs and unsafe source expressions.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.presentation_and_atomic_ui[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: SurfaceSpecRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: presentation is declarative and sourced from behavioural availability
+    invariant_source: family
+  acceptance:
+  - AC-UI-002-01
+  proof: &id069
+  - just gate-t05
+  settling_tasks:
+  - T05
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UI-003
+  title: REQ-UI-003
+  statement: Deterministic source-binding and pure composition/reducer behavior MUST define displayed facts and resulting intents.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.presentation_and_atomic_ui[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: SurfaceSpecRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: presentation is declarative and sourced from behavioural availability
+    invariant_source: family
+  acceptance:
+  - AC-UI-003-01
+  proof: &id070
+  - just gate-t05
+  settling_tasks:
+  - T05
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UI-004
+  title: REQ-UI-004
+  statement: Clack and GUI MUST consume the same behavioral contract and produce equivalent typed intents for equivalent frames.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.presentation_and_atomic_ui[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: SurfaceSpecRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: presentation is declarative and sourced from behavioural availability
+    invariant_source: family
+  acceptance:
+  - AC-UI-004-01
+  proof: &id071
+  - just gate-t08
+  - just gate-t18
+  settling_tasks:
+  - T08
+  - T18
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-005
+  - REQ-UI-006
+  - REQ-UX-001
+  - REQ-UX-004
+  - REQ-UX-006
+  - REQ-UX-007
+  - REQ-UX-009
+  - REQ-UX-010
+  - REQ-UX-011
+  - REQ-UX-012
+  - REQ-VERIFY-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UI-005
+  title: REQ-UI-005
+  statement: Atomic UI MUST derive elements, groups, regions and views from proved behavioral necessities, preserving accessible loading, empty, blocked and recovery states.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.presentation_and_atomic_ui[4]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: SurfaceSpecRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: presentation is declarative and sourced from behavioural availability
+    invariant_source: family
+  acceptance:
+  - AC-UI-005-01
+  proof: &id072
+  - just gate-t03
+  - just gate-t09
+  settling_tasks:
+  - T03
+  - T09
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-OUT-001
+  - REQ-OUT-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UI-006
+  title: REQ-UI-006
+  statement: Agent-composed content MUST NOT reorder owner-pinned surfaces or seize presentation control; owner choices govern layout.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.presentation_and_atomic_ui[5]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: SurfaceSpecRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: presentation is declarative and sourced from behavioural availability
+    invariant_source: family
+  acceptance:
+  - AC-UI-006-01
+  proof: &id073
+  - just gate-t05
+  - just gate-t09
+  settling_tasks:
+  - T05
+  - T09
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-003
+  - REQ-GOAL-005
+  - REQ-INT-002
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UI-007
+  title: REQ-UI-007
+  statement: The source of every substantive value MUST be inspectable, and agent-supplied values MUST be visibly marked as such.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.presentation_and_atomic_ui[6]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: SurfaceSpecRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: presentation is declarative and sourced from behavioural availability
+    invariant_source: family
+  acceptance:
+  - AC-UI-007-01
+  proof: &id074
+  - just gate-t05
+  - just gate-t10
+  settling_tasks:
+  - T05
+  - T10
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SAFE-003
+  - REQ-SEC-006
+  - REQ-STACK-002
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UI-008
+  title: REQ-UI-008
+  statement: Contextual MCP, WebMCP and CLI tools MUST share the same validation and role boundaries; tool discovery MUST NOT imply authorization.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.presentation_and_atomic_ui[7]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: SurfaceSpecRecord
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: presentation is declarative and sourced from behavioural availability
+    invariant_source: family
+  acceptance:
+  - AC-UI-008-01
+  proof: &id075
+  - just gate-t05
+  settling_tasks:
+  - T05
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UX-001
+  title: REQ-UX-001
+  statement: Opening Horizon MUST land on a home view that resumes the last focus and shows, ordered by the mode-precedence selector, pending human decisions (including SEA-Forge approvals), work in flight, contradicted or unresolved evidence, degraded sources and changes to watched objects.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.operator_experience[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationFrame
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
+    invariant_source: family
+  acceptance:
+  - AC-UX-001-01
+  proof: &id076
+  - just gate-t22
+  settling_tasks:
+  - T22
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-OUT-004
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-004
+  - REQ-UI-005
+  - REQ-UI-006
+  - REQ-UX-005
+  - REQ-UX-006
+  - REQ-UX-008
+  - REQ-UX-011
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UX-002
+  title: REQ-UX-002
+  statement: A keyboard-first command palette MUST reach search, focus, traversal and every currently derived choice; it is a renderer of the same frame and MUST emit the same typed intents as Clack and GUI.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.operator_experience[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationFrame
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
+    invariant_source: family
+  acceptance:
+  - AC-UX-002-01
+  proof: &id077
+  - just gate-t18
+  - just gate-t22
+  settling_tasks:
+  - T18
+  - T22
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-005
+  - REQ-UI-006
+  - REQ-UX-005
+  - REQ-UX-006
+  - REQ-UX-008
+  - REQ-UX-011
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UX-003
+  title: REQ-UX-003
+  statement: Every focus and frame MUST be addressable by a stable link pinning world_ref, checkpoint and focus; opening a link reproduces that context or states explicitly that newer state exists and offers to move to it.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.operator_experience[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationFrame
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
+    invariant_source: family
+  acceptance:
+  - AC-UX-003-01
+  proof: &id078
+  - just gate-t18
+  - just gate-t22
+  settling_tasks:
+  - T18
+  - T22
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-005
+  - REQ-UI-006
+  - REQ-UX-005
+  - REQ-UX-006
+  - REQ-UX-008
+  - REQ-UX-011
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UX-004
+  title: REQ-UX-004
+  statement: Navigation MUST keep a traversal trail with back/forward and breadcrumbs that preserve selections; read-only navigation is always reversible.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.operator_experience[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationFrame
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
+    invariant_source: family
+  acceptance:
+  - AC-UX-004-01
+  proof: &id079
+  - just gate-t22
+  settling_tasks:
+  - T22
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-OUT-004
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-004
+  - REQ-UI-005
+  - REQ-UI-006
+  - REQ-UX-005
+  - REQ-UX-006
+  - REQ-UX-008
+  - REQ-UX-011
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UX-005
+  title: REQ-UX-005
+  statement: Explanations MUST lead with plain language (what this is, why it is blocked, the single next prerequisite) with progressive drill-down to gates, evidence, provenance and raw refs; internal vocabulary MUST NOT be required to operate.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.operator_experience[4]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationFrame
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
+    invariant_source: family
+  acceptance:
+  - AC-UX-005-01
+  proof: &id080
+  - just gate-t08
+  - just gate-t09
+  settling_tasks:
+  - T08
+  - T09
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-OUT-001
+  - REQ-OUT-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UX-006
+  title: REQ-UX-006
+  statement: Every action, answer and composition MUST show its actor; an agent acting for a human MUST be visibly distinct from the human.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.operator_experience[5]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationFrame
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
+    invariant_source: family
+  acceptance:
+  - AC-UX-006-01
+  proof: &id081
+  - just gate-t05
+  - just gate-t09
+  settling_tasks:
+  - T05
+  - T09
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-003
+  - REQ-GOAL-005
+  - REQ-INT-002
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-SEC-006
+  - REQ-STACK-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UX-007
+  title: REQ-UX-007
+  statement: SEA-Forge approvals MUST be presented and resolved as SEA-Forge approval records under the approver's own authenticated identity; Horizon MUST NOT keep a local approval state.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.operator_experience[6]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationFrame
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
+    invariant_source: family
+  acceptance:
+  - AC-UX-007-01
+  proof: &id082
+  - just gate-t11
+  - just gate-t22
+  settling_tasks:
+  - T11
+  - T22
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-003
+  - REQ-GOAL-005
+  - REQ-INT-002
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-004
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-SEC-006
+  - REQ-STACK-002
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-UI-004
+  - REQ-UI-005
+  - REQ-UI-006
+  - REQ-UX-005
+  - REQ-UX-006
+  - REQ-UX-008
+  - REQ-UX-011
+  - REQ-VERIFY-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UX-008
+  title: REQ-UX-008
+  statement: The GUI and terminal renderers MUST be fully keyboard operable, meet WCAG 2.2 AA for the GUI, respect reduced motion, support light and dark themes, and announce frame changes to assistive technology.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.operator_experience[7]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationFrame
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
+    invariant_source: family
+  acceptance:
+  - AC-UX-008-01
+  proof: &id083
+  - just gate-t08
+  - just gate-t09
+  settling_tasks:
+  - T08
+  - T09
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-OUT-001
+  - REQ-OUT-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UX-009
+  title: REQ-UX-009
+  statement: Read-only navigation interactions SHOULD respond within 300 ms p95 on the local_operator profile; operations exceeding 1 s MUST show progress tied to real events and remain cancellable where the owner supports cancellation.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.operator_experience[8]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationFrame
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
+    invariant_source: family
+  acceptance:
+  - AC-UX-009-01
+  proof: &id084
+  - just gate-t19
+  - just gate-t22
+  settling_tasks:
+  - T19
+  - T22
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-DEV-001
+  - REQ-DEV-002
+  - REQ-DEV-003
+  - REQ-GOAL-001
+  - REQ-GOAL-003
+  - REQ-GOAL-005
+  - REQ-INT-002
+  - REQ-INT-003
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-OUT-004
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-005
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-001
+  - REQ-STACK-003
+  - REQ-STACK-004
+  - REQ-STACK-005
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-011
+  - REQ-STACK-012
+  - REQ-STACK-013
+  - REQ-UI-004
+  - REQ-UI-005
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UX-005
+  - REQ-UX-006
+  - REQ-UX-008
+  - REQ-UX-011
+  - REQ-VERIFY-001
+  - REQ-VERIFY-003
+  - REQ-VERIFY-004
+  - REQ-WORLD-004
+  - REQ-WORLD-007
+  - REQ-WORLD-008
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UX-010
+  title: REQ-UX-010
+  statement: First run and empty states MUST guide the observer to connect a world and a product, and MUST explain each unavailable capability with its next prerequisite instead of showing blank regions.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.operator_experience[9]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationFrame
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
+    invariant_source: family
+  acceptance:
+  - AC-UX-010-01
+  proof: &id085
+  - just gate-t22
+  settling_tasks:
+  - T22
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-OUT-004
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-004
+  - REQ-UI-005
+  - REQ-UI-006
+  - REQ-UX-005
+  - REQ-UX-006
+  - REQ-UX-008
+  - REQ-UX-011
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UX-011
+  title: REQ-UX-011
+  statement: Graph and lineage views MUST open fit-to-content, aggregate beyond a bounded node count, and always offer an equivalent table or list projection.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.operator_experience[10]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationFrame
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
+    invariant_source: family
+  acceptance:
+  - AC-UX-011-01
+  proof: &id086
+  - just gate-t09
+  settling_tasks:
+  - T09
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-OUT-001
+  - REQ-OUT-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-UX-012
+  title: REQ-UX-012
+  statement: Notices MUST be deduplicated by source identity and severity-ranked; repeated identical conditions update one notice rather than creating new ones.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.operator_experience[11]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: NavigationFrame
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
+    invariant_source: family
+  acceptance:
+  - AC-UX-012-01
+  proof: &id087
+  - just gate-t15
+  - just gate-t22
+  settling_tasks:
+  - T15
+  - T22
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-004
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-004
+  - REQ-UI-005
+  - REQ-UI-006
+  - REQ-UX-005
+  - REQ-UX-006
+  - REQ-UX-008
+  - REQ-UX-011
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-VERIFY-001
+  title: REQ-VERIFY-001
+  statement: Identical fixture and frame revision produce equivalent typed choices and intents across Clack and GUI.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.outcome_contract.outcome_verified.signals[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: InteractionInvariant
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: every claim carries a proof level and its evidence reference
+    invariant_source: family
+  acceptance:
+  - AC-VERIFY-001-01
+  proof: &id088
+  - just gate-t18
+  settling_tasks:
+  - T18
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-005
+  - REQ-UI-006
+  - REQ-UX-001
+  - REQ-UX-004
+  - REQ-UX-005
+  - REQ-UX-006
+  - REQ-UX-007
+  - REQ-UX-008
+  - REQ-UX-009
+  - REQ-UX-010
+  - REQ-UX-011
+  - REQ-UX-012
+  - REQ-VERIFY-002
+  critic_predicate: verification-quality
+  status: candidate
+- id: REQ-VERIFY-002
+  title: REQ-VERIFY-002
+  statement: Invalid, stale, unauthorized, unpayable, or unverifiable operations never produce unauthorized side effects.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.outcome_contract.outcome_verified.signals[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: InteractionInvariant
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: every claim carries a proof level and its evidence reference
+    invariant_source: family
+  acceptance:
+  - AC-VERIFY-002-01
+  proof: &id089
+  - just gate-t11
+  - just gate-t19
+  settling_tasks:
+  - T11
+  - T19
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-DEV-001
+  - REQ-DEV-002
+  - REQ-DEV-003
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-INT-003
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-004
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-005
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-STACK-001
+  - REQ-STACK-002
+  - REQ-STACK-004
+  - REQ-STACK-005
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-011
+  - REQ-STACK-012
+  - REQ-STACK-013
+  - REQ-UI-004
+  - REQ-UI-007
+  - REQ-UX-001
+  - REQ-UX-002
+  - REQ-UX-003
+  - REQ-UX-004
+  - REQ-UX-010
+  - REQ-UX-012
+  - REQ-VERIFY-001
+  - REQ-VERIFY-003
+  - REQ-VERIFY-004
+  - REQ-WORLD-004
+  - REQ-WORLD-007
+  - REQ-WORLD-008
+  critic_predicate: verification-quality
+  status: candidate
+- id: REQ-VERIFY-003
+  title: REQ-VERIFY-003
+  statement: A restart reconstructs focus, provenance, committed intentions, and outstanding human decisions.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.outcome_contract.outcome_verified.signals[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: InteractionInvariant
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: every claim carries a proof level and its evidence reference
+    invariant_source: family
+  acceptance:
+  - AC-VERIFY-003-01
+  proof: &id090
+  - just gate-t18
+  settling_tasks:
+  - T18
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-003
+  - REQ-INT-002
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-005
+  - REQ-UI-006
+  - REQ-UX-001
+  - REQ-UX-004
+  - REQ-UX-005
+  - REQ-UX-006
+  - REQ-UX-007
+  - REQ-UX-008
+  - REQ-UX-009
+  - REQ-UX-010
+  - REQ-UX-011
+  - REQ-UX-012
+  - REQ-VERIFY-002
+  critic_predicate: verification-quality
+  status: candidate
+- id: REQ-VERIFY-004
+  title: REQ-VERIFY-004
+  statement: Operational and developmental conclusions never exceed the strength or scope of their evidence.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.outcome_contract.outcome_verified.signals[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: InteractionInvariant
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: every claim carries a proof level and its evidence reference
+    invariant_source: family
+  acceptance:
+  - AC-VERIFY-004-01
+  proof: &id091
+  - just gate-t13
+  - just gate-t17
+  settling_tasks:
+  - T13
+  - T17
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-001
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  critic_predicate: evasion
+  status: candidate
+- id: REQ-VERIFY-005
+  title: REQ-VERIFY-005
+  statement: Six canonical journeys (J01–J06) pass recorded happy, blocked, and recovery fixtures.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.outcome_contract.outcome_verified.signals[4]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: InteractionInvariant
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: every claim carries a proof level and its evidence reference
+    invariant_source: family
+  acceptance:
+  - AC-VERIFY-005-01
+  proof: &id092
+  - just gate-t19
+  settling_tasks:
+  - T19
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-003
+  - REQ-DEV-001
+  - REQ-DEV-002
+  - REQ-DEV-003
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-INT-003
+  - REQ-NAV-004
+  - REQ-OUT-003
+  - REQ-OUT-004
+  - REQ-RES-001
+  - REQ-RES-002
+  - REQ-RES-003
+  - REQ-RES-004
+  - REQ-RES-005
+  - REQ-RES-006
+  - REQ-RES-007
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-005
+  - REQ-STACK-001
+  - REQ-STACK-004
+  - REQ-STACK-005
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-011
+  - REQ-STACK-012
+  - REQ-STACK-013
+  - REQ-UI-004
+  - REQ-UI-007
+  - REQ-UX-001
+  - REQ-UX-002
+  - REQ-UX-003
+  - REQ-UX-004
+  - REQ-UX-007
+  - REQ-UX-010
+  - REQ-UX-012
+  - REQ-VERIFY-001
+  - REQ-VERIFY-003
+  - REQ-VERIFY-004
+  - REQ-WORLD-004
+  - REQ-WORLD-007
+  - REQ-WORLD-008
+  critic_predicate: verification-quality
+  status: candidate
+- id: REQ-WORLD-001
+  title: REQ-WORLD-001
+  statement: Horizon MUST search semantic types, live objects, resources and apps without treating them as one undifferentiated graph.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.world_navigation[0]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: WorldRevision
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: world_ref identity is immutable and owned by DomainForge
+    invariant_source: family
+  acceptance:
+  - AC-WORLD-001-01
+  proof: &id093
+  - just gate-t06
+  settling_tasks:
+  - T06
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-SEC-006
+  - REQ-STACK-001
+  - REQ-STACK-002
+  - REQ-WORLD-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-WORLD-002
+  title: REQ-WORLD-002
+  statement: Horizon MUST filter typed operational sets and traverse declared relationships at a known checkpoint.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.world_navigation[1]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: WorldRevision
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: world_ref identity is immutable and owned by DomainForge
+    invariant_source: family
+  acceptance:
+  - AC-WORLD-002-01
+  proof: &id094
+  - just gate-t06
+  settling_tasks:
+  - T06
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-SEC-006
+  - REQ-STACK-001
+  - REQ-STACK-002
+  - REQ-WORLD-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-WORLD-003
+  title: REQ-WORLD-003
+  statement: Horizon MUST preserve focus, object-set selection, observer and world across surfaces and journeys.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.world_navigation[2]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: WorldRevision
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: world_ref identity is immutable and owned by DomainForge
+    invariant_source: family
+  acceptance:
+  - AC-WORLD-003-01
+  proof: &id095
+  - just gate-t06
+  settling_tasks:
+  - T06
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-SEC-006
+  - REQ-STACK-001
+  - REQ-STACK-002
+  - REQ-WORLD-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-WORLD-004
+  title: REQ-WORLD-004
+  statement: Historical, current and candidate worlds MUST be visibly distinguished with immutable references.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.world_navigation[3]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: WorldRevision
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: Historical, current and candidate worlds stay visibly distinguished by immutable references; flaws become candidate revisions for a higher observer.
+    invariant_source: sea:INV-05
+  acceptance:
+  - AC-WORLD-004-01
+  proof: &id096
+  - just gate-t01
+  - just gate-t14
+  settling_tasks:
+  - T01
+  - T14
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-004
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: semantic-fidelity
+  status: candidate
+- id: REQ-WORLD-005
+  title: REQ-WORLD-005
+  statement: The import graph, operational relation graph, and data lineage MUST retain distinct identities and semantics.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.world_navigation[4]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: WorldRevision
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: world_ref identity is immutable and owned by DomainForge
+    invariant_source: family
+  acceptance:
+  - AC-WORLD-005-01
+  proof: &id097
+  - just gate-t06
+  settling_tasks:
+  - T06
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-SEC-006
+  - REQ-STACK-001
+  - REQ-STACK-002
+  - REQ-WORLD-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-WORLD-006
+  title: REQ-WORLD-006
+  statement: Operational objects and links MUST be typed Cognate projections over durable events and connector observations, keyed by DomainForge semantic IDs; checkpoint_ref MUST identify the Cognate commit position and the projection versions read; Horizon MUST NOT keep a separate mutable object database outside Cognate.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.world_navigation[5]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: WorldRevision
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: world_ref identity is immutable and owned by DomainForge
+    invariant_source: family
+  acceptance:
+  - AC-WORLD-006-01
+  proof: &id098
+  - just gate-t06
+  settling_tasks:
+  - T06
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-SEC-006
+  - REQ-STACK-001
+  - REQ-STACK-002
+  - REQ-WORLD-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-WORLD-007
+  title: REQ-WORLD-007
+  statement: Every object, set and link MUST expose its owning product, connector, checkpoint age and integration level, and stale or degraded sources MUST be visibly marked.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.world_navigation[6]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: WorldRevision
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: world_ref identity is immutable and owned by DomainForge
+    invariant_source: family
+  acceptance:
+  - AC-WORLD-007-01
+  proof: &id099
+  - just gate-t06
+  - just gate-t20
+  settling_tasks:
+  - T06
+  - T20
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CASE-001
+  - REQ-CASE-002
+  - REQ-CASE-003
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-001
+  - REQ-GOAL-005
+  - REQ-INT-004
+  - REQ-NAV-001
+  - REQ-NAV-002
+  - REQ-NAV-003
+  - REQ-NAV-004
+  - REQ-NAV-005
+  - REQ-NAV-006
+  - REQ-NAV-007
+  - REQ-OUT-001
+  - REQ-OUT-002
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-SEC-006
+  - REQ-STACK-001
+  - REQ-STACK-002
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-WORLD-004
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-WORLD-008
+  title: REQ-WORLD-008
+  statement: An active world MUST be selected through a DomainForge world alias pinned to an immutable world_ref; a candidate-versus-active semantic diff MAY be a Horizon-derived read-only view but MUST NOT mint or verify identity.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.world_navigation[7]
+    digest: sha256:75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+  semantic_binding:
+    entity: WorldRevision
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: world_ref identity is immutable and owned by DomainForge
+    invariant_source: family
+  acceptance:
+  - AC-WORLD-008-01
+  proof: &id100
+  - just gate-t14
+  settling_tasks:
+  - T14
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-OUT-003
+  - REQ-SAFE-001
+  - REQ-SAFE-002
+  - REQ-SAFE-003
+  - REQ-SAFE-005
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-004
+  - REQ-STACK-006
+  - REQ-STACK-007
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-VERIFY-004
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+acceptance_contracts:
+- id: AC-CASE-001-01
+  requirement: REQ-CASE-001
+  expected: A Case is observed to remain a purpose-relative derived view anchored in authoritative facts and declared direction, not a competing ontology.
+  gate_command: *id003
+  status: candidate
+- id: AC-CASE-002-01
+  requirement: REQ-CASE-002
+  expected: For a frame whose recorded deviation input is `undertaken` -- a listed operation has completed, been refused, failed, or returned evidence that contradicts its new state -- the next primary move responds to that operation by name; for a frame whose recorded deviation input is `none` and whose every choice is optional, no primary move is named.
+  gate_command: *id004
+  status: candidate
+- id: AC-CASE-003-01
+  requirement: REQ-CASE-003
+  expected: Settlement reachable and should settle now is observed to be separate; the latter requires an authorized judgment.
+  gate_command: *id005
+  status: candidate
+- id: AC-CONFIG-001-01
+  requirement: REQ-CONFIG-001
+  expected: An observer identity supplied in presentation metadata (frame, intent or surface payload) is ignored; the effective observer_ref is the OS-session-derived operator for local_operator, and the attempt is observable in the audit record.
+  gate_command: *id006
+  status: candidate
+- id: AC-CONFIG-002-01
+  requirement: REQ-CONFIG-002
+  expected: Semantic world selection is observed to pin a valid DomainForge world_ref, and operations MUST carry a checkpoint reference.
+  gate_command: *id007
+  status: candidate
+- id: AC-CONFIG-003-01
+  requirement: REQ-CONFIG-003
+  expected: With the semantic adapter's world unpinned or unavailable, the affected operation reports blocked/unknown with the missing gate named, and no other operation's read-only affordances disappear.
+  gate_command: *id008
+  status: candidate
+- id: AC-CONFIG-004-01
+  requirement: REQ-CONFIG-004
+  expected: For the same world and frame revision, changing a configured provider endpoint, credential, timeout or scope leaves the typed choices, intent ids and surface blocks unchanged; only provider configuration records differ.
+  gate_command: *id009
+  status: candidate
+- id: AC-CONFIG-010-01
+  requirement: REQ-CONFIG-010
+  expected: A read-only startup reports the pinned world_ref, the resolved observer and the projection capabilities it supports, and refuses to start (rather than guess) when the world cannot be pinned.
+  gate_command: *id010
+  status: candidate
+- id: AC-CONFIG-011-01
+  requirement: REQ-CONFIG-011
+  expected: At invocation the runtime re-checks target, actor, world revision, authority and settlement prerequisites; a change after preflight yields a refusal naming the changed prerequisite, not an executed action.
+  gate_command: *id011
+  status: candidate
+- id: AC-CONFIG-012-01
+  requirement: REQ-CONFIG-012
+  expected: A failed preflight blocks only the operations that depend on the missing prerequisite; unrelated read-only exploration remains reachable and is visibly marked as unaffected.
+  gate_command: *id012
+  status: candidate
+- id: AC-DEV-001-01
+  requirement: REQ-DEV-001
+  expected: Every operation's outcome, including refusals and failed attempts, is retained with its references and remains available to later developmental evaluation.
+  gate_command: *id013
+  status: candidate
+- id: AC-DEV-002-01
+  requirement: REQ-DEV-002
+  expected: A durable capability claim is refused unless repeated settlement under variation plus transfer or recovery evidence is recorded; a single success cannot mint it.
+  gate_command: *id014
+  status: candidate
+- id: AC-DEV-003-01
+  requirement: REQ-DEV-003
+  expected: Developmental settlement scoring and capability-promotion rules are observed to have exactly one authoritative implementation. If ported from GodSpeed Agent, its golden fixtures and tests are the conformance oracle and the superseded implementation is retired for that function; inherited thresholds migrate as provenance-bearing configuration, never silently changed.
+  gate_command: *id015
+  status: candidate
+- id: AC-GOAL-001-01
+  requirement: REQ-GOAL-001
+  expected: Horizon is observed to provide a navigable shared semantic and operational world independent of chat.
+  gate_command: *id016
+  status: candidate
+- id: AC-GOAL-002-01
+  requirement: REQ-GOAL-002
+  expected: Horizon is observed to derive contextual interactions from source-grounded objects, relationships, cases, and capabilities.
+  gate_command: *id017
+  status: candidate
+- id: AC-GOAL-003-01
+  requirement: REQ-GOAL-003
+  expected: Horizon is observed to preserve behavioral equivalence between sequential Clack and richer atomic GUI projections.
+  gate_command: *id018
+  status: candidate
+- id: AC-GOAL-004-01
+  requirement: REQ-GOAL-004
+  expected: Horizon is observed to maintain separate governance, execution, evidence, operational settlement, and developmental claims.
+  gate_command: *id019
+  status: candidate
+- id: AC-GOAL-005-01
+  requirement: REQ-GOAL-005
+  expected: Horizon is observed to preserve navigation context across focus changes, renderer changes, interruption, and replay.
+  gate_command: *id020
+  status: candidate
+- id: AC-INT-001-01
+  requirement: REQ-INT-001
+  expected: Every canonical journey is observed to project the IS1–IS8 Behavioral IR responsibilities and identify unresolved bindings explicitly.
+  gate_command: *id021
+  status: candidate
+- id: AC-INT-002-01
+  requirement: REQ-INT-002
+  expected: The GUI is observed to preserve persistent case/world/focus context while Clack presents one next meaningful decision at a time.
+  gate_command: *id022
+  status: candidate
+- id: AC-INT-003-01
+  requirement: REQ-INT-003
+  expected: A replayed navigation intent id resolves to the original commit and returns its stored outcome, and no second external side effect is attempted or recorded.
+  gate_command: *id023
+  status: candidate
+- id: AC-INT-004-01
+  requirement: REQ-INT-004
+  expected: An answer, choice or confirmation is never observed to be misrepresented as independent approval or a world mutation.
+  gate_command: *id024
+  status: candidate
+- id: AC-NAV-001-01
+  requirement: REQ-NAV-001
+  expected: An operation whose path is not reachable, payable, governable and settleable is reported as possible/blocked/unknown/conflicted -- never available; possibility alone never yields an affordance.
+  gate_command: *id025
+  status: candidate
+- id: AC-NAV-002-01
+  requirement: REQ-NAV-002
+  expected: An affordance assessment carrying any key outside visibility, reach, payment, authority, capability, recovery and settlement_access is rejected, not ignored.
+  gate_command: *id026
+  status: candidate
+- id: AC-NAV-003-01
+  requirement: REQ-NAV-003
+  expected: Only eligible paths are observed to be recommended as spendable. Blocked paths are observed to expose material reasons and reachable prerequisites where known.
+  gate_command: *id027
+  status: candidate
+- id: AC-NAV-004-01
+  requirement: REQ-NAV-004
+  expected: The observer is observed to retain discretion to inspect alternatives, defer, reframe or disagree with the representation.
+  gate_command: *id028
+  status: candidate
+- id: AC-NAV-005-01
+  requirement: REQ-NAV-005
+  expected: Against the pinned frame vocabulary, a prompt whose requested context is derivable from a reference already present in the frame -- the checkpoint ref, the world ref, an operation_ref or the focus ref -- is never issued; the frame resolves it and records the reference it resolved from.
+  gate_command: *id029
+  status: candidate
+- id: AC-NAV-006-01
+  requirement: REQ-NAV-006
+  expected: 'No gate value grants authority: an authority outcome of likely_allow is accompanied by a non-granting evaluation, and requires_approval, denied, unreachable and unknown each block the path until a real decision exists.'
+  gate_command: *id030
+  status: candidate
+- id: AC-NAV-007-01
+  requirement: REQ-NAV-007
+  expected: Before any consequential commitment the observer is observed to see the operation's reversibility class, payment, expected evidence and what happens if authority escalates.
+  gate_command: *id031
+  status: candidate
+- id: AC-OUT-001-01
+  requirement: REQ-OUT-001
+  expected: Every frame is observed to identify observer, pinned semantic world, operational checkpoint or explicit unknown, current focus, view mode, and allowed choices.
+  gate_command: *id032
+  status: candidate
+- id: AC-OUT-002-01
+  requirement: REQ-OUT-002
+  expected: Every choice is observed to bind a typed semantic operation and its current affordance assessment. It is never observed to gain authority from UI enablement.
+  gate_command: *id033
+  status: candidate
+- id: AC-OUT-003-01
+  requirement: REQ-OUT-003
+  expected: Each consequential attempt is observed to preserve predeclared expectations, authorization correlation, execution references, and observation status.
+  gate_command: *id034
+  status: candidate
+- id: AC-OUT-004-01
+  requirement: REQ-OUT-004
+  expected: Both renderers are observed to project the same behavior without duplicating source-of-truth rules or creating a second approval path.
+  gate_command: *id035
+  status: candidate
+- id: AC-RES-001-01
+  requirement: REQ-RES-001
+  expected: 'Research runs as a Python process behind a versioned typed contract: a recorded experiment run shows the dataset, corpora, calibration and evaluation artifacts produced by that subsystem, and the TypeScript tree contains no training or evaluation implementation of its own.'
+  gate_command: *id036
+  status: candidate
+- id: AC-RES-002-01
+  requirement: REQ-RES-002
+  expected: Research artifacts (datasets and corpora, preregistrations, experiment runs, results and verdicts, models, shadow evaluations) are observed to be navigable world objects with content-hash provenance. Migrated results are observed to keep their original claim level and verdict and MUST NOT be upgraded by migration.
+  gate_command: *id037
+  status: candidate
+- id: AC-RES-003-01
+  requirement: REQ-RES-003
+  expected: Starting a research run is observed to be a consequential governed operation with a compute/payment gate and a preregistration frozen before execution; long runs use Gauntlet or a bounded Cognate execution world, and results become evidence, not settlement by assertion.
+  gate_command: *id038
+  status: candidate
+- id: AC-RES-004-01
+  requirement: REQ-RES-004
+  expected: 'Predictive estimates are observed to inform payment, consequence or ranking only after governed activation: a frozen preregistered held-out criterion, retained evaluation evidence and an authorized promotion. Active, heuristic and disabled estimator states are observed to be visible, and estimates MUST NOT change hard-gate outcomes.'
+  gate_command: *id039
+  status: candidate
+- id: AC-RES-005-01
+  requirement: REQ-RES-005
+  expected: Settled, failed and contradicted Horizon episodes are observed to be exportable to the research subsystem as versioned, scope-filtered datasets with provenance and without secrets or cross-scope leakage.
+  gate_command: *id040
+  status: candidate
+- id: AC-RES-006-01
+  requirement: REQ-RES-006
+  expected: Existing agent workflows using the cybernetic_nav MCP tools and godspeed-nav CLI is observed to receive an explicit mapping to Horizon equivalents or a documented deprecation; no tool may silently disappear or change meaning.
+  gate_command: *id041
+  status: candidate
+- id: AC-RES-007-01
+  requirement: REQ-RES-007
+  expected: Migrated ledgers, data and reports are observed to preserve append-only history, original timestamps and content hashes. Large data are observed to be referenced by hash and location rather than committed to the repository.
+  gate_command: *id042
+  status: candidate
+- id: AC-SAFE-001-01
+  requirement: REQ-SAFE-001
+  expected: Horizon is observed to fail closed on unknown runtime authorization, unsafe world revision or unreconciled duplicate commit.
+  gate_command: *id043
+  status: candidate
+- id: AC-SAFE-002-01
+  requirement: REQ-SAFE-002
+  expected: Horizon is observed to preserve immutable expectation, evidence and error history during recovery and reframing.
+  gate_command: *id044
+  status: candidate
+- id: AC-SAFE-003-01
+  requirement: REQ-SAFE-003
+  expected: Horizon is observed to distinguish source unavailable, access denied, empty result and no matching object.
+  gate_command: *id045
+  status: candidate
+- id: AC-SAFE-004-01
+  requirement: REQ-SAFE-004
+  expected: Horizon is observed to permit valid read-only navigation and diagnostics when an unrelated executor is unavailable.
+  gate_command: *id046
+  status: candidate
+- id: AC-SAFE-005-01
+  requirement: REQ-SAFE-005
+  expected: Horizon is observed to prevent a candidate, historical view or simulated outcome being presented as current observed fact.
+  gate_command: *id047
+  status: candidate
+- id: AC-SEC-001-01
+  requirement: REQ-SEC-001
+  expected: An attempt to reach a consequential capability without passing Cognate capability resolution and SEA-Forge invocation checks has no external effect and is refused.
+  gate_command: *id048
+  status: candidate
+- id: AC-SEC-002-01
+  requirement: REQ-SEC-002
+  expected: Agent, human and system presentation roles are observed to remain separated in transport and reducer enforcement.
+  gate_command: *id049
+  status: candidate
+- id: AC-SEC-003-01
+  requirement: REQ-SEC-003
+  expected: All untrusted source and UI strings are observed to be schema-validated, scoped, and escaped; no arbitrary executable markup may be submitted.
+  gate_command: *id050
+  status: candidate
+- id: AC-SEC-004-01
+  requirement: REQ-SEC-004
+  expected: A multi-user or remote deployment refuses a request whose authority is only the Product Actualizer loopback token assumption, and the refusal names the missing trust boundary rather than silently admitting the request.
+  gate_command: *id051
+  status: candidate
+- id: AC-SEC-005-01
+  requirement: REQ-SEC-005
+  expected: Credential and private reference material is never observed to be exposed through shared UI context, logs or evidence.
+  gate_command: *id052
+  status: candidate
+- id: AC-SEC-006-01
+  requirement: REQ-SEC-006
+  expected: 'Initial conformance targets the local_operator profile: loopback-bound, per-launch secrets, operator identity from the OS session, and agent principals distinct from the human. shared_remote is never observed to be enabled without a real identity provider at Cognate''s authenticate boundary. Conformance claims are observed to name their profile.'
+  gate_command: *id053
+  status: candidate
+- id: AC-STACK-001-01
+  requirement: REQ-STACK-001
+  expected: DomainForge alone is observed to own canonical semantic compilation and world_ref identity.
+  gate_command: *id054
+  status: candidate
+- id: AC-STACK-002-01
+  requirement: REQ-STACK-002
+  expected: Cognate is observed to own app events/capability invocation/projection state. Adapters are observed to not create a second authoritative event history.
+  gate_command: *id055
+  status: candidate
+- id: AC-STACK-003-01
+  requirement: REQ-STACK-003
+  expected: SEA-Forge is observed to authorize each consequential invocation. Preflight is never observed to substitute for invocation authorization.
+  gate_command: *id056
+  status: candidate
+- id: AC-STACK-004-01
+  requirement: REQ-STACK-004
+  expected: Bounded long-horizon work runs only through Gauntlet, and the run's Reference is frozen at start and preserved unchanged through every later observation.
+  gate_command: *id057
+  status: candidate
+- id: AC-STACK-005-01
+  requirement: REQ-STACK-005
+  expected: Context Kernel results are observed to remain scoped/cited and MUST NOT be interpreted as canonical organizational truth.
+  gate_command: *id058
+  status: candidate
+- id: AC-STACK-006-01
+  requirement: REQ-STACK-006
+  expected: RealityTrace delivery receipts are never observed to be treated as evidence derivation or settlement.
+  gate_command: *id059
+  status: candidate
+- id: AC-STACK-007-01
+  requirement: REQ-STACK-007
+  expected: Operational obligation settlement and GodSpeed developmental interpretation is observed to be separately referenced.
+  gate_command: *id060
+  status: candidate
+- id: AC-STACK-008-01
+  requirement: REQ-STACK-008
+  expected: Every cross-system episode is observed to preserve correlation through observer/world/case/intent/authority/execution/evidence/settlement refs.
+  gate_command: *id061
+  status: candidate
+- id: AC-STACK-009-01
+  requirement: REQ-STACK-009
+  expected: Only a SEA-Forge allow disposition with a matching invocation grant (bound to the exact action, targets, world_ref and unexpired) is observed to permit a side effect. Deny, escalate, boundary, degraded and any unrecognized disposition is observed to produce no effect and a visible typed status.
+  gate_command: *id062
+  status: candidate
+- id: AC-STACK-010-01
+  requirement: REQ-STACK-010
+  expected: Horizon is observed to reach SEA-Forge, Gauntlet, RealityTrace, Context Kernel and the research subsystem only through Cognate capabilities or Cognate-owned adapters. The navigation controller and renderers are never observed to hold a second client to an authority or evidence owner.
+  gate_command: *id063
+  status: candidate
+- id: AC-STACK-011-01
+  requirement: REQ-STACK-011
+  expected: For a joined product, each proven facet (types and links, provenance-bearing read observations, SEA-Forge-covered action bindings, RealityTrace evidence hooks) is individually observable, an unproven facet is absent rather than assumed, and the product's reported integration level follows exactly the facets proven.
+  gate_command: *id064
+  status: candidate
+- id: AC-STACK-012-01
+  requirement: REQ-STACK-012
+  expected: Products are never observed to be required to adopt Horizon's language, storage or UI; non-TypeScript products integrate through process, CLI, MCP or Connect boundaries owned by Cognate.
+  gate_command: *id065
+  status: candidate
+- id: AC-STACK-013-01
+  requirement: REQ-STACK-013
+  expected: A product with its own UI is observed to be reachable as a hosted surface via deep links that carry focus refs in and return typed intents or focus out. A hosted surface is never observed to run inside Horizon's trust boundary or acquire Horizon authority.
+  gate_command: *id066
+  status: candidate
+- id: AC-STACK-014-01
+  requirement: REQ-STACK-014
+  expected: Every stack owner and joined product continues to operate through its own public surface with Horizon stopped or uninstalled, and Horizon holds no requirement that a product change to accommodate it.
+  gate_command: *id067
+  status: candidate
+- id: AC-UI-001-01
+  requirement: REQ-UI-001
+  expected: A submitted surface specification containing executable code is rejected at validation, and the accepted specification consists only of declarative elements, groups and actions.
+  gate_command: *id068
+  status: candidate
+- id: AC-UI-002-01
+  requirement: REQ-UI-002
+  expected: Schema validation is observed to reject unknown blocks, unauthorized actions, invalid refs and unsafe source expressions.
+  gate_command: *id069
+  status: candidate
+- id: AC-UI-003-01
+  requirement: REQ-UI-003
+  expected: Deterministic source-binding and pure composition/reducer behavior is observed to define displayed facts and resulting intents.
+  gate_command: *id070
+  status: candidate
+- id: AC-UI-004-01
+  requirement: REQ-UI-004
+  expected: Clack and GUI is observed to consume the same behavioral contract and produce equivalent typed intents for equivalent frames.
+  gate_command: *id071
+  status: candidate
+- id: AC-UI-005-01
+  requirement: REQ-UI-005
+  expected: Atomic UI is observed to derive elements, groups, regions and views from proved behavioral necessities, preserving accessible loading, empty, blocked and recovery states.
+  gate_command: *id072
+  status: candidate
+- id: AC-UI-006-01
+  requirement: REQ-UI-006
+  expected: Agent-composed content is never observed to reorder owner-pinned surfaces or seize presentation control; owner choices govern layout.
+  gate_command: *id073
+  status: candidate
+- id: AC-UI-007-01
+  requirement: REQ-UI-007
+  expected: The source of every substantive value is observed to be inspectable, and agent-supplied values MUST be visibly marked as such.
+  gate_command: *id074
+  status: candidate
+- id: AC-UI-008-01
+  requirement: REQ-UI-008
+  expected: Contextual MCP, WebMCP and CLI tools are observed to share the same validation and role boundaries. Tool discovery is never observed to imply authorization.
+  gate_command: *id075
+  status: candidate
+- id: AC-UX-001-01
+  requirement: REQ-UX-001
+  expected: Opening the application lands on a home view that resumes the last focus and lists, in mode-precedence order, pending human decisions, work in flight, contradicted or unresolved evidence, degraded sources and changes to watched objects.
+  gate_command: *id076
+  status: candidate
+- id: AC-UX-002-01
+  requirement: REQ-UX-002
+  expected: A keyboard-first command palette is observed to reach search, focus, traversal and every currently derived choice. It is a renderer of the same frame and is observed to emit the same typed intents as Clack and GUI.
+  gate_command: *id077
+  status: candidate
+- id: AC-UX-003-01
+  requirement: REQ-UX-003
+  expected: Every focus and frame is observed to be addressable by a stable link pinning world_ref, checkpoint and focus; opening a link reproduces that context or states explicitly that newer state exists and offers to move to it.
+  gate_command: *id078
+  status: candidate
+- id: AC-UX-004-01
+  requirement: REQ-UX-004
+  expected: Navigation is observed to keep a traversal trail with back/forward and breadcrumbs that preserve selections; read-only navigation is always reversible.
+  gate_command: *id079
+  status: candidate
+- id: AC-UX-005-01
+  requirement: REQ-UX-005
+  expected: Explanations are observed to lead with plain language (what this is, why it is blocked, the single next prerequisite) with progressive drill-down to gates, evidence, provenance and raw refs. Internal vocabulary is never observed to be required to operate.
+  gate_command: *id080
+  status: candidate
+- id: AC-UX-006-01
+  requirement: REQ-UX-006
+  expected: Every action, answer and composition is observed to show its actor. An agent acting for a human is observed to be visibly distinct from the human.
+  gate_command: *id081
+  status: candidate
+- id: AC-UX-007-01
+  requirement: REQ-UX-007
+  expected: SEA-Forge approvals are observed to be presented and resolved as SEA-Forge approval records under the approver's own authenticated identity. Horizon is never observed to keep a local approval state.
+  gate_command: *id082
+  status: candidate
+- id: AC-UX-008-01
+  requirement: REQ-UX-008
+  expected: The GUI and terminal renderers are observed to be fully keyboard operable, meet WCAG 2.2 AA for the GUI, respect reduced motion, support light and dark themes, and announce frame changes to assistive technology.
+  gate_command: *id083
+  status: candidate
+- id: AC-UX-009-01
+  requirement: REQ-UX-009
+  expected: Read-only navigation interactions are observed to respond within 300 ms p95 on the local_operator profile. Operations exceeding 1 s are observed to show progress tied to real events and remain cancellable where the owner supports cancellation.
+  gate_command: *id084
+  status: candidate
+- id: AC-UX-010-01
+  requirement: REQ-UX-010
+  expected: First run and empty states are observed to guide the observer to connect a world and a product, and MUST explain each unavailable capability with its next prerequisite instead of showing blank regions.
+  gate_command: *id085
+  status: candidate
+- id: AC-UX-011-01
+  requirement: REQ-UX-011
+  expected: Graph and lineage views are observed to open fit-to-content, aggregate beyond a bounded node count, and always offer an equivalent table or list projection.
+  gate_command: *id086
+  status: candidate
+- id: AC-UX-012-01
+  requirement: REQ-UX-012
+  expected: Notices are observed to be deduplicated by source identity and severity-ranked; repeated identical conditions update one notice rather than creating new ones.
+  gate_command: *id087
+  status: candidate
+- id: AC-VERIFY-001-01
+  requirement: REQ-VERIFY-001
+  expected: The same fixture and frame revision yield the same typed choices and intent ids through both Clack and the graphical renderer, differing only in presentation.
+  gate_command: *id088
+  status: candidate
+- id: AC-VERIFY-002-01
+  requirement: REQ-VERIFY-002
+  expected: An invalid, stale, unauthorized, unpayable or unverifiable operation produces no external side effect, and its refusal names which of those conditions applied.
+  gate_command: *id089
+  status: candidate
+- id: AC-VERIFY-003-01
+  requirement: REQ-VERIFY-003
+  expected: After a restart, focus, provenance, committed intentions and outstanding human decisions are reconstructed from the durable store, not re-derived from scratch.
+  gate_command: *id090
+  status: candidate
+- id: AC-VERIFY-004-01
+  requirement: REQ-VERIFY-004
+  expected: An operational settlement claim and a developmental conclusion are recorded with separate strength and scope, and neither exceeds what its own evidence supports.
+  gate_command: *id091
+  status: candidate
+- id: AC-VERIFY-005-01
+  requirement: REQ-VERIFY-005
+  expected: Six canonical journeys J01 Explore, J02 Operate, J03 Build, J04 Monitor, J05 Compare and J06 Develop each pass recorded happy, blocked and recovery fixtures, and a skipped required integration fails conformance instead of passing.
+  gate_command: *id092
+  status: candidate
+- id: AC-WORLD-001-01
+  requirement: REQ-WORLD-001
+  expected: A single search returns semantic types, live objects, resources and applications as distinctly typed results, and no result is presented as belonging to a different kind than its source declares.
+  gate_command: *id093
+  status: candidate
+- id: AC-WORLD-002-01
+  requirement: REQ-WORLD-002
+  expected: Horizon is observed to filter typed operational sets and traverse declared relationships at a known checkpoint.
+  gate_command: *id094
+  status: candidate
+- id: AC-WORLD-003-01
+  requirement: REQ-WORLD-003
+  expected: Horizon is observed to preserve focus, object-set selection, observer and world across surfaces and journeys.
+  gate_command: *id095
+  status: candidate
+- id: AC-WORLD-004-01
+  requirement: REQ-WORLD-004
+  expected: Historical, current and candidate revisions of one world are shown with distinct immutable references, and no surface presents a candidate revision as the active world.
+  gate_command: *id096
+  status: candidate
+- id: AC-WORLD-005-01
+  requirement: REQ-WORLD-005
+  expected: The import graph, operational relation graph, and data lineage is observed to retain distinct identities and semantics.
+  gate_command: *id097
+  status: candidate
+- id: AC-WORLD-006-01
+  requirement: REQ-WORLD-006
+  expected: Operational objects and links are observed to be typed Cognate projections over durable events and connector observations, keyed by DomainForge semantic IDs. Checkpoint_ref is observed to identify the Cognate commit position and the projection versions read. Horizon is never observed to keep a separate mutable object database outside Cognate.
+  gate_command: *id098
+  status: candidate
+- id: AC-WORLD-007-01
+  requirement: REQ-WORLD-007
+  expected: Every object, set and link is observed to expose its owning product, connector, checkpoint age and integration level, and stale or degraded sources MUST be visibly marked.
+  gate_command: *id099
+  status: candidate
+- id: AC-WORLD-008-01
+  requirement: REQ-WORLD-008
+  expected: An active world is observed to be selected through a DomainForge world alias pinned to an immutable world_ref. A candidate-versus-active semantic diff is observed to be a Horizon-derived read-only view but MUST NOT mint or verify identity.
+  gate_command: *id100
+  status: candidate

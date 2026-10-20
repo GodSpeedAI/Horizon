@@ -1,0 +1,75 @@
+candidate_revision:
+  id: T04-CR-001
+  task: T04
+  prepared_at: "2026-10-19"
+  prepared_by: builder (this remediation session)
+  status: prepared-awaiting-owner-authorization
+  source_verdict: .agents/evidence/horizon/T04/verdicts/codex-root-20261019-7b4d110.md
+  active_freeze_untouched: true
+  active_pins:
+    ledger_sha256: c7afbcc60f9cd197ddef60941e19bd6cc9cfc00584c5703a6e6fa07e364e7417
+    wayfinder_sha256: f00b060d4f27a1dc727ad34a50b099efa881a665e7c4ba308c2429b22ec05eb2
+    spec_sha256: 75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130
+    world_ref: "world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0"
+  why:
+    - >-
+      F2 (S1): four frozen acceptance contracts invert their requirements' prohibitions
+      (AC-INT-004-01, AC-STACK-006-01, AC-STACK-012-01, AC-UI-006-01). Changing the generator
+      alone would leave the frozen oracles wrong. Regenerating also corrects every other
+      generic contract that lost its subject and every prohibition left unrestated.
+    - >-
+      F3 (S2): AC-CASE-002-01, AC-CONFIG-004-01 and AC-NAV-005-01 were underdetermined.
+      Each is bound to a witness or an explicitly bound evaluation rule that adds no
+      policy, threshold or new requirement.
+    - >-
+      F4 (S2): the prereg's pin_revision.verified_by cites "0 violations" as verification.
+      The gate is blind to a dangling requirement_ref and a duplicated invariant_id, so the
+      claim is corrected to what the evidence supports.
+  files:
+    - path: .agents/candidates/horizon/T04-CR-001/ledger.yaml
+      change: regenerated from the composed policy by scripts/gen-ledger-variant.py; 98/98 contracts; freeze_hash candidate
+    - path: .agents/candidates/horizon/T04-CR-001/answer-key.md
+      change: wayfinder generated from the candidate ledger (freeze_id T04-CR-001-candidate)
+    - path: .agents/candidates/horizon/T04-CR-001/composed/ledger-policy.yaml
+      change: frozen policy + the three witness-bound overrides + evaluated_by
+    - path: .agents/candidates/horizon/T04-CR-001/composed/prereg.patch
+      change: proposed verified_by correction for .agents/prereg/horizon/T04.prereg.yaml
+    - path: .agents/candidates/horizon/T04-CR-001/REVIEW.md
+      change: itemized diff against the frozen ledger and the review questions
+  source_fidelity:
+    spec_text_changed: false
+    requirement_added_or_removed: false
+    normative_policy_added: false
+    world_ref_changed: false
+    claim: >-
+      Every changed contract restates the same requirement text with its polarity and
+      subject preserved, or binds an existing requirement to an observable. No new
+      requirement, threshold or product policy is introduced.
+  affected_pins_and_plan:
+    ledger_sha256: changes (whole-file digest recorded by the new Wayfinder freeze)
+    ledger_fragment_digest: changes
+    wayfinder_sha256: changes
+    ledger_policy_sha256: changes (new overrides + evaluated_by)
+    spec_sha256: unchanged
+    plan_sha256: unchanged
+    world_ref: unchanged
+    plan_rebind_required: false
+    plan_rebind_rationale: >-
+      The plan's task DAG, settling-task mapping and gate commands are unchanged; only the
+      expected observable of three contracts and the expression of the others change. The
+      plan needs no rebind, but a new freeze id and a new independent criticism round are
+      required by the repository's freeze process.
+  re_freeze_process:
+    - owner decision recorded in .agents/reports/horizon-decisions.yaml (authorize/decline T04-CR-001)
+    - apply composed/ledger-policy.yaml over scripts/ledger-policy.yaml and the prereg patch, only if authorized
+    - regenerate the ledger and Wayfinder, then run scripts/freeze-formation.sh (new freeze id, new hashes)
+    - obtain fresh, context-isolated independent criticism of the candidate inputs before the new freeze
+  scope_limits:
+    - >-
+      The missing REQ-CMP-001 reference (scripts/idm-integrity-debt.yaml) is NOT fixed here:
+      correcting it changes the canonical .sea world and therefore world_ref, which the
+      verdict did not require and this revision does not undertake.
+    - >-
+      The 94 remaining generic contracts are not individually re-authored. Polarity and
+      subject are checked mechanically; per-requirement observables remain the owning tasks'
+      work (DEBT D-012), now with a binding witness requirement for new overrides.

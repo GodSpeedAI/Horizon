@@ -1,0 +1,23 @@
+# Reference integrity exceptions: a requirement reference that no frozen requirement backs.
+#
+# An entry here keeps `scripts/check-idm-integrity.py` green for that exact
+# (file, instance, requirement_ref) triple and nothing else. A new dangling or duplicate
+# reference fails the gate. Entries are removed by correcting the model, never by widening
+# the match.
+#
+# Dangling refs may only be added here when the correction requires a new freeze: the
+# `.sea` canonical world is pinned by `world_ref`, so editing it changes identity.
+dangling_requirement_refs:
+  - file: .sea/interaction/interaction-model.sea
+    instance: inv_simulation_never_changes_world
+    requirement_ref: REQ-CMP-001
+    reason: >-
+      No REQ-CMP-* requirement exists in the frozen spec (HORIZON-001 1.0.0). The invariant
+      statement "Hypothetical comparison never changes world state and never grants
+      authority" restates the J05_compare journey note ("Simulation NEVER changes world
+      state or grants authority"), which is not bound to a REQ id. The ledger census
+      already records this: 98 of 98 spec requirements are bound, and no requirement is
+      CMP. Correcting the reference therefore needs either a spec revision that declares
+      the requirement or a re-bind to an existing requirement plus a re-pin of world_ref;
+      both are frozen-artifact changes, so this is recorded rather than silently repaired.
+    found_by: T04 remediation (this session), while adding the referential-integrity check

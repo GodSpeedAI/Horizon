@@ -50,6 +50,15 @@ function asStringList(value: unknown, field: string): readonly string[] {
   return value as string[];
 }
 
+/** `research_source` is optional; an absent binding is an empty command, not a malformed one. */
+function asOptionalCommand(value: unknown, field: string): readonly string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || !value.every((v) => typeof v === "string" && v.length > 0)) {
+    bounded(`${field} must be a list of strings when present; omit it to disable research`);
+  }
+  return value as string[];
+}
+
 export function configFromDocument(document: unknown): HorizonConfig {
   const doc = asRecord(document, "config");
   const profile = asString(doc.deployment_profile, "deployment_profile") as DeploymentProfile;
@@ -106,7 +115,7 @@ export function configFromDocument(document: unknown): HorizonConfig {
     world_alias: asString(doc.world_alias, "world_alias"),
     world_ref: asString(doc.world_ref, "world_ref"),
     runtime_store: asString(doc.runtime_store, "runtime_store"),
-    research_command: asStringList(doc.research_command, "research_command"),
+    research_command: asOptionalCommand(doc.research_command, "research_command"),
     identity,
     secrets,
     transports,

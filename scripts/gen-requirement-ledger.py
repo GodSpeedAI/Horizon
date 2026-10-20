@@ -129,16 +129,93 @@ def sea_invariant_by_requirement():
 
 
 def restate(rid, text):
-    """Observable statement of a requirement, in the requirement's own terms.
+    """Observable statement of a requirement, preserving its normative polarity.
 
-    The default contract is the requirement text restated as a consequence an
-    operator could observe; curated overrides replace it where the requirement
-    names a conjunction that one observable cannot settle. It is never
-    "the gate passes".
+    The default contract states the obligation as the *required* observation:
+      - "X MUST Y"      -> "X is observed to Y"        (positive obligation)
+      - "X MUST NOT Y"  -> "X is never observed to Y"  (prohibition kept as a prohibition)
+      - "A ...; B MUST NOT ..." -> each clause is restated on its own, with its own subject.
+
+    Restatement strips terminal punctuation so the result reads as one clause, so clause
+    boundaries are derived from the normative modals rather than from punctuation.
+    Curated overrides (scripts/ledger-policy.yaml) replace it where the requirement names
+    a conjunction one observable cannot settle. It is never "the gate passes".
     """
-    body = re.sub(r"^[A-Za-z0-9 ,'’()/–-]*?MUST (?:NOT )?", "", text).strip()
-    body = body[0].lower() + body[1:] if body else body
-    return f"Observed in the runtime's own terms: {body}"
+    clauses = _split_clauses(text)
+    return " ".join(_restate_clause(c, first=(i == 0)) for i, c in enumerate(clauses))
+
+
+# Subject = everything before the first normative modal. Kept verbatim so actors survive.
+MODAL = re.compile(r"(?P<subject>.*?)\b(?P<modal>MUST NOT|MUST|SHOULD NOT|SHOULD|MAY NOT|MAY)\b\s*(?P<body>.*)$", re.S)
+
+
+def _split_clauses(text):
+    """Split on `;` and on `. ` boundaries — never on a decimal point or an abbreviation
+    inside a word — then merge any piece that has no modal into the previous clause."""
+    pieces = [p.strip() for p in re.split(r"(?<=[;])\s+|(?<=\.)\s+(?=[A-Z(])", text.strip()) if p.strip()]
+    clauses = []
+    for piece in pieces:
+        if clauses and MODAL.match(piece) is None:
+            clauses[-1] = f"{clauses[-1]} {piece}".strip()
+        else:
+            clauses.append(piece)
+    return clauses
+
+
+def _restate_clause(text, first=False):
+    clause = text.strip().rstrip(".;").strip()
+    match = MODAL.match(clause)
+    if match is None:
+        body = clause[0].lower() + clause[1:] if clause else clause
+        return f"Observed: {body}."
+    subject = " ".join(match.group("subject").split())
+    if not first and re.match(r"[a-z]", subject):
+        subject = subject[0].upper() + subject[1:]
+    # Agreement is judged on the subject's head word, not on the requirement as a whole.
+    head = re.sub(r"[()\[\]“”\"'.,:;*_`]", "", subject).split()[-1] if subject.split() else ""
+    plural = (
+        bool(re.search(PLURAL_HEADS, head))
+        or (head.endswith("s") and not head.endswith(("ss", "us", "is", "ics", "sis")))
+    )
+    be = "are" if plural and not subject.endswith(("'s", "s'")) else "is"
+    modal = match.group("modal")
+    body = match.group("body").strip().rstrip(".;").strip()
+    if modal in ("MUST NOT", "SHOULD NOT", "MAY NOT"):
+        # "MUST NOT" and "MUST never" are prohibitions, not positive obligations.
+        body = re.sub(r"^(never|not)\s+", "", body)
+        return f"{subject} {be} never observed to {body}."
+    if re.match(r"(never|always)\s+", body):
+        body = re.sub(r"^(never|always)\s+", "", body)
+        return f"{subject} {be} never observed to {body}."
+    return f"{subject} {be} observed to {body}."
+
+
+PLURAL_HEADS = r"(data|people|children|criteria|receipts|records|results|choices|surfaces|operations|requirements|contracts|artifacts|estimators|endpoints|connectors|actions|roles|gates|claims|paths|adapters|deployments|products|renderers|tools|approvals|estimates|objects|links|artifacts|views|fixtures|thresholds|capabilities)$"
+
+
+_SELF_TEST = (
+    # (requirement text, expected contract)
+    ("RealityTrace delivery receipts MUST NOT be treated as evidence derivation or settlement.",
+     "RealityTrace delivery receipts are never observed to be treated as evidence derivation or settlement."),
+    ("An answer MUST NOT be misrepresented as independent approval.",
+     "An answer is never observed to be misrepresented as independent approval."),
+    ("DomainForge alone MUST own canonical semantic compilation.",
+     "DomainForge alone is observed to own canonical semantic compilation."),
+    ("A product MAY be reachable as a hosted surface; a hosted surface MUST NOT run inside Horizon's trust boundary.",
+     "A product is observed to be reachable as a hosted surface. A hosted surface is never observed to run inside Horizon's trust boundary."),
+)
+
+
+def self_test():
+    """Fail generation if restatement ever inverts a prohibition (F2 regression)."""
+    for text, expected in _SELF_TEST:
+        actual = restate("REQ-TEST", text)
+        if actual != expected:
+            raise SystemExit(f"restate() self-test failed for {text!r}: got {actual!r}, want {expected!r}")
+    # The defect itself: a restated prohibition must never read as a positive observation.
+    inverted = restate("REQ-TEST", "X MUST NOT be treated as approval")
+    if "never observed" not in inverted or inverted.startswith("Observed in the runtime's own terms"):
+        raise SystemExit(f"restate() dropped a prohibition: {inverted!r}")
 
 
 
@@ -281,6 +358,7 @@ def requirement_dependencies(reqs, mapping, edges):
 
 
 def main():
+    self_test()
     spec_digest = sha256_of(SPEC)
     spec = yaml.safe_load(open(SPEC, encoding="utf-8"))
     plan = yaml.safe_load(open(PLAN, encoding="utf-8"))
@@ -375,7 +453,7 @@ def main():
             "plan": ".agents/plans/horizon.plan.yaml",
             "plan_sha256": sha256_of(PLAN),
             "semantic_sources": list(SEA_FILES),
-            "policy": "scripts/ledger-policy.yaml",
+            "policy": os.path.relpath(POLICY, REPO),
             "policy_sha256": sha256_of(POLICY),
             "generator": "scripts/gen-requirement-ledger.py",
         },

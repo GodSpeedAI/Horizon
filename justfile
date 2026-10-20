@@ -16,6 +16,16 @@ check:
 boundaries:
     bun run scripts/check-boundaries.ts
 
+idm-integrity:
+    python3 scripts/check-idm-integrity.py
+
+acceptance-claims:
+    python3 scripts/check-acceptance-claims.py --ledger .agents/candidates/horizon/T04-CR-001/ledger.yaml --require-candidate
+
+acceptance-claims-frozen:
+    @echo "acceptance-claims-frozen: the ACTIVE frozen ledger does not preserve its prohibitions; expected to fail until T04-CR-001 is authorized and re-frozen"
+    python3 scripts/check-acceptance-claims.py
+
 test:
     bun test
     uv run --project research pytest -q
@@ -32,12 +42,16 @@ teeth:
     bun run scripts/teeth.ts
     bash scripts/teeth-ledger-freeze.sh
     python3 scripts/teeth-domainforge-gate.py
+    python3 scripts/teeth-idm-integrity.py
 
 status:
     tail -n 1 .agents/CURRENT_STATUS.jsonl
 
-verify: check boundaries test ledger wayfinder
-    @echo "verify: ok"
+# `verify` is T04's declared gate (`.agents/plans/horizon.plan.yaml` T04.gate lists
+# `just check`, `just boundaries`, `just verify`), so it carries every required proof:
+# the baseline checks AND the adversarial teeth. It reads the ACTIVE frozen artifact set.
+verify: check boundaries idm-integrity test ledger wayfinder teeth
+    @echo "verify: ok (active frozen artifacts: requirements/ledger.yaml + .wayfinder/answer-key.md)"
 
 check-toolchain:
     @test -x "{{domainforge_bin}}" || (echo "domainforge missing: set DOMAINFORGE_BIN to the 0.21.1 binary" && exit 1)
@@ -47,6 +61,7 @@ gate-t01: check-toolchain
     {{domainforge_bin}} validate .sea/interaction/interaction-model.sea --application --format human
     python3 scripts/world-ref.py --expect "{{world_ref}}" .sea/interaction/interaction-model.sea
     python3 scripts/check-idm-coverage.py
+    python3 scripts/check-idm-integrity.py
 
 gate-t02:
     python3 behavioral/proof/run.py --out .tmp/t02-transcripts
@@ -58,8 +73,8 @@ gate-t03:
     python3 scripts/check-ui-traceability.py
     python3 scripts/teeth-ui-traceability.py
 
-gate-t04: check boundaries test ledger wayfinder teeth
-    @echo "gate-t04: ok"
+gate-t04: check boundaries idm-integrity acceptance-claims test ledger wayfinder teeth
+    @echo "gate-t04: ok — active frozen artifacts verified; T04-CR-001 candidate contracts verified; T04 settlement still requires an independent verdict"
 
 freeze-t04:
     ./scripts/freeze-formation.sh
