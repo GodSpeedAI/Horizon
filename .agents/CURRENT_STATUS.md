@@ -1,12 +1,14 @@
 # Horizon Current Status
 
-**Revision:** 11 · **Recorded:** 2026-10-19 · **Stage:** T04 candidate corrected after criticism round 1; authorization deferred; awaiting fresh independent verification
+**Revision:** 12 · **Recorded:** 2026-10-20 · **Stage:** T04 candidate **authorized, conditional on independent review; not applied**; awaiting a verdict
 
-The independent T04 verdict (`codex-root-20261019-7b4d110`) **failed** the build. The owner deferred authorizing its candidate fix and directed that fresh criticism of the candidate proceed first. That criticism found the candidate itself needed correcting. **T04 is still not settled.**
+The independent T04 verdict (`codex-root-20261019-7b4d110`) **failed** the build. The owner deferred authorizing its candidate fix and directed that fresh criticism of the candidate proceed first. That criticism found the candidate itself needed correcting, and it was corrected to revision 2. On 2026-10-19 the owner **authorized the full candidate, conditional on a fresh independent review of revision 2 firsthand** (`DEC-T04-05`). The authorization is not effective until a verdict exists, and **nothing has been applied, regenerated or re-frozen**. **T04 is still not settled.**
 
 **Corrected (candidate, revision 2 — not applied):** the first draft's three witness-bound contracts introduced policy the ruler does not carry. `AC-CASE-002-01` defined its own materiality predicate with a list of outcomes; `AC-CONFIG-004-01` prescribed "exercise configuration through construction" and claimed a provider-record difference nothing observed; `AC-NAV-005-01` named an unratified "pinned frame vocabulary". All three now restate their requirement verbatim, with what the witness supplies stated separately (`introduced: []`, enforced by the composer). The witnesses were also fixed: `evaluateDeviation` now follows the spec's own `derive_navigation_frame` / INV-01 rule (first *available* choice — never a blocked one), and the config witness reads both configurations from `app.loaded.config` and proves they differ before asserting invariance. Reviewing every regenerated contract found the same class in seven more nobody had flagged: `REQ-STACK-002` (a prohibition inverted once its subject was restored), `REQ-RES-004`, `REQ-STACK-013`, `REQ-WORLD-008`, `REQ-NAV-003`, `REQ-STACK-009` (a `MAY` made absolute) and `REQ-UX-009` (a `SHOULD` made a MUST). The generator now preserves `MAY` and `SHOULD` and treats a lowercase `must not` as a prohibition, each locked by a self-test.
 
-**Measured:** 10 contracts changed between the first draft and revision 2. The candidate has **zero** changed contracts that lose a modal their requirement carries; the active frozen ledger has 10. `check-witness-claims` reports 9 known pre-existing findings (DEBT D-020) and fails on any new one (verified by injection).
+**Measured:** 10 contracts changed between the first draft and revision 2; 72 changed relative to the frozen ledger. The candidate has **zero** changed contracts that lose a modal their requirement carries; the active frozen ledger has 10. `check-witness-claims` reports 9 known pre-existing findings (DEBT D-020) and fails on any new one (verified by injection).
+
+**Review entry point:** exactly one — `evidence/horizon/T04/REVIEW_REQUEST.md` (index: `REVIEW-REQUEST-INDEX.md`). It covers revision 2 at `7a248ea`, criticism round 1, the D-020 baseline and review question 9, and requires four rulings: **R1** candidate (regenerate it yourself, audit all 98 contracts), **R2** criticism round 1, **R3** baseline (verify the suppressed requirements do not intersect the 72 changed contracts; adjudicate `REQ-NAV-002`, `REQ-RES-001`, `REQ-STACK-011`, `REQ-STACK-014`), **R4** `REQ-UX-009`. The two earlier requests are superseded and retained with banners, so there is no second door.
 
 **Verified:** `check` 0, `boundaries` 0, `idm-integrity` 0, `acceptance-claims` 0, `witness-claims` 0, `contract-modals` 0, `test` 0, `ledger` 0, `wayfinder` 0, `teeth` 0, `verify` 0, `gate-t04` 0. `acceptance-claims-frozen` and `contract-modals-frozen` are **1 by design** — the active frozen ledger is still inverted and still drops modals. `just test`: 20 Bun pass / 0 fail, pytest 4 passed. Each correction was demonstrated to have teeth by mutation (generator self-test, blocked-choice witness, endpoint-dependent surface, reintroduced SHOULD→MUST), then reverted.
 
@@ -14,7 +16,14 @@ The independent T04 verdict (`codex-root-20261019-7b4d110`) **failed** the build
 
 **Limits:** criticism round 1 is a build-session record, **not** an independent verdict. No inverted prohibition is recorded as accepted risk. `REQ-CONFIG-004`'s timeouts and scopes do not exist in `HorizonConfig` (D-019). Nine pre-existing findings are baselined, not fixed (D-020), four of them real modal losses. `REQ-CMP-001` remains a dangling `.sea` reference (D-016) because repairing it changes `world_ref`. Network was unavailable.
 
-**Next:** owner decides on candidate revision 2 (authorize full T04-CR-001 / authorize the prereg patch only / decline / defer); a fresh verifier with no builder context reviews `evidence/horizon/T04/REMEDIATION.review-request.md` and `candidates/horizon/T04-CR-001/REVIEW.md`. T04 settles only when both exist; T05 stays blocked.
+**Next:** a fresh verifier with no builder context reviews the single entry point
+`evidence/horizon/T04/REVIEW_REQUEST.md` against candidate revision 2 (`7a248ea`), completing
+rulings R1–R4 (candidate, criticism round 1, the D-020 baseline, `REQ-UX-009`). The owner
+**authorized the full candidate conditionally** on that review (`DEC-T04-05`); the authorization
+is not effective until a verdict lands in `verdicts/`, and nothing has been applied, regenerated or
+re-frozen. After the verdict: no S1/S2 → apply, regenerate, `freeze-formation.sh`, record the new
+freeze id and hashes; `NAV-002`/`RES-001`/`STACK-011`/`STACK-014` ruled a defect → fold into
+revision 3 **before** freezing; anything else material → revise and resubmit. T05 stays blocked.
 
 **Spec:** HORIZON-001 v1.0.0, frozen; SHA-256 `75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130`.
 

@@ -3,8 +3,16 @@ candidate_revision:
   task: T04
   prepared_at: "2026-10-19"
   prepared_by: builder (this remediation session)
-  status: prepared-awaiting-owner-authorization
+  status: authorized-conditional-on-independent-review (not applied; see DEC-T04-05)
   revision: 2 (corrected after criticism round 1; see .agents/evidence/horizon/T04/criticism-round1.md)
+  authorization:
+    decision: DEC-T04-05
+    date: "2026-10-19"
+    scope: full candidate (ledger, Wayfinder, prereg patch) -- not the prereg patch alone
+    condition: a verdict from a reviewer independent of the builder exists in .agents/evidence/horizon/T04/verdicts/
+    applied: false
+    applied_commit: null
+    review_request: .agents/evidence/horizon/T04/REVIEW_REQUEST.md
   source_verdict: .agents/evidence/horizon/T04/verdicts/codex-root-20261019-7b4d110.md
   active_freeze_untouched: true
   active_pins:

@@ -1,59 +1,193 @@
-# T04 Independent Review Request (adversarial)
+# T04 independent review — single entry point
 
-> **You are the independent verifier.** You have no access to the builder's context,
-> reasoning or chat history. That is the point: the builder's claims below are *claims*,
-> not findings. Your job is to try to falsify them. If you cannot falsify a claim, say so
-> plainly. If you can, that is the most valuable thing you can produce.
->
-> Do not repair anything. Do not edit `requirements/ledger.yaml`, `.wayfinder/answer-key.md`,
-> the `.sea` model, or any frozen artifact. Report only.
+**This is the only review request for T04.** The owner authorized candidate revision 2 on
+2026-10-19, *conditional on this review*; the decision is `DEC-T04-05` in
+`.agents/reports/horizon-decisions.yaml`. Nothing has been applied, regenerated or re-frozen.
 
-## 1. What you are reviewing
+Two earlier requests exist and are **superseded, not deleted** — read them only as history:
+`REVIEW-attempt1.superseded.md` (the first-build request against `7b4d110`) and
+`REMEDIATION.review-request.md.superseded.md` (its remediation restatement). Both point at
+material this document includes. Verdicts already recorded for the first build
+(`verdicts/codex-root-20261019-7b4d110.md`) are **evidence you may cite but not a
+specification** — they name defects that revision 2 claims to have corrected, so the same
+defects must be re-tested rather than inherited.
+
+You have no access to the builder's context, reasoning or chat history. That is the point: the
+builder's claims below are *claims*, not findings. Falsifying one is the most valuable thing you
+can produce; "could not falsify" is a complete verdict. Do not repair anything. Do not edit a
+frozen artifact. Report only.
+
+## 1. What is under review
 
 | | |
-|---|---|
-| Repository | `GodSpeedAI/Horizon` (local: `/home/sprime01/projects/Horizon`) |
-| Commit under review | **`7b4d110`** — `t04: scaffold walking skeleton, freeze ledger and wayfinder` |
-| Post-freeze debt commit | `d80cdd5` — `chore: record observed debt d-011 d-012` (not under review) |
-| Later commits | Any commit after `d80cdd5` that adds this request and a DomainForge tooth; review those **only** as "does the tooth actually work" (Q5). Frozen artifacts must be unchanged. |
-| Task | T04 — Project Topology Architect walking skeleton with Cognate and selective Product Actualizer reuse |
-| Preregistration | `.agents/prereg/horizon/T04.prereg.yaml` (sha256 `9c434b404a948971e3bca27a06eef670ab790e1f6bfc5c7ffd0847662a06a03e`) — **frozen and MUST NOT be edited**; it is the oracle you argue against |
+| --- | --- |
+| Repository | `GodSpeedAI/Horizon`, local `/home/sprime01/projects/Horizon` |
+| Review target | The tree at commit **`7a248ea`** — `fix(t04): correct T04-CR-001 policy additions found by criticism round 1` (`git status` should be clean) |
+| Candidate under review | `.agents/candidates/horizon/T04-CR-001/` — **revision 2**, `status: prepared-awaiting-owner-authorization` |
+| Original verdict | `verdicts/codex-root-20261019-7b4d110.md` (reviewed `7b4d110`; verdict `fail`) |
+| Builder criticism | `.agents/evidence/horizon/T04/criticism-round1.md` — a **build-session record, not an independent verdict** |
+| Preregistration | `.agents/prereg/horizon/T04.prereg.yaml`, sha256 `9c434b404a948971e3bca27a06eef670ab790e1f6bfc5c7ffd0847662a06a03e` — frozen, the oracle to argue against |
+| Owner decision | `DEC-T04-05`: authorized, conditional on this review; not yet applied |
 
-Verify the commit is what you think it is before starting:
+The candidate is a **proposal**. Review it; do not apply it to the active tree.
+
+### Frozen artifacts — confirm these before evaluating anything
 
 ```bash
 cd /home/sprime01/projects/Horizon
-git log --oneline -4
-git status --porcelain          # expect clean, or only untracked review scaffolding
-git rev-parse 7b4d110
+git status --porcelain     # expect empty
+sha256sum requirements/ledger.yaml .wayfinder/answer-key.md \
+  .agents/specs/horizon.agent.spec.yaml .agents/prereg/horizon/T04.prereg.yaml \
+  scripts/ledger-policy.yaml .sea/interaction/interaction-model.sea
 ```
 
-## 2. Frozen artifacts under scrutiny
-
 | Path | sha256 | Authority |
-|---|---|---|
-| `requirements/ledger.yaml` | `c7afbcc60f9cd197ddef60941e19bd6cc9cfc00584c5703a6e6fa07e364e7417` | requirement ledger: 98 requirements + 98 acceptance contracts |
-| `.wayfinder/answer-key.md` | `f00b060d4f27a1dc727ad34a50b099efa881a665e7c4ba308c2429b22ec05eb2` | Wayfinder; its `hashes:` block is authoritative for whole-file digests |
-| `.agents/specs/horizon.agent.spec.yaml` | `75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130` | normative ruler (approved, frozen 1.0.0) |
+| --- | --- | --- |
+| `requirements/ledger.yaml` | `c7afbcc60f9cd197ddef60941e19bd6cc9cfc00584c5703a6e6fa07e364e7417` | 98 requirements + 98 acceptance contracts |
+| `.wayfinder/answer-key.md` | `f00b060d4f27a1dc727ad34a50b099efa881a665e7c4ba308c2429b22ec05eb2` | Wayfinder; `hashes:` block is authoritative for whole-file digests |
+| `.agents/specs/horizon.agent.spec.yaml` | `75cfc1ceb9eec6139f7b8e73f8d1107fcc5e2b680e80683824edd7d8de434130` | normative ruler, frozen 1.0.0 |
+| `.agents/prereg/horizon/T04.prereg.yaml` | `9c434b404a948971e3bca27a06eef670ab790e1f6bfc5c7ffd0847662a06a03e` | preregistration |
+| `scripts/ledger-policy.yaml` | `6d03ab70cfabc446e2610300909edbaa81adfce6b629ce0b2d79eef733003e45` | ledger policy, frozen |
 | `.sea/interaction/interaction-model.sea` | `1c3909e51c509b60634dc5f4dba7dc29c3c58bc883a0134cf2861ac23bb1eec1` | canonical semantic model |
 | Pinned `world_ref` | `world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0` | immutable semantic identity |
 
-Confirm the recorded hashes match reality before evaluating anything — if they do not, stop and
-report that as a blocker:
+If a hash differs, **stop and report it as a blocker**. Also confirm the candidate did not leak
+into the active tree: `git diff 7b4d110 -- requirements/ .wayfinder/ .agents/specs/
+.agents/prereg/ .sea/ scripts/ledger-policy.yaml` must be empty.
+
+## 2. What revision 2 claims to have fixed
+
+The first build's verdict failed on four frozen defects: four contracts inverting their
+prohibition (F2, S1), three underdetermined contracts (F3, S2), and a prereg claim that
+"0 violations" verifies semantic fidelity (F4, S2). Revision 2 changes nothing frozen; it
+prepares a corrected ledger, Wayfinder and prereg patch, and it also corrected **itself** after
+the builder's own criticism found the first draft had introduced policy:
+
+- `AC-CASE-002-01` had invented a materiality predicate and listed four outcomes.
+- `AC-CONFIG-004-01` had prescribed "exercise configuration through construction" and claimed a
+  provider-record difference nothing observed.
+- `AC-NAV-005-01` had named an unratified "pinned frame vocabulary".
+- Seven further contracts nobody had flagged carried the same class: `REQ-STACK-002` (prohibition
+  inverted), `REQ-RES-004`, `REQ-STACK-013`, `REQ-WORLD-008`, `REQ-NAV-003`, `REQ-STACK-009`
+  (`MAY` made absolute), `REQ-UX-009` (`SHOULD` made a MUST).
+
+The claim to attack is: **each contract preserves its requirement's MUST / MUST NOT / MAY /
+SHOULD exactly, and a witness supplies an input without restating policy as ratified.**
+
+These are mandatory. Each needs a **RULING**, and R1 must name any contract it judges defective.
+
+### R1 — Candidate revision 2
+
+Regenerate it yourself and diff your result against the committed candidate. A candidate that
+cannot be reproduced from its own scripts is a finding.
 
 ```bash
-sha256sum requirements/ledger.yaml .wayfinder/answer-key.md .agents/specs/horizon.agent.spec.yaml .sea/interaction/interaction-model.sea
-grep -A4 '^hashes:' .wayfinder/answer-key.md
+python3 scripts/apply-candidate-revision.py
+python3 scripts/gen-wayfinder.py --ledger .agents/candidates/horizon/T04-CR-001/ledger.yaml \
+  --out /tmp/ak.md --freeze-id T04-CR-001-candidate --frozen-at pending-owner-authorization
+git status --porcelain .agents/candidates/horizon/T04-CR-001/   # expect empty after regeneration
 ```
 
-The ledger cannot contain its own whole-file sha256, so its `freeze_hash` is a **fragment
-digest** computed with the marker normalised to the literal string `candidate`. The Wayfinder
-`hashes:` block carries the whole-file digest. `scripts/check-ledger-freeze.sh` is supposed to
-verify both and their mutual agreement. **Check that this argument is sound, not merely that
-the script exits 0.** A digest scheme that verifies itself against a value it also produced is
-not a proof.
+Then audit **all 98** contracts, not only the ten the builder changed. For each changed contract
+compare the contract text against the requirement text in `.agents/specs/horizon.agent.spec.yaml`
+and record, per contract, whether the modal (MUST / MUST NOT / MAY / SHOULD), the subject, the
+quantifier and the prohibition survive. Attack these specifically:
 
-## 3. Re-run the gates
+| Requirement | What to test | Why |
+| --- | --- | --- |
+| `REQ-CASE-002` | Does `AC-CASE-002-01` still imply a materiality threshold, an outcome list, or a `changed_from` field the ruler never sets? Compare `evaluateDeviation` in `src/domain/contracts.ts` against the spec's `derive_navigation_frame` / `firstAvailableThatAddressesMaterialDeviationOrNone` and INV-01. | The first draft invented all three; revision 2 claims to have removed them. |
+| `REQ-CONFIG-004` | Does `AC-CONFIG-004-01` observe anything, or does it still assert a difference in values it just constructed? Does it claim coverage of provider timeouts/scopes? | The first draft's witness read no configuration at all. |
+| `REQ-NAV-005` | Does the contract restate the requirement, or does it re-introduce an unratified "pinned frame vocabulary"? | Same class. |
+| `REQ-STACK-002` | Is the prohibition (`MUST NOT`) restored in polarity, subject and strength? | It was inverted once its subject was restored. |
+| `REQ-RES-004`, `REQ-STACK-013`, `REQ-WORLD-008`, `REQ-NAV-003`, `REQ-STACK-009` | Is `MAY` still a permission, or quietly an absolute observation? | All six were `MAY → absolute`. |
+| `REQ-UX-009` | Is the `SHOULD` still soft? | See R4. |
+
+```bash
+python3 scripts/check-witness-claims.py; echo "exit=$?"
+python3 scripts/measure-contract-modals.py --ledger .agents/candidates/horizon/T04-CR-001/ledger.yaml; echo "exit=$?"
+python3 scripts/measure-contract-modals.py --ledger requirements/ledger.yaml --baseline scripts/witness-claims-baseline.txt
+```
+
+The builder claims 72 contracts changed, ten of them deliberately and the rest generic ones that
+gained back their subject; and that the candidate has **zero** changed contracts which lose a modal
+their requirement carries, while the active frozen ledger has **ten**. Confirm the 72 yourself, and
+test the instrument rather than only its output: feed `measure-contract-modals.py` and
+`check-witness-claims.py` a ledger you deliberately corrupt (one `MAY`→`MUST`, one `MUST NOT`→`MUST`)
+and confirm both fire. A checker that stays silent on your own injection is the finding.
+
+**RULING R1:** `accept` | `accept_with_S3_findings` | `revise_again`. If `revise_again`, list each
+contract that must change and why.
+
+### R2 — Criticism round 1
+
+`.agents/evidence/horizon/T04/criticism-round1.md` was written by the builder. Judge it as a
+document, not as authority:
+
+- Are C1–C5 (the four defects plus the self-found incompleteness) real defects, or does the file
+  overstate or understate what it found?
+- Is each correction it claims **actually** in the candidate, or is the record ahead of the code?
+- Did the corrections stay inside the ruler, or did they substitute one invention for another —
+  in particular does `evaluateDeviation` now follow the spec's algorithm or merely a different
+  invented rule?
+- Was the same class forgotten anywhere? Search every contract, not just the ten changed.
+
+**RULING R2:** is criticism round 1 an accurate and complete account of the candidate's defects?
+
+### R3 — The D-020 baseline
+
+`scripts/witness-claims-baseline.txt` suppresses findings so inherited defects do not fail a gate
+while a new one does. Counts, verified against the current file: **11** `check-witness-claims`
+lines (9 distinct findings — `REQ-CASE-003` and `REQ-NAV-002` appear under both ledger paths) and
+**14** `check-modals` entries (the modal losses, which overlap the first set). The builder's claim
+is that no suppressed finding sits on a requirement whose contract this revision changes, so
+suppressing them cannot hide new policy.
+
+- Verify that claim yourself. The candidate changes **72 contracts**; list the requirements they
+  touch and intersect that set with every requirement named in the baseline. The claim is false if
+  the intersection is non-empty — note that `REQ-CASE-003`'s candidate contract *is* repaired
+  ("should settle now"), so inspect whether its baseline entry is honest bookkeeping or a mask.
+- Four baselined entries are claimed to be **real modal losses in the active ledger**:
+  `REQ-NAV-002` (drops `exactly`), `REQ-RES-001` (loses a prohibition), `REQ-STACK-011` (loses
+  `only`), `REQ-STACK-014` (loses a prohibition). All four are absent from the candidate's 72
+  changed contracts — that is the builder's justification for not fixing them. **Adjudicate each
+  of the four as DEFECT or ACCEPTABLE-DIFFERENCE.** This ruling has a named consequence in §9, so
+  state it explicitly.
+- Is a baseline the right instrument at all, or should the active ledger's defects fail a gate
+  until the candidate is applied?
+
+**RULING R3:** for each of the four, `DEFECT` or `ACCEPTABLE-DIFFERENCE`, plus a claim on whether
+the baseline hides anything.
+
+### R4 — Review question 9: `REQ-UX-009`
+
+The candidate contract reads "Read-only navigation interactions *should be observed to respond*
+within 300 ms p95 …". The owner has decided that this soft `SHOULD` shape is **kept** for now and
+that any change is an open question for the next spec version; the spec is **not** amended in this
+round and must not be.
+
+So the question is narrow: is "should be observed to respond" a **faithful** rendering of a
+`SHOULD`, or does it smuggle a requirement into an observation? If you judge it unfaithful, say
+what a faithful `SHOULD` contract would look like — as an open question, not as an instruction to
+edit the spec.
+
+**RULING R4:** `faithful_SHOULD` | `unfaithful_but_not_blocking` | `blocking`.
+
+### Recommended reading order
+
+1. This file, §1–§3.
+2. `.agents/candidates/horizon/T04-CR-001/REVIEW.md` — the builder's itemised diff: a verbatim table
+   for the three witness-bound contracts and all 72 changed contracts against the frozen ledger.
+   Treat every row as a claim; the underlying YAML is the evidence.
+3. `.agents/evidence/horizon/T04/criticism-round1.md` (R2).
+4. `.agents/DEBT.md` D-016 … D-021.
+5. `verdicts/codex-root-20261019-7b4d110.md`, to check that nothing it found is still present.
+
+
+## 3. The four items the owner specifically required
+
+
+
+## 4. Re-run the gates
 
 A single recording script exists. It asserts nothing beyond propagating a non-zero exit:
 
@@ -80,7 +214,7 @@ Settle these mechanical questions and record the exact outputs:
    `teeth`. Is that a gap in what `verify` means?
 4. Does `gate-t04` actually cover the PE/NE items below, or only a subset?
 
-## 4. Criteria you must adjudicate
+## 5. Criteria you must adjudicate
 
 For each item give **PASS**, **FAIL**, or **UNVERIFIABLE**, one sentence of justification, and the
 command or file you relied on. Quote from the preregistration, not from the builder's summary.
@@ -127,7 +261,7 @@ Re-run the NE arms yourself; do not trust `scripts/teeth.ts`. `just teeth` curre
 Do your best to make this happen. If the E2E passes under a fake runtime, T04's claim is falsified
 regardless of every other result.
 
-## 5. Known weaknesses placed in your scope
+## 6. Known weaknesses placed in your scope
 
 Disclosed by the builder because the ledger freezes at T04, so a defect now is cheap and a defect
 later costs a re-freeze. These are **not** pre-adjudicated; you decide.
@@ -197,7 +331,7 @@ git diff --stat .sea/                                       # expect empty: the 
 Do your best to make this happen. If the E2E passes under a fake runtime, T04's claim is falsified
 regardless of every other result.
 
-## 6. Questions you must answer
+## 7. Questions you must answer
 
 Number your answers to match. "Unverifiable" is acceptable if you say what would make it
 verifiable.
@@ -225,7 +359,7 @@ verifiable.
     labelled reconstructed because the original `cognate create` output was lost — judge whether
     that is disclosed adequately and whether anything in it is unverifiable as a result.
 
-## 7. Where verdicts go
+## 8. Where verdicts go
 
 Write your verdict to `.agents/evidence/horizon/T04/verdicts/<reviewer-id>.md`.
 
@@ -237,23 +371,64 @@ reviewer's file. Use this header:
 ---
 reviewer: <id>
 date: <YYYY-MM-DD>
-commit: 7b4d110
+commit: 7a248ea
 independent_of_builder: true
 verdict: pass | pass_with_findings | fail
+candidate_revision_reviewed: 2
 ---
+```
 
+```markdown
 ## Per-criterion
 PE-01..PE-08, NE-01..NE-05: PASS | FAIL | UNVERIFIABLE + one line each
 
-## Answers
-1..11
+## Rulings
+R1: accept | accept_with_S3_findings | revise_again   (+ contracts to change, if revise_again)
+R2: accurate_and_complete | incomplete | overstated     (+ what it missed)
+R3: REQ-NAV-002=… REQ-RES-001=… REQ-STACK-011=… REQ-STACK-014=…   each DEFECT | ACCEPTABLE-DIFFERENCE
+R4: faithful_SHOULD | unfaithful_but_not_blocking | blocking
 
-## Material findings
-Each: what is wrong, where (file:line), why it matters, and whether it demands a re-freeze.
+## Findings
+Each: severity S1 | S2 | S3, what is wrong, where (file:line), why it matters, and
+whether it demands a re-freeze.
+
+## Answers
+Numbered to match §7.
 
 ## Scope limits
 What you could not check, and why.
 ```
+
+**Rules for the verdict:**
+
+- One line per criterion is enough; do not pad.
+- A finding against a **frozen** artifact must say explicitly **candidate revision / re-freeze
+  required: yes|no**. It is never waived.
+- If a command fails for environmental reasons (no DomainForge, no network), record it as a scope
+  limit and still adjudicate what you can.
+- Do not fix anything and do not mark T04 settled. The builder records settlement; you supply the
+  verdict.
+
+## 9. What the owner has committed to do with your verdict
+
+Stated here so you can judge the consequence of each ruling. None of this is a waiver: a finding
+is either fixed or the candidate is withdrawn.
+
+| If your verdict contains | Then the builder will |
+| --- | --- |
+| no **S1** and no **S2** findings | apply the candidate, regenerate the ledger and Wayfinder, run `freeze-formation.sh`, record the new freeze id and hashes, and append status — **without further owner approval** |
+| `REQ-NAV-002`, `REQ-RES-001`, `REQ-STACK-011` or `REQ-STACK-014` ruled `DEFECT` | fold the fix into the candidate as **revision 3** *before* freezing, then have revision 3 reviewed. A known-wrong contract is not frozen. |
+| anything else material (S1/S2, or a `revise_again` ruling) | revise and resubmit; no freeze |
+| `S3`/advisory findings only | freeze as authorized, and record the S3 items as DEBT |
+
+`REQ-UX-009` is already decided: the `SHOULD` shape stays for this round and becomes an open
+question for the next spec version (`OQ-001` in `.agents/reports/horizon-decisions.yaml`). Your
+R4 ruling is recorded but does not by itself block the freeze unless you call it `blocking`.
+
+T04 settles only when this verdict **and** `DEC-T04-05`'s condition are both satisfied. Until
+then the frozen ledger keeps its four inverted prohibitions and no inverted prohibition is
+recorded as accepted risk.
+
 
 **Rules for the verdict:**
 

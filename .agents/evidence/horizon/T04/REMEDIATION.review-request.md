@@ -1,3 +1,9 @@
+> **SUPERSEDED (2026-10-19).** This file is not current. The single current review request is
+> `REVIEW_REQUEST.md` in this directory (see `REVIEW-REQUEST-INDEX.md`); the pre-supersession copy
+> is `REMEDIATION.review-request.superseded.md`. Retained, not deleted, so links written before
+> supersession still resolve. Do not treat it as a second request.
+
+
 # T04 remediation — request for fresh independent verification
 
 You are the independent verifier of the **remediation**, not of the original build. The

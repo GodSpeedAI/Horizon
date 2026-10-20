@@ -33,6 +33,10 @@ These were *not* applied to the frozen ledger.
 
 ## Review questions for an independent critic
 
+> **Where these are answered:** `.agents/evidence/horizon/T04/REVIEW_REQUEST.md` is the single
+> review entry point (`DEC-T04-05`). Questions 8 and 9 are its rulings R3 and R4; the rest are
+> covered by its R1/R2. This file is supporting material — the itemised diff — not a second request.
+
 1. Does any changed contract add an obligation the requirement does not carry? (Look for a
    verb or condition absent from the spec text.)
 2. Do the three witness-bound contracts bind evaluation without inventing policy — in

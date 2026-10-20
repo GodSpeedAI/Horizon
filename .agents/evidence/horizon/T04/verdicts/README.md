@@ -2,7 +2,8 @@
 
 Independent reviewer verdicts for T04 go here, one file per reviewer:
 `<reviewer-id>.md`. Instructions and the required header are in
-[`../REVIEW_REQUEST.md`](../REVIEW_REQUEST.md).
+[`../REVIEW_REQUEST.md`](../REVIEW_REQUEST.md) (the single current review request; see
+[`../REVIEW-REQUEST-INDEX.md`](../REVIEW-REQUEST-INDEX.md)).
 
 Rules:
 

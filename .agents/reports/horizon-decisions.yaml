@@ -261,3 +261,57 @@ decisions:
       - "scripts/check-witness-claims.py"
       - "scripts/measure-contract-modals.py"
       - ".agents/DEBT.md"
+
+  - id: DEC-T04-05
+    date: "2026-10-19"
+    task: T04
+    requirement: REQ-VERIFY-002
+    decision: >-
+      T04-CR-001 revision 2 is AUTHORIZED, conditional on fresh independent review of the
+      candidate; NOT YET APPLIED. The owner authorized the full candidate (not only the prereg
+      patch) on the condition that a context-isolated reviewer first reviews candidate revision 2,
+      criticism round 1, the DEBT D-020 baseline and review question 9 (REQ-UX-009). Nothing is
+      applied, regenerated or re-frozen until a verdict exists in
+      .agents/evidence/horizon/T04/verdicts/. The single review entry point is
+      .agents/evidence/horizon/T04/REVIEW_REQUEST.md; the two earlier requests are superseded and
+      retained as REVIEW-attempt1.superseded.md and REMEDIATION.review-request.superseded.md.
+    rationale:
+      - "The owner's instruction: authorize full, conditional on a fresh independent review of the candidate first."
+      - "Conditional, not effective: the authorization carries no effect on any frozen artifact until the condition is met, so the record cannot be read as an approved freeze."
+      - "Disposition on the verdict: no S1/S2 -> apply, regenerate, run freeze-formation.sh, record the new freeze id and hashes, append status; NAV-002 / RES-001 / STACK-011 / STACK-014 judged a defect -> fold into revision 3 BEFORE freezing, because a known-wrong contract must not be frozen; anything else material -> revise and resubmit. No finding is waived."
+      - "Scope is fixed: no spec edits, no world_ref change (the REQ-CMP-001 .sea correction stays deferred under D-016), no T05 work."
+    reversible: true
+    conditions:
+      - "A verdict exists at .agents/evidence/horizon/T04/verdicts/<reviewer-id>.md, written by a reviewer independent of the builder."
+      - "The reviewer completed rulings R1-R4 of REVIEW_REQUEST.md section 3."
+    evidence:
+      - ".agents/evidence/horizon/T04/REVIEW_REQUEST.md"
+      - ".agents/evidence/horizon/T04/REVIEW-attempt1.superseded.md"
+      - ".agents/evidence/horizon/T04/REMEDIATION.review-request.superseded.md"
+      - ".agents/candidates/horizon/T04-CR-001/CANDIDATE.yaml"
+      - ".agents/candidates/horizon/T04-CR-001/REVIEW.md"
+      - ".agents/DEBT.md"
+
+open_questions:
+  - id: OQ-001
+    raised: "2026-10-19"
+    task: T04
+    target_spec_version: next (after 1.0.0; NOT amended now)
+    requirement: REQ-UX-009
+    question: >-
+      REQ-UX-009 states a SHOULD ("read-only navigation interactions SHOULD respond within 300 ms
+      p95 on the local_operator profile"). The candidate renders it as "should be observed to
+      respond". Is a soft obligation faithfully expressed by an observation of soft obligation, or
+      does REQ-UX-009 need a different contract shape entirely for the next spec version?
+    position: >-
+      KEPT AS IS for the T04 freeze, by owner decision. This is not an accepted defect and not a
+      waiver of the modal: the SHOULD is preserved as a SHOULD and the review request still asks the
+      independent reviewer to rule on whether the shape is faithful (R4). Changing the shape is a
+      next-spec-version question, because a T04 re-freeze cannot legitimate a change in meaning.
+    status: open
+    rationale:
+      - "The owner's instruction: keep 'should be observed to respond'; log an open question for the next spec version; do not amend the spec now."
+      - "Editing the ruler requires a new spec version, an explicit re-freeze and a plan rebind; a T04 re-freeze cannot legitimate a semantic change."
+    evidence:
+      - ".agents/candidates/horizon/T04-CR-001/REVIEW.md"
+      - ".agents/evidence/horizon/T04/REVIEW_REQUEST.md"
