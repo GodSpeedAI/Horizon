@@ -29,16 +29,21 @@ overrides:
     action.
   REQ-CONFIG-012: A failed preflight blocks only the operations that depend on the missing prerequisite;
     unrelated read-only exploration remains reachable and is visibly marked as unaffected.
-  REQ-STACK-004: Bounded long-horizon work runs only through Gauntlet, and the run's Reference is frozen
-    at start and preserved unchanged through every later observation.
+  REQ-STACK-004: 'Gauntlet is used only for tasks that require bounded long-horizon work: a task that
+    does not require bounded long-horizon work is never observed to run through Gauntlet. Gauntlet freezes
+    its Reference at the start of a run and preserves it unchanged for the rest of the run. The restriction
+    is on what Gauntlet is used for; it does not make Gauntlet the sole executor of bounded long-horizon
+    work.'
   REQ-UI-001: A submitted surface specification containing executable code is rejected at validation,
     and the accepted specification consists only of declarative elements, groups and actions.
-  REQ-DEV-001: Every operation's outcome, including refusals and failed attempts, is retained with its
-    references and remains available to later developmental evaluation.
+  REQ-DEV-001: Failure, contradictions, recovery, payment and orchestration burden each remain available
+    to developmental evaluation; none of the five is observed to be missing from what developmental evaluation
+    can read.
   REQ-WORLD-001: A single search returns semantic types, live objects, resources and applications as distinctly
     typed results, and no result is presented as belonging to a different kind than its source declares.
-  REQ-NAV-002: An affordance assessment carrying any key outside visibility, reach, payment, authority,
-    capability, recovery and settlement_access is rejected, not ignored.
+  REQ-NAV-002: 'Affordance gates use exactly the canonical keys visibility, reach, payment, authority,
+    capability, recovery and settlement_access: an assessment missing one of the seven keys is rejected,
+    and an assessment carrying a key outside them is rejected.'
   REQ-SEC-001: An attempt to reach a consequential capability without passing Cognate capability resolution
     and SEA-Forge invocation checks has no external effect and is refused.
   REQ-UX-001: Opening the application lands on a home view that resumes the last focus and lists, in mode-precedence
@@ -66,19 +71,22 @@ overrides:
     fails conformance instead of passing.
   REQ-DEV-002: A durable capability claim is refused unless repeated settlement under variation plus transfer
     or recovery evidence is recorded; a single success cannot mint it.
-  REQ-STACK-014: Every stack owner and joined product continues to operate through its own public surface
-    with Horizon stopped or uninstalled, and Horizon holds no requirement that a product change to accommodate
-    it.
+  REQ-STACK-014: 'Dependency is one-way: every stack owner (DomainForge, Cognate, SEA-Forge, Gauntlet,
+    RealityTrace, Context Kernel) and every joined product remains fully operable with Horizon stopped
+    or absent. Horizon is never observed to require changes that make a product depend on Horizon, and
+    Horizon''s integration with each product uses that product''s own public surfaces; a product unaware
+    of Horizon is a valid product.'
   REQ-RES-001: 'Research runs as a Python process behind a versioned typed contract: a recorded experiment
     run shows the dataset, corpora, calibration and evaluation artifacts produced by that subsystem, and
     the TypeScript tree contains no training or evaluation implementation of its own.'
   REQ-SEC-004: A multi-user or remote deployment refuses a request whose authority is only the Product
     Actualizer loopback token assumption, and the refusal names the missing trust boundary rather than
     silently admitting the request.
-  REQ-STACK-011: For a joined product, each proven facet (types and links, provenance-bearing read observations,
-    SEA-Forge-covered action bindings, RealityTrace evidence hooks) is individually observable, an unproven
-    facet is absent rather than assumed, and the product's reported integration level follows exactly
-    the facets proven.
+  REQ-STACK-011: 'A product joins the world only through the product integration contract: a DomainForge
+    module for its types, links and operations; a read connector emitting provenance-bearing observations
+    into Cognate; capability bindings for actions, each covered by SEA-Forge policy; and optional RealityTrace
+    evidence hooks. A product that attempts to join by a route outside that contract is refused. Its integration
+    level (visible, queryable, actionable, evidenced) is derived from which facets are proven.'
   REQ-CASE-002: The next primary move responds to material deviation. No primary recommendation is required
     when only optional choices remain.
   REQ-CONFIG-004: Configured provider endpoints, credentials, timeouts and scope remain below stable behavior
@@ -95,9 +103,5 @@ overrides:
     to run inside Horizon's trust boundary or acquire Horizon authority.
   REQ-NAV-005: The navigation controller avoids asking for context it can resolve without user burden.
 evaluated_by:
-  REQ-CASE-002:
-  - 'test/acceptance.test.ts :: AC-CASE-002-01'
   REQ-CONFIG-004:
   - 'test/acceptance.test.ts :: AC-CONFIG-004-01'
-  REQ-NAV-005:
-  - 'test/acceptance.test.ts :: AC-NAV-005-01'

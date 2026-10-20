@@ -1,11 +1,12 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { StoredEvent } from "@godspeedai/cognate-events";
 import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
 import { readIntentAttempts, readIntentRecords } from "../src/capabilities/navigation-intent.ts";
+import { REQUIRED_COGNATE } from "../src/runtime/required-cognate.ts";
 import { projectFrame } from "../src/ui/surface.ts";
 import { PINNED_WORLD_REF, horizonDocument, writeConfig } from "./support/config.ts";
 
@@ -69,6 +70,30 @@ async function waitForRow(app: HorizonApplication, runId: string) {
   throw new Error(`projection row for ${runId} never appeared`);
 }
 
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return sourceFiles(path);
+    return entry.isFile() && /\.(ts|tsx)$/.test(entry.name) ? [path] : [];
+  });
+}
+
+function assertDeclaredCognateClosure(): void {
+  const manifest = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8")) as {
+    dependencies?: Record<string, string>;
+  };
+  const declared = new Set(Object.keys(manifest.dependencies ?? {}));
+  const imported = new Set<string>();
+  for (const file of sourceFiles(join(process.cwd(), "src"))) {
+    for (const match of readFileSync(file, "utf8").matchAll(/from\s+["'](@godspeedai\/cognate-[a-z0-9-]+)/g)) {
+      imported.add(match[1]!);
+    }
+  }
+  expect(imported.size).toBeGreaterThan(0);
+  const missing = [...new Set([...REQUIRED_COGNATE, ...imported])].filter((name) => !declared.has(name)).sort();
+  expect(missing).toEqual([]);
+}
+
 describe("durable store boundary", () => {
   test("the configured store is a Cognate SQLite database that survives a close and reopen", async () => {
     // This test writes and reopens before any application assertion can observe a
@@ -119,6 +144,10 @@ describe("structural walking skeleton", () => {
   const fixture = (): string => mkdtempSync(join(tmpdir(), "horizon-app-"));
 
   test("source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen", async () => {
+    // The composition is a declared Cognate project, not whatever happens to be installed:
+    // removing a required package (or any Cognate package the source imports) from
+    // package.json fails this E2E even while node_modules still resolves it (prereg falsifier).
+    assertDeclaredCognateClosure();
     const root = fixture();
     application = await configuredApplication(root);
     const app = application;

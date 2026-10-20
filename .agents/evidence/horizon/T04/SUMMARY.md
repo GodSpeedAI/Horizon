@@ -12,6 +12,15 @@
   requires independent critic verdicts recorded before freeze and no independent verifier
   has reported. See "Status and open items".
 
+> **Correction (2026-10-20, independent verdict r2 F7):** "All mechanical gates pass" and
+> "Mechanically complete and honest" below were ahead of the evidence at commit `7a248ea`. The
+> recorder exited 1, the unbaselined candidate modal measure exited 1, and the frozen prereg
+> falsifier (metadata-only removal of a Cognate dependency, E2E still passes) was true. Revision 3
+> fixes the falsifier (the E2E now fails on it), and the recorder now exits 0 only when required
+> targets pass and expected-red targets fail. The gate table below is the first build's historical
+> record (8 tests); see `gates.txt` and the `just-*.log` files for the current run. T04 is still
+> not settled.
+
 ## Gate runs (all re-run after the final freeze)
 
 | Command | Result | Log |

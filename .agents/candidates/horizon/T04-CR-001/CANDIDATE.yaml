@@ -3,18 +3,34 @@ candidate_revision:
   task: T04
   prepared_at: "2026-10-19"
   prepared_by: builder (this remediation session)
-  status: authorized-conditional-on-independent-review (not applied; see DEC-T04-05)
-  revision: 2 (corrected after criticism round 1; see .agents/evidence/horizon/T04/criticism-round1.md)
+  status: applied (revision 3, re-frozen as T04-CR-001@2026-10-20 under DEC-T04-06)
+  revision: 3 (revision 2 failed independent verdict r2; see .agents/evidence/horizon/T04/verdicts/codex-adversarial-r2-20261019.md)
+  revision_history:
+    - "1: first draft; criticism round 1 found invented policy in the three witness-bound contracts"
+    - "2: corrected after criticism round 1 (7a248ea); independent verdict r2 = fail, R1 revise_again"
+    - "3: addresses verdict r2 F1-F7; this revision"
+  verdict_r2_disposition: >-
+    DEC-T04-05's recorded rule applied: the reviewer ruled REQ-NAV-002, REQ-STACK-011 and
+    REQ-STACK-014 (and REQ-DEV-001, REQ-STACK-004) DEFECT, so revision 3 is prepared before any
+    freeze. Revision 3 is not applied and needs its own independent verdict; whether DEC-T04-05's
+    conditional authorization carries over to revision 3 is the owner's call.
   authorization:
     decision: DEC-T04-05
     date: "2026-10-19"
     scope: full candidate (ledger, Wayfinder, prereg patch) -- not the prereg patch alone
     condition: a verdict from a reviewer independent of the builder exists in .agents/evidence/horizon/T04/verdicts/
-    applied: false
-    applied_commit: null
-    review_request: .agents/evidence/horizon/T04/REVIEW_REQUEST.md
+    applied: true
+    applied_by_decision: DEC-T04-06 (owner; no independent verdict on revision 3, deviation recorded)
+    new_pins:
+      freeze_id: T04-CR-001@2026-10-20
+      ledger_sha256: c4237e177f7f3202df851c49d2736b3453a7e7b9ba73cad36954fc1897226868
+      wayfinder_sha256: 50ccfd6bbd05847c15c8f8da9981c44644489adf3e74742cc534014b09e05f4c
+      ledger_policy_sha256: 4bc84acab788299433863483f857ab2079682755c9608d753c8613ef3cb8c670
+      prereg_sha256: f42836a612981dfb5d2ce6b59cc74c34bf62cc54ff14cec01f23fc74c2643a8b
+    review_request: .agents/evidence/horizon/T04/REVIEW_REQUEST.md (revision 3)
+    revision_2_verdict: .agents/evidence/horizon/T04/verdicts/codex-adversarial-r2-20261019.md (fail)
   source_verdict: .agents/evidence/horizon/T04/verdicts/codex-root-20261019-7b4d110.md
-  active_freeze_untouched: true
+  active_freeze_untouched: false (applied 2026-10-20)
   active_pins:
     ledger_sha256: c7afbcc60f9cd197ddef60941e19bd6cc9cfc00584c5703a6e6fa07e364e7417
     wayfinder_sha256: f00b060d4f27a1dc727ad34a50b099efa881a665e7c4ba308c2429b22ec05eb2
@@ -36,13 +52,25 @@ candidate_revision:
       F4 (S2): the prereg's pin_revision.verified_by cites "0 violations" as verification.
       The gate is blind to a dangling requirement_ref and a duplicated invariant_id, so the
       claim is corrected to what the evidence supports.
+    - >-
+      Verdict r2 F2 (S2, revision 3): five inherited contracts altered or omitted their ruler
+      and would have been re-frozen: AC-DEV-001-01 (dropped the five named categories),
+      AC-NAV-002-01 (subset instead of exactly seven keys), AC-STACK-004-01 (reversed "only"),
+      AC-STACK-011-01 (lost the joining restriction), AC-STACK-014-01 (over-broad prohibition,
+      public-surface clause missing). Each is now a restatement of its own ruler.
+    - >-
+      Verdict r2 F3 (S2, revision 3): revision 2's witnesses for AC-CASE-002-01 and
+      AC-NAV-005-01 were uncalled helpers that did not observe the requirement. Both bindings
+      are withdrawn (proof open until T07). AC-CONFIG-004-01 is a PARTIAL witness that varies
+      the one configured provider (research) and claims nothing about credentials, timeouts or
+      scope.
   files:
     - path: .agents/candidates/horizon/T04-CR-001/ledger.yaml
       change: regenerated from the composed policy by scripts/gen-ledger-variant.py; 98/98 contracts; freeze_hash candidate
     - path: .agents/candidates/horizon/T04-CR-001/answer-key.md
       change: wayfinder generated from the candidate ledger (freeze_id T04-CR-001-candidate)
     - path: .agents/candidates/horizon/T04-CR-001/composed/ledger-policy.yaml
-      change: frozen policy + the three witness-bound overrides + evaluated_by
+      change: frozen policy + the overlay entries (witness-bound or unbound, see scripts/ledger-policy.candidate.yaml) + evaluated_by (REQ-CONFIG-004 only)
     - path: .agents/candidates/horizon/T04-CR-001/composed/prereg.patch
       change: proposed verified_by correction for .agents/prereg/horizon/T04.prereg.yaml
     - path: .agents/candidates/horizon/T04-CR-001/REVIEW.md
@@ -57,14 +85,13 @@ candidate_revision:
       modal preserved, or binds an existing requirement to an input the witness supplies (never
       restated as policy). No new requirement, threshold or product policy is introduced.
     checked_by:
-      - "scripts/check-witness-claims.py — fails on a new permission-negated, SHOULD-strengthened, quantifier-added or prohibition-unrestated contract (9 pre-existing findings baselined, DEBT D-020)"
-      - "scripts/measure-contract-modals.py --ledger <candidate> — no changed contract drops a modal (the active ledger drops 10)"
+      - "scripts/check-witness-claims.py --ledger <candidate> --baseline /dev/null — 0 findings over 98 candidate contracts (no baseline needed for the candidate)"
+      - "scripts/measure-contract-modals.py --ledger <candidate> --baseline /dev/null — one loss, REQ-RES-001, a lexical false positive ruled ACCEPTABLE-DIFFERENCE by verdict r2 R3 and the only candidate baseline entry"
+      - "baseline keys are full ledger path + contract-text digest, and a stale entry fails (verdict r2 F4); restoring the active CASE-003 and NAV-002 wording in the candidate fails both checkers"
       - "scripts/gen-requirement-ledger.py self_test — prohibition, lowercase 'not', MAY and SHOULD restatement are locked"
     known_exception: >-
-      REQ-UX-009 restates a SHOULD as "should be observed to respond" so the soft obligation is
-      not strengthened; the active ledger's generic form already turned it into a hard one, and
-      this revision does not adopt that. Review question 9 asks whether that phrasing is the
-      right way to keep a SHOULD soft.
+      REQ-UX-009 restates a SHOULD as "should be observed to respond". Verdict r2 R4 ruled this
+      faithful_SHOULD; OQ-001 remains open for the next spec version only.
   affected_pins_and_plan:
     ledger_sha256: changes (whole-file digest recorded by the new Wayfinder freeze)
     ledger_fragment_digest: changes
@@ -76,7 +103,7 @@ candidate_revision:
     plan_rebind_required: false
     plan_rebind_rationale: >-
       The plan's task DAG, settling-task mapping and gate commands are unchanged; only the
-      expected observable of three contracts and the expression of the others change. The
+      expected observable of eight contracts and the expression of the others change. The
       plan needs no rebind, but a new freeze id and a new independent criticism round are
       required by the repository's freeze process.
   re_freeze_process:
@@ -94,10 +121,17 @@ candidate_revision:
       subject are checked mechanically; per-requirement observables remain the owning tasks'
       work (DEBT D-012), now with a binding witness requirement for new overrides.
     - >-
-      REQ-CONFIG-004's "timeouts and scope" cannot be exercised: HorizonConfig declares no
-      provider timeout or scope field (DEBT D-019). The witness states this instead of
-      asserting coverage.
+      REQ-CONFIG-004's credentials, timeouts and scope cannot be exercised: no configured
+      provider declares them (DEBT D-019). The witness is recorded as PARTIAL.
     - >-
-      Nine pre-existing findings outside the contracts this revision changes are recorded and
-      baselined as DEBT D-020, not fixed: repairing them is owning-task contract work and
-      would enlarge the freeze surface beyond what the verdict required.
+      REQ-CASE-002 and REQ-NAV-005 have no witness: their proof is open until T07 implements
+      the navigation controller. Their contracts restate the ruler and are not claimed as
+      observed.
+    - >-
+      The baseline holds the active ledger's five check-contract findings (removed by this
+      candidate; delete them at re-freeze) and one candidate entry (REQ-RES-001, ruled
+      acceptable). It is not acceptance (DEBT D-020).
+    - >-
+      Verdict r2 F6 (boundary gate) and F1 (E2E falsifier) are fixed in mutable code and need
+      no re-freeze: scripts/check-boundaries.ts now admits only the canonical import closure,
+      and the structural E2E fails when a required Cognate package is undeclared.

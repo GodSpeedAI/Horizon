@@ -1,25 +1,28 @@
-# T04 final gate run — recorded 2026-10-19, exit codes as observed
+# T04 settlement gate run — re-frozen T04-CR-001@2026-10-20, recorded 2026-10-20, exit codes as observed
 #
 # Reproduce from the repo root:  bash .agents/evidence/horizon/T04/run-gates.sh
-# Each target's stdout/stderr is written to just-<target>.log beside this file.
+# Toolchain: Bun 1.4.0, DomainForge 0.21.1 (DOMAINFORGE_BIN), uv-managed research project.
+# just-acceptance-claims-frozen.log and just-contract-modals-frozen.log are historical: they record
+# the pre-re-freeze ledger failing those diagnostics; the targets were retired at the re-freeze.
 
-check exit=0 6s
-boundaries exit=0 0s
-test exit=0 1s
-ledger exit=0 4s
-wayfinder exit=0 3s
-teeth exit=0 14s
-verify exit=0 11s
-gate-t04 exit=0 21s
+check exit=0
+boundaries exit=0
+idm-integrity exit=0
+acceptance-claims exit=0      (active ledger: 4 prohibitions preserved)
+witness-claims exit=0         (196 contracts, active + applied candidate; 0 known, 0 new, 0 stale)
+contract-modals exit=0        (active ledger: 1 known, REQ-RES-001; 0 new; 0 stale)
+test exit=0                   (14 Bun pass / 0 fail; research pytest 4 passed)
+ledger exit=0                 (98/98, freeze verified)
+wayfinder exit=0
+teeth exit=0                  (all attacks blocked, incl. missing-cognate-dependency-e2e and duplicate-canonical-subtree)
+verify exit=0
+gate-t04 exit=0
+recorder exit=0
 
-# Observed results
-#   just check        check: ok (local_operator, 127.0.0.1:4319, horizon)
-#   just boundaries   boundaries: ok (.)
-#   just test         8 pass, 0 fail, 36 expect(); research pytest 4 passed
-#   just ledger       98 requirements, 98 acceptance contracts, freeze verified
-#   just wayfinder    wayfinder: 0 error(s)
-#   just teeth        all five structural attacks blocked; 6 freeze attacks blocked, 0 missed
-#   just verify       verify: ok
-#   just gate-t04     gate-t04: ok
-#
-# All eight targets fail closed on a non-zero exit; none of them substitutes for another.
+# Frozen pins after the re-freeze
+#   freeze_id                 T04-CR-001@2026-10-20
+#   requirements/ledger.yaml  c4237e177f7f3202df851c49d2736b3453a7e7b9ba73cad36954fc1897226868
+#   .wayfinder/answer-key.md  50ccfd6bbd05847c15c8f8da9981c44644489adf3e74742cc534014b09e05f4c
+#   scripts/ledger-policy.yaml 4bc84acab788299433863483f857ab2079682755c9608d753c8613ef3cb8c670
+#   T04.prereg.yaml           f42836a612981dfb5d2ce6b59cc74c34bf62cc54ff14cec01f23fc74c2643a8b (prereg.patch applied)
+#   spec / world_ref          unchanged (75cfc1ce..., 6c18d6a6...)

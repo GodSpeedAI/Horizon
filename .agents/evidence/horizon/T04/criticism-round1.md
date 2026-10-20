@@ -134,3 +134,25 @@ place the modal where the ruler put it inside a multi-clause sentence), `REQ-UX-
 by the generator itself, and all four are reviewed again in the table above. The lesson is
 recorded because it is the same lesson as C4: the contracts nobody flagged are where the same
 defect class hides.
+
+## Correction after independent verdict r2 (2026-10-20)
+
+`verdicts/codex-adversarial-r2-20261019.md` (F7, R2) showed four claims in this record were
+ahead of the evidence. They are left above as written; this note supersedes them.
+
+- **C1 / question 6:** revision 2's `evaluateDeviation` picked the first *available* choice and
+  labelled it a response to any deviation. That is not the spec's
+  `firstAvailableThatAddressesMaterialDeviationOrNone`: no addressing relation existed. Revision 3
+  deletes the helper and leaves REQ-CASE-002 unbound until T07.
+- **C2:** the CONFIG-004 witness varied Horizon's own listening address and secret path, not a
+  provider. Revision 3 varies the research provider endpoint and records the witness as PARTIAL.
+- **C3:** the NAV-005 witness tested a helper no controller called. Revision 3 removes it and
+  leaves REQ-NAV-005 unbound until T07.
+- **C4:** the old STACK-001 text "observed to **not** create" already negated creation; calling it
+  a polarity inversion overstated the defect. The clearer revision-2 wording stands.
+- **"every contract preserves its requirement's modals":** false at the time; the unbaselined
+  candidate measure listed four inherited losses. Revision 3 leaves one, REQ-RES-001, ruled an
+  acceptable lexical false positive.
+- **"none [of the baselined findings] is in a contract this revision changes":** false; the
+  intersection was six requirements, and the candidate CASE-003 entry hid its own regression.
+  Revision 3 re-keys the baseline (full path plus contract digest) and fails on stale entries.

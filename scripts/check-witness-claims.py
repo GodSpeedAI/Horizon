@@ -25,6 +25,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import re
 import sys
@@ -159,16 +160,25 @@ def check_contract(rid: str, statement: str, expected: str) -> list[str]:
     return problems
 
 
-def _baseline_key(finding: str) -> str:
-    """Stable identity of a finding: `<ledger file name>: <symbol>: <REQ id>: <finding>`.
+def fingerprint(expected: str) -> str:
+    """Short digest of a contract's text: a baseline entry covers that text and no other."""
+    return hashlib.sha256(" ".join(expected.split()).encode("utf-8")).hexdigest()[:12]
 
-    The ledger path is reduced to its file name so the same finding does not become "new"
-    because a ledger was regenerated into a different directory.
+
+def baseline_key(label: str, symbol: str, problem: str, expected: str) -> str:
+    """Identity of a finding: `<repo-relative ledger>: <symbol>: <REQ id>: <finding> @<digest>`.
+
+    The full repo-relative path keeps the active and candidate ledgers apart, and the digest
+    binds the entry to the contract text it was recorded against: a repaired contract that
+    regresses to its old wording is a new finding, never inherited debt (verdict r2 F4).
     """
-    path, _, rest = finding.partition(": ")
-    symbol, _, rest = rest.partition(": ")
-    rid, _, message = rest.partition(": ")
-    return f"{os.path.basename(path)}: {symbol.strip()}: {rid.strip()}: {message.strip()}"
+    return f"{label}: {symbol}: {problem} @{fingerprint(expected)}"
+
+
+def load_baseline(path: str | None) -> set[str]:
+    if not path or not os.path.isfile(path):
+        return set()
+    return {line.strip() for line in open(path, encoding="utf-8") if line.strip() and not line.startswith("#")}
 
 
 def main(argv: list[str]) -> int:
@@ -189,17 +199,20 @@ def main(argv: list[str]) -> int:
         if os.path.isfile(path)
     ]
     spec = spec_requirements()
-    findings: list[str] = []
+    findings: list[tuple[str, str]] = []  # (printable finding, baseline key)
+    scanned: list[str] = []
     held: list[str] = []
     counts = {"checked": 0, "generic": 0, "authored": 0}
     for path in ledgers:
         ledger = yaml.safe_load(open(path, encoding="utf-8"))
         label = os.path.relpath(os.path.abspath(path), REPO)
+        scanned.append(label)
         for contract in ledger.get("acceptance_contracts") or []:
             rid = contract["requirement"]
             statement = spec.get(rid)
             if statement is None:
-                findings.append(f"{label}: top-level: {rid}: not declared in the frozen spec")
+                problem = f"{rid}: not declared in the frozen spec"
+                findings.append((f"{label}: top-level: {problem}", baseline_key(label, "top-level", problem, contract["expected"])))
                 continue
             expected = contract["expected"]
             counts["checked"] += 1
@@ -207,31 +220,34 @@ def main(argv: list[str]) -> int:
             if "potentially-ratified" in expected.lower():
                 held.append(f"{label}: {rid}")
             for problem in check_contract(rid, statement, expected):
-                findings.append(f"{label}: check-contract: {problem}")
+                findings.append((f"{label}: check-contract: {problem}", baseline_key(label, "check-contract", problem, expected)))
 
     for item in args.ratified:
         held.append(item)
 
-    # A finding already present in the active ledger is pre-existing debt (DEBT D-020); it is
-    # reported but does not fail, so a *new* finding cannot hide behind old ones.
-    baseline = set()
-    if args.baseline and os.path.isfile(args.baseline):
-        baseline = {
-            line.strip()
-            for line in open(args.baseline, encoding="utf-8")
-            if line.strip() and not line.startswith("#")
-        }
-    new_findings = [f for f in findings if _baseline_key(f) not in baseline]
-    known_findings = [f for f in findings if _baseline_key(f) in baseline]
+    # A finding already present in a frozen ledger is pre-existing debt (DEBT D-020); it is
+    # reported but does not fail, so a *new* finding cannot hide behind old ones. An entry for
+    # a scanned ledger that matches nothing is stale and fails: left in place it would
+    # silently accept the same finding if it returned.
+    baseline = {line for line in load_baseline(args.baseline) if ": check-contract: " in line or ": top-level: " in line}
+    keys = {key for _, key in findings}
+    new_findings = [text for text, key in findings if key not in baseline]
+    known_findings = [text for text, key in findings if key in baseline]
+    stale = sorted(line for line in baseline if line.split(": ", 1)[0] in scanned and line not in keys)
 
     if known_findings:
         print(f"check-witness-claims: {len(known_findings)} known pre-existing finding(s) (DEBT D-020), not fatal:")
         for finding in known_findings:
             print(f"  ~ {finding}")
+    if stale:
+        print(f"check-witness-claims: FAILED ({len(stale)} stale baseline entr(y/ies); remove them)")
+        for line in stale:
+            print(f"- stale: {line}")
     if new_findings:
         print(f"check-witness-claims: FAILED ({len(new_findings)} new finding(s) over {counts['checked']} contracts)")
         for finding in new_findings:
             print(f"- {finding}")
+    if stale or new_findings:
         return 1
     print(
         f"check-witness-claims: OK ({counts['checked']} contracts: {counts['generic']} generic, "

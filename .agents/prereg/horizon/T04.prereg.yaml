@@ -30,10 +30,13 @@ preregistration:
       derives the semantic closure hash from the source set, so this one-line semantic
       correction changes world_ref. No entity, invariant statement or operation changed.
     verified_by: >-
-      `domainforge validate --application` reports 0 violations (4 operations, 8 records,
-      16 enums, 24 entities) and `scripts/world-ref.py --expect <revised>` reports the
-      identity unchanged for the revised source; `scripts/probe-world.ts` accepts the
-      revised ref and rejects any other.
+      The one-line semantic correction is independently reproducible: `scripts/world-ref.py --expect
+      <revised>` derives 6c18d6a6.. from the corrected source, and reversing only that line derives
+      b0f31fcc.., the original pin (confirmed by the T04 verdict, 2026-10-19). `domainforge validate
+      --application` reports 0 violations and 4 operations / 8 records / 16 enums / 24 entities, which
+      is compilation and symbol-resolution evidence ONLY: the same gate reports 0 violations for a
+      nonexistent requirement_ref and for a duplicated invariant_id (scripts/teeth-domainforge-gate.py).
+      Referential integrity is checked separately by scripts/check-idm-integrity.py.
     rejected: >-
       Keeping the original pin. A pinned world_ref that no longer matches the canonical
       source is exactly the "stale world" the runtime must fail closed on; the test

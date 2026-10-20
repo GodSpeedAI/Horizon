@@ -70,4 +70,4 @@ check-acceptance-claims: FAILED (69)
 - REQ-WORLD-006: generic restatement does not keep the ruler's subject 'Operational objects and links': 'be typed Cognate projections over durable events and connector observations, keyed by DomainForge semantic IDs; checkpoint_ref MUST identify the Cognate commit position and the projection versions read; Horizon MUST NOT keep a separate mutable object database outside Cognate'
 - REQ-WORLD-007: generic restatement does not keep the ruler's subject 'Every object, set and link': 'expose its owning product, connector, checkpoint age and integration level, and stale or degraded sources MUST be visibly marked'
 - REQ-WORLD-008: generic restatement does not keep the ruler's subject 'An active world': 'be selected through a DomainForge world alias pinned to an immutable world_ref; a candidate-versus-active semantic diff MAY be a Horizon-derived read-only view but MUST NOT mint or verify identity'
-error: recipe `acceptance-claims-frozen` failed on line 44 with exit code 1
+error: recipe `acceptance-claims-frozen` failed on line 45 with exit code 1

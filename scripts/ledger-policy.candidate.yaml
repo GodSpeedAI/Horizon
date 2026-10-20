@@ -14,47 +14,54 @@ version: 1
 # REQ-NAV-003. Each corrected rule below is a verbatim restatement of the requirement;
 # every `introduced` term is recorded empty so the next reviewer can check the claim.
 #
+# Revision 3 (independent verdict r2, `.agents/evidence/horizon/T04/verdicts/
+# codex-adversarial-r2-20261019.md`):
+# - F3: the CASE-002 and NAV-005 witnesses observed nothing their requirement names (an
+#   uncalled first-available helper and an uncalled reference resolver). Both bindings are
+#   withdrawn and their proof is open until T07; CONFIG-004 is bound as a PARTIAL witness
+#   that varies the one configured provider (research) and claims nothing else.
+# - F2: five inherited contracts (DEV-001, NAV-002, STACK-004, STACK-011, STACK-014) altered
+#   or omitted a load-bearing rule. Each is replaced below by a restatement of its own ruler.
+#
 # Applying an authorized freeze composes this file over `scripts/ledger-policy.yaml` (and
 # re-appends `evaluated_by` last); see `.agents/candidates/horizon/T04-CR-001/`.
 
 # The witnesses the candidate entries are evaluated by. Each maps to an implemented test
 # that carries the same id; `scripts/check-acceptance-claims.py` verifies the test exists.
+# Only REQ-CONFIG-004 is bound, and only partially (see its entry). REQ-CASE-002 and
+# REQ-NAV-005 are deliberately unbound: no implemented code observes them yet.
 evaluated_by:
-  REQ-CASE-002:
-    - "test/acceptance.test.ts :: AC-CASE-002-01"
   REQ-CONFIG-004:
     - "test/acceptance.test.ts :: AC-CONFIG-004-01"
-  REQ-NAV-005:
-    - "test/acceptance.test.ts :: AC-NAV-005-01"
 
 overrides:
   # Ruler (frozen, verbatim): "The next primary move MUST respond to material deviation;
   # no primary recommendation is required when only optional choices remain."
-  # What the witness supplies and the contract does NOT restate: the spec's own reference
-  # algorithm (`derive_navigation_frame`) and `.sea` INV-01 define "material deviation" as
-  # a move that is not a visible reachable, payable, governable, settleable path, and the
-  # algorithm selects the *first available* such move. No outcome list
-  # (completed/refused/failed/contradicted) is added: the requirement names none.
+  # Revision 2 bound this to a helper that returned the first *available* choice and labelled
+  # it a response to whatever deviation it was given; the spec's algorithm is
+  # `firstAvailableThatAddressesMaterialDeviationOrNone`, and no implemented code has an
+  # addressing relation (verdict r2 F3). The binding is withdrawn, not replaced by invented
+  # policy: the proof is open until T07's navigation controller exists.
   REQ-CASE-002:
     rule: >-
       The next primary move responds to material deviation. No primary recommendation is
       required when only optional choices remain.
     witness_supplies: >-
-      Which operations deviated from a visible settleable path on a supplied frame, and that
-      frame's ordered typed choices.
+      Nothing: no witness binds this contract. Its proof is open until T07 (gate-t07).
     introduced: []
   # Ruler (frozen, verbatim): "Configured provider endpoints, credentials, timeouts and
   # scope MUST remain below stable behavior contracts."
-  # The witness's assertion that configuration is exercised through application
-  # construction is not policy and is not restated here; it could only be ratified by
-  # amending the frozen ruler at a new version.
+  # Revision 2's witness varied Horizon's own listening address and launch-secret path and
+  # called them "two different provider configurations" (verdict r2 F3). The only configured
+  # provider is research (`research_command`); the witness now varies that endpoint alone.
   REQ-CONFIG-004:
     rule: >-
       Configured provider endpoints, credentials, timeouts and scope remain below stable
       behavior contracts.
     witness_supplies: >-
-      Typed choices, intent ids and surface blocks read from an application constructed under
-      two different provider configurations.
+      PARTIAL. Typed choices, the committed intent's operation and frame revision, and surface
+      blocks read from applications whose configured research provider endpoint differs. No
+      provider declares credentials, timeouts or scope (DEBT D-019); those remain unproven.
     introduced: []
   # Ruler (frozen, verbatim): "Predictive estimates MAY inform payment, consequence or
   # ranking only after governed activation: a frozen preregistered held-out criterion,
@@ -100,11 +107,90 @@ overrides:
     introduced: []
   # Ruler (frozen, verbatim): "The navigation controller MUST avoid asking for context it
   # can resolve without user burden."
-  # The narrowest of the three: the witness supplies which references a frame carries, a
-  # set the ruler does not enumerate.
+  # Revision 2 bound this to a reference resolver no controller called (verdict r2 F3); the
+  # binding is withdrawn and the proof is open until T07.
   REQ-NAV-005:
     rule: >-
       The navigation controller avoids asking for context it can resolve without user burden.
     witness_supplies: >-
-      The reference classes a supplied frame carries (checkpoint, world, operation, focus).
+      Nothing: no witness binds this contract. Its proof is open until T07 (gate-t07).
+    introduced: []
+  # --- Revision 3: five inherited contracts that altered or omitted their ruler (verdict r2
+  # F2). None has a witness yet; each is owned by the task named in witness_supplies.
+  #
+  # Ruler (frozen, verbatim): "Failure, contradictions, recovery, payment and orchestration
+  # burden MUST remain available to developmental evaluation."
+  # The frozen contract retained "every operation's outcome", which neither names nor keeps
+  # these five categories, and adds retention of successful outcomes the rule does not state.
+  REQ-DEV-001:
+    rule: >-
+      Failure, contradictions, recovery, payment and orchestration burden each remain available
+      to developmental evaluation; none of the five is observed to be missing from what
+      developmental evaluation can read.
+    witness_supplies: >-
+      Nothing: no witness binds this contract yet. Its proof is owned by T17 (gate-t17).
+    introduced: []
+  # Ruler (frozen, verbatim): "Affordance gates MUST use exactly the canonical keys
+  # visibility, reach, payment, authority, capability, recovery and settlement_access."
+  # The frozen contract rejected only extra keys, so an empty or incomplete gate map passed.
+  REQ-NAV-002:
+    rule: >-
+      Affordance gates use exactly the canonical keys visibility, reach, payment, authority,
+      capability, recovery and settlement_access: an assessment missing one of the seven keys
+      is rejected, and an assessment carrying a key outside them is rejected.
+    witness_supplies: >-
+      Nothing: no witness binds this contract yet. Its proof is owned by T07 (gate-t07).
+    introduced: []
+  # Ruler (frozen, verbatim): "Gauntlet MUST be used only for tasks that require bounded
+  # long-horizon work and MUST freeze and preserve its Reference."
+  # The frozen contract reversed the restriction ("bounded long-horizon work runs only
+  # through Gauntlet"), which forbids the bounded Cognate execution world REQ-RES-003 allows
+  # and does not forbid using Gauntlet for short work. The last sentence states the
+  # direction of the restriction; it adds no rule (REQ-RES-003 names the alternative).
+  REQ-STACK-004:
+    rule: >-
+      Gauntlet is used only for tasks that require bounded long-horizon work: a task that does
+      not require bounded long-horizon work is never observed to run through Gauntlet. Gauntlet
+      freezes its Reference at the start of a run and preserves it unchanged for the rest of
+      the run. The restriction is on what Gauntlet is used for; it does not make Gauntlet the
+      sole executor of bounded long-horizon work.
+    witness_supplies: >-
+      Nothing: no witness binds this contract yet. Its proof is owned by T12 (gate-t12).
+    introduced: []
+  # Ruler (frozen, verbatim): "A product joins the world only through the product
+  # integration contract: a DomainForge module for its types, links and operations; a read
+  # connector emitting provenance-bearing observations into Cognate; capability bindings for
+  # actions, each covered by SEA-Forge policy; and optional RealityTrace evidence hooks. Its
+  # integration level (visible, queryable, actionable, evidenced) MUST be derived from which
+  # facets are proven."
+  # The frozen contract observed facets and the derived level but lost the joining
+  # restriction: a product joined by a competing route could pass.
+  REQ-STACK-011:
+    rule: >-
+      A product joins the world only through the product integration contract: a DomainForge
+      module for its types, links and operations; a read connector emitting provenance-bearing
+      observations into Cognate; capability bindings for actions, each covered by SEA-Forge
+      policy; and optional RealityTrace evidence hooks. A product that attempts to join by a
+      route outside that contract is refused. Its integration level (visible, queryable,
+      actionable, evidenced) is derived from which facets are proven.
+    witness_supplies: >-
+      Nothing: no witness binds this contract yet. Its proof is owned by T20 (gate-t20).
+    introduced: []
+  # Ruler (frozen, verbatim): "Dependency MUST be one-way: every stack owner (DomainForge,
+  # Cognate, SEA-Forge, Gauntlet, RealityTrace, Context Kernel) and every joined product
+  # MUST remain fully operable without Horizon. Horizon MUST NOT require changes that make a
+  # product depend on Horizon, and integration MUST use each product's own public surfaces;
+  # a product unaware of Horizon is a valid product."
+  # The frozen contract prohibited every accommodating change, not only dependency-producing
+  # ones, and did not test that Horizon's integration uses only public surfaces.
+  REQ-STACK-014:
+    rule: >-
+      Dependency is one-way: every stack owner (DomainForge, Cognate, SEA-Forge, Gauntlet,
+      RealityTrace, Context Kernel) and every joined product remains fully operable with Horizon
+      stopped or absent. Horizon is never observed to require changes that make a product
+      depend on Horizon, and Horizon's integration with each product uses that product's own
+      public surfaces; a product unaware of Horizon is a valid product.
+    witness_supplies: >-
+      Nothing: no witness binds this contract yet. Its proof is owned by T19 and T20
+      (gate-t19, gate-t20).
     introduced: []

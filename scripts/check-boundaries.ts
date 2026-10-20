@@ -1,13 +1,8 @@
-import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+import { REQUIRED_COGNATE } from "../src/runtime/required-cognate.ts";
 
-const REQUIRED_COGNATE = [
-  "@godspeedai/cognate-cli",
-  "@godspeedai/cognate-domainforge",
-  "@godspeedai/cognate-runtime-bun",
-  "@godspeedai/cognate-projections",
-  "@godspeedai/cognate-kernel-api",
-];
+const CANONICAL_ENTRY = ".sea/interaction/interaction-model.sea";
 
 const args = process.argv.slice(2);
 const rootArg = args.indexOf("--root");
@@ -62,14 +57,41 @@ function rejectCompetingModel(): void {
   }
 }
 
+/**
+ * The canonical semantic source is the import closure of the entry model, nothing else.
+ * Exempting the whole `.sea/` tree let a byte-for-byte copy at `.sea/alternative/` pass
+ * (verdict r2 F6), so every `.sea` file outside that closure is a duplicate authority.
+ */
+function canonicalClosure(): Set<string> {
+  const closure = new Set<string>();
+  const entry = join(root, CANONICAL_ENTRY);
+  if (!existsSync(entry)) return closure;
+  const pending = [entry];
+  while (pending.length > 0) {
+    const file = pending.pop()!;
+    const rel = relative(root, file).split("\\").join("/");
+    if (closure.has(rel)) continue;
+    if (!existsSync(file)) {
+      fail(`BOUNDARY: canonical model imports a missing file ${rel}`);
+      continue;
+    }
+    closure.add(rel);
+    for (const match of readFileSync(file, "utf8").matchAll(/^\s*import\b[^\n]*?\bfrom\s+"([^"]+\.sea)"/gm)) {
+      pending.push(resolve(dirname(file), match[1]!));
+    }
+  }
+  return closure;
+}
+
 function rejectDuplicateSemanticAuthority(): void {
+  const closure = canonicalClosure();
   walk(root, (path) => {
     if (!path.endsWith(".sea")) return;
     const rel = relative(root, path).split("\\").join("/");
     if (rel.startsWith("node_modules/") || rel.startsWith(".git/") || rel.startsWith(".cognate/")) return;
     if (rel.startsWith(".agents/") || rel.startsWith(".tmp/") || rel.startsWith("research/.venv/")) return;
-    if (rel.startsWith(".sea/")) return;
-    fail(`BOUNDARY: duplicate semantic authority at ${rel}; canonical model lives under .sea/`);
+    if (closure.has(rel)) return;
+    fail(`BOUNDARY: duplicate semantic authority at ${rel}; the canonical model is the import closure of ${CANONICAL_ENTRY}`);
   });
 }
 

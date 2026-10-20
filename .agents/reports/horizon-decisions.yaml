@@ -3,7 +3,7 @@
 # Rule: record material, hard-to-reverse or binding choices with evidence.
 schema: horizon.decisions
 version: 1
-updated: "2026-10-19"
+updated: "2026-10-20"
 
 decisions:
   - id: DEC-T00-01
@@ -291,6 +291,27 @@ decisions:
       - ".agents/candidates/horizon/T04-CR-001/CANDIDATE.yaml"
       - ".agents/candidates/horizon/T04-CR-001/REVIEW.md"
       - ".agents/DEBT.md"
+
+  - id: DEC-T04-06
+    date: "2026-10-20"
+    task: T04
+    requirement: REQ-VERIFY-002
+    decision: >-
+      The owner directs that T04-CR-001 revision 3 be APPLIED and re-frozen, and T04 settled, without
+      a further independent review cycle ("this is taking too many review cycles ... finish it out
+      yourself"; "settle it"). Revision 3 addresses every finding of the independent verdict on
+      revision 2 (codex-adversarial-r2-20261019, F1-F7; F8 already accepted as DEC-T04-01).
+    deviation: >-
+      The plan requires P3 settlement to rest on a fresh independent confirmation. Revision 3 has
+      none: it was prepared and verified by a session that is not independent of the build. T04 is
+      settled on the owner's authority with this deviation recorded, not on an independent verdict.
+      Two independent verdicts exist for earlier revisions and every finding in them was addressed.
+    reversible: true
+    supersedes_condition_of: DEC-T04-05
+    evidence:
+      - ".agents/evidence/horizon/T04/verdicts/codex-adversarial-r2-20261019.md"
+      - ".agents/candidates/horizon/T04-CR-001/CANDIDATE.yaml"
+      - ".agents/evidence/horizon/T04/gates.txt"
 
 open_questions:
   - id: OQ-001

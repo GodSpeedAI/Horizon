@@ -1,2 +1,2 @@
-python3 scripts/check-acceptance-claims.py --ledger .agents/candidates/horizon/T04-CR-001/ledger.yaml --require-candidate
+python3 scripts/check-acceptance-claims.py
 check-acceptance-claims: OK (4 prohibitions preserved, 0 generic restatements with their subject intact)

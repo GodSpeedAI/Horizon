@@ -1,133 +1,107 @@
-# Curated formation policy for requirements/ledger.yaml (T04, topology P5).
-#
-# This file carries ONLY semantic judgment that scripts cannot derive:
-# which independent critic predicate defends each requirement at freeze, and any
-# authored acceptance-contract observable that the requirement text alone cannot
-# state. Everything mechanical (source digest, settling tasks, gates, dependency
-# edges) is derived from the frozen spec and plan by scripts/gen-requirement-ledger.py.
-#
-# Freeze boundary: covered by .wayfinder/answer-key.md `hashes`. Editing it after a
-# freeze requires a CandidateRevision, not a silent edit.
 version: 1
-
-# Default binding method for requirements this file does not override:
-#   source-fidelity. Source-fidelity defends that the projection restates the ruler
-#   verbatim, so the requirements needing an independent reading are the ones that
-#   name semantics, contradiction, escape hatches, or gate honesty.
-
-# semantic-fidelity: the projection must name the canonical `.sea` entity/attribute
-# rather than screen or API fiction.
-semantic_fidelity: [REQ-STACK-001, REQ-NAV-001, REQ-NAV-002, REQ-WORLD-004]
-
-# contradiction: the ruler or its projection carries an unresolved ambiguity a reader
-# could act on in two incompatible ways.
+semantic_fidelity:
+- REQ-STACK-001
+- REQ-NAV-001
+- REQ-NAV-002
+- REQ-WORLD-004
 contradiction: []
-
-# evasion: a requirement whose obligation could silently slip past the projection --
-# an unconditional claim, an unrecorded outcome, or a weak proof substitute.
-evasion: [REQ-VERIFY-004, REQ-DEV-002, REQ-STACK-014, REQ-SAFE-005, REQ-SEC-005]
-
-# verification-quality: settlement is defined only by an honest, non-false-green gate.
-verification_quality: [REQ-VERIFY-001, REQ-VERIFY-002, REQ-VERIFY-003, REQ-VERIFY-005]
-
-# Authored acceptance observables. The default contract for REQ-X is the requirement
-# text restated in the first person as an observable consequence; these entries record
-# where that restatement would be ambiguous or where the requirement names a conjunction
-# that one observable cannot settle. Keys are REQ ids.
+evasion:
+- REQ-VERIFY-004
+- REQ-DEV-002
+- REQ-STACK-014
+- REQ-SAFE-005
+- REQ-SEC-005
+verification_quality:
+- REQ-VERIFY-001
+- REQ-VERIFY-002
+- REQ-VERIFY-003
+- REQ-VERIFY-005
 overrides:
-  REQ-CONFIG-001: >-
-    An observer identity supplied in presentation metadata (frame, intent or surface
-    payload) is ignored; the effective observer_ref is the OS-session-derived operator
-    for local_operator, and the attempt is observable in the audit record.
-  REQ-CONFIG-003: >-
-    With the semantic adapter's world unpinned or unavailable, the affected operation
-    reports blocked/unknown with the missing gate named, and no other operation's
-    read-only affordances disappear.
-  REQ-CONFIG-010: >-
-    A read-only startup reports the pinned world_ref, the resolved observer and the
-    projection capabilities it supports, and refuses to start (rather than guess) when
-    the world cannot be pinned.
-  REQ-CONFIG-011: >-
-    At invocation the runtime re-checks target, actor, world revision, authority and
-    settlement prerequisites; a change after preflight yields a refusal naming the
-    changed prerequisite, not an executed action.
-  REQ-CONFIG-012: >-
-    A failed preflight blocks only the operations that depend on the missing
-    prerequisite; unrelated read-only exploration remains reachable and is visibly
-    marked as unaffected.
-  REQ-STACK-004: >-
-    Bounded long-horizon work runs only through Gauntlet, and the run's Reference is
-    frozen at start and preserved unchanged through every later observation.
-  REQ-UI-001: >-
-    A submitted surface specification containing executable code is rejected at
-    validation, and the accepted specification consists only of declarative elements,
-    groups and actions.
-  REQ-DEV-001: >-
-    Every operation's outcome, including refusals and failed attempts, is retained with
-    its references and remains available to later developmental evaluation.
-  REQ-WORLD-001: >-
-    A single search returns semantic types, live objects, resources and applications
-    as distinctly typed results, and no result is presented as belonging to a
-    different kind than its source declares.
-  REQ-NAV-002: >-
-    An affordance assessment carrying any key outside visibility, reach, payment,
-    authority, capability, recovery and settlement_access is rejected, not ignored.
-  REQ-SEC-001: >-
-    An attempt to reach a consequential capability without passing Cognate capability
-    resolution and SEA-Forge invocation checks has no external effect and is refused.
-  REQ-UX-001: >-
-    Opening the application lands on a home view that resumes the last focus and lists,
-    in mode-precedence order, pending human decisions, work in flight, contradicted or
-    unresolved evidence, degraded sources and changes to watched objects.
-  REQ-INT-003: >-
-    A replayed navigation intent id resolves to the original commit and returns its
-    stored outcome, and no second external side effect is attempted or recorded.
-  REQ-NAV-001: >-
-    An operation whose path is not reachable, payable, governable and settleable is
-    reported as possible/blocked/unknown/conflicted -- never available; possibility
-    alone never yields an affordance.
-  REQ-NAV-006: >-
-    No gate value grants authority: an authority outcome of likely_allow is
-    accompanied by a non-granting evaluation, and requires_approval, denied,
-    unreachable and unknown each block the path until a real decision exists.
-  REQ-WORLD-004: >-
-    Historical, current and candidate revisions of one world are shown with distinct
-    immutable references, and no surface presents a candidate revision as the active
-    world.
-  REQ-VERIFY-001: >-
-    The same fixture and frame revision yield the same typed choices and intent ids
-    through both Clack and the graphical renderer, differing only in presentation.
-  REQ-VERIFY-002: >-
-    An invalid, stale, unauthorized, unpayable or unverifiable operation produces no
-    external side effect, and its refusal names which of those conditions applied.
-  REQ-VERIFY-003: >-
-    After a restart, focus, provenance, committed intentions and outstanding human
-    decisions are reconstructed from the durable store, not re-derived from scratch.
-  REQ-VERIFY-004: >-
-    An operational settlement claim and a developmental conclusion are recorded with
-    separate strength and scope, and neither exceeds what its own evidence supports.
-  REQ-VERIFY-005: >-
-    Six canonical journeys J01 Explore, J02 Operate, J03 Build, J04 Monitor,
-    J05 Compare and J06 Develop each pass recorded happy, blocked and recovery
-    fixtures, and a skipped required integration fails conformance instead of passing.
-  REQ-DEV-002: >-
-    A durable capability claim is refused unless repeated settlement under variation
-    plus transfer or recovery evidence is recorded; a single success cannot mint it.
-  REQ-STACK-014: >-
-    Every stack owner and joined product continues to operate through its own public
-    surface with Horizon stopped or uninstalled, and Horizon holds no requirement that
-    a product change to accommodate it.
-  REQ-RES-001: >-
-    Research runs as a Python process behind a versioned typed contract: a recorded
-    experiment run shows the dataset, corpora, calibration and evaluation artifacts
-    produced by that subsystem, and the TypeScript tree contains no training or
-    evaluation implementation of its own.
-  REQ-SEC-004: >-
-    A multi-user or remote deployment refuses a request whose authority is only the
-    Product Actualizer loopback token assumption, and the refusal names the missing
-    trust boundary rather than silently admitting the request.
-  REQ-STACK-011: >-
-    For a joined product, each proven facet (types and links, provenance-bearing read
-    observations, SEA-Forge-covered action bindings, RealityTrace evidence hooks) is
-    individually observable, an unproven facet is absent rather than assumed, and the
-    product's reported integration level follows exactly the facets proven.
+  REQ-CONFIG-001: An observer identity supplied in presentation metadata (frame, intent or surface payload)
+    is ignored; the effective observer_ref is the OS-session-derived operator for local_operator, and
+    the attempt is observable in the audit record.
+  REQ-CONFIG-003: With the semantic adapter's world unpinned or unavailable, the affected operation reports
+    blocked/unknown with the missing gate named, and no other operation's read-only affordances disappear.
+  REQ-CONFIG-010: A read-only startup reports the pinned world_ref, the resolved observer and the projection
+    capabilities it supports, and refuses to start (rather than guess) when the world cannot be pinned.
+  REQ-CONFIG-011: At invocation the runtime re-checks target, actor, world revision, authority and settlement
+    prerequisites; a change after preflight yields a refusal naming the changed prerequisite, not an executed
+    action.
+  REQ-CONFIG-012: A failed preflight blocks only the operations that depend on the missing prerequisite;
+    unrelated read-only exploration remains reachable and is visibly marked as unaffected.
+  REQ-STACK-004: 'Gauntlet is used only for tasks that require bounded long-horizon work: a task that
+    does not require bounded long-horizon work is never observed to run through Gauntlet. Gauntlet freezes
+    its Reference at the start of a run and preserves it unchanged for the rest of the run. The restriction
+    is on what Gauntlet is used for; it does not make Gauntlet the sole executor of bounded long-horizon
+    work.'
+  REQ-UI-001: A submitted surface specification containing executable code is rejected at validation,
+    and the accepted specification consists only of declarative elements, groups and actions.
+  REQ-DEV-001: Failure, contradictions, recovery, payment and orchestration burden each remain available
+    to developmental evaluation; none of the five is observed to be missing from what developmental evaluation
+    can read.
+  REQ-WORLD-001: A single search returns semantic types, live objects, resources and applications as distinctly
+    typed results, and no result is presented as belonging to a different kind than its source declares.
+  REQ-NAV-002: 'Affordance gates use exactly the canonical keys visibility, reach, payment, authority,
+    capability, recovery and settlement_access: an assessment missing one of the seven keys is rejected,
+    and an assessment carrying a key outside them is rejected.'
+  REQ-SEC-001: An attempt to reach a consequential capability without passing Cognate capability resolution
+    and SEA-Forge invocation checks has no external effect and is refused.
+  REQ-UX-001: Opening the application lands on a home view that resumes the last focus and lists, in mode-precedence
+    order, pending human decisions, work in flight, contradicted or unresolved evidence, degraded sources
+    and changes to watched objects.
+  REQ-INT-003: A replayed navigation intent id resolves to the original commit and returns its stored
+    outcome, and no second external side effect is attempted or recorded.
+  REQ-NAV-001: An operation whose path is not reachable, payable, governable and settleable is reported
+    as possible/blocked/unknown/conflicted -- never available; possibility alone never yields an affordance.
+  REQ-NAV-006: 'No gate value grants authority: an authority outcome of likely_allow is accompanied by
+    a non-granting evaluation, and requires_approval, denied, unreachable and unknown each block the path
+    until a real decision exists.'
+  REQ-WORLD-004: Historical, current and candidate revisions of one world are shown with distinct immutable
+    references, and no surface presents a candidate revision as the active world.
+  REQ-VERIFY-001: The same fixture and frame revision yield the same typed choices and intent ids through
+    both Clack and the graphical renderer, differing only in presentation.
+  REQ-VERIFY-002: An invalid, stale, unauthorized, unpayable or unverifiable operation produces no external
+    side effect, and its refusal names which of those conditions applied.
+  REQ-VERIFY-003: After a restart, focus, provenance, committed intentions and outstanding human decisions
+    are reconstructed from the durable store, not re-derived from scratch.
+  REQ-VERIFY-004: An operational settlement claim and a developmental conclusion are recorded with separate
+    strength and scope, and neither exceeds what its own evidence supports.
+  REQ-VERIFY-005: Six canonical journeys J01 Explore, J02 Operate, J03 Build, J04 Monitor, J05 Compare
+    and J06 Develop each pass recorded happy, blocked and recovery fixtures, and a skipped required integration
+    fails conformance instead of passing.
+  REQ-DEV-002: A durable capability claim is refused unless repeated settlement under variation plus transfer
+    or recovery evidence is recorded; a single success cannot mint it.
+  REQ-STACK-014: 'Dependency is one-way: every stack owner (DomainForge, Cognate, SEA-Forge, Gauntlet,
+    RealityTrace, Context Kernel) and every joined product remains fully operable with Horizon stopped
+    or absent. Horizon is never observed to require changes that make a product depend on Horizon, and
+    Horizon''s integration with each product uses that product''s own public surfaces; a product unaware
+    of Horizon is a valid product.'
+  REQ-RES-001: 'Research runs as a Python process behind a versioned typed contract: a recorded experiment
+    run shows the dataset, corpora, calibration and evaluation artifacts produced by that subsystem, and
+    the TypeScript tree contains no training or evaluation implementation of its own.'
+  REQ-SEC-004: A multi-user or remote deployment refuses a request whose authority is only the Product
+    Actualizer loopback token assumption, and the refusal names the missing trust boundary rather than
+    silently admitting the request.
+  REQ-STACK-011: 'A product joins the world only through the product integration contract: a DomainForge
+    module for its types, links and operations; a read connector emitting provenance-bearing observations
+    into Cognate; capability bindings for actions, each covered by SEA-Forge policy; and optional RealityTrace
+    evidence hooks. A product that attempts to join by a route outside that contract is refused. Its integration
+    level (visible, queryable, actionable, evidenced) is derived from which facets are proven.'
+  REQ-CASE-002: The next primary move responds to material deviation. No primary recommendation is required
+    when only optional choices remain.
+  REQ-CONFIG-004: Configured provider endpoints, credentials, timeouts and scope remain below stable behavior
+    contracts.
+  REQ-RES-004: 'Predictive estimates may be observed to inform payment, consequence or ranking only after
+    governed activation: a frozen preregistered held-out criterion, retained evaluation evidence and an
+    authorized promotion. Active, heuristic and disabled estimator states are observed to be visible,
+    and estimates are never observed to change hard-gate outcomes.'
+  REQ-WORLD-008: An active world is observed to be selected through a DomainForge world alias pinned to
+    an immutable world_ref. A candidate-versus-active semantic diff may be observed to be a Horizon-derived
+    read-only view but is never observed to mint or verify identity.
+  REQ-STACK-013: A product with its own UI may be observed to be reachable as a hosted surface via deep
+    links that carry focus refs in and return typed intents or focus out. A hosted surface is never observed
+    to run inside Horizon's trust boundary or acquire Horizon authority.
+  REQ-NAV-005: The navigation controller avoids asking for context it can resolve without user burden.
+evaluated_by:
+  REQ-CONFIG-004:
+  - 'test/acceptance.test.ts :: AC-CONFIG-004-01'

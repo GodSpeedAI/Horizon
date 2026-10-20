@@ -7,7 +7,10 @@ RuntimeBoundaryError: RUNTIME: local_operator forbids an in-memory runtime; a du
 blocked competing-product-model: exit=1
 BOUNDARY: competing canonical model/authority store at product-model/process.yaml
 blocked duplicate-semantic-authority: exit=1
-BOUNDARY: duplicate semantic authority at other/model.sea; canonical model lives under .sea/
+BOUNDARY: duplicate semantic authority at other/model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+baseline canonical-closure-control: exit=0
+blocked duplicate-canonical-subtree: exit=1
+BOUNDARY: duplicate semantic authority at .sea/alternative/interaction-model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
 blocked false-world-ref: exit=1
 19 |   throw new SemanticAdapterError(`SEMANTIC: ${message}`);
 SemanticAdapterError: SEMANTIC: world identity mismatch: expected world:horizon@sha256:0000000000000000000000000000000000000000000000000000000000000000, observed world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0
@@ -18,9 +21,9 @@ blocked fake-runtime-substitution: exit=1, failing=3
   fails: structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact
 blocked missing-cognate-dependency-metadata: exit=1
 STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
-BOUNDARY: duplicate semantic authority at domain/research-artifacts.sea; canonical model lives under .sea/
-BOUNDARY: duplicate semantic authority at domain/product-integration-contract.sea; canonical model lives under .sea/
-observed missing-cognate-dependency-e2e: exit=0 (installed modules still resolve; `check-boundaries.ts` is the enforcing verification route)
+BOUNDARY: duplicate semantic authority at domain/research-artifacts.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+BOUNDARY: duplicate semantic authority at domain/product-integration-contract.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked missing-cognate-dependency-e2e: exit=1, failing=1
 
 teeth: all attacks blocked
 bash scripts/teeth-ledger-freeze.sh
@@ -39,12 +42,12 @@ dangling: exit=0 exit=0 Validation succeeded: 0 violations total
 BLIND SPOT CONFIRMED: dangling .sea accepted with no violation
 duplicate: exit=0 exit=0 Validation succeeded: 0 violations total
 BLIND SPOT CONFIRMED: duplicate .sea accepted with no violation
-control: exit=1 exit=1 Error: Parse failed for /tmp/tmpa0kcetmf/.sea/interaction/interaction-model.sea: resolved closure failed graph co
+control: exit=1 exit=1 Error: Parse failed for /tmp/tmp_5b6oxnw/.sea/interaction/interaction-model.sea: resolved closure failed graph co
 
 tooth: gate discriminates (control fails, and the two blind spots are proven)
 python3 scripts/teeth-idm-integrity.py
 null: exit=0 exit=0 - debt: .sea/interaction/interaction-model.sea:inv_simulation_never_changes_world requirement_ref 'REQ-
 dangling: exit=1 exit=1 - .sea/interaction/interaction-model.sea:inv_intent_idempotent requirement_ref 'REQ-DOES-NOT-EXIST-999'
-duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmpbwmsarqq/.sea/interaction/interaction-m
+duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmpk63tal0w/.sea/interaction/interaction-m
 
 tooth: referential integrity is enforced (dangling and duplicate both fail)

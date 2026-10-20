@@ -24,6 +24,7 @@ Exit 0 only if every ledger it read preserves every modal.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import re
 import sys
@@ -49,9 +50,14 @@ def counts(text: str) -> dict[str, int]:
     return {name: len(re.findall(pattern, text.lower())) for name, pattern in MODALS.items()}
 
 
-def _key(path: str, rid: str, missing: dict[str, int]) -> str:
-    """One baseline line per lost modal: `<ledger file name>: check-modals: <REQ>: loses <kind>`."""
-    return f"{os.path.basename(path)}: check-modals: {rid}: loses {', '.join(missing)}"
+def _key(label: str, rid: str, missing: dict[str, int], expected: str) -> str:
+    """One baseline line per contract: `<repo-relative ledger>: check-modals: <REQ>: loses <kind> @<digest>`.
+
+    The full path keeps the active and candidate ledgers apart; the digest binds the entry to
+    the contract text it was recorded against, so a regression is new (verdict r2 F4).
+    """
+    digest = hashlib.sha256(" ".join(expected.split()).encode("utf-8")).hexdigest()[:12]
+    return f"{label}: check-modals: {rid}: loses {', '.join(missing)} @{digest}"
 
 
 def main(argv: list[str]) -> int:
@@ -75,7 +81,7 @@ def main(argv: list[str]) -> int:
         baseline = {
             line.strip()
             for line in open(args.baseline, encoding="utf-8")
-            if line.strip() and not line.startswith("#")
+            if line.strip() and not line.startswith("#") and ": check-modals: " in line
         }
     for path in ledgers:
         label = os.path.relpath(os.path.abspath(path), REPO)
@@ -89,10 +95,17 @@ def main(argv: list[str]) -> int:
             wanted, got = counts(statement), counts(contract["expected"])
             missing = {name: wanted[name] for name in wanted if wanted[name] and not got[name]}
             if missing:
-                losses.append((contract["requirement"], missing))
+                losses.append((contract["requirement"], missing, _key(label, contract["requirement"], missing, contract["expected"])))
+        keys = {key for _, _, key in losses}
+        stale = sorted(line for line in baseline if line.split(": ", 1)[0] == label and line not in keys)
+        if stale:
+            failures += len(stale)
+            print(f"measure-contract-modals: FAILED — {label}: {len(stale)} stale baseline entr(y/ies); remove them")
+            for line in stale:
+                print(f"- stale: {line}")
         if losses:
-            known = [(rid, m) for rid, m in losses if _key(path, rid, m) in baseline]
-            new = [(rid, m) for rid, m in losses if _key(path, rid, m) not in baseline]
+            known = [(rid, m) for rid, m, key in losses if key in baseline]
+            new = [(rid, m) for rid, m, key in losses if key not in baseline]
             if known:
                 print(f"measure-contract-modals: {len(known)} known pre-existing loss(es) in {label} (DEBT D-020), not fatal")
                 for rid, missing in known:

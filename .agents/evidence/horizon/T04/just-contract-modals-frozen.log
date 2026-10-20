@@ -11,4 +11,4 @@ measure-contract-modals: FAILED — requirements/ledger.yaml: 10 contract(s) dro
 - REQ-STACK-012: loses prohibition
 - REQ-STACK-014: loses prohibition
 - REQ-UI-006: loses prohibition
-error: recipe `contract-modals-frozen` failed on line 40 with exit code 1
+error: recipe `contract-modals-frozen` failed on line 41 with exit code 1

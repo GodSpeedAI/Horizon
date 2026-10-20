@@ -5,58 +5,23 @@ boundaries: ok (.)
 python3 scripts/check-idm-integrity.py
 check-idm-integrity: OK (11 requirement references, 1 tolerated as recorded debt, 11 invariant ids unique)
 - debt: .sea/interaction/interaction-model.sea:inv_simulation_never_changes_world requirement_ref 'REQ-CMP-001' (see scripts/idm-integrity-debt.yaml)
-python3 scripts/check-acceptance-claims.py --ledger .agents/candidates/horizon/T04-CR-001/ledger.yaml --require-candidate
+python3 scripts/check-acceptance-claims.py
 check-acceptance-claims: OK (4 prohibitions preserved, 0 generic restatements with their subject intact)
 python3 scripts/check-witness-claims.py
-check-witness-claims: 9 known pre-existing finding(s) (DEBT D-020), not fatal:
-  ~ requirements/ledger.yaml: check-contract: REQ-CASE-003: the requirement uses SHOULD; the contract drops or strengthens it
-  ~ requirements/ledger.yaml: check-contract: REQ-DEV-001: adds the quantifier 'every'
-  ~ requirements/ledger.yaml: check-contract: REQ-NAV-002: drops the requirement's 'exactly'
-  ~ requirements/ledger.yaml: check-contract: REQ-STACK-004: adds the quantifier 'every'
-  ~ requirements/ledger.yaml: check-contract: REQ-STACK-011: adds the quantifier 'exactly'
-  ~ .agents/candidates/horizon/T04-CR-001/ledger.yaml: check-contract: REQ-DEV-001: adds the quantifier 'every'
-  ~ .agents/candidates/horizon/T04-CR-001/ledger.yaml: check-contract: REQ-NAV-002: drops the requirement's 'exactly'
-  ~ .agents/candidates/horizon/T04-CR-001/ledger.yaml: check-contract: REQ-STACK-004: adds the quantifier 'every'
-  ~ .agents/candidates/horizon/T04-CR-001/ledger.yaml: check-contract: REQ-STACK-011: adds the quantifier 'exactly'
-check-witness-claims: OK (196 contracts: 72 generic, 124 authored; no new policy)
+check-witness-claims: OK (196 contracts: 0 generic, 196 authored; no new policy)
+python3 scripts/measure-contract-modals.py --ledger requirements/ledger.yaml --baseline scripts/witness-claims-baseline.txt
+measure-contract-modals: 1 known pre-existing loss(es) in requirements/ledger.yaml (DEBT D-020), not fatal
+  ~ REQ-RES-001: loses prohibition
 bun test
 bun test v1.4.0 (34cbb9a40)
 
-test/config.test.ts:
-(pass) local_operator configuration > accepts a loopback local operator [0.23ms]
-(pass) local_operator configuration > refuses a non-loopback bind [0.09ms]
-(pass) local_operator configuration > refuses shared_remote without a real identity provider [0.02ms]
-(pass) local_operator configuration > keeps operator and agent principals distinct [0.10ms]
-(pass) local_operator configuration > issues a fresh 0600 secret on every launch [1.11ms]
-
-test/app.test.ts:
-(pass) durable store boundary > the configured store is a Cognate SQLite database that survives a close and reopen [3.81ms]
-(pass) structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen [238.91ms]
-(pass) structural walking skeleton > configured in-memory storage is rejected by construction, with no E2E override [247.91ms]
-(pass) structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable [91.73ms]
-(pass) structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact [64.88ms]
-(pass) structural walking skeleton > an absent research source is a typed absent observation, not a startup failure [37.79ms]
-
-test/acceptance.test.ts:
-(pass) AC-CASE-002-01 next primary move responds to material deviation > a deviation is answered by the first available move, which reports what it responds to [0.11ms]
-(pass) AC-CASE-002-01 next primary move responds to material deviation > a blocked choice is not a primary move even when it deviated (possibility is not an affordance) [0.05ms]
-(pass) AC-CASE-002-01 next primary move responds to material deviation > no deviation and only optional choices names no primary move [0.02ms]
-(pass) AC-CASE-002-01 next primary move responds to material deviation > an undertaken deviation that names nothing is refused, not silently accepted [0.08ms]
-(pass) AC-NAV-005-01 the controller does not ask for context the frame can resolve > each reference class the frame carries is resolved from the frame [0.09ms]
-(pass) AC-NAV-005-01 the controller does not ask for context the frame can resolve > an unknown checkpoint is not resolvable, and a conflicting value is not claimed [0.03ms]
-(pass) AC-CONFIG-004-01 configured provider endpoints stay below stable behavior contracts > typed choices, intent ids and surface blocks are unchanged when the configured endpoint and credential differ [164.67ms]
-
-test/ui.test.ts:
-(pass) renderer-neutral surface seam > projects a frame without executable markup and with sources on every block [0.13ms]
-(pass) renderer-neutral surface seam > marks agent-supplied values as agent sources [0.12ms]
-
- 20 pass
+ 14 pass
  0 fail
- 125 expect() calls
-Ran 20 tests across 4 files. [899.00ms]
+ 111 expect() calls
+Ran 14 tests across 4 files. [882.00ms]
 uv run --project research pytest -q
 ....                                                                     [100%]
-4 passed in 0.04s
+4 passed in 0.03s
 python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
 ledger: 0 error(s) in ledger.yaml
   ok: 98 requirements, 98 acceptance contracts
@@ -73,7 +38,10 @@ RuntimeBoundaryError: RUNTIME: local_operator forbids an in-memory runtime; a du
 blocked competing-product-model: exit=1
 BOUNDARY: competing canonical model/authority store at product-model/process.yaml
 blocked duplicate-semantic-authority: exit=1
-BOUNDARY: duplicate semantic authority at other/model.sea; canonical model lives under .sea/
+BOUNDARY: duplicate semantic authority at other/model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+baseline canonical-closure-control: exit=0
+blocked duplicate-canonical-subtree: exit=1
+BOUNDARY: duplicate semantic authority at .sea/alternative/interaction-model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
 blocked false-world-ref: exit=1
 19 |   throw new SemanticAdapterError(`SEMANTIC: ${message}`);
 SemanticAdapterError: SEMANTIC: world identity mismatch: expected world:horizon@sha256:0000000000000000000000000000000000000000000000000000000000000000, observed world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0
@@ -84,9 +52,9 @@ blocked fake-runtime-substitution: exit=1, failing=3
   fails: structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact
 blocked missing-cognate-dependency-metadata: exit=1
 STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
-BOUNDARY: duplicate semantic authority at domain/research-artifacts.sea; canonical model lives under .sea/
-BOUNDARY: duplicate semantic authority at domain/product-integration-contract.sea; canonical model lives under .sea/
-observed missing-cognate-dependency-e2e: exit=0 (installed modules still resolve; `check-boundaries.ts` is the enforcing verification route)
+BOUNDARY: duplicate semantic authority at domain/research-artifacts.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+BOUNDARY: duplicate semantic authority at domain/product-integration-contract.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked missing-cognate-dependency-e2e: exit=1, failing=1
 
 teeth: all attacks blocked
 bash scripts/teeth-ledger-freeze.sh
@@ -105,13 +73,13 @@ dangling: exit=0 exit=0 Validation succeeded: 0 violations total
 BLIND SPOT CONFIRMED: dangling .sea accepted with no violation
 duplicate: exit=0 exit=0 Validation succeeded: 0 violations total
 BLIND SPOT CONFIRMED: duplicate .sea accepted with no violation
-control: exit=1 exit=1 Error: Parse failed for /tmp/tmp8psiirhu/.sea/interaction/interaction-model.sea: resolved closure failed graph co
+control: exit=1 exit=1 Error: Parse failed for /tmp/tmpi8qeaycr/.sea/interaction/interaction-model.sea: resolved closure failed graph co
 
 tooth: gate discriminates (control fails, and the two blind spots are proven)
 python3 scripts/teeth-idm-integrity.py
 null: exit=0 exit=0 - debt: .sea/interaction/interaction-model.sea:inv_simulation_never_changes_world requirement_ref 'REQ-
 dangling: exit=1 exit=1 - .sea/interaction/interaction-model.sea:inv_intent_idempotent requirement_ref 'REQ-DOES-NOT-EXIST-999'
-duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmpdpiqthwy/.sea/interaction/interaction-m
+duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmp3b23dn_4/.sea/interaction/interaction-m
 
 tooth: referential integrity is enforced (dangling and duplicate both fail)
-gate-t04: ok — active frozen artifacts verified; T04-CR-001 candidate contracts verified; T04 settlement still requires an independent verdict
+gate-t04: ok — frozen artifacts (T04-CR-001@2026-10-20) verified

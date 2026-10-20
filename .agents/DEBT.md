@@ -106,6 +106,7 @@
 - Evidence: clause census in `.agents/evidence/horizon/T04/REMEDIATION.md`; `scripts/check-acceptance-claims.py` reports 65 failures against the frozen ledger and 0 against the candidate.
 - Confidence: high (directly observed)
 - Closure: covered by candidate revision T04-CR-001 for the frozen artifacts; per-requirement observables remain D-012's own work. Size S for the generator (done), L for the remaining contracts.
+- Status: CLOSED 2026-10-20 for the frozen artifacts: T04-CR-001 revision 3 applied and re-frozen (`T04-CR-001@2026-10-20`, DEC-T04-06). Per-requirement witnesses remain owning-task work.
 
 ## D-015 Frozen acceptance contracts invert four prohibitions (2026-10-19)
 - Location: `requirements/ledger.yaml` (`AC-INT-004-01`, `AC-STACK-006-01`, `AC-STACK-012-01`, `AC-UI-006-01`), `.wayfinder/answer-key.md`, `scripts/gen-requirement-ledger.py`
@@ -121,6 +122,7 @@
 - Evidence: `just acceptance-claims` passes on the candidate; `just acceptance-claims-frozen` fails on the active ledger, by design.
 - Confidence: high
 - Closure: close this entry when a new freeze replaces the inverted contracts. Do not close it on the strength of the generator fix alone.
+- Status: CLOSED 2026-10-20 for the frozen artifacts: T04-CR-001 revision 3 applied and re-frozen (`T04-CR-001@2026-10-20`, DEC-T04-06).
 
 ## D-016 Canonical `.sea` binds an invariant to a requirement that does not exist (2026-10-19)
 - Location: `.sea/interaction/interaction-model.sea:728` (`inv_simulation_never_changes_world` → `REQ-CMP-001`)
@@ -143,26 +145,26 @@
 - Confidence: high (directly observed)
 - Closure: capture `status=$?` before reassigning `rc` (done in this session) and never summarise a target's status without capturing it first. Size S.
 
-## D-019 REQ-CONFIG-004 names provider controls Horizon does not have (2026-10-19)
+## D-019 REQ-CONFIG-004 names provider controls Horizon does not have (2026-10-19, updated 2026-10-20)
 - Date: 2026-10-19
 - Location: `.agents/specs/horizon.agent.spec.yaml:576` (`REQ-CONFIG-004`), `src/config/types.ts:21` (`HorizonConfig`), `test/acceptance.test.ts` (`AC-CONFIG-004-01`)
-- Debt: The frozen requirement says "Configured provider endpoints, credentials, timeouts and scope MUST remain below stable behavior contracts", but `HorizonConfig` declares no provider endpoint, timeout or scope: the closest real controls are `bind_host`, `port`, `secrets.path` and `identity.source`. The corrected witness (criticism round 1) therefore exercises the endpoint and credential path it can observe and states plainly that configurable provider timeouts and scopes are unproven. Nothing in the ledger should claim they are covered until the runtime has such controls.
-- Evidence: `HorizonConfig` has no provider field; the first draft of the witness compared two object literals neither application read, and the shipped `config/horizon.toml` declares no provider section.
+- Debt: The frozen requirement says "Configured provider endpoints, credentials, timeouts and scope MUST remain below stable behavior contracts". The only configured provider is the research subsystem (`research_command`); no provider declares credentials, timeouts or scope. Revision 2's witness varied Horizon's own `bind_host`/`port` and `secrets.path` and called them provider configuration (independent verdict r2 F3). Revision 3's witness varies the research provider endpoint only and is recorded as PARTIAL; credentials, timeouts and scope remain unproven.
+- Evidence: `HorizonConfig` has no provider credential, timeout or scope field; `scripts/ledger-policy.candidate.yaml` `REQ-CONFIG-004.witness_supplies` begins "PARTIAL".
 - Confidence: high (directly observed in code and config)
-- Closure: either declare the provider controls the requirement assumes, or amend REQ-CONFIG-004 in a new frozen spec version to name the controls Horizon actually has. Size M.
+- Closure: either declare the provider controls the requirement assumes and extend the witness, or amend REQ-CONFIG-004 in a new frozen spec version to name the controls Horizon actually has. Size M.
 
-## D-020 Pre-existing contracts add or drop policy relative to their requirement (2026-10-19)
+## D-020 Contract findings carried by the witness-claims baseline (2026-10-19, updated 2026-10-20)
 - Date: 2026-10-19
-- Location: `requirements/ledger.yaml` (`REQ-CASE-003`, `REQ-DEV-001`, `REQ-NAV-002`, `REQ-STACK-004`, `REQ-STACK-011`), inheriting into `.agents/candidates/horizon/T04-CR-001/ledger.yaml`
-- Debt: Outside the contracts this revision corrected, five acceptance contracts still do not preserve their requirement's meaning: `REQ-CASE-003` drops the `SHOULD` in "should settle now"; `REQ-NAV-002` replaces "exactly the canonical keys" with "any key outside ... is rejected"; `REQ-DEV-001` and `REQ-STACK-004` add "every"; `REQ-STACK-011` adds "exactly" and rewrites "Joins the world only through the contract" as facet observability. `REQ-RES-001` and `REQ-STACK-014` restate prohibitions as positive outcomes ("runs as a Python process", "continues to operate") and are measured by `scripts/measure-contract-modals.py`. These are the same defect class as criticism round 1, but they predate the candidate and are untouched by it, so they are recorded rather than silently repaired.
-- Evidence: `python3 scripts/check-witness-claims.py` reports them as known findings (`scripts/witness-claims-baseline.txt`); `just contract-modals-frozen` reports the modal losses on the active ledger.
-- Confidence: high (directly observed and reproduced mechanically)
-- Closure: repair each in the owning task's contract work (or in a follow-up candidate revision) with a witness that observes the requirement's own words; do not promote a baseline entry to acceptance. Size M.
+- Location: `scripts/witness-claims-baseline.txt`, `scripts/check-witness-claims.py`, `scripts/measure-contract-modals.py`
+- Debt: Revision 2 baselined eleven check-contract lines and fourteen check-modals lines and called the candidate's inherited DEV-001, NAV-002, STACK-004, STACK-011 and STACK-014 contracts "pre-existing debt". Independent verdict r2 ruled them DEFECT (F2) and showed the baseline was keyed by file basename, so a candidate entry could suppress an active finding and a repaired CASE-003 contract could regress silently (F4). Revision 3 rewrites the five contracts, keys entries by full ledger path plus a contract-text digest, fails on stale entries, and adds `contract-modals` to `gate-t04`. After the 2026-10-20 re-freeze the only entries are REQ-RES-001 for the active and the applied candidate ledger, a lexical false positive the verdict ruled ACCEPTABLE-DIFFERENCE. The checkers remain lexical; neither establishes semantic equivalence.
+- Evidence: `just witness-claims` (5 known, 0 new, 0 stale); `just contract-modals` (1 known); attacks in `.agents/evidence/horizon/T04/gates.txt`.
+- Confidence: high (reproduced mechanically)
+- Closure: the five active entries were deleted at the re-freeze. Keep the RES-001 entry only while its contract text is unchanged; a lexical checker with a "contains no" pattern would retire it. Size S.
 
 ## D-021 The requirements author has no committed artifact witnesses (2026-10-19)
 - Date: 2026-10-19
 - Location: `.wayfinder/answer-key.md`, `requirements/ledger.yaml`
-- Debt: All 98 requirements are marked `evidence_class: "declared"` with `status: "active"` in the canonical `.sea`, and the frozen ledger records no acceptance-evidence binding per requirement; the Wayfinder lists only the gate command. A contractual acceptance claim can therefore cite a gate that exercises a different behavior. The candidate revision's witness bindings live in the candidate policy only and are not represented per requirement in the ledger.
+- Debt: All 98 requirements are marked `evidence_class: "declared"` with `status: "active"` in the canonical `.sea`, and the frozen ledger records no acceptance-evidence binding per requirement; the Wayfinder lists only the gate command. A contractual acceptance claim can therefore cite a gate that exercises a different behavior. The candidate revision's witness bindings (revision 3: only REQ-CONFIG-004, partial) live in the candidate policy only and are not represented per requirement in the ledger.
 - Evidence: `requirements/ledger.yaml` rows carry `proof` (gate commands) and `acceptance` (ids), no evidence reference; the `.sea` invariants all read `evidence_class: "declared"`.
 - Confidence: medium (code and schema reading, not observed failing a gate)
 - Closure: add an `acceptance_evidence` binding per requirement (path plus test name) to the ledger schema, emitted by the generator from `evaluated_by`, and validate it in `just wayfinder`. Size M.

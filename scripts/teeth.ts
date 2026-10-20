@@ -31,7 +31,9 @@ function failedTests(output: string): string[] {
 }
 
 function checkControl(id: string, result: Result): void {
-  const passed = (result.output.match(/^\(pass\)/gm) ?? []).length;
+  // Read the summary line: Bun omits per-test "(pass)" lines in some environments (it
+  // quiets passing tests when it detects an agent session), but always prints "N pass".
+  const passed = Number(result.output.match(/^\s*(\d+) pass$/m)?.[1] ?? 0);
   const ok = result.exit === 0 && passed > 0;
   console.log(`${ok ? "baseline" : "BROKEN"} ${id}: exit=${result.exit}, passed=${passed}`);
   if (!ok) {
@@ -90,6 +92,21 @@ function check(id: string, result: Result, needle: string): void {
   mkdirSync(join(root, "other"), { recursive: true });
   writeFileSync(join(root, "other", "model.sea"), "namespace other\n");
   check("duplicate-semantic-authority", await run(["bun", "run", join(process.cwd(), "scripts/check-boundaries.ts"), "--root", root]), "duplicate semantic authority");
+}
+
+{
+  // A byte-for-byte copy of the full canonical entry *inside* `.sea/` is still a second
+  // authority (verdict r2 F6): only the entry's import closure is canonical.
+  const root = tempRoot("duplicate-canonical-subtree");
+  copyManifest(root);
+  cpSync(realpathSync(".sea"), join(root, ".sea"), { recursive: true });
+  const control = await run(["bun", "run", join(process.cwd(), "scripts/check-boundaries.ts"), "--root", root]);
+  const controlOk = control.exit === 0;
+  console.log(`${controlOk ? "baseline" : "BROKEN"} canonical-closure-control: exit=${control.exit}`);
+  if (!controlOk) failures.push("canonical-closure-control: the unmodified canonical closure must pass before its attack means anything");
+  mkdirSync(join(root, ".sea", "alternative"), { recursive: true });
+  copyFileSync(join(root, ".sea", "interaction", "interaction-model.sea"), join(root, ".sea", "alternative", "interaction-model.sea"));
+  check("duplicate-canonical-subtree", await run(["bun", "run", join(process.cwd(), "scripts/check-boundaries.ts"), "--root", root]), "duplicate semantic authority at .sea/alternative/interaction-model.sea");
 }
 
 {
@@ -161,13 +178,14 @@ async function isolatedTree(): Promise<string> {
       await run(["bun", "run", join(process.cwd(), "scripts/check-boundaries.ts"), "--root", root, "--package", manifestPath], root),
       "missing required Cognate dependency @godspeedai/cognate-domainforge",
     );
-    // ...while metadata removal alone leaves installed modules usable: the E2E still passes,
-    // because `check-boundaries.ts` (the real verification route) is what enforces it. The
-    // tooth records the observed value so a change in that boundary is noticed, rather than
-    // asserting a discriminator this E2E does not have.
+    // ...and the structural E2E must fail too, although the installed module still resolves:
+    // the prereg falsifier is "remove the required Cognate project dependency and the
+    // structural E2E still passes" (verdict r2 F1; before revision 3 this arm exited 0).
     const e2e = await run(["bun", "test", "test/app.test.ts"], root);
-    console.log(`observed missing-cognate-dependency-e2e: exit=${e2e.exit} (installed modules still resolve; ` +
-      "`check-boundaries.ts` is the enforcing verification route)");
+    const failed = failedTests(e2e.output);
+    const ok = e2e.exit !== 0 && failed.some((name) => name.includes("source world -> frame"));
+    console.log(`${ok ? "blocked" : "LEAKED"} missing-cognate-dependency-e2e: exit=${e2e.exit}, failing=${failed.length}`);
+    if (!ok) failures.push("missing-cognate-dependency-e2e: the structural E2E passed with a required Cognate dependency removed from metadata");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

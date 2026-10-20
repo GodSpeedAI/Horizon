@@ -12,7 +12,7 @@ generated_from:
   - .sea/interaction/research-artifacts.sea
   - .sea/interaction/product-integration-contract.sea
   policy: .agents/candidates/horizon/T04-CR-001/composed/ledger-policy.yaml
-  policy_sha256: e54d86be904558cc473b95880682b12ca2eeeea3437400c9f387e942d3a92860
+  policy_sha256: 4bc84acab788299433863483f857ab2079682755c9608d753c8613ef3cb8c670
   generator: scripts/gen-requirement-ledger.py
 population: 'candidate at T04. At freeze, scripts/freeze-formation.sh replaces freeze_hash with the sha256 of this document with the marker normalised to ''candidate'' (fragment digest: a document cannot contain its own whole-file sha256). The Wayfinder freeze header''s hashes block is authoritative: it records the whole-file sha256 of this ledger as written. scripts/check-ledger-freeze.sh verifies both and their agreement.'
 unmapped_requirements: []
@@ -4766,7 +4766,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-DEV-001-01
   requirement: REQ-DEV-001
-  expected: Every operation's outcome, including refusals and failed attempts, is retained with its references and remains available to later developmental evaluation.
+  expected: Failure, contradictions, recovery, payment and orchestration burden each remain available to developmental evaluation; none of the five is observed to be missing from what developmental evaluation can read.
   gate_command: *id013
   status: candidate
 - id: AC-DEV-002-01
@@ -4831,7 +4831,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-NAV-002-01
   requirement: REQ-NAV-002
-  expected: An affordance assessment carrying any key outside visibility, reach, payment, authority, capability, recovery and settlement_access is rejected, not ignored.
+  expected: 'Affordance gates use exactly the canonical keys visibility, reach, payment, authority, capability, recovery and settlement_access: an assessment missing one of the seven keys is rejected, and an assessment carrying a key outside them is rejected.'
   gate_command: *id026
   status: candidate
 - id: AC-NAV-003-01
@@ -4986,7 +4986,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-STACK-004-01
   requirement: REQ-STACK-004
-  expected: Bounded long-horizon work runs only through Gauntlet, and the run's Reference is frozen at start and preserved unchanged through every later observation.
+  expected: 'Gauntlet is used only for tasks that require bounded long-horizon work: a task that does not require bounded long-horizon work is never observed to run through Gauntlet. Gauntlet freezes its Reference at the start of a run and preserves it unchanged for the rest of the run. The restriction is on what Gauntlet is used for; it does not make Gauntlet the sole executor of bounded long-horizon work.'
   gate_command: *id057
   status: candidate
 - id: AC-STACK-005-01
@@ -5021,7 +5021,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-STACK-011-01
   requirement: REQ-STACK-011
-  expected: For a joined product, each proven facet (types and links, provenance-bearing read observations, SEA-Forge-covered action bindings, RealityTrace evidence hooks) is individually observable, an unproven facet is absent rather than assumed, and the product's reported integration level follows exactly the facets proven.
+  expected: 'A product joins the world only through the product integration contract: a DomainForge module for its types, links and operations; a read connector emitting provenance-bearing observations into Cognate; capability bindings for actions, each covered by SEA-Forge policy; and optional RealityTrace evidence hooks. A product that attempts to join by a route outside that contract is refused. Its integration level (visible, queryable, actionable, evidenced) is derived from which facets are proven.'
   gate_command: *id064
   status: candidate
 - id: AC-STACK-012-01
@@ -5036,7 +5036,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-STACK-014-01
   requirement: REQ-STACK-014
-  expected: Every stack owner and joined product continues to operate through its own public surface with Horizon stopped or uninstalled, and Horizon holds no requirement that a product change to accommodate it.
+  expected: 'Dependency is one-way: every stack owner (DomainForge, Cognate, SEA-Forge, Gauntlet, RealityTrace, Context Kernel) and every joined product remains fully operable with Horizon stopped or absent. Horizon is never observed to require changes that make a product depend on Horizon, and Horizon''s integration with each product uses that product''s own public surfaces; a product unaware of Horizon is a valid product.'
   gate_command: *id067
   status: candidate
 - id: AC-UI-001-01
