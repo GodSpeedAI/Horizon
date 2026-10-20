@@ -231,6 +231,15 @@
 - Closure: Have `just verify` (or a pre-commit check) report ahead/behind and refuse to report green when behind on a fetched remote. Files likely touched: `justfile`, a small `scripts/check-sync.ts`. Size S.
 
 
+## D-030 The T05 boundary check keeps its findings in module-level state (2026-10-20)
+- Date: 2026-10-20
+- Location: `scripts/check-t05-boundaries.ts` (`checkT05Boundaries`), and the pattern it sets for the newer T05 checks
+- Debt: `checkT05Boundaries(root)` accumulates into module-scoped arrays, so calling it twice in one process mixes the first run's findings into the second. The teeth tolerate it today only because each tooth builds a fresh tree and reads `result.failures` before the next call. A caller that compares two trees in one process (which is what a coverage-of-coverage check would want to do) would read a merged result. `check-t05-prereg-coverage.ts` was written the same way and hit this during its own teeth; it now resets its buffers at entry and returns a copy, but the boundary check still has the hazard.
+- Evidence: observed while writing `scripts/teeth-t05-prereg-coverage.ts` — a second call in the same process reported the first run's messages, and a hoisted duplicate `fail()` inside `gateProof` shadowed the collecting one so failures were printed but never recorded.
+- Confidence: high (directly observed in the coverage check's own teeth; the boundary check's shape was read, not exercised twice)
+- Closure: make both checks return their findings from a local accumulator instead of module state (or reset at entry and return a copy), then add a tooth that calls the check twice with different trees and asserts the second answer is not contaminated by the first. Files likely touched: `scripts/check-t05-boundaries.ts`, `scripts/teeth-t05-boundaries.ts`. Size S.
+
+
 
 ## D-027 No end-to-end journey exercises a conflicting human/agent layout claim (2026-10-20)
 - Date: 2026-10-20
