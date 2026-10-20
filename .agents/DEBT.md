@@ -233,6 +233,15 @@
 
 ## D-030 The T05 boundary check keeps its findings in module-level state (2026-10-20)
 - Date: 2026-10-20
+
+## D-031 The operational layer reads whole projections on every query (2026-10-20)
+- Date: 2026-10-20
+- Location: `src/adapters/operational-objects.ts` (`readProjection`, `queryObjects`, `traverse`)
+- Debt: Every query and every traversal calls `catchUp` and then materialises the projection's entire state via `readProjectionSnapshot`, filtering in process. Cost is therefore O(projection size) per request, and a traversal costs another full read for its starting query. Adequate for the durable fixture (6 objects) and honest in the SUMMARY, but it will not hold for a large operational world: a handful of concurrent operators on a realistic projection would each pay for the whole set.
+- Evidence: `readProjection` reads `snapshot.rows` in full and `traverse` calls `readProjection` directly; `SUMMARY.md` records "cost scales with projection size; no scale claim".
+- Confidence: medium (mechanism read and exercised, but no large-world measurement was taken — this is a design cost, not an observed failure)
+- Closure: the real fix is upstream (predicate query / traversal in Cognate, already recorded in D-002); a local mitigation is an index projection keyed for the filter being asked, kept derived and rebuildable. Files likely touched: `src/adapters/operational-objects.ts`, a new projection under `src/projections/`. Size M, and should be justified by a measured slow query rather than by this note.
+
 - Location: `scripts/check-t05-boundaries.ts` (`checkT05Boundaries`), and the pattern it sets for the newer T05 checks
 - Debt: `checkT05Boundaries(root)` accumulates into module-scoped arrays, so calling it twice in one process mixes the first run's findings into the second. The teeth tolerate it today only because each tooth builds a fresh tree and reads `result.failures` before the next call. A caller that compares two trees in one process (which is what a coverage-of-coverage check would want to do) would read a merged result. `check-t05-prereg-coverage.ts` was written the same way and hit this during its own teeth; it now resets its buffers at entry and returns a copy, but the boundary check still has the hazard.
 - Evidence: observed while writing `scripts/teeth-t05-prereg-coverage.ts` — a second call in the same process reported the first run's messages, and a hoisted duplicate `fail()` inside `gateProof` shadowed the collecting one so failures were printed but never recorded.
