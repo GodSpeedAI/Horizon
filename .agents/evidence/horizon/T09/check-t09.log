@@ -1,0 +1,11 @@
+bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/T09.prereg.yaml
+  ok   .agents/prereg/horizon/T09.prereg.yaml: 10 positive + 8 negative expectations are structural members
+  ok   .agents/prereg/horizon/T09.prereg.yaml: no id is declared only as text, and every id token resolves to a member
+prereg shape: ok
+bun test test/workspace-model.test.ts test/workspace-render.test.tsx
+bun test v1.4.0 (34cbb9a40)
+
+ 16 pass
+ 0 fail
+ 77 expect() calls
+Ran 16 tests across 2 files. [406.00ms]

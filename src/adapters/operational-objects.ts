@@ -46,6 +46,8 @@ const SCHEMA_VERSION = "horizon.operational-objects/1";
 /** The declared vocabulary of the pinned world. Absent declarations are refused, never guessed. */
 export interface DeclaredWorld {
   readonly world_ref: string;
+  /** The Cognate tenant partition the operational rows belong to. Public projections are keyed `<tenant>/<key>`. */
+  readonly tenant: string;
   readonly types: ReadonlySet<SemanticRef>;
   readonly relations: ReadonlySet<RelationTypeRef>;
 }
@@ -92,6 +94,7 @@ export async function readProjection(
   }
 
   const snapshot = await readSnapshot(store, OPERATIONAL_OBJECTS_PROJECTION.name);
+  const tenantPrefix = `${world.tenant}/`;
   // No checkpoint means the projection has never been committed. That is the genuine "nothing
   // has been recorded yet" case, and it is *empty*, not unavailable: Cognate's runner does not
   // commit a checkpoint when there were no events to fold, so requiring one would report a
@@ -101,11 +104,15 @@ export async function readProjection(
   const links: OperationalLinkV1[] = [];
   const errors: { key: string; code: string; message: string }[] = [];
   for (const row of snapshot.rows) {
-    if (row.key.startsWith("object/")) objects.push(row.value as unknown as OperationalObjectV1);
-    else if (row.key.startsWith("link/")) links.push(row.value as unknown as OperationalLinkV1);
-    else if (row.key.startsWith("error/")) {
+    // Public projection state is tenant-partitioned. A row outside this tenant is not ours to
+    // read, even when the same store also holds another observer's objects.
+    if (!row.key.startsWith(tenantPrefix)) continue;
+    const key = row.key.slice(tenantPrefix.length);
+    if (key.startsWith("object/")) objects.push(row.value as unknown as OperationalObjectV1);
+    else if (key.startsWith("link/")) links.push(row.value as unknown as OperationalLinkV1);
+    else if (key.startsWith("error/")) {
       const entry = row.value as { code?: unknown; message?: unknown };
-      errors.push({ key: row.key, code: String(entry.code ?? "unknown"), message: String(entry.message ?? "") });
+      errors.push({ key, code: String(entry.code ?? "unknown"), message: String(entry.message ?? "") });
     }
   }
   return {
@@ -458,7 +465,7 @@ export async function recordObject(
   if (!world.types.has(object.semantic_ref)) {
     throw new OperationalObjectError("undeclared", `semantic type ${object.semantic_ref} is not declared in ${worldRef}`);
   }
-  return commit(store, worldRef, OBJECT_EVENTS.objectRecorded, object.object_ref, object);
+  return commit(store, world.tenant, worldRef, OBJECT_EVENTS.objectRecorded, object.object_ref, object);
 }
 
 export async function recordLink(
@@ -482,7 +489,7 @@ export async function recordLink(
       throw new OperationalObjectError("dangling", `link endpoint ${endpoint} is not a projected object`);
     }
   }
-  return commit(store, worldRef, OBJECT_EVENTS.linkRecorded, `${link.from}->${link.to}`, link);
+  return commit(store, world.tenant, worldRef, OBJECT_EVENTS.linkRecorded, `${link.from}->${link.to}`, link);
 }
 
 export async function recordLineage(
@@ -498,7 +505,7 @@ export async function recordLineage(
   if (!view.objects.some((object) => object.object_ref === edge.object_ref)) {
     throw new OperationalObjectError("dangling", `lineage object ${edge.object_ref} is not a projected object`);
   }
-  return commit(store, worldRef, OBJECT_EVENTS.lineageRecorded, edge.observation_ref, edge);
+  return commit(store, world.tenant, worldRef, OBJECT_EVENTS.lineageRecorded, edge.observation_ref, edge);
 }
 
 async function currentView(store: DurableStore, world: DeclaredWorld, worldRef: string): Promise<ProjectionView> {
@@ -510,6 +517,7 @@ async function currentView(store: DurableStore, world: DeclaredWorld, worldRef: 
 /** One append, through the durable store. The event carries its own world and object identity. */
 async function commit(
   store: DurableStore,
+  tenant: string,
   worldRef: string,
   eventType: string,
   streamKey: string,
@@ -528,7 +536,7 @@ async function commit(
             eventType,
             schemaVersion: 1,
             occurredAt,
-            tenant: `world:${worldRef}`,
+            tenant,
             correlationId: `corr-${streamKey}`,
             causationId: null,
             runId: null,

@@ -245,7 +245,7 @@ describe("T06 operational object layer — negative evidence (NE-01…NE-09)", (
     // ordering guarantee NE-09 needs is the explicit sort, so this asserts it where it lives: two
     // orderings of the same rows must produce the same answer.
     const rows = (await store.listProjection("horizon.operational-objects"))
-      .filter((row) => row.key.startsWith("object/"))
+      .filter((row) => row.key.startsWith(`${world.tenant}/object/`))
       .map((row) => row.value as { object_ref: string });
     const references = rows.map((row) => row.object_ref);
     expect(references.length).toBe(before.items.length);

@@ -50,14 +50,14 @@ export const OPERATIONAL_RELATIONS: readonly RelationTypeRef[] = [
   "entity.lineage_of",
 ] as const;
 
-export function declaredWorld(worldRef = FIXTURE_WORLD_REF): DeclaredWorld {
+export function declaredWorld(worldRef = FIXTURE_WORLD_REF, tenant = "local:test"): DeclaredWorld {
   const world = loadWorld(worldRef);
   const types = new Set<SemanticRef>();
   for (const object of world.projection.objects) {
     if (object.kind === "Entity" || object.kind === "EntityInstance") types.add(object.ref.id as SemanticRef);
   }
   const relations = new Set<RelationTypeRef>(OPERATIONAL_RELATIONS);
-  return { world_ref: world.worldRef, types, relations };
+  return { world_ref: world.worldRef, tenant, types, relations };
 }
 
 function provenance(connector: string, position: number, observedAt: string) {
@@ -119,8 +119,9 @@ export function fixtureLineage(observedAt: string): LineageEdgeV1[] {
 export async function seedOperationalFixture(
   store: DurableStore,
   worldRef = FIXTURE_WORLD_REF,
+  tenant = "local:test",
 ): Promise<{ readonly world: DeclaredWorld; readonly objects: number; readonly links: number }> {
-  const world = declaredWorld(worldRef);
+  const world = declaredWorld(worldRef, tenant);
   // Fail loudly if the pinned world stops declaring a fixture type: the fixture is a claim about
   // *this* world, and a silent fallback would hide a world change.
   for (const type of FIXTURE_TYPES) {

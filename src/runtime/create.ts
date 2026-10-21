@@ -8,6 +8,7 @@ import type { LoadedWorld } from "../adapters/semantic.ts";
 import { healthAgent } from "../agents/health.ts";
 import { semanticWorldComponent } from "../capabilities/semantic.ts";
 import { navigationContextProjection } from "../projections/navigation-context.ts";
+import { operationalObjectsProjection } from "../projections/operational-objects.ts";
 
 export class RuntimeBoundaryError extends Error {
   override readonly name = "RuntimeBoundaryError";
@@ -79,7 +80,10 @@ export async function createHorizonRuntime(
     actions,
     agents: options.agents ?? [healthAgent],
     components: [semanticWorldComponent(world), ...(options.components ?? [])],
-    projections: [{ projection: navigationContextProjection, public: true }],
+    projections: [
+      { projection: navigationContextProjection, public: true },
+      { projection: operationalObjectsProjection, public: true },
+    ],
     tickMs: 5,
   });
   return { runtime, caller: options.caller, storePath };

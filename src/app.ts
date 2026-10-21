@@ -15,7 +15,7 @@ import { buildCommitIntent, type CommitIntentInput, type CommitIntentOutput } fr
 import type { NavigationFrame as NavigationFrameV2 } from "./domain/navigation.ts";
 import type { SemanticRef } from "./domain/operational.ts";
 import { buildOperationalFrame } from "./adapters/navigation.ts";
-import { checkpointOf, readProjection, type DeclaredWorld } from "./adapters/operational-objects.ts";
+import { checkpointOf, readProjection, type DeclaredWorld, type ProjectionView } from "./adapters/operational-objects.ts";
 import {
   bindingContextOf,
   canonicalIntent,
@@ -30,6 +30,8 @@ import {
 } from "./ui/surface.ts";
 import { publishSurfaceSchema, SURFACE_SCHEMA, type SurfaceRole } from "./ui/surface2/grammar.ts";
 import { renderHtml, renderText } from "./ui/surface2/render.ts";
+import { buildWorkspace, type WorkspaceFrameRef, type WorkspaceSnapshot, type WorkspaceTheme } from "./ui/workspace/model.ts";
+import { renderWorkspacePage } from "./ui/workspace/render.tsx";
 import type { Server } from "bun";
 
 type HttpServer = Server<unknown>;
@@ -47,6 +49,23 @@ export interface SurfaceIntentRequestBody {
   /** CLI/MCP: the operation the caller named. */
   readonly operation?: unknown;
   readonly frame_id?: unknown;
+}
+
+export interface NavigationOptions {
+  readonly focusRef?: string;
+  readonly caseRef?: string;
+  readonly purpose?: string;
+  readonly directionRef?: string;
+  readonly directionStatement?: string;
+}
+
+export interface WorkspaceData {
+  readonly frame: NavigationFrameV2;
+  readonly view: GuiView;
+  readonly objects: readonly import("./domain/operational.ts").OperationalObjectV1[];
+  readonly links: readonly import("./domain/operational.ts").OperationalLinkV1[];
+  readonly current: WorkspaceFrameRef;
+  readonly snapshot: WorkspaceSnapshot;
 }
 
 export interface IntentCommit {
@@ -71,13 +90,9 @@ export interface HorizonApplication {
    * It is a real Cognate read, not a renderer fixture; an empty projection becomes an honest
    * "focus absent" deviation rather than a fabricated move.
    */
-  navigationFrame(options?: {
-    readonly focusRef?: string;
-    readonly caseRef?: string;
-    readonly purpose?: string;
-    readonly directionRef?: string;
-    readonly directionStatement?: string;
-  }): Promise<NavigationFrameV2>;
+  navigationFrame(options?: NavigationOptions): Promise<NavigationFrameV2>;
+  /** The GUI's data seam: one navigation read, one closed surface projection and the same frame. */
+  workspace(options?: NavigationOptions & { readonly evidenceRef?: string; readonly theme?: WorkspaceTheme }): Promise<WorkspaceData>;
   commitNavigationIntent(request: { readonly operationRef: string; readonly intentId?: string }): Promise<IntentCommit>;
   /** Submit a pre-built intent (e.g. one a surface composed): same validation and audit. */
   submitIntent(intent: CommitIntentInput): Promise<IntentCommit>;
@@ -283,23 +298,17 @@ export async function createApplication(
    * relation declarations are not invented here, because the T08 adapter only inspects objects
    * and their already-projected links.
    */
-  async function navigationFrame(options: {
-    readonly focusRef?: string;
-    readonly caseRef?: string;
-    readonly purpose?: string;
-    readonly directionRef?: string;
-    readonly directionStatement?: string;
-  } = {}): Promise<NavigationFrameV2> {
+  async function readNavigation(options: NavigationOptions = {}): Promise<{ readonly frame: NavigationFrameV2; readonly projection: ProjectionView }> {
     const types = new Set<SemanticRef>();
     for (const object of world.projection.objects) {
       if (object.kind === "Entity" || object.kind === "EntityInstance") types.add(object.ref.id as SemanticRef);
     }
-    const declared: DeclaredWorld = { world_ref: world.worldRef, types, relations: new Set() };
+    const declared: DeclaredWorld = { world_ref: world.worldRef, tenant: caller.tenant, types, relations: new Set() };
     const read = await readProjection(runtime.runtime.store, declared, world.worldRef);
     if (!read.ok) throw new Error(`NAVIGATION: operational projection is unavailable: ${read.reason}`);
     const objects = [...read.view.objects].sort((left, right) => (left.object_ref < right.object_ref ? -1 : left.object_ref > right.object_ref ? 1 : 0));
     const focus = options.focusRef ?? objects[0]?.object_ref ?? `focus:${world.worldRef}`;
-    return buildOperationalFrame(
+    const frame = buildOperationalFrame(
       {
         observer_ref: caller.actor.id,
         tenant_ref: caller.tenant,
@@ -314,6 +323,28 @@ export async function createApplication(
         declared,
       },
     ).frame;
+    return { frame, projection: read.view };
+  }
+
+  async function navigationFrame(options: NavigationOptions = {}): Promise<NavigationFrameV2> {
+    return (await readNavigation(options)).frame;
+  }
+
+  async function workspace(options: NavigationOptions & { readonly evidenceRef?: string; readonly theme?: WorkspaceTheme } = {}): Promise<WorkspaceData> {
+    const { frame, projection } = await readNavigation(options);
+    const surface = surfaceFor("human");
+    if (!surface.ok) throw new Error(`WORKSPACE: surface projection is unavailable: ${surface.code}`);
+    const current: WorkspaceFrameRef = { frame_id: frame.frame_id, revision: frame.revision };
+    const snapshot = buildWorkspace({
+      frame,
+      view: surface.view,
+      objects: projection.objects,
+      links: projection.links,
+      current,
+      ...(options.evidenceRef === undefined ? {} : { evidenceRef: options.evidenceRef }),
+      ...(options.theme === undefined ? {} : { theme: options.theme }),
+    });
+    return { frame, view: surface.view, objects: projection.objects, links: projection.links, current, snapshot };
   }
 
   return {
@@ -325,6 +356,7 @@ export async function createApplication(
     frames,
     frame: () => issued,
     navigationFrame,
+    workspace,
     commitNavigationIntent,
     submitIntent,
     startObservation,
@@ -410,6 +442,74 @@ export async function createApplication(
             return outcome.ok
               ? Response.json({ ok: true, intent: outcome.bound, committed: outcome.result })
               : Response.json({ ok: false, code: outcome.code, message: outcome.message }, { status: 409 });
+          }
+          if (url.pathname === "/workspace" && request.method === "GET") {
+            const theme = url.searchParams.get("theme") === "light" ? "light" as const : "dark" as const;
+            const evidenceRef = url.searchParams.get("evidence");
+            const data = await workspace({
+              ...(url.searchParams.get("focus") === null ? {} : { focusRef: url.searchParams.get("focus") as string }),
+              ...(evidenceRef === null ? {} : { evidenceRef }),
+              theme,
+            });
+            const html = await renderWorkspacePage({
+              service: runtime.runtime.service,
+              caller,
+              frame: data.frame,
+              view: data.view,
+              current: data.current,
+              evidenceRef,
+              theme,
+              expectedObjects: data.objects.length,
+            });
+            return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/workspace.json" && request.method === "GET") {
+            const theme = url.searchParams.get("theme") === "light" ? "light" as const : "dark" as const;
+            const evidenceRef = url.searchParams.get("evidence");
+            const data = await workspace({
+              ...(url.searchParams.get("focus") === null ? {} : { focusRef: url.searchParams.get("focus") as string }),
+              ...(evidenceRef === null ? {} : { evidenceRef }),
+              theme,
+            });
+            return Response.json(data.snapshot, { headers: { "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/workspace/intent" && request.method === "POST") {
+            let form: FormData;
+            try {
+              form = await request.formData();
+            } catch {
+              return Response.json({ code: "invalid_argument", message: "WORKSPACE: body is not a form" }, { status: 400 });
+            }
+            const actionId = form.get("action_id");
+            if (typeof actionId !== "string" || actionId === "") {
+              return Response.json({ code: "invalid_argument", message: "WORKSPACE: action_id is required" }, { status: 400 });
+            }
+            const submittedFrame = form.get("frame_id");
+            const submittedRevision = form.get("frame_revision");
+            const focus = typeof form.get("focus") === "string" ? (form.get("focus") as string) : undefined;
+            const evidence = typeof form.get("evidence") === "string" && (form.get("evidence") as string) !== "" ? (form.get("evidence") as string) : undefined;
+            const theme = form.get("theme") === "light" ? "light" as const : "dark" as const;
+            const data = await workspace({ ...(focus === undefined ? {} : { focusRef: focus }), ...(evidence === undefined ? {} : { evidenceRef: evidence }), theme });
+            if (
+              typeof submittedFrame !== "string" || submittedFrame === "" ||
+              (submittedRevision !== null && String(data.frame.revision) !== String(submittedRevision))
+            ) {
+              return Response.json({ code: "invalid_argument", message: "WORKSPACE: frame_id and frame_revision are required" }, { status: 400 });
+            }
+            if (submittedFrame !== data.frame.frame_id) {
+              return Response.json({ code: "stale_surface", message: `WORKSPACE: frame ${submittedFrame} is not the current frame` }, { status: 409 });
+            }
+            const action = data.view.actions.find((candidate) => candidate.action_id === actionId);
+            if (action === undefined || action.posture !== "offered" || action.affordance !== "available") {
+              return Response.json({ code: "not_available", message: `WORKSPACE: ${actionId} is not an available action in the current view` }, { status: 409 });
+            }
+            const outcome = await commitSurfaceIntent({ transport: "gui", role: "human", node_id: actionId });
+            if (!outcome.ok) return Response.json({ code: outcome.code, message: outcome.message }, { status: 409 });
+            const query = new URLSearchParams({ result: `intent:${actionId}` });
+            if (focus !== undefined) query.set("focus", focus);
+            if (evidence !== undefined) query.set("evidence", evidence);
+            query.set("theme", theme);
+            return Response.redirect(`/workspace?${query.toString()}`, 303);
           }
           if (url.pathname === "/") {
             return new Response("Horizon structural skeleton\n", {

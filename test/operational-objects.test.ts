@@ -124,7 +124,7 @@ describe("T06 operational object layer — positive evidence (PE-01…PE-10)", (
     const checkpoint = parseCheckpointRef(result.checkpoint_ref);
     expect(checkpoint).not.toBeNull();
     expect(checkpoint?.position).toBeGreaterThan(0);
-    expect(checkpoint?.projections).toEqual([{ name: "horizon.operational-objects", version: "1.0.0" }]);
+    expect(checkpoint?.projections).toEqual([{ name: "horizon.operational-objects", version: "1.1.0" }]);
     // The same checkpoint is answerable; a different one is refused rather than answered.
     const at = await queryObjects(store, world, FIXTURE_WORLD_REF, {}, { scope: FULL_SCOPE, checkpoint_ref: result.checkpoint_ref });
     expect(at.ok).toBe(true);
@@ -238,7 +238,7 @@ describe("T06 operational object layer — positive evidence (PE-01…PE-10)", (
     const recovered = await readProjection(store, world, FIXTURE_WORLD_REF);
     expect(recovered.ok).toBe(true);
     if (recovered.ok) {
-      expect(recovered.view.checkpoint?.version).toBe("1.0.0");
+      expect(recovered.view.checkpoint?.version).toBe("1.1.0");
       expect(recovered.view.objects.map((object) => object.object_ref)).toEqual(before.view.objects.map((object) => object.object_ref));
     }
   });

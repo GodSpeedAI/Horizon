@@ -1,0 +1,7 @@
+bun test test/workspace-teeth.test.tsx
+bun test v1.4.0 (34cbb9a40)
+
+ 5 pass
+ 0 fail
+ 19 expect() calls
+Ran 5 tests across 1 file. [303.00ms]

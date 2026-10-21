@@ -1,0 +1,181 @@
+preregistration:
+  id: T09.prereg
+  task: T09
+  title: Atomic GUI projection in Cognate React
+  recorded_at: "2026-10-21T00:10:00Z"
+  recorded_before_artifacts: true
+
+  claim: >-
+    A persistent, keyboard-operable GUI can project the T07 navigation frame and the T05 closed
+    surface into the T03 Atomic UI regions without creating a second availability or approval
+    policy. Owner-pinned regions keep their declared order and identity across agent updates;
+    focus, evidence and source inspection survive an update; historical or candidate scope is
+    announced from the renderer's own frame comparison rather than from agent-supplied text.
+
+  upstream_pins:
+    - id: horizon-spec
+      version: 1.0.1
+      sha256: 14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    - id: atomic-ui-ir
+      artifact: ui-model/atomic-ui-contract.yaml
+      note: >-
+        Regions, primitives, states, accessibility obligations and projection decisions are taken
+        from T03. The GUI adds renderer mechanisms, not new UI responsibilities.
+    - id: atomic-ui-views
+      artifact: ui-model/views/navigation_entry.yaml
+      note: >-
+        The workspace composes navigation_entry, evidence_inspector, history_timeline and
+        comparison responsibilities; it does not add a dashboard, approval control or graph-only
+        decision surface (PD-06, PD-08, PD-09, PD-10).
+    - id: behavioral-ir
+      artifact: behavioral/journeys/J01..J06.yaml
+      note: >-
+        Every affordance and blocked reason projects the behavioral frame; the GUI does not
+        evaluate gates for itself.
+    - id: cognate-react
+      artifact: node_modules/@godspeedai/cognate-react/src/index.tsx
+      version: 0.6.1
+      note: >-
+        CognateProvider/useProjection is the data layer for operational rows where the runtime can
+        supply a live client. The server-rendered workspace does not invent a second client or a
+        private projection protocol.
+
+  settles:
+    - REQ-UI-005
+    - REQ-UI-006
+    - REQ-OUT-004
+    - REQ-UX-005
+    - REQ-UX-006
+    - REQ-UX-008
+    - REQ-UX-011
+    - REQ-NAV-007
+
+  positive_expectations:
+    - id: PE-01
+      expectation: >-
+        The workspace derives its regions and elements from T03 view responsibilities: persistent
+        context, one decision surface, evidence, source/ref inspector and lineage/comparison. The
+        region order is fixed by the owner, not by input order.
+    - id: PE-02
+      expectation: >-
+        Blocked, unknown, conflicted, empty, partial, error and historical scope are visually and
+        semantically distinct. Every blocked or pending choice leads with plain language and at
+        most one next prerequisite before raw gates and refs.
+    - id: PE-03
+      expectation: >-
+        World, checkpoint, focus and case stay visible across the session. Resolved context is
+        shown, never asked for again; only an unresolved field becomes a request.
+    - id: PE-04
+      expectation: >-
+        Every rendered value and composition shows its actor. An agent acting for a human is
+        visibly distinct from the human and from the system.
+    - id: PE-05
+      expectation: >-
+        Owner-pinned regions remain in the owner's order. Agent-composed blocks are appended after
+        owner content and cannot reorder, pin, resize, close or focus an owner region.
+    - id: PE-06
+      expectation: >-
+        The renderer derives current-versus-historical scope by comparing the frame it holds with
+        the current frame identity; an agent string cannot suppress or rewrite the banner.
+    - id: PE-07
+      expectation: >-
+        A lineage graph opens fit-to-content, aggregates beyond a bounded node count, and always
+        offers an equivalent table projection containing every row.
+    - id: PE-08
+      expectation: >-
+        The GUI is keyboard operable with a visible focus ring, semantic landmarks and regions,
+        an aria-live frame announcement, non-colour status text, light and dark themes that meet
+        WCAG 2.2 AA contrast, and a reduced-motion equivalent.
+    - id: PE-09
+      expectation: >-
+        Evidence, artifact references, source bindings, provenance and raw refs remain inspectable
+        while a decision is pending, using progressive disclosure rather than internal vocabulary
+        in the first line.
+    - id: PE-10
+      expectation: >-
+        Loading, empty, unavailable, blocked and recovery states are rendered as their own states;
+        an unavailable source is reported as unknown, never as an empty success.
+
+  negative_expectations:
+    - id: NE-01
+      attack: >-
+        An agent update submits a surface whose blocks claim owner_pinned/owner_laid_out and place
+        an agent block before the owner's decision.
+      expected: >-
+        The agent block is rendered after every owner region, pinned order is unchanged, and the
+        reduction note is shown.
+    - id: NE-02
+      attack: >-
+        An agent writes the text "Current" or "Approved" into a block while the workspace is
+        showing a historical frame.
+      expected: >-
+        The renderer's own scope check keeps the historical banner; agent text cannot replace it,
+        and "approved" is never rendered as approval state.
+    - id: NE-03
+      attack: >-
+        Submit a blocked or unknown action through the GUI form.
+      expected: >-
+        The control is absent or disabled, and a forged POST is refused by the same canonical
+        intent path rather than executed.
+    - id: NE-04
+      attack: >-
+        Provide more lineage nodes than the bounded graph limit.
+      expected: >-
+        The graph aggregates the excess, states how many nodes were folded, and the table still
+        lists every node and edge.
+    - id: NE-05
+      attack: >-
+        Remove an evidence source or mark it unavailable while the decision is pending.
+      expected: >-
+        The evidence region reports unknown/unresolved and does not fabricate a value or an empty
+        success.
+    - id: NE-06
+      attack: >-
+        An agent supplies a consequential action as though the agent could offer it.
+      expected: >-
+        The action is proposed, visibly distinct, and not executable by the human through this
+        surface.
+    - id: NE-07
+      attack: >-
+        Change focus while a request for an old frame is in flight.
+      expected: >-
+        The stale frame is refused and the newer focus is retained; no intent is recorded.
+    - id: NE-08
+      attack: >-
+        Put markup or a script URL in agent-supplied text.
+      expected: >-
+        It is escaped in HTML and never becomes an element, attribute or executable URL.
+
+  falsifier: >-
+    An agent update rearranges a pinned owner surface, or suppresses the current-versus-candidate
+    banner on historical data, without the GUI refusing or marking the change.
+
+  known_confounds:
+    - Mocks and fixture-only results are not live settlement evidence.
+    - Pinned external API and skill versions may differ from prose documentation.
+    - The local workspace has no live SEA-Forge authority channel, so the GUI can show blocked
+      and pending states but cannot prove an approval or denial.
+    - A graphical conformance claim rests on semantic HTML and computed contrast assertions, not
+      on a screen-reader vendor's announcement trace.
+
+  evidence_plan:
+    - Run the prereg shape check before implementation and again in the gate.
+    - Run model tests over real T06 fixtures and rendered SSR HTML.
+    - Run teeth that attack pinning, historical scope, blocked submissions, graph bounds,
+      missing evidence, agent-offered actions, stale focus and HTML injection.
+    - Run the T09 narrow gate, then `just verify`, retaining exact output.
+    - Record the UI-renderer decisions and evidence in the T09 directory.
+
+  redesign_trigger: >-
+    The GUI needs unverifiable client state or a local enablement rule that cannot remain a
+    projection of the shared frame and closed surface.
+
+  confirmation_condition: >-
+    The builder demonstrates every preregistered positive and negative expectation with stable
+    evidence, including both falsifier attacks, and documents plausible alternate failures.
+
+  notes: >-
+    T09 reuses T03's regions instead of inventing screens, T05's closed projection instead of
+    re-parsing agent markup, and T07/T08's frame and plain-language reasons instead of a second
+    policy. The workspace is server-rendered semantic HTML so that keyboard and assistive
+    semantics do not depend on a client bundle; no layout or approval authority is added.

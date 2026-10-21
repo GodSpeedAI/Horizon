@@ -1,0 +1,125 @@
+bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/T09.prereg.yaml
+  ok   .agents/prereg/horizon/T09.prereg.yaml: 10 positive + 8 negative expectations are structural members
+  ok   .agents/prereg/horizon/T09.prereg.yaml: no id is declared only as text, and every id token resolves to a member
+prereg shape: ok
+bun test test/workspace-model.test.ts test/workspace-render.test.tsx
+bun test v1.4.0 (34cbb9a40)
+
+ 16 pass
+ 0 fail
+ 77 expect() calls
+Ran 16 tests across 2 files. [430.00ms]
+bun test test/workspace-teeth.test.tsx
+bun test v1.4.0 (34cbb9a40)
+
+ 5 pass
+ 0 fail
+ 19 expect() calls
+Ran 5 tests across 1 file. [305.00ms]
+bun test
+bun test v1.4.0 (34cbb9a40)
+
+ 114 pass
+ 0 fail
+ 916 expect() calls
+Ran 114 tests across 18 files. [3.09s]
+uv run --project research pytest -q
+....                                                                     [100%]
+4 passed in 0.04s
+bun run scripts/check.ts
+check: ok (local_operator, 127.0.0.1:4319, horizon)
+bun run scripts/check-boundaries.ts
+boundaries: ok (.)
+python3 scripts/check-idm-integrity.py
+check-idm-integrity: OK (11 requirement references, 0 tolerated as recorded debt, 11 invariant ids unique)
+python3 scripts/check-acceptance-claims.py
+check-acceptance-claims: OK (4 prohibitions preserved, 0 generic restatements with their subject intact)
+python3 scripts/check-witness-claims.py
+check-witness-claims: OK (197 contracts: 0 generic, 197 authored; no new policy)
+python3 scripts/measure-contract-modals.py --ledger requirements/ledger.yaml --baseline scripts/witness-claims-baseline.txt
+measure-contract-modals: 1 known pre-existing loss(es) in requirements/ledger.yaml (DEBT D-020), not fatal
+  ~ REQ-RES-001: loses prohibition
+python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
+ledger: 0 error(s) in ledger.yaml
+  ok: 99 requirements, 99 acceptance contracts
+./scripts/check-ledger-freeze.sh
+python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py . --ledger requirements/ledger.yaml
+wayfinder: 0 error(s)
+./scripts/check-ledger-freeze.sh
+bun run scripts/teeth-t05-boundaries.ts
+ok   NE-B0 real tree passes (70 files, 6 in the authority)
+ok   NE-B1 second schema version outside the authority
+ok   NE-B2 second block vocabulary outside the authority
+ok   NE-B2c a block-kind record is a vocabulary copy
+ok   NE-B2d a record keyed by the block-kind type is the claim; keyed by string is not
+ok   NE-B2b one or two named kinds are still a selection, not a scrape
+ok   NE-B3 second source-expression pattern outside the authority
+ok   NE-B4 route importing the binder directly
+ok   NE-B5 authority importing Cognate
+ok   NE-B6 authority emitting dynamic code
+ok   NE-B7 renderer outside the authority
+ok   NE-B8 competing authority store
+ok   NE-B9 prose in comments and messages is not flagged
+ok   NE-B9b a real sink beside prose is still caught
+ok   NE-B10 NOTICE absent is rejected, not assumed present
+ok   NE-B11 a donor dropped from NOTICE is drift
+ok   NE-B12 an extra donor in NOTICE is drift
+ok   NE-B13 a donor section without a license is not a record
+ok   NE-B14 NOTICE describing Horizon without its declared license is rejected
+ok   NE-B15 a declared license with no LICENSE file is rejected
+ok   NE-B16 a manifest with no license field is not a silent pass
+teeth-t05: ok (21 checks)
+bun run scripts/teeth.ts
+blocked missing-cognate-dependency: exit=1
+STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
+blocked in-memory-runtime: exit=1
+18 |   throw new RuntimeBoundaryError(`RUNTIME: ${message}`);
+RuntimeBoundaryError: RUNTIME: local_operator forbids an in-memory runtime; a durable SQLite store is required
+blocked competing-product-model: exit=1
+BOUNDARY: competing canonical model/authority store at product-model/process.yaml
+blocked duplicate-semantic-authority: exit=1
+BOUNDARY: duplicate semantic authority at other/model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+baseline canonical-closure-control: exit=0
+blocked duplicate-canonical-subtree: exit=1
+BOUNDARY: duplicate semantic authority at .sea/alternative/interaction-model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked false-world-ref: exit=1
+19 |   throw new SemanticAdapterError(`SEMANTIC: ${message}`);
+SemanticAdapterError: SEMANTIC: world identity mismatch: expected world:horizon@sha256:0000000000000000000000000000000000000000000000000000000000000000, observed world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0
+baseline isolated-tree-real-runtime: exit=0, passed=6
+blocked fake-runtime-substitution: exit=1, failing=3
+  fails: structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen
+  fails: structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable
+  fails: structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact
+blocked missing-cognate-dependency-metadata: exit=1
+STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
+BOUNDARY: duplicate semantic authority at domain/research-artifacts.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+BOUNDARY: duplicate semantic authority at domain/product-integration-contract.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked missing-cognate-dependency-e2e: exit=1, failing=1
+
+teeth: all attacks blocked
+bash scripts/teeth-ledger-freeze.sh
+BASELINE clean tree verifies
+BLOCKED  frozen ledger edited after freeze -> FAIL: ledger content does not match its freeze_hash (hand edit after freeze?)
+BLOCKED  frozen ledger reverted to candidate -> FAIL: ledger freeze_hash is not frozen: 'candidate'
+BLOCKED  wayfinder body hand-edited -> FAIL: committed wayfinder body is not the projection its generator produces (hand edit?)
+BLOCKED  wayfinder unfrozen -> FAIL: wayfinder validation failed
+BLOCKED  hashed input drifted (ledger policy) -> FAIL: wayfinder validation failed
+BLOCKED  ledger row removed after freeze (ledger structure / projection) -> FAIL: requirement ledger validation failed
+
+teeth: 6 blocked, 0 missed
+python3 scripts/teeth-domainforge-gate.py
+null: exit=0 exit=0 Validation succeeded: 0 violations total
+dangling: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: dangling .sea accepted with no violation
+duplicate: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: duplicate .sea accepted with no violation
+control: exit=1 exit=1 Error: Parse failed for /tmp/tmp3gf989tk/.sea/interaction/interaction-model.sea: resolved closure failed graph co
+
+tooth: gate discriminates (control fails, and the two blind spots are proven)
+python3 scripts/teeth-idm-integrity.py
+null: exit=0 exit=0 check-idm-integrity: OK (11 requirement references, 0 tolerated as recorded debt, 11 invariant ids uniq
+dangling: exit=1 exit=1 - .sea/interaction/interaction-model.sea:inv_intent_idempotent requirement_ref 'REQ-DOES-NOT-EXIST-999'
+duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmp7di8urlq/.sea/interaction/interaction-m
+
+tooth: referential integrity is enforced (dangling and duplicate both fail)
+gate-t09: ok — atomic GUI projection in Cognate React

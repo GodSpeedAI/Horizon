@@ -1,59 +1,56 @@
 # Horizon Current Status
 
-**Revision:** 22 · **Recorded:** 2026-10-20T23:59:30Z · **Stage:** T08 settled (P1); next ready task **T09**
+**Revision:** 23 · **Recorded:** 2026-10-21T00:55:00Z · **Stage:** T09 settled (P2 builder+teeth); next ready task **T10**
 
 **Spec:** HORIZON-001 v1.0.1, frozen; SHA-256 `14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4`.
 
-## T08 — Clack-style sequential renderer from the shared frame
+## T09 — Atomic GUI projection in Cognate React
 
-The terminal half of the behavioral contract now consumes the T07 navigation frame. A pure
-`horizon.sequential/1` controller turns one validated frame into **one** question and one answer
-into one `horizon.sequential-intent/1` typed intent. The real OpenTUI renderer uses a registry copy
-of `GodSpeedAI/Terminal-UI` (`Select`, `Confirm`, prompt shell; MIT) and only maps controller state
-to controls.
+The rich workspace now projects the same T07 frame and T05 closed surface as the terminal. It is
+server-rendered semantic HTML with native form submissions: no client bundle, no inline handler,
+and no client-side enablement rule. The page is also rendered through the real Cognate React
+`useProjection` path against a durable store.
 
-- **One decision at a time.** Primary, optional-only, blocked and no-move frames each produce a
-  single prompt. Context carried by the frame is displayed, never asked for again; only an unknown
-  checkpoint becomes a question.
-- **Blocked is visible, not offered.** Blocked, unknown and conflicted moves remain in the list,
-  disabled, with a plain-language reason and the single next prerequisite. Submitting one is
-  refused with `unavailable_choice`.
-- **Review before commitment.** A consequential move must pass a review of reversibility, payment
-  and provenance, expected evidence, escalation and the next prerequisite. Only then can a
-  `confirm` intent exist. Confirming records intent; it neither approves nor executes.
-- **Stale, historical and cancelled answers fail closed.** Stale revisions are refused with a
-  refresh path. Back restores the previous frame and selection, marks it historical, and refuses
-  action until resume. Cancel keeps frame, focus, history and selection and emits nothing.
-- **Real source path.** `buildOperationalFrame` derives the frame from a real T06 Cognate
-  projection read; `horizon frame --json|--text|--tui` exposes the same frame to scripts, agents
-  and a keyboard terminal. An absent focus is a material deviation, not a fabricated repair.
-- **No execution.** T08 stops at the typed intent. It does not submit, call SEA-Forge or claim an
-  effect; simulation is explicit in the intent and review.
+- **Owner layout.** Region order is fixed: context, decision, evidence, inspector, lineage, agent.
+  Agent-composed blocks are appended after owner regions and cannot enter owner evidence, even if
+  an agent claims `owner_pinned`.
+- **Plain language first.** Every blocked/pending choice leads with what it is, why it is blocked
+  and one next prerequisite, then progressive drill-down to gates, sources, provenance and refs.
+- **Scope is renderer-derived.** Historical scope is a comparison of frame id **and** revision;
+  the banner is independent of agent text. "Approved" in agent content is never approval state.
+- **Lineage is bounded and equivalent.** The SVG opens fit-to-content and aggregates beyond the
+  node bound; the table always contains every object and link row.
+- **Accessible states.** Skip link, landmarks, live scope announcement, visible focus, light/dark
+  themes, reduced motion, and distinct loading/empty/unknown/blocked/partial/error states.
+- **Fail closed.** Forms carry `frame_id` and `frame_revision`. A stale frame returns
+  `stale_surface`; an unavailable/proposed action has no form and a forged POST is refused.
+- **T06 defect corrected.** The live Cognate read was empty because public projections require
+  `<tenant>/<key>` state. Operational projection keys and event tenancy were corrected and the
+  projection version bumped to `1.1.0`; direct and public reads now observe the same rows.
 
 **Verified:**
 
 | Command | Result |
 | --- | --- |
-| `just check-t08` | exit 0 — 19 pass / 0 fail (4 files, 188 expects) |
-| `just teeth-t08` | exit 0 — 4 pass / 0 fail (20 expects) |
-| `just gate-t08` | exit 0 |
+| `just check-t09` | exit 0 — 16 pass / 0 fail (2 files, 77 expects); prereg shape ok |
+| `just teeth-t09` | exit 0 — 5 pass / 0 fail (19 expects) |
+| `just gate-t09` | exit 0 |
 | `just verify` | exit 0 |
-| `bun test` | 93 pass / 0 fail (15 files, 820 expects) |
+| `bun test` | 114 pass / 0 fail (18 files, 916 expects) |
 | `bun x tsc --noEmit` | exit 0 |
 | Spec hash | unchanged |
 
 **Limits:**
 
-- GUI equivalence is not proven. T08 proves the Clack half of REQ-UI-004/REQ-GOAL-003; T09 must
-  consume the same frame and emit the same typed intents.
-- T08 creates intents only; governed execution and settlement remain T10/T11.
-- The real Cognate read path uses fixture-produced T06 rows; `integration_level` stays `fixture`.
-- Terminal accessibility is keyboard-first only; screen-reader announcement and WCAG 2.2 AA are
-  T09 GUI obligations.
-- The vendored terminal themes are clack, ascii and high-contrast; no light theme.
-- The `createCliRenderer` mount is a thin wrapper not covered by an automated pty test; the
-  component is driven through OpenTUI's real test renderer.
-- Default focus is the first projected object by ref, or a synthetic absent focus.
+- P2 is builder plus adversarial teeth, not an independent replay or a fresh confirmer signature.
+- The GUI is server-rendered; there is no browser bundle/hydration test and no screen-reader
+  vendor announcement trace. WCAG 2.2 AA rests on semantic structure, contrast tokens and computed
+  CSS assertions.
+- Live pages use fixture-produced T06 rows; `integration_level` stays `fixture`. No live
+  SEA-Forge authority channel exists, so approval/denial cannot be proven.
+- The GUI records intents only. It does not execute, settle or claim a world effect.
+- Existing stores with the old `1.0.0` projection need an explicit Cognate projection rebuild
+  before the new `1.1.0` rows are read; the gate reports `rebuild_required` rather than reinterpreting.
 
 ## Settled task history
 
@@ -62,6 +59,7 @@ to controls.
 - T06: operational object layer on Cognate's public Projection API.
 - T07: `horizon.navigation/2` deterministic navigation controller (P2, 12 reqs).
 - T08: sequential Clack renderer over the shared frame (P1, 5 reqs).
+- T09: atomic GUI projection in Cognate React (P2 builder+teeth, 8 reqs).
 
 ## Open items carried
 
@@ -75,12 +73,5 @@ to controls.
 - Earlier: `REQ-RES-001` lexical baseline; Clack and the WebMCP browser transport remain declared
   but not bound.
 
-**Next:** T09 — Atomic GUI projection in Cognate React (depends on T07 + T03, both settled).
-Preregistration is required before implementation. T10 also becomes ready (T06 + T07).
-
-**Evidence:** [T08 summary](evidence/horizon/T08/SUMMARY.md), [check-t08](evidence/horizon/T08/check-t08.log),
-[teeth-t08](evidence/horizon/T08/teeth-t08.log), [gate-t08](evidence/horizon/T08/gate-t08.log),
-[verify](evidence/horizon/T08/just-verify.log), [bun test](evidence/horizon/T08/bun-test.log),
-[decisions](reports/horizon-decisions.yaml), [third-party notices](../THIRD_PARTY_NOTICES.md),
-[spec](specs/horizon.agent.spec.yaml), [plan](plans/horizon.plan.yaml),
-[ledger](../requirements/ledger.yaml), [wayfinder](../.wayfinder/answer-key.md), [debt](DEBT.md).
+**Next:** T10 — Context Kernel and source-grounded seven-operation world debugger (depends on
+settled T06 + T07).

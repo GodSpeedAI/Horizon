@@ -3,7 +3,7 @@
 # Rule: record material, hard-to-reverse or binding choices with evidence.
 schema: horizon.decisions
 version: 1
-updated: "2026-10-20"
+updated: "2026-10-21"
 
 decisions:
   - id: DEC-T00-01
@@ -771,6 +771,74 @@ decisions:
       - "src/ui/sequential/vendor/terminal-ui/README.md"
       - "THIRD_PARTY_NOTICES.md"
       - "package.json"
+
+  - id: DEC-T09-01
+    date: "2026-10-21"
+    task: T09
+    requirement: REQ-UI-005
+    decision: >-
+      The workspace is server-rendered semantic HTML with native form submissions. There is no
+      client bundle, no inline handler and no client-side enablement rule. Every control is a
+      button or link, so keyboard and assistive semantics do not depend on JavaScript; the server
+      re-reads the frame and refuses a stale or unavailable action through the canonical surface
+      path.
+    rationale:
+      - "REQ-UI-005 requires accessible loading, empty, blocked and recovery states, not a client framework."
+      - "A pure renderer over the workspace model can be tested by static HTML assertions and by a real HTTP POST."
+      - "Native forms keep the surface keyboard-operable and avoid inventing a second action-availability policy in browser state."
+    reversible: true
+    evidence:
+      - "src/ui/workspace/render.tsx"
+      - "src/app.ts (/workspace, /workspace/intent)"
+      - "test/workspace-render.test.tsx"
+      - "test/workspace-teeth.test.tsx"
+
+  - id: DEC-T09-02
+    date: "2026-10-21"
+    task: T09
+    requirement: REQ-UI-005
+    decision: >-
+      `@godspeedai/cognate-react`'s `CognateProvider`/`useProjection` is the live row data layer.
+      Its public-projection contract requires state keys `<tenant>/<key>`; T06's operational
+      projection keyed state `object/...` and used `world:<ref>` as the event tenant, so the live
+      client read was empty. The correction (T06 implementation defect found by T09) keys
+      projection state with the event tenant, records operational events under the caller's
+      tenant, filters direct reads by that tenant, and bumps `horizon.operational-objects` to
+      1.1.0. The direct adapter and the public read now observe the same rows.
+    rationale:
+      - "Cognate's runtime README documents public projections as tenant-partitioned; an unprefixed key is invisible to every caller."
+      - "A GUI that silently falls back to a private read would not prove the Cognate React data path."
+      - "Tenant scoping is required by the spec's scoped-ref model; the world_ref remains a separate immutable identity."
+    reversible: false
+    evidence:
+      - "src/projections/operational-objects.ts"
+      - "src/adapters/operational-objects.ts"
+      - "src/app.ts (readNavigation declared tenant)"
+      - "test/workspace-render.test.tsx (live projection page)"
+      - "test/operational-objects.test.ts"
+      - "test/operational-objects-negative.test.ts"
+
+  - id: DEC-T09-03
+    date: "2026-10-21"
+    task: T09
+    requirement: REQ-UI-006
+    decision: >-
+      Region order is fixed by the owner: context, decision, evidence, inspector, lineage, agent.
+      Agent-composed blocks are appended only in the agent region and never become owner evidence,
+      even if an agent claims `owner_pinned`; the claim is shown as a reduction note. Current versus
+      historical scope is derived by frame id plus revision, and the banner is independent of any
+      agent-supplied text.
+    rationale:
+      - "REQ-UI-006 forbids agent-composed content from reordering or seizing owner-pinned surfaces."
+      - "REQ-UX-003 requires an explicit statement when newer state exists rather than a silent relabel."
+      - "An agent may act for a human (REQ-UX-006), but attribution does not grant layout authority."
+    reversible: true
+    evidence:
+      - "src/ui/workspace/model.ts"
+      - "src/ui/workspace/render.tsx"
+      - "test/workspace-model.test.ts"
+      - "test/workspace-render.test.tsx"
+
 
 open_questions:
 

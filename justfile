@@ -164,9 +164,18 @@ teeth-t08:
 gate-t08: check-t08 teeth-t08 test check boundaries idm-integrity acceptance-claims witness-claims contract-modals ledger wayfinder teeth
     @echo "gate-t08: ok — sequential Clack renderer over the shared navigation frame"
 
-gate-t09:
-    @echo "gate-t09: not implemented; fails closed until T09 settles"
-    @exit 1
+# T09: the server-rendered atomic GUI over the shared frame and closed surface. The narrow target
+# proves the model and semantic HTML; the teeth separately attack forged/stale forms, agent
+# proposals, missing evidence and escaping.
+check-t09:
+    bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/T09.prereg.yaml
+    bun test test/workspace-model.test.ts test/workspace-render.test.tsx
+
+teeth-t09:
+    bun test test/workspace-teeth.test.tsx
+
+gate-t09: check-t09 teeth-t09 test check boundaries idm-integrity acceptance-claims witness-claims contract-modals ledger wayfinder teeth
+    @echo "gate-t09: ok — atomic GUI projection in Cognate React"
 
 gate-t10:
     @echo "gate-t10: not implemented; fails closed until T10 settles"

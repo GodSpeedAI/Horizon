@@ -28,7 +28,7 @@ export const OPERATIONAL_OBJECTS_PROJECTION = {
    * Bump on any change to how state is derived. A stored checkpoint with another version yields
    * `rebuild_required` from Cognate's runner rather than a silent reinterpretation (PE-08).
    */
-  version: "1.0.0",
+  version: "1.1.0",
 } as const;
 
 /** Event types this projection folds. Anything else is ignored, not guessed at. */
@@ -42,6 +42,11 @@ export const OBJECT_EVENTS = {
 const OBJECT_PREFIX = "object/";
 const LINK_PREFIX = "link/";
 const LINEAGE_PREFIX = "lineage/";
+
+/** Public projections are tenant-partitioned: every state key starts with `<tenant>/`. */
+function tenantKey(event: { readonly tenant: string }, key: string): string {
+  return `${event.tenant}/${key}`;
+}
 
 export function objectKey(objectRef: string): string {
   return `${OBJECT_PREFIX}${objectRef}`;
@@ -87,28 +92,28 @@ export const operationalObjectsProjection: Projection = {
       const parsed = OperationalObjectV1.safeParse({ schema: OBJECT_SCHEMA, ...body });
       // A malformed event is not silently skipped: it is written to an error row so the query
       // layer can report the projection as degraded instead of claiming an empty result.
-      if (!parsed.success) return [{ key: errorKey(event), value: { code: "schema", message: parsed.error.message } }];
+      if (!parsed.success) return [{ key: tenantKey(event, errorKey(event)), value: { code: "schema", message: parsed.error.message } }];
       const object = parsed.data;
-      const existing = state.get(objectKey(object.object_ref));
+      const existing = state.get(tenantKey(event, objectKey(object.object_ref)));
       // Idempotent: the same object recorded twice is one object, and the first observation wins
       // so a later duplicate cannot rewrite history for an earlier checkpoint.
       if (existing !== undefined) return [];
-      return [{ key: objectKey(object.object_ref), value: object as unknown as Json }];
+      return [{ key: tenantKey(event, objectKey(object.object_ref)), value: object as unknown as Json }];
     }
 
     if (event.eventType === OBJECT_EVENTS.linkRecorded) {
       const parsed = OperationalLinkV1.safeParse({ schema: OBJECT_SCHEMA, ...body });
-      if (!parsed.success) return [{ key: `error/${event.eventId}`, value: { code: "schema", message: parsed.error.message } }];
+      if (!parsed.success) return [{ key: tenantKey(event, `error/${event.eventId}`), value: { code: "schema", message: parsed.error.message } }];
       const link = parsed.data;
       // Endpoint integrity is checked structurally here; the store-facing recorder refuses a
       // dangling endpoint before committing, so a half-link cannot be written in the first place.
-      return [{ key: linkKey({ ...link, checkpoint_ref: link.provenance.checkpoint_ref }), value: link as unknown as Json }];
+      return [{ key: tenantKey(event, linkKey({ ...link, checkpoint_ref: link.provenance.checkpoint_ref })), value: link as unknown as Json }];
     }
 
     if (event.eventType === OBJECT_EVENTS.lineageRecorded) {
       const parsed = LineageEdgeV1.safeParse({ schema: OBJECT_SCHEMA, ...body });
-      if (!parsed.success) return [{ key: `error/${event.eventId}`, value: { code: "schema", message: parsed.error.message } }];
-      return [{ key: lineageKey(parsed.data), value: parsed.data as unknown as Json }];
+      if (!parsed.success) return [{ key: tenantKey(event, `error/${event.eventId}`), value: { code: "schema", message: parsed.error.message } }];
+      return [{ key: tenantKey(event, lineageKey(parsed.data)), value: parsed.data as unknown as Json }];
     }
 
     return [];

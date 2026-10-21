@@ -197,14 +197,14 @@ function needsReview(choice: NavigationChoice): boolean {
   return choice.selectable && isConsequential(choice);
 }
 
-function plainReason(choice: NavigationChoice): string | undefined {
+export function plainReason(choice: NavigationChoice): string | undefined {
   const blocker = choice.blockers[0];
   if (blocker === undefined) return undefined;
   const head = GATE_PLAIN[blocker.gate] ?? "it is blocked";
   return `${head}: ${blocker.reason}`;
 }
 
-function nextStep(choice: NavigationChoice): string | undefined {
+export function nextStep(choice: NavigationChoice): string | undefined {
   const blocker = choice.blockers.find((entry) => entry.prerequisite_ref !== undefined);
   if (blocker?.prerequisite_ref === undefined) return undefined;
   const head = GATE_PLAIN[blocker.gate] ?? "resolve the blocker";
