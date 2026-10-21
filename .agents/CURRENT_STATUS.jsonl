@@ -355,3 +355,76 @@
     "sha256": "14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4"
   }
 }
+---
+{
+  "schema": "horizon.status/1",
+  "revision": 22,
+  "recorded_at": "2026-10-20T23:59:30Z",
+  "task": "T08",
+  "state": "settled",
+  "stage": "T08 settled (P1, builder); next dependency-ready task T09",
+  "settled": [
+    "REQ-UI-004",
+    "REQ-INT-002",
+    "REQ-GOAL-003",
+    "REQ-UX-008",
+    "REQ-UX-005"
+  ],
+  "summary": "T08 settled as the sequential half of the shared behavioral contract. A pure `horizon.sequential/1` controller turns one validated `horizon.navigation/2` frame into exactly one question and one answer into one `horizon.sequential-intent/1` typed intent. Blocked, unknown and conflicted moves stay visible but disabled, with plain-language reasons and a single next prerequisite; a consequential move must pass a review of reversibility, payment, expected evidence and escalation before a confirm intent exists. Back, defer, cancel, resume, refresh and selected-object preservation are explicit transitions. Stale frames, historical frames, blocked choices and confirming without a review fail closed. The real OpenTUI renderer uses a registry copy of GodSpeedAI/Terminal-UI (`Select`, `Confirm`, prompt shell; commit 7932155, MIT) and only maps controller state to controls. `buildOperationalFrame` derives the frame from a real T06 projection read, and `horizon frame --json|--text|--tui` exposes the same frame to scripts, agents and a keyboard terminal. T08 stops at an intent: it does not submit, call SEA-Forge or execute, so no terminal answer becomes authority or a world effect.",
+  "verified": {
+    "check_t08": "0 (19 pass / 0 fail, 4 files, 188 expects)",
+    "teeth_t08": "0 (4 pass / 0 fail, 20 expects)",
+    "gate_t08": "0",
+    "just_verify": "0",
+    "bun_test": "93 pass / 0 fail (15 files, 820 expects)",
+    "typecheck": "0 (bun x tsc --noEmit)",
+    "spec_sha256_unchanged": true
+  },
+  "limits": [
+    "P1, builder. No independent replay is required or implied.",
+    "GUI equivalence is not proven. T08 proves the Clack half of REQ-UI-004/REQ-GOAL-003; T09 must consume the same frame and emit the same typed intents.",
+    "T08 creates intents only. It does not submit them, call SEA-Forge or establish settlement; T10/T11 own that path.",
+    "The real Cognate read path is exercised with fixture-produced T06 rows; integration_level stays `fixture`.",
+    "Terminal accessibility is keyboard-first only. No screen-reader announcement was measured; WCAG 2.2 AA remains a T09 GUI obligation.",
+    "The vendored terminal themes are clack, ascii and high-contrast; there is no light theme, and terminal colour remains host-controlled.",
+    "The `createCliRenderer` mount in `main.ts` is a thin wrapper not covered by an automated pty test; the component itself is driven through OpenUI's real test renderer."
+  ],
+  "next": "T09 — depends on T07 and T03 (both settled). Earliest ready task. Its preregistration is required before implementation. T10 also becomes ready (T06 + T07) and follows.",
+  "decisions": [
+    "DEC-T08-01",
+    "DEC-T08-02",
+    "DEC-T08-03",
+    "DEC-T08-04",
+    "DEC-T08-05"
+  ],
+  "evidence": ".agents/evidence/horizon/T08/SUMMARY.md",
+  "changed": [
+    "src/ui/sequential/controller.ts",
+    "src/ui/sequential/terminal.tsx",
+    "src/ui/sequential/vendor/terminal-ui/",
+    "src/adapters/navigation.ts",
+    "src/app.ts",
+    "src/main.ts",
+    "test/sequential-controller.test.ts",
+    "test/sequential-terminal.test.tsx",
+    "test/sequential-source.test.ts",
+    "test/sequential-cli.test.ts",
+    "test/sequential-teeth.test.ts",
+    "test/support/sequential-fixture.ts",
+    "justfile",
+    "package.json",
+    "bun.lock",
+    "tsconfig.json",
+    "THIRD_PARTY_NOTICES.md",
+    ".agents/evidence/horizon/T08/",
+    ".agents/reports/horizon-decisions.yaml",
+    ".agents/CURRENT_STATUS.jsonl",
+    ".agents/CURRENT_STATUS.md"
+  ],
+  "spec": {
+    "id": "HORIZON-001",
+    "version": "1.0.1",
+    "status": "frozen",
+    "sha256": "14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4"
+  }
+}

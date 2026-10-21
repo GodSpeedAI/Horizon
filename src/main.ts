@@ -1,6 +1,7 @@
 import { createApplication } from "./app.ts";
 import { mcpTools, renderText } from "./ui/surface2/render.ts";
 import { HORIZON_OPERATIONS, isConsequential, type HorizonOperation, type SurfaceRole } from "./ui/surface2/grammar.ts";
+import { openSequential, renderSequentialText, type SequentialIntent } from "./ui/sequential/controller.ts";
 
 /**
  * Three transports, one surface. The CLI and MCP verbs below resolve their target through the
@@ -15,6 +16,41 @@ function flag(name: string): string | undefined {
   return index === -1 ? undefined : rest[index + 1];
 }
 
+function hasFlag(name: string): boolean {
+  return rest.includes(`--${name}`);
+}
+
+/**
+ * Mount the Clack-style renderer on the real OpenTUI renderer. The intent callback is the boundary:
+ * T08 records the typed intent and does not execute it, so no terminal keystroke becomes a world
+ * mutation before the capability and authority tasks bind one.
+ */
+async function runSequentialTui(
+  session: ReturnType<typeof openSequential>,
+  onIntent: (intent: SequentialIntent) => void,
+): Promise<void> {
+  const [{ createCliRenderer }, { createRoot }, { createElement }, { SequentialTerminal }] = await Promise.all([
+    import("@opentui/core"),
+    import("@opentui/react"),
+    import("react"),
+    import("./ui/sequential/terminal.tsx"),
+  ]);
+  const renderer = await createCliRenderer({ exitOnCtrlC: true, useKittyKeyboard: { disambiguate: true }, targetFps: 30 });
+  const root = createRoot(renderer);
+  await new Promise<void>((resolve) => {
+    root.render(
+      createElement(SequentialTerminal, {
+        initialSession: session,
+        onIntent,
+        onExit: () => {
+          renderer.destroy();
+          resolve();
+        },
+      }),
+    );
+  });
+}
+
 function roleFlag(): SurfaceRole {
   const role = flag("role");
   if (role === "human" || role === "agent" || role === "system") return role;
@@ -22,7 +58,37 @@ function roleFlag(): SurfaceRole {
   return "human";
 }
 
-if (command === "surface") {
+if (command === "frame") {
+  const frame = await application.navigationFrame({
+    ...(flag("focus") === undefined ? {} : { focusRef: flag("focus") as string }),
+    ...(flag("case") === undefined ? {} : { caseRef: flag("case") as string }),
+    ...(flag("purpose") === undefined ? {} : { purpose: flag("purpose") as string }),
+  });
+  const session = openSequential(frame, { source: "operational-projection" });
+  if (hasFlag("json")) {
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          schema: "horizon.frame/1",
+          source: session.source,
+          frame,
+          prompt: session.prompt,
+          intent_schema: "horizon.sequential-intent/1",
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    await application.close();
+  } else if (hasFlag("text") || (!process.stdout.isTTY && !hasFlag("tui"))) {
+    process.stdout.write(renderSequentialText(session.prompt));
+    await application.close();
+  } else {
+    const intents: SequentialIntent[] = [];
+    await runSequentialTui(session, (intent) => intents.push(intent));
+    await application.close();
+  }
+} else if (command === "surface") {
   const projection = application.surface(roleFlag());
   if (!projection.ok) {
     // A surface the grammar refuses is a failure, not a degraded page.

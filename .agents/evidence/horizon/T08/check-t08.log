@@ -1,0 +1,7 @@
+bun test test/sequential-controller.test.ts test/sequential-terminal.test.tsx test/sequential-source.test.ts test/sequential-cli.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+ 19 pass
+ 0 fail
+ 188 expect() calls
+Ran 19 tests across 4 files. [724.00ms]

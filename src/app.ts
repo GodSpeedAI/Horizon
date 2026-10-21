@@ -12,6 +12,10 @@ import type { Json } from "@godspeedai/cognate-events";
 import type { RunView } from "@godspeedai/cognate-runtime-api";
 import { buildStructuralFrame, type NavigationFrameV1, type NavigationIntentRecord } from "./domain/frame.ts";
 import { buildCommitIntent, type CommitIntentInput, type CommitIntentOutput } from "./domain/intent.ts";
+import type { NavigationFrame as NavigationFrameV2 } from "./domain/navigation.ts";
+import type { SemanticRef } from "./domain/operational.ts";
+import { buildOperationalFrame } from "./adapters/navigation.ts";
+import { checkpointOf, readProjection, type DeclaredWorld } from "./adapters/operational-objects.ts";
 import {
   bindingContextOf,
   canonicalIntent,
@@ -62,6 +66,18 @@ export interface HorizonApplication {
   readonly research: ResearchStatus;
   readonly frames: FrameRegister;
   frame(): FrameView | null;
+  /**
+   * The T07 observer-relative frame over the current operational projection (T08's shared input).
+   * It is a real Cognate read, not a renderer fixture; an empty projection becomes an honest
+   * "focus absent" deviation rather than a fabricated move.
+   */
+  navigationFrame(options?: {
+    readonly focusRef?: string;
+    readonly caseRef?: string;
+    readonly purpose?: string;
+    readonly directionRef?: string;
+    readonly directionStatement?: string;
+  }): Promise<NavigationFrameV2>;
   commitNavigationIntent(request: { readonly operationRef: string; readonly intentId?: string }): Promise<IntentCommit>;
   /** Submit a pre-built intent (e.g. one a surface composed): same validation and audit. */
   submitIntent(intent: CommitIntentInput): Promise<IntentCommit>;
@@ -261,6 +277,45 @@ export async function createApplication(
     return { ok: true, result: await commitNavigationIntent({ operationRef: bound.intent.operation }), bound };
   }
 
+  /**
+   * Read the operational projection once and build the navigation frame a terminal or agent
+   * consumes. The declared vocabulary is taken from the pinned semantic world; operational
+   * relation declarations are not invented here, because the T08 adapter only inspects objects
+   * and their already-projected links.
+   */
+  async function navigationFrame(options: {
+    readonly focusRef?: string;
+    readonly caseRef?: string;
+    readonly purpose?: string;
+    readonly directionRef?: string;
+    readonly directionStatement?: string;
+  } = {}): Promise<NavigationFrameV2> {
+    const types = new Set<SemanticRef>();
+    for (const object of world.projection.objects) {
+      if (object.kind === "Entity" || object.kind === "EntityInstance") types.add(object.ref.id as SemanticRef);
+    }
+    const declared: DeclaredWorld = { world_ref: world.worldRef, types, relations: new Set() };
+    const read = await readProjection(runtime.runtime.store, declared, world.worldRef);
+    if (!read.ok) throw new Error(`NAVIGATION: operational projection is unavailable: ${read.reason}`);
+    const objects = [...read.view.objects].sort((left, right) => (left.object_ref < right.object_ref ? -1 : left.object_ref > right.object_ref ? 1 : 0));
+    const focus = options.focusRef ?? objects[0]?.object_ref ?? `focus:${world.worldRef}`;
+    return buildOperationalFrame(
+      {
+        observer_ref: caller.actor.id,
+        tenant_ref: caller.tenant,
+        world_ref: world.worldRef,
+        checkpoint_ref: checkpointOf(read.view),
+        focus_ref: focus,
+        case_ref: options.caseRef ?? `case:${focus}`,
+        purpose: options.purpose ?? "keep the focused object inside its declared direction",
+        direction_ref: options.directionRef ?? `direction:${focus}`,
+        direction_statement: options.directionStatement ?? "navigate the focused object without changing the world",
+        projection: read.view,
+        declared,
+      },
+    ).frame;
+  }
+
   return {
     loaded,
     world,
@@ -269,6 +324,7 @@ export async function createApplication(
     research,
     frames,
     frame: () => issued,
+    navigationFrame,
     commitNavigationIntent,
     submitIntent,
     startObservation,

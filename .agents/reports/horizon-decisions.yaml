@@ -676,6 +676,102 @@ decisions:
       - "src/domain/frame.ts (unchanged v1)"
       - "just gate-t05"
 
+  - id: DEC-T08-01
+    date: "2026-10-20"
+    task: T08
+    requirement: REQ-UI-004
+    decision: >-
+      The sequential controller is a pure, renderer-neutral state machine between the
+      `horizon.navigation/2` frame and a `horizon.sequential-intent/1` intent. The OpenTUI
+      component only maps prompt options to `Select`/`Confirm`; it cannot widen availability,
+      invent a gate, approve an escalation or execute a capability.
+    rationale:
+      - "REQ-UI-004 and REQ-GOAL-003 require the terminal and GUI to consume one behavioral contract, not two policy implementations."
+      - "A pure controller can be tested without a terminal, while the real renderer is tested through OpenTUI's key events."
+      - "Keeping execution in the capability path preserves REQ-STACK-003 and REQ-NAV-006."
+    reversible: true
+    evidence:
+      - "src/ui/sequential/controller.ts"
+      - "src/ui/sequential/terminal.tsx"
+      - "test/sequential-controller.test.ts"
+      - "test/sequential-terminal.test.tsx"
+
+  - id: DEC-T08-02
+    date: "2026-10-20"
+    task: T08
+    requirement: REQ-INT-002
+    decision: >-
+      One prompt is the whole decision surface. Blocked, unknown and conflicted choices stay
+      visible but disabled with a plain-language reason and the single next prerequisite; a
+      consequential available move passes a review step before its confirm intent exists.
+      Observer controls remain selectable so the observer can inspect, defer, reframe or disagree.
+    rationale:
+      - "REQ-INT-002 asks Clack to present one next meaningful decision at a time."
+      - "Hiding blocked alternatives would make the representation look complete when it is not."
+      - "REQ-NAV-007 and REQ-UX-005 require reversibility, payment, evidence, escalation and the next prerequisite before commitment."
+    reversible: true
+    evidence:
+      - "src/ui/sequential/controller.ts (promptFor, reviewFor)"
+      - "test/sequential-controller.test.ts"
+      - "test/sequential-terminal.test.tsx"
+
+  - id: DEC-T08-03
+    date: "2026-10-20"
+    task: T08
+    requirement: REQ-OUT-002
+    decision: >-
+      T08 ends at a typed intent. It does not submit the intent to Cognate, call SEA-Forge or claim
+      an effect. The `simulated` flag is part of the intent, and the review prompt labels simulation
+      in plain language when the caller selected it.
+    rationale:
+      - "T08's proof level is P1 and its plan explicitly does not prove live authority or settlement."
+      - "Recording a choice is not approval, execution or a world mutation (REQ-INT-004)."
+      - "T10/T11 own the governed execution path; anticipating it here would invent authority."
+    reversible: true
+    evidence:
+      - "src/ui/sequential/controller.ts (SequentialIntent)"
+      - "test/sequential-controller.test.ts (simulation)"
+      - ".agents/evidence/horizon/T08/SUMMARY.md"
+
+  - id: DEC-T08-04
+    date: "2026-10-20"
+    task: T08
+    requirement: REQ-NAV-005
+    decision: >-
+      Context that the frame already carries is displayed, never asked for again. An unknown
+      checkpoint is the only context question the controller can raise. `horizon frame` defaults
+      its focus to the first projected object by ref and reports a synthetic absent focus as a
+      material deviation rather than inventing a repair.
+    rationale:
+      - "REQ-NAV-005 forbids asking for context the controller can resolve without user burden."
+      - "A deterministic default keeps scripts and tests from depending on random ordering."
+      - "An absent focus is an observation about the projection, not a reason to fabricate a move."
+    reversible: true
+    evidence:
+      - "src/ui/sequential/controller.ts (contextOf)"
+      - "src/app.ts (navigationFrame)"
+      - "test/sequential-controller.test.ts"
+      - "test/sequential-cli.test.ts"
+
+  - id: DEC-T08-05
+    date: "2026-10-20"
+    task: T08
+    requirement: REQ-UI-004
+    decision: >-
+      The Clack shell, `Select` and `Confirm` are a source copy of GodSpeedAI/Terminal-UI at commit
+      7932155 under MIT, placed under `src/ui/sequential/vendor/terminal-ui/`. Horizon owns the copy;
+      the upstream Workbench, scenarios and other controls are not included. Attribution and license
+      text are recorded in THIRD_PARTY_NOTICES.md.
+    rationale:
+      - "The T08 plan names the terminal-ui registry copy as the intended donor path."
+      - "A source copy avoids a runtime dependency on a private sibling checkout and keeps the UI editable."
+      - "MIT permits redistribution with attribution; the license text is retained."
+    reversible: true
+    evidence:
+      - "src/ui/sequential/vendor/terminal-ui/README.md"
+      - "THIRD_PARTY_NOTICES.md"
+      - "package.json"
+
 open_questions:
 
   - id: OQ-001

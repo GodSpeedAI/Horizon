@@ -9,8 +9,8 @@
  * The case is a derived value, not stored state: facts name the object/link refs and the checkpoint
  * they were read at, and the direction is the caller's declared purpose. There is no case table.
  */
-import type { CandidateOperation, CaseFact, DerivedCase, PossibleOperation } from "../domain/navigation.ts";
-import { deriveCase } from "../domain/navigation.ts";
+import type { CandidateOperation, CaseFact, DerivedCase, NavigationFrame, PossibleOperation } from "../domain/navigation.ts";
+import { buildNavigationFrame, deriveCase } from "../domain/navigation.ts";
 import type { DeclaredWorld, ProjectionView } from "./operational-objects.ts";
 import type { OperationalLinkV1, OperationalObjectV1 } from "../domain/operational.ts";
 
@@ -137,6 +137,40 @@ export function deriveOperationalNavigation(input: OperationalNavigationInput): 
     candidates: Object.freeze(candidates),
     possible_operations: Object.freeze(candidates.map((candidate) => ({ operation_ref: candidate.operation_ref, label: candidate.label }))),
   });
+}
+
+/**
+ * Build the T08 sequential renderer's input from one operational read.
+ *
+ * The frame id is deterministic for (world, checkpoint, focus), so a script that reads the same
+ * projection twice sees the same frame identity. The revision is supplied by the caller; a new
+ * observation is a new revision, not a mutation of an old one.
+ */
+export function buildOperationalFrame(
+  input: OperationalNavigationInput,
+  frame: { readonly revision?: number; readonly frame_id?: string } = {},
+): { readonly frame: NavigationFrame; readonly navigation: OperationalNavigation } {
+  const navigation = deriveOperationalNavigation(input);
+  const frameId = frame.frame_id ?? `frame:${input.world_ref}:${input.checkpoint_ref}:${input.focus_ref}`;
+  return {
+    frame: buildNavigationFrame({
+      frame_id: frameId,
+      revision: frame.revision ?? 1,
+      context: {
+        observer_ref: input.observer_ref,
+        tenant_ref: input.tenant_ref,
+        world_ref: input.world_ref,
+        checkpoint_ref: input.checkpoint_ref,
+        checkpoint_unknown_reason: null,
+        focus_ref: input.focus_ref,
+        case_ref: input.case_ref,
+      },
+      case: navigation.case,
+      possible_operations: navigation.possible_operations,
+      candidates: navigation.candidates,
+    }),
+    navigation,
+  };
 }
 
 function readOnlyCandidate(input: {

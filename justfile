@@ -152,9 +152,17 @@ teeth-t07: teeth-t07-mutation
 gate-t07: check-t07 teeth-t07 test check boundaries idm-integrity acceptance-claims witness-claims contract-modals ledger wayfinder teeth
     @echo "gate-t07: ok — deterministic navigation and observer-relative affordance controller"
 
-gate-t08:
-    @echo "gate-t08: not implemented; fails closed until T08 settles"
-    @exit 1
+# T08: the Clack-style sequential renderer. The narrow suites exercise the controller, the real
+# OpenTUI keyboard path, the T06 projection adapter and `horizon frame`; the teeth are a separate
+# target so a green consumer path cannot stand in for an adversarial refusal.
+check-t08:
+    bun test test/sequential-controller.test.ts test/sequential-terminal.test.tsx test/sequential-source.test.ts test/sequential-cli.test.ts
+
+teeth-t08:
+    bun test test/sequential-teeth.test.ts
+
+gate-t08: check-t08 teeth-t08 test check boundaries idm-integrity acceptance-claims witness-claims contract-modals ledger wayfinder teeth
+    @echo "gate-t08: ok — sequential Clack renderer over the shared navigation frame"
 
 gate-t09:
     @echo "gate-t09: not implemented; fails closed until T09 settles"

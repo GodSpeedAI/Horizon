@@ -13,6 +13,7 @@
       "bun"
     ],
     "jsx": "react-jsx",
+    "jsxImportSource": "@opentui/react",
     "noImplicitAny": false
   },
   "include": [

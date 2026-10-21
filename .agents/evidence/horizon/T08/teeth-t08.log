@@ -1,0 +1,7 @@
+bun test test/sequential-teeth.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+ 4 pass
+ 0 fail
+ 20 expect() calls
+Ran 4 tests across 1 file. [22.00ms]
