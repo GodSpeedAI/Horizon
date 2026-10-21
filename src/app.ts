@@ -15,7 +15,7 @@ import { buildCommitIntent, type CommitIntentInput, type CommitIntentOutput } fr
 import type { NavigationFrame as NavigationFrameV2 } from "./domain/navigation.ts";
 import type { SemanticRef } from "./domain/operational.ts";
 import { buildOperationalFrame } from "./adapters/navigation.ts";
-import { checkpointOf, readProjection, type DeclaredWorld, type ProjectionView } from "./adapters/operational-objects.ts";
+import { checkpointOf, readProjection, readSnapshotAt, type DeclaredWorld, type ProjectionView } from "./adapters/operational-objects.ts";
 import {
   bindingContextOf,
   canonicalIntent,
@@ -30,7 +30,11 @@ import {
 } from "./ui/surface.ts";
 import { publishSurfaceSchema, SURFACE_SCHEMA, type SurfaceRole } from "./ui/surface2/grammar.ts";
 import { renderHtml, renderText } from "./ui/surface2/render.ts";
-import { buildWorkspace, type WorkspaceFrameRef, type WorkspaceSnapshot, type WorkspaceTheme } from "./ui/workspace/model.ts";
+import { buildWorkspace, type WorkspaceDebugger, type WorkspaceFrameRef, type WorkspaceRetrieval, type WorkspaceSnapshot, type WorkspaceTheme } from "./ui/workspace/model.ts";
+import { debuggerView, inspect, missingRetrieval } from "./ui/workspace/inspect.ts";
+import type { ContextKernelAdapter, ContextReferenceAnswer } from "./adapters/context-kernel.ts";
+import { CONTEXT_REFERENCE } from "./capabilities/context.ts";
+import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type DebuggerOperation, type DebuggerSources } from "./domain/debugger.ts";
 import { renderWorkspacePage } from "./ui/workspace/render.tsx";
 import type { Server } from "bun";
 
@@ -92,7 +96,25 @@ export interface HorizonApplication {
    */
   navigationFrame(options?: NavigationOptions): Promise<NavigationFrameV2>;
   /** The GUI's data seam: one navigation read, one closed surface projection and the same frame. */
-  workspace(options?: NavigationOptions & { readonly evidenceRef?: string; readonly theme?: WorkspaceTheme }): Promise<WorkspaceData>;
+  workspace(options?: NavigationOptions & {
+    readonly evidenceRef?: string;
+    readonly theme?: WorkspaceTheme;
+    /** An already-answered inspection about this frame, carried into the surface verbatim. */
+    readonly inspection?: { readonly debugger: WorkspaceDebugger; readonly retrieval: WorkspaceRetrieval | null };
+  }): Promise<WorkspaceData>;
+  /**
+   * Answer one of the seven debugger questions about the shared focus, citing reference material
+   * when a query is given (T10). Read-only: it never commits and never mutates the frame.
+   */
+  inspectFocus(
+    operation: string,
+    options?: NavigationOptions & {
+      readonly checkpointRef?: string;
+      readonly query?: string;
+      /** The operation's own arguments; the debugger validates them and types any refusal. */
+      readonly arguments?: Omit<DebuggerArguments, "operation">;
+    },
+  ): Promise<{ readonly frame: NavigationFrameV2; readonly debugger: WorkspaceDebugger; readonly retrieval: WorkspaceRetrieval | null }>;
   commitNavigationIntent(request: { readonly operationRef: string; readonly intentId?: string }): Promise<IntentCommit>;
   /** Submit a pre-built intent (e.g. one a surface composed): same validation and audit. */
   submitIntent(intent: CommitIntentInput): Promise<IntentCommit>;
@@ -120,7 +142,18 @@ export interface HorizonApplication {
  * blocks only research-dependent operations (REQ-CONFIG-012).
  */
 export async function createApplication(
-  options: { readonly storePath?: string; readonly configPath?: string } = {},
+  options: {
+    readonly storePath?: string;
+    readonly configPath?: string;
+    /**
+     * The Context Kernel adapter to bind, instead of building one from `context_kernel.command`.
+     *
+     * Injected by tests so a scripted wire can stand in for the server process without pretending
+     * one exists. The adapter is still reached only through the boot-registered capability, so the
+     * policy and the binding shape under test are the production ones (REQ-STACK-010).
+     */
+    readonly contextAdapter?: ContextKernelAdapter;
+  } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath);
   const world = loadWorld(loaded.config.world_ref);
@@ -132,6 +165,7 @@ export async function createApplication(
     ...(options.storePath ? { storePath: options.storePath } : {}),
     components: [navigationIntentComponent(frames)],
     agents: [structuralObservationAgent(frames)],
+    ...(options.contextAdapter === undefined ? {} : { contextAdapter: options.contextAdapter }),
   });
   let issued: FrameView | null = null;
 
@@ -295,15 +329,27 @@ export async function createApplication(
   /**
    * Read the operational projection once and build the navigation frame a terminal or agent
    * consumes. The declared vocabulary is taken from the pinned semantic world; operational
-   * relation declarations are not invented here, because the T08 adapter only inspects objects
-   * and their already-projected links.
+   * relation declarations are not invented here, because the sequential reader only inspects
+   * objects and their already-projected links.
    */
-  async function readNavigation(options: NavigationOptions = {}): Promise<{ readonly frame: NavigationFrameV2; readonly projection: ProjectionView }> {
+  /**
+   * The declared vocabulary of the pinned world, as the T06 adapter needs it.
+   *
+   * Relation types are read from the world's declared relations, not invented: the debugger
+   * refuses to traverse a relation the world does not declare, and an empty set means "this
+   * reader knows of no declared relation", which the debugger reports rather than silently
+   * traversing operational links it was never authorised to interpret.
+   */
+  function declaredFor(tenant: string): DeclaredWorld {
     const types = new Set<SemanticRef>();
     for (const object of world.projection.objects) {
       if (object.kind === "Entity" || object.kind === "EntityInstance") types.add(object.ref.id as SemanticRef);
     }
-    const declared: DeclaredWorld = { world_ref: world.worldRef, tenant: caller.tenant, types, relations: new Set() };
+    return { world_ref: world.worldRef, tenant, types, relations: new Set() };
+  }
+
+  async function readNavigation(options: NavigationOptions = {}): Promise<{ readonly frame: NavigationFrameV2; readonly projection: ProjectionView }> {
+    const declared = declaredFor(caller.tenant);
     const read = await readProjection(runtime.runtime.store, declared, world.worldRef);
     if (!read.ok) throw new Error(`NAVIGATION: operational projection is unavailable: ${read.reason}`);
     const objects = [...read.view.objects].sort((left, right) => (left.object_ref < right.object_ref ? -1 : left.object_ref > right.object_ref ? 1 : 0));
@@ -330,7 +376,17 @@ export async function createApplication(
     return (await readNavigation(options)).frame;
   }
 
-  async function workspace(options: NavigationOptions & { readonly evidenceRef?: string; readonly theme?: WorkspaceTheme } = {}): Promise<WorkspaceData> {
+  async function workspace(
+    options: NavigationOptions & {
+      readonly evidenceRef?: string;
+      readonly theme?: WorkspaceTheme;
+      /**
+       * The answer this surface should carry, already read about this frame. The surface never asks
+       * a question itself, so a rendered answer and its frame can never disagree.
+       */
+      readonly inspection?: { readonly debugger: WorkspaceDebugger; readonly retrieval: WorkspaceRetrieval | null };
+    } = {},
+  ): Promise<WorkspaceData> {
     const { frame, projection } = await readNavigation(options);
     const surface = surfaceFor("human");
     if (!surface.ok) throw new Error(`WORKSPACE: surface projection is unavailable: ${surface.code}`);
@@ -343,8 +399,78 @@ export async function createApplication(
       current,
       ...(options.evidenceRef === undefined ? {} : { evidenceRef: options.evidenceRef }),
       ...(options.theme === undefined ? {} : { theme: options.theme }),
+      ...(options.inspection === undefined ? {} : { debugger: options.inspection.debugger, retrieval: options.inspection.retrieval }),
     });
     return { frame, view: surface.view, objects: projection.objects, links: projection.links, current, snapshot };
+  }
+
+  /**
+   * Answer one debugger question, and optionally cite reference material, about the shared focus.
+   *
+   * This is a read: it builds a frame exactly as the workspace does, reads the projection behind
+   * it, and returns answers. It never commits, never appends and never selects a capability but
+   * the registered read-only one, so an inspection cannot become a state change.
+   */
+  async function inspectFocus(
+    operation: string,
+    options: NavigationOptions & {
+      readonly checkpointRef?: string;
+      readonly query?: string;
+      readonly arguments?: Omit<DebuggerArguments, "operation">;
+    } = {},
+  ): Promise<{ readonly frame: NavigationFrameV2; readonly debugger: WorkspaceDebugger; readonly retrieval: WorkspaceRetrieval | null }> {
+    if (!(DEBUGGER_OPERATIONS as readonly string[]).includes(operation)) {
+      throw new Error(`INSPECT: '${operation}' is not one of ${DEBUGGER_OPERATIONS.join(", ")}`);
+    }
+    const { frame, projection } = await readNavigation(options);
+    const declared = declaredFor(caller.tenant);
+    const sources: DebuggerSources = {
+      frame,
+      objects: projection.objects,
+      links: projection.links,
+      lineage: projection.lineage ?? [],
+      declared_relations: [...declared.relations],
+    };
+    const runtimeForInspection = {
+      // The capability is invoked, never the adapter: the renderer and debugger hold no client
+      // (REQ-STACK-010). A refusal or an unavailable kernel comes back as a typed answer.
+      invoke: async (query: string): Promise<ContextReferenceAnswer> =>
+        (await runtime.runtime.service.invoke(caller, {
+          capability: CONTEXT_REFERENCE.id,
+          input: { operation: "query_reference", query } as unknown as Json,
+        })) as unknown as ContextReferenceAnswer,
+      readSnapshotAt: async (checkpointRef: string) => {
+        const read = await readSnapshotAt(runtime.runtime.store, declared, world.worldRef, checkpointRef);
+        // A checkpoint that cannot be restored says so; one that can hands over the rows it held.
+        if (!read.ok) return { ok: false };
+        return { ok: true, objects: read.objects, links: read.links };
+      },
+    };
+    try {
+      const result = await inspect(
+        {
+          frame,
+          sources,
+          operation: operation as DebuggerOperation,
+          ...(options.checkpointRef === undefined ? {} : { checkpoint_ref: options.checkpointRef }),
+          ...(options.arguments === undefined ? {} : { arguments: options.arguments }),
+          ...(options.query === undefined ? {} : { query: options.query }),
+        },
+        runtimeForInspection,
+      );
+      return { frame, ...result };
+    } catch (error) {
+      // The capability refused or could not be reached. The debugger answer is still the local
+      // answer; only the citation row degrades, and it degrades to a named fact (REQ-STACK-005).
+      const local = runDebugger(sources, { operation: operation as DebuggerOperation } as DebuggerArguments);
+      return {
+        frame,
+        debugger: debuggerView(local),
+        retrieval: options.query === undefined || options.query.trim() === ""
+          ? null
+          : missingRetrieval("unavailable", error instanceof Error ? `the context reference capability refused: ${error.message}` : "the context reference capability could not be reached"),
+      };
+    }
   }
 
   return {
@@ -357,6 +483,7 @@ export async function createApplication(
     frame: () => issued,
     navigationFrame,
     workspace,
+    inspectFocus,
     commitNavigationIntent,
     submitIntent,
     startObservation,
@@ -451,6 +578,16 @@ export async function createApplication(
               ...(evidenceRef === null ? {} : { evidenceRef }),
               theme,
             });
+            // An `operation=` on the page is answered server-side and rendered with the frame it
+            // was answered about, so the surface never shows an answer next to a different focus.
+            const inspectOperation = url.searchParams.get("operation");
+            const inspectQuery = url.searchParams.get("query");
+            const inspected = inspectOperation !== null && (DEBUGGER_OPERATIONS as readonly string[]).includes(inspectOperation)
+              ? await inspectFocus(inspectOperation, {
+                  ...(url.searchParams.get("focus") === null ? {} : { focusRef: url.searchParams.get("focus") as string }),
+                  ...(inspectQuery === null ? {} : { query: inspectQuery }),
+                })
+              : null;
             const html = await renderWorkspacePage({
               service: runtime.runtime.service,
               caller,
@@ -460,6 +597,8 @@ export async function createApplication(
               evidenceRef,
               theme,
               expectedObjects: data.objects.length,
+              debuggerAnswer: inspected?.debugger ?? null,
+              retrievalAnswer: inspected?.retrieval ?? null,
             });
             return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
           }
@@ -472,6 +611,35 @@ export async function createApplication(
               theme,
             });
             return Response.json(data.snapshot, { headers: { "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/workspace/inspect" && request.method === "GET") {
+            // Read-only, deliberately: GET, no form, no commit. The operation is one of the seven
+            // published ones or the request is refused before any read happens.
+            const operation = url.searchParams.get("operation") ?? "why";
+            if (!(DEBUGGER_OPERATIONS as readonly string[]).includes(operation)) {
+              return Response.json(
+                { code: "invalid_argument", message: `INSPECT: operation must be one of ${DEBUGGER_OPERATIONS.join(", ")}` },
+                { status: 400 },
+              );
+            }
+            const focus = url.searchParams.get("focus");
+            const checkpoint = url.searchParams.get("checkpoint");
+            const query = url.searchParams.get("query");
+            const data = await inspectFocus(operation, {
+              ...(focus === null ? {} : { focusRef: focus }),
+              ...(checkpoint === null ? {} : { checkpointRef: checkpoint }),
+              ...(query === null ? {} : { query }),
+            });
+            return Response.json(
+              {
+                schema: "horizon.inspection/1",
+                frame: { frame_id: data.frame.frame_id, revision: data.frame.revision, focus: data.frame.focus_ref },
+                operations: DEBUGGER_OPERATIONS,
+                debugger: data.debugger,
+                retrieval: data.retrieval,
+              },
+              { headers: { "cache-control": "no-store" } },
+            );
           }
           if (url.pathname === "/workspace/intent" && request.method === "POST") {
             let form: FormData;

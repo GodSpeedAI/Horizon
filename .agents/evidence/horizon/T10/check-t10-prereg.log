@@ -1,0 +1,3 @@
+  ok   .agents/prereg/horizon/T10.prereg.yaml: 14 positive + 10 negative expectations are structural members
+  ok   .agents/prereg/horizon/T10.prereg.yaml: no id is declared only as text, and every id token resolves to a member
+prereg shape: ok

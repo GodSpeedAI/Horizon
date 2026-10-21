@@ -65,6 +65,11 @@ export interface ProjectionView {
   readonly checkpoint: ProjectionCheckpoint | undefined;
   readonly objects: readonly OperationalObjectV1[];
   readonly links: readonly OperationalLinkV1[];
+  /**
+   * Lineage observations carried by a *typed* lineage event. Present because `why` names lineage
+   * facts; they are never folded into `links` (a different graph).
+   */
+  readonly lineage?: readonly LineageEdgeV1[];
   readonly errors: readonly { readonly key: string; readonly code: string; readonly message: string }[];
   /** True when checkpoint and rows came from one statement. */
   readonly consistent: boolean;
@@ -102,6 +107,7 @@ export async function readProjection(
   // records a failure, or for a source the caller names as down.
   const objects: OperationalObjectV1[] = [];
   const links: OperationalLinkV1[] = [];
+  const lineage: LineageEdgeV1[] = [];
   const errors: { key: string; code: string; message: string }[] = [];
   for (const row of snapshot.rows) {
     // Public projection state is tenant-partitioned. A row outside this tenant is not ours to
@@ -110,6 +116,7 @@ export async function readProjection(
     const key = row.key.slice(tenantPrefix.length);
     if (key.startsWith("object/")) objects.push(row.value as unknown as OperationalObjectV1);
     else if (key.startsWith("link/")) links.push(row.value as unknown as OperationalLinkV1);
+    else if (key.startsWith("lineage/")) lineage.push(row.value as unknown as LineageEdgeV1);
     else if (key.startsWith("error/")) {
       const entry = row.value as { code?: unknown; message?: unknown };
       errors.push({ key, code: String(entry.code ?? "unknown"), message: String(entry.message ?? "") });
@@ -117,13 +124,73 @@ export async function readProjection(
   }
   return {
     ok: true,
-    view: { checkpoint: snapshot.checkpoint, objects, links, errors, consistent: store.readProjectionSnapshot !== undefined },
+    view: { checkpoint: snapshot.checkpoint, objects, links, lineage, errors, consistent: store.readProjectionSnapshot !== undefined },
   };
 }
 
 /** One consistent read; the optional native method when present, Cognate's documented fallback otherwise. */
 async function readSnapshot(store: DurableStore, name: string) {
   return store.readProjectionSnapshot !== undefined ? store.readProjectionSnapshot(name) : readProjectionSnapshotFallback(store, name);
+}
+
+/**
+ * Read the projection *at* a checkpoint the caller names, without asking it to be current.
+ *
+ * `queryObjects` refuses a requested checkpoint that is not the stored one — correct for a query,
+ * because a stale answer would be misread as current. `diff` and `timeline` are the two questions
+ * that name another checkpoint on purpose, so they need the rows as recorded: a row whose
+ * provenance places it after the named checkpoint is excluded, because it was not there yet.
+ * That ordering is the row's own `provenance.checkpoint_ref`, not a recomputation.
+ *
+ * A checkpoint the projection never reached is `not_found`, which the debugger reports as
+ * unavailable rather than as an empty result: "nothing was recorded" and "I cannot read that"
+ * are different facts (PE-05, NE-08).
+ */
+export async function readSnapshotAt(
+  store: DurableStore,
+  world: DeclaredWorld,
+  worldRef: string,
+  checkpointRef: string,
+): Promise<{ readonly ok: true; readonly ref: string; readonly objects: readonly OperationalObjectV1[]; readonly links: readonly OperationalLinkV1[] } | { readonly ok: false; readonly status: "unavailable" | "not_found"; readonly reason: string }> {
+  const parsed = parseCheckpointRef(checkpointRef);
+  if (parsed === null) return { ok: false, status: "unavailable", reason: `checkpoint ${checkpointRef} is not a checkpoint reference` };
+  if (parsed.projections.some((entry) => entry.version !== OPERATIONAL_OBJECTS_PROJECTION.version)) {
+    return { ok: false, status: "not_found", reason: `checkpoint ${checkpointRef} names another projection version, which this reader cannot restore` };
+  }
+  const read = await readProjection(store, world, worldRef);
+  if (!read.ok) return { ok: false, status: "unavailable", reason: read.reason };
+  // This restores by filtering the *current* rows, which is exact only while the projection is
+  // additive. It is today: `operationalObjectsProjection.apply` records and never removes or
+  // tombstones, and a repeated object keeps its first observation. If a removal event is ever
+  // added, a row that existed at the named checkpoint and was later removed would be missing
+  // here, and a `diff` would under-report `removed`; that change must come with a real replay.
+  // A checkpoint names the position *and* the projection versions (REQ-WORLD-007). Restoring it
+  // means both match: rows produced by another version are not this checkpoint's rows, and
+  // silently reading them would attribute them to a version that never produced them.
+  const currentRef = parseCheckpointRef(checkpointOf(read.view));
+  if (currentRef === null || currentRef.position < parsed.position) {
+    return { ok: false, status: "not_found", reason: `the projection has not reached ${checkpointRef}` };
+  }
+  // A row's own `provenance.checkpoint_ref` is the position the event that produced it was
+  // committed (a `cognate:<position>` marker), which is how a row says when it came to exist.
+  const positionOf = (entry: { readonly provenance: { readonly checkpoint_ref: string } }): number | null => {
+    const marker = /^cognate:(\d+)$/.exec(entry.provenance.checkpoint_ref);
+    return marker?.[1] === undefined ? null : Number(marker[1]);
+  };
+  // A row is here at the named checkpoint when its own provenance places it at or before it. Rows
+  // whose provenance is not a position marker cannot be ordered, so they belong only to a read that
+  // names their exact reference: otherwise "cannot tell yet" would be read as "was already there".
+  const isHere = (entry: { readonly provenance: { readonly checkpoint_ref: string } }): boolean => {
+    const position = positionOf(entry);
+    if (position !== null) return position <= parsed.position;
+    return entry.provenance.checkpoint_ref === checkpointRef;
+  };
+  const objects = read.view.objects.filter(isHere);
+  const present = new Set(objects.map((object) => object.object_ref));
+  // A link is shown only when both endpoints were present at that checkpoint; half an edge is
+  // not an edge.
+  const links = read.view.links.filter((link) => isHere(link) && present.has(link.from) && present.has(link.to));
+  return { ok: true, ref: checkpointRef, objects, links };
 }
 
 /** The composite checkpoint string for this projection state. */

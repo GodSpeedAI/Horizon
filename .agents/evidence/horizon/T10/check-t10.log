@@ -1,0 +1,22 @@
+bun test v1.4.0 (34cbb9a40)
+
+test/retrieval-debugger.test.ts:
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-01: seven debugger operations answer from one shared focus with the frame context [8.92ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-02: every value names a class from the closed set and the source it came from [2.84ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-03: why explains the focus through recorded rows, links and lineage only [5.73ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-04: impact follows only declared links within an explicit bound and folds the remainder [3.20ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-05: diff compares the frame's checkpoint with another checkpoint read through the T06 adapter [8.70ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-06: timeline is row provenance ordered by observation time then object ref [2.99ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-07: counterfactual is a possibility preview that settles nothing [1.64ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-08: reach reports the ladder with only observed rungs and runs nothing [2.91ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-09: replay reports pass, fail or not-selected and writes no event [2.48ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-10: retrieval is cited reference material that is never canonical [3.61ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-11: a read that grants no authority adds no reference row and no event [2.33ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-12: an absent Context Kernel is reported absent and never as a server that is down [0.95ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-13: the seven operations and the retrieval row appear in the closed workspace surface [2.13ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-14: no invocation the surface makes can settle, execute or write [5.38ms]
+
+ 14 pass
+ 0 fail
+ 258 expect() calls
+Ran 14 tests across 1 file. [500.00ms]

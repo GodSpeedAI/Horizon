@@ -1,0 +1,13 @@
+  ok   NE-01 (M1 retrieved text is promoted out of the untrusted class): caught
+  ok   NE-02 (M2 a proposal is presented as recorded authority): caught
+  ok   NE-07 (M3 an empty replay selection is reported as a pass): caught
+  ok   NE-07 (M4 a failing expectation is reported as a pass): caught
+  ok   NE-06 (M5 the node cap truncates silently instead of stating the fold): caught
+  ok   NE-06 (M6 an undeclared relation type is traversed anyway): caught
+  ok   NE-06 (M7 an unbounded traversal is allowed to default): caught
+  ok   NE-02 (M8 the adapter silently drops the operation's own arguments): caught
+  ok   NE-08 (M9 an unreadable checkpoint is reported as readable with no rows): caught
+  ok   NE-08 (M10 a cross-checkpoint read is labelled as the current checkpoint): caught
+  ok   NE-09 (M11 the debugger surface imports the Context Kernel client directly): caught
+teeth-t10-mutation: ok — 11 mutants caught
+EXIT:0

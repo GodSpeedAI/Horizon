@@ -257,3 +257,29 @@
 - Evidence: `behavioral/journeys/J02.yaml` contains no human/agent conflict or layout claim; `.sea/interaction/interaction-model.sea` mentions `conflicted` only as an availability value and `concurrency_conflict` only for reused intent ids; T05 `SUMMARY.md` records the gap under unknowns.
 - Confidence: high (checked J02 and the canonical IDM for the case; it is absent)
 - Closure: add the conflicting-claim route to the J02 journey fixtures and an end-to-end assertion at the transport boundary (human claim winning, agent claim capped at `agent_proposed`, both retained with provenance), then point `just gate-t06` or the J02 gate at it. Files likely touched: `behavioral/journeys/J02.yaml`, `.sea` if the route is canonical, `test/surface-negative.test.ts`, a journey fixture. Size M.
+
+### WSL VM swap exhausted by long-lived agent sessions
+- Date: 2026-10-21
+- Location: WSL VM host (`/proc/meminfo`, `/proc/sys/vm/swappiness`); not a Horizon source file
+- Debt: The 8 GiB RAM / 12 GiB-swap VM runs at `swappiness=60` with no memory cap on the non-systemd workload root, so an idle long-lived agent session is swapped out rather than limited. Sustained swap saturation is what severs the remote connection, and no repo-level check can see it.
+- Evidence: `SwapFree` 804 MB of 12 GB (91% used) with `MemAvailable` 141 MB; `cline` PID 510869 (1h14m) held 9.2 GB `VmSwap` and `opencode --continue` PID 5239 (7h) held 731 MB. No `bun` or `context-kernal` process had leaked from Horizon tests. After killing both, `SwapFree` returned to 11.3 GB.
+- Confidence: high
+- Closure: set `MemoryHigh`/`memory.max` on the workload cgroup and a `.wslconfig` cap for the VM, and reap stale interactive agent sessions before long test runs. Size S.
+
+
+### The app declares no operational relation types, so `impact` cannot traverse
+- Date: 2026-10-21
+- Location: `src/app.ts` (`declaredFor`), consumed by `inspectFocus` -> `src/domain/debugger.ts` (`impact`)
+- Debt: `declaredFor` returns `relations: new Set()`, so every debugger answer built from the application surface declares an empty operational vocabulary. `impact` then refuses any explicit `relation_types` as `undeclared` and, with the default relation set empty, reaches nothing and reports `unknown`. The debugger is correct; the reader simply never learns what the pinned world declares. End-to-end `impact` is therefore unexercised, and a user asking "what depends on this" is told the world declares nothing.
+- Evidence: `src/app.ts:343` `return { world_ref: world.worldRef, tenant, types, relations: new Set() };` with the comment that operational relation declarations are not invented there. `test/support/operational-fixture.ts` declares four (`journey.covers`, `entity.governed_by`, `host.serves`, `entity.lineage_of`) and the T10 teeth can only exercise traversal by passing `declared_relations` to `runDebugger` directly.
+- Confidence: high (the empty set is explicit and the consequence is observed in T10 NE-06).
+- Closure: source the operational relation vocabulary from the pinned world (or the T06 adapter) into `declaredFor`, then assert bounded `impact` through `inspectFocus` end to end. Files likely touched: `src/app.ts`, possibly `src/adapters/semantic.ts` if relations must be read from the loaded world. Size S.
+
+### Only one of Context Kernel's three retrieval tools is bound
+- Date: 2026-10-21
+- Location: `src/capabilities/context.ts`, `src/adapters/context-kernel.ts`
+- Debt: The spec (`CLAIM-007`) and the T10 plan step both describe Context Kernel as exposing `query_reference`, `resolve_reference` and `recall_context`. Horizon binds and exposes only `query_reference`; the other two are unreachable, so resolving a known citation or recalling surrounding context cannot be done through the capability. The trait T10 settles (REQ-STACK-005 / AC-STACK-005-01, scoped and cited results) does not depend on them, so T10 is not blocked, but the plan step as written is only partly met.
+- Evidence: `src/capabilities/context.ts` registers `horizon.context.query_reference` and refuses any other operation ("the only retrieval operation is query_reference"); `src/adapters/context-kernel.ts` sends only `query_reference` and `get_status`. `.agents/specs/horizon.agent.spec.yaml:324` and `.agents/plans/horizon.plan.yaml` T10 step 2 each name all three.
+- Confidence: high (the capability refuses the other two by construction)
+- Closure: add per-tool request/answer shapes under the same closed outcome set and scope checks, extend the capability and its policy, then add positive and refusal teeth for each. Files likely touched: `src/adapters/context-kernel.ts`, `src/capabilities/context.ts`, `src/ui/workspace/inspect.ts`, `test/retrieval-debugger.test.ts`, `test/retrieval-debugger-teeth.test.ts`. Size M.
+

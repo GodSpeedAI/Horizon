@@ -1,0 +1,280 @@
+bun run scripts/check.ts
+check: ok (local_operator, 127.0.0.1:4319, horizon)
+bun run scripts/check-boundaries.ts
+boundaries: ok (.)
+python3 scripts/check-idm-integrity.py
+check-idm-integrity: OK (11 requirement references, 0 tolerated as recorded debt, 11 invariant ids unique)
+bun test
+bun test v1.4.0 (34cbb9a40)
+
+test/operational-objects.test.ts:
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-01 objects keep a DomainForge semantic_ref distinct from their object_ref, and one object is projected once [125.47ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-02 every link names a declared relation type and both endpoints resolve to projected objects [83.46ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-03 every object carries product, connector, checkpoint_ref, integration_level and checkpoint age [79.28ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-04 checkpoint_ref names the Cognate commit position plus the projection names and versions read [88.20ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-05 the same query from two observers with different authority yields different, correctly-scoped sets [91.07ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-06 traversal is deterministic and bounded across two relationships (journey.covers + entity.governed_by) [89.94ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-07 empty, no-match, denied, blocked and unavailable are five distinct outcomes [92.20ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-08 a stale or mismatched projection version reports rebuild_required instead of reinterpreting state [107.67ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-09 the semantic, operational and lineage graphs keep distinct identities and semantics [157.39ms]
+(pass) T06 operational object layer — positive evidence (PE-01…PE-10) > PE-10 focus, object-set selection, observer and world are carried on the result for the next surface [64.78ms]
+
+test/config.test.ts:
+(pass) local_operator configuration > accepts a loopback local operator [0.48ms]
+(pass) local_operator configuration > refuses a non-loopback bind [0.26ms]
+(pass) local_operator configuration > refuses shared_remote without a real identity provider [0.06ms]
+(pass) local_operator configuration > keeps operator and agent principals distinct [0.17ms]
+(pass) local_operator configuration > issues a fresh 0600 secret on every launch [0.99ms]
+
+test/workspace-model.test.ts:
+(pass) T09 workspace projection > PE-01/PE-03/PE-07 reads the real projection and keeps the owner region order [6.57ms]
+(pass) T09 workspace projection > PE-02/REQ-NAV-007 leads with plain language and a single next prerequisite [0.87ms]
+(pass) T09 workspace projection > PE-04/PE-09 preserves actor attribution and source drill-down [1.53ms]
+(pass) T09 workspace projection > PE-05/NE-01 an agent block claiming owner_pinned is appended, never moved into the decision [1.03ms]
+(pass) T09 workspace projection > PE-06/NE-02 historical scope comes from the frame comparison, not agent text [0.33ms]
+(pass) T09 workspace projection > PE-07/NE-04 the graph aggregates beyond the bound and the table keeps every row [1.76ms]
+(pass) T09 workspace projection > PE-10 empty, unknown and partial are distinct states [1.06ms]
+(pass) T09 workspace projection > PE-01 scopeOf rejects a different revision, not only a different id [0.37ms]
+
+test/retrieval-debugger-teeth.test.ts:
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-01: a retrieved instruction to approve a deployment stays an untrusted citation [7.39ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-02: a counterfactual is never presented as current world state [3.21ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-03: a denied corpus discloses nothing, and is distinct from unavailable and no-match [4.15ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-04: a malformed query or a path-shaped corpus id is refused before anything is sent [1.75ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-05: a bad kernel answer degrades to invalid_response and is never surfaced as an excerpt [4.47ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-06: unbounded and malformed traversal is refused, and the node cap folds the remainder [3.64ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-07: an unsatisfied expectation fails, an empty selection is not-selected, and neither passes [4.55ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-08: a named alternate or unreadable checkpoint is a comparison or unavailable, never the current row set [10.48ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-09: the debugger has no mutating operation and writes no event history [101.02ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-10: donor-only questions answer unknown with the missing source named, and fabricate nothing [2.05ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > PE-14 tooth: answers stay in the inspector region and the owner-pinned region order is unchanged [0.96ms]
+
+test/surface-negative.test.ts:
+(pass) T05 negative evidence (NE-01…NE-10) > NE-01 rejects <script>alert(1)</script> and other executable markup at the SCHEMA, with a typed rejection (falsifier PE-05) [2.06ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick fields (.strict()); NE-02/PE-02 then refuses an agent-supplied value dressed as a bound fact, and every typed source (horizon: / semantic: / file: / agent:) resolves to a value or a non-bound status (falsifier PE-01/PE-02) [7.43ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} with no I/O — so no agent layout op (view.move / view.pin / surface.put / human.approve) moves, pins, resizes, closes or focuses an owner block (falsifier PE-03) [1.16ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06) [1.42ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06) [0.91ms]
+(pass) T05 negative evidence (NE-01…NE-10) > PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 projection (falsifier PE-04) [0.80ms]
+(pass) T05 negative evidence (NE-01…NE-10) > PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01) [1.46ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown horizon: source, and records no agent op as human (falsifier PE-02) [0.86ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02) [0.10ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04) [0.44ms]
+(pass) T05 negative evidence (NE-01…NE-10) > NE-10 escapes an <img onerror=...> value that arrives from an observed source (falsifier PE-05) [0.79ms]
+(pass) T05 negative evidence (NE-01…NE-10) > PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every node and attributes no surface to an unattributable observer (falsifier PE-05) [1.63ms]
+
+test/app.test.ts:
+(pass) durable store boundary > the configured store is a Cognate SQLite database that survives a close and reopen [4.98ms]
+(pass) structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen [321.92ms]
+(pass) structural walking skeleton > configured in-memory storage is rejected by construction, with no E2E override [394.55ms]
+(pass) structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable [134.90ms]
+(pass) structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact [94.12ms]
+(pass) structural walking skeleton > an absent research source is a typed absent observation, not a startup failure [66.73ms]
+
+test/workspace-teeth.test.tsx:
+(pass) T09 GUI teeth > NE-03 a blocked action has no form and a forged POST is refused [22.74ms]
+(pass) T09 GUI teeth > NE-06 an agent-proposed consequential action is visible but not executable [5.49ms]
+(pass) T09 GUI teeth > NE-07 a stale frame POST records no intent and keeps the newer frame [7.63ms]
+(pass) T09 GUI teeth > NE-08 agent markup is escaped in the credential context too [2.07ms]
+(pass) T09 GUI teeth > the real page carries its frame, live rows and form provenance [30.36ms]
+
+test/navigation-source.test.ts:
+(pass) T07 navigation over the T06 projection > derives an optional-only case and only read-only inspection moves from real rows [73.37ms]
+(pass) T07 navigation over the T06 projection > an absent focus is a material operational deviation, not a fabricated repair [65.40ms]
+
+test/workspace-render.test.tsx:
+(pass) T09 workspace HTML > PE-08/PE-03 renders landmarks, live scope, keyboard controls and theme tokens [2.99ms]
+(pass) T09 workspace HTML > PE-02/REQ-NAV-007 renders why a choice is blocked before the gate drill-down [2.24ms]
+(pass) T09 workspace HTML > PE-05/NE-02 historical scope is a fixed banner and agent text is escaped [2.07ms]
+(pass) T09 workspace HTML > PE-07/NE-04 graphs open fit-to-content, aggregate and always offer a full table [4.87ms]
+(pass) T09 workspace HTML > PE-10 error is an alert state and does not render a decision form [2.08ms]
+(pass) T09 workspace HTML > PE-09 evidence and source refs stay inspectable behind progressive disclosure [2.39ms]
+(pass) T09 workspace HTML > NE-05 an unavailable source is reported as unresolved, never as an empty success [1.84ms]
+(pass) T09 workspace HTML > Cognate React supplies the operational rows for the full page [5.58ms]
+
+test/operational-objects-negative.test.ts:
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-01 a denied observer learns nothing: no object, no count, no type in the refusal [67.01ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-02 a down source is unavailable and a blocked connector is blocked, never empty or no-match [66.24ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-03 an unbounded traversal is refused before any work, naming the missing bound [67.13ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-04 an undeclared relation type and a dangling endpoint are both refused at record time [60.41ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-05 a mismatched checkpoint is refused and a changed projection version reports rebuild_required, never answered [65.20ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-06 a semantic import edge and a lineage record are refused by the operational link set [64.29ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-07 an object for an undeclared semantic type or the wrong world is refused, leaving no orphan [63.28ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-08 a result set is never assembled from rows of two checkpoint positions [65.37ms]
+(pass) T06 operational object layer — negative evidence (NE-01…NE-09) > NE-09 the same events rebuilt from position zero produce identical results at the same checkpoint [63.66ms]
+
+test/retrieval-debugger.test.ts:
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-01: seven debugger operations answer from one shared focus with the frame context [2.58ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-02: every value names a class from the closed set and the source it came from [4.56ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-03: why explains the focus through recorded rows, links and lineage only [3.44ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-04: impact follows only declared links within an explicit bound and folds the remainder [6.99ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-05: diff compares the frame's checkpoint with another checkpoint read through the T06 adapter [8.77ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-06: timeline is row provenance ordered by observation time then object ref [4.62ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-07: counterfactual is a possibility preview that settles nothing [1.81ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-08: reach reports the ladder with only observed rungs and runs nothing [2.04ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-09: replay reports pass, fail or not-selected and writes no event [2.69ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-10: retrieval is cited reference material that is never canonical [1.80ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-11: a read that grants no authority adds no reference row and no event [1.61ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-12: an absent Context Kernel is reported absent and never as a server that is down [0.74ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-13: the seven operations and the retrieval row appear in the closed workspace surface [2.71ms]
+(pass) T10 world debugger and CK retrieval — positive evidence (PE-01…PE-14) > PE-14: no invocation the surface makes can settle, execute or write [6.90ms]
+
+test/sequential-terminal.test.tsx:
+(pass) T08 Clack-style terminal > keyboard opens a review and confirms one typed intent [125.55ms]
+(pass) T08 Clack-style terminal > a blocked move is visible, disabled, and its prerequisite is plain [37.09ms]
+(pass) T08 Clack-style terminal > escape cancels without an intent and keeps a resume path; a second escape exits [86.20ms]
+
+test/sequential-controller.test.ts:
+(pass) T08 sequential controller > J01 optional-only case asks one question, does not force a primary and asks no known context again [0.40ms]
+(pass) T08 sequential controller > a known checkpoint is not asked for; an unknown one is [0.39ms]
+(pass) T08 sequential controller > J02 consequential choice is reviewed before any typed intent exists [0.35ms]
+(pass) T08 sequential controller > a contradictory authority is visible, not selectable, and names one next prerequisite [1.36ms]
+(pass) T08 sequential controller > stale revision after a newer frame is refused and asks for refresh [0.54ms]
+(pass) T08 sequential controller > a review cannot survive a frame change [0.76ms]
+(pass) T08 sequential controller > cancel midway keeps frame, focus and selection and emits nothing [0.66ms]
+(pass) T08 sequential controller > back restores the previous frame and selection, and does not act on a historical frame [0.64ms]
+(pass) T08 sequential controller > defer is a typed control, not a fake commitment [0.64ms]
+(pass) T08 sequential controller > simulation is explicit in both the intent and the review [0.48ms]
+(pass) T08 sequential controller > J01–J05 fixtures all traverse a prompt without renderer-side authority [2.28ms]
+(pass) T08 sequential controller > text rendering is deterministic and leads with plain language [0.91ms]
+
+test/sequential-cli.test.ts:
+(pass) T08 frame command > prints the shared frame and one prompt as JSON, with no side effect [351.82ms]
+(pass) T08 frame command > prints stable text when a terminal is not wanted [324.65ms]
+
+test/acceptance.test.ts:
+(pass) AC-CONFIG-004-01 a configured provider endpoint stays below stable behavior contracts (partial) > typed choices, committed intent and surface blocks are unchanged when the research provider endpoint differs [243.69ms]
+
+test/navigation-controller.test.ts:
+(pass) T07 navigation controller — positive evidence (PE-01…PE-12) > PE-01 possible is not available: blocked, unknown and conflicted stay distinct [0.78ms]
+(pass) T07 navigation controller — positive evidence (PE-01…PE-12) > PE-02 exactly the seven canonical gate keys, no extras [0.39ms]
+(pass) T07 navigation controller — positive evidence (PE-01…PE-12) > PE-03 only an available assessment is spendable, and a blocked path keeps its reason and prerequisite [0.21ms]
+(pass) T07 navigation controller — positive evidence (PE-01…PE-12) > PE-04 optional-only case offers inspect, defer, reframe and disagree with no forced primary [0.22ms]
+(pass) T07 navigation controller — positive evidence (PE-01…PE-12) > PE-05 resolved context is not asked for again [0.05ms]
+(pass) T07 navigation controller — positive evidence (PE-01…PE-12) > PE-06 six authority values: pass without grant, pending, blocked and unknown stay distinct [0.37ms]
+(pass) T07 navigation controller — positive evidence (PE-01…PE-12) > PE-07 consequential choice carries reversibility, payment, expected evidence and escalation [0.40ms]
+(pass) T07 navigation controller — positive evidence (PE-01…PE-12) > PE-08 case derivation is anchored in facts and direction, with no second ontology [0.13ms]
+(pass) T07 navigation controller — positive evidence (PE-01…PE-12) > PE-09 material deviation yields one primary, optional-only yields none [0.32ms]
+(pass) T07 navigation controller — positive evidence (PE-01…PE-12) > PE-10 settlement reachable and should settle now are separate and the latter needs an authorized judgment [0.35ms]
+(pass) T07 navigation controller — positive evidence (PE-01…PE-12) > PE-11 frame identifies observer, world, checkpoint unknown, focus, mode and allowed choices [0.30ms]
+(pass) T07 navigation controller — positive evidence (PE-01…PE-12) > PE-12 frames are immutable, revision advances only through revise, stale and UI enablement grant nothing [0.73ms]
+
+test/navigation-negative.test.ts:
+(pass) T07 navigation controller — negative evidence (NE-01…NE-11) > NE-01 unauthorized high-value candidate ranked first is still eliminated from spendable options [0.48ms]
+(pass) T07 navigation controller — negative evidence (NE-01…NE-11) > NE-02 an optional-only case cannot be forced to produce a primary move [0.14ms]
+(pass) T07 navigation controller — negative evidence (NE-01…NE-11) > NE-03 a blocked gate without a material reason is refused [0.20ms]
+(pass) T07 navigation controller — negative evidence (NE-01…NE-11) > NE-04 unknown authority is unknown, not available [0.17ms]
+(pass) T07 navigation controller — negative evidence (NE-01…NE-11) > NE-05 requires_approval is pending and deferred_to_invocation is a known pass without grant [0.27ms]
+(pass) T07 navigation controller — negative evidence (NE-01…NE-11) > NE-06 a gate map with an extra or missing canonical key is refused [0.23ms]
+(pass) T07 navigation controller — negative evidence (NE-01…NE-11) > NE-07 case derivation without a world anchor or declared direction is refused [0.12ms]
+(pass) T07 navigation controller — negative evidence (NE-01…NE-11) > NE-08 should settle now stays false without an authorized judgment [0.37ms]
+(pass) T07 navigation controller — negative evidence (NE-01…NE-11) > NE-09 UI enablement of a blocked choice is ignored and grants no authority [0.44ms]
+(pass) T07 navigation controller — negative evidence (NE-01…NE-11) > NE-10 a frozen frame cannot be mutated in place [0.31ms]
+(pass) T07 navigation controller — negative evidence (NE-01…NE-11) > NE-11 a stale frame revision is refused [0.31ms]
+
+test/sequential-source.test.ts:
+(pass) T08 sequential renderer over the operational projection > opens a read-only inspection decision from real rows and emits one typed intent [56.56ms]
+(pass) T08 sequential renderer over the operational projection > an absent focus is an informative dead end, not a fabricated action [65.95ms]
+
+test/sequential-teeth.test.ts:
+(pass) T08 teeth > stale frame revision after focus change is refused and requests refresh [1.22ms]
+(pass) T08 teeth > cancel midway through a choice leaves no side effect and erases no context [0.45ms]
+(pass) T08 teeth > a blocked move cannot be smuggled through as a choice [0.25ms]
+(pass) T08 teeth > a historical frame cannot be acted on after going back [0.29ms]
+
+test/ui.test.ts:
+(pass) renderer-neutral surface seam > projects a frame without executable markup and with sources on every block [0.95ms]
+(pass) renderer-neutral surface seam > never lets a binding claim an observation the route did not make [0.37ms]
+
+ 139 pass
+ 0 fail
+ 1290 expect() calls
+Ran 139 tests across 20 files. [6.12s]
+uv run --project research pytest -q
+....                                                                     [100%]
+4 passed in 0.07s
+python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
+ledger: 0 error(s) in ledger.yaml
+  ok: 99 requirements, 99 acceptance contracts
+./scripts/check-ledger-freeze.sh
+python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py . --ledger requirements/ledger.yaml
+wayfinder: 0 error(s)
+./scripts/check-ledger-freeze.sh
+bun run scripts/teeth-t05-boundaries.ts
+ok   NE-B0 real tree passes (75 files, 6 in the authority)
+ok   NE-B1 second schema version outside the authority
+ok   NE-B2 second block vocabulary outside the authority
+ok   NE-B2c a block-kind record is a vocabulary copy
+ok   NE-B2d a record keyed by the block-kind type is the claim; keyed by string is not
+ok   NE-B2b one or two named kinds are still a selection, not a scrape
+ok   NE-B3 second source-expression pattern outside the authority
+ok   NE-B4 route importing the binder directly
+ok   NE-B5 authority importing Cognate
+ok   NE-B6 authority emitting dynamic code
+ok   NE-B7 renderer outside the authority
+ok   NE-B8 competing authority store
+ok   NE-B9 prose in comments and messages is not flagged
+ok   NE-B9b a real sink beside prose is still caught
+ok   NE-B10 NOTICE absent is rejected, not assumed present
+ok   NE-B11 a donor dropped from NOTICE is drift
+ok   NE-B12 an extra donor in NOTICE is drift
+ok   NE-B13 a donor section without a license is not a record
+ok   NE-B14 NOTICE describing Horizon without its declared license is rejected
+ok   NE-B15 a declared license with no LICENSE file is rejected
+ok   NE-B16 a manifest with no license field is not a silent pass
+teeth-t05: ok (21 checks)
+bun run scripts/teeth.ts
+blocked missing-cognate-dependency: exit=1
+STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
+blocked in-memory-runtime: exit=1
+21 |   throw new RuntimeBoundaryError(`RUNTIME: ${message}`);
+RuntimeBoundaryError: RUNTIME: local_operator forbids an in-memory runtime; a durable SQLite store is required
+blocked competing-product-model: exit=1
+BOUNDARY: competing canonical model/authority store at product-model/process.yaml
+blocked duplicate-semantic-authority: exit=1
+BOUNDARY: duplicate semantic authority at other/model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+baseline canonical-closure-control: exit=0
+blocked duplicate-canonical-subtree: exit=1
+BOUNDARY: duplicate semantic authority at .sea/alternative/interaction-model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked false-world-ref: exit=1
+19 |   throw new SemanticAdapterError(`SEMANTIC: ${message}`);
+SemanticAdapterError: SEMANTIC: world identity mismatch: expected world:horizon@sha256:0000000000000000000000000000000000000000000000000000000000000000, observed world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0
+baseline isolated-tree-real-runtime: exit=0, passed=6
+blocked fake-runtime-substitution: exit=1, failing=3
+  fails: structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen
+  fails: structural walking skeleton > a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable
+  fails: structural walking skeleton > a failed optional research source degrades one gate and leaves read-only startup and operations intact
+blocked missing-cognate-dependency-metadata: exit=1
+STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
+BOUNDARY: duplicate semantic authority at domain/research-artifacts.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+BOUNDARY: duplicate semantic authority at domain/product-integration-contract.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked missing-cognate-dependency-e2e: exit=1, failing=1
+
+teeth: all attacks blocked
+bash scripts/teeth-ledger-freeze.sh
+BASELINE clean tree verifies
+BLOCKED  frozen ledger edited after freeze -> FAIL: ledger content does not match its freeze_hash (hand edit after freeze?)
+BLOCKED  frozen ledger reverted to candidate -> FAIL: ledger freeze_hash is not frozen: 'candidate'
+BLOCKED  wayfinder body hand-edited -> FAIL: committed wayfinder body is not the projection its generator produces (hand edit?)
+BLOCKED  wayfinder unfrozen -> FAIL: wayfinder validation failed
+BLOCKED  hashed input drifted (ledger policy) -> FAIL: wayfinder validation failed
+BLOCKED  ledger row removed after freeze (ledger structure / projection) -> FAIL: requirement ledger validation failed
+
+teeth: 6 blocked, 0 missed
+python3 scripts/teeth-domainforge-gate.py
+null: exit=0 exit=0 Validation succeeded: 0 violations total
+dangling: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: dangling .sea accepted with no violation
+duplicate: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: duplicate .sea accepted with no violation
+control: exit=1 exit=1 Error: Parse failed for /tmp/tmpw9cirkov/.sea/interaction/interaction-model.sea: resolved closure failed graph co
+
+tooth: gate discriminates (control fails, and the two blind spots are proven)
+python3 scripts/teeth-idm-integrity.py
+null: exit=0 exit=0 check-idm-integrity: OK (11 requirement references, 0 tolerated as recorded debt, 11 invariant ids uniq
+dangling: exit=1 exit=1 - .sea/interaction/interaction-model.sea:inv_intent_idempotent requirement_ref 'REQ-DOES-NOT-EXIST-999'
+duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmp0eeg061g/.sea/interaction/interaction-m
+
+tooth: referential integrity is enforced (dangling and duplicate both fail)
+verify: ok (active frozen artifacts: requirements/ledger.yaml + .wayfinder/answer-key.md)
+EXIT:0

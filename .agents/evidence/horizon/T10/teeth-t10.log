@@ -1,0 +1,19 @@
+bun test v1.4.0 (34cbb9a40)
+
+test/retrieval-debugger-teeth.test.ts:
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-01: a retrieved instruction to approve a deployment stays an untrusted citation [7.68ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-02: a counterfactual is never presented as current world state [1.72ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-03: a denied corpus discloses nothing, and is distinct from unavailable and no-match [2.04ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-04: a malformed query or a path-shaped corpus id is refused before anything is sent [1.04ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-05: a bad kernel answer degrades to invalid_response and is never surfaced as an excerpt [2.01ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-06: unbounded and malformed traversal is refused, and the node cap folds the remainder [5.83ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-07: an unsatisfied expectation fails, an empty selection is not-selected, and neither passes [2.65ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-08: a named alternate or unreadable checkpoint is a comparison or unavailable, never the current row set [6.98ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-09: the debugger has no mutating operation and writes no event history [52.12ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > NE-10: donor-only questions answer unknown with the missing source named, and fabricate nothing [2.53ms]
+(pass) T10 world debugger and CK retrieval — adversarial teeth (NE-01 … NE-10) > PE-14 tooth: answers stay in the inspector region and the owner-pinned region order is unchanged [1.42ms]
+
+ 11 pass
+ 0 fail
+ 116 expect() calls
+Ran 11 tests across 1 file. [524.00ms]

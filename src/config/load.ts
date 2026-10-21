@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "n
 import { hostname, userInfo } from "node:os";
 import { dirname, resolve } from "node:path";
 import type {
+  ContextKernelConfig,
   DeploymentProfile,
   HorizonConfig,
   IdentityConfig,
@@ -59,6 +60,21 @@ function asOptionalCommand(value: unknown, field: string): readonly string[] {
   return value as string[];
 }
 
+/**
+ * The Context Kernel binding is optional as a whole. When present it must be complete: a command
+ * without a corpus (or the reverse) is a malformed binding, not a half-working one.
+ */
+function asContextKernel(value: unknown): ContextKernelConfig | undefined {
+  if (value === undefined) return undefined;
+  const doc = asRecord(value, "context_kernel");
+  const command = asStringList(doc.command, "context_kernel.command");
+  const corpus = asString(doc.corpus_id, "context_kernel.corpus_id");
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(corpus)) {
+    bounded("context_kernel.corpus_id must be an opaque corpus id, not a path");
+  }
+  return { command, corpus_id: corpus };
+}
+
 export function configFromDocument(document: unknown): HorizonConfig {
   const doc = asRecord(document, "config");
   const profile = asString(doc.deployment_profile, "deployment_profile") as DeploymentProfile;
@@ -108,6 +124,8 @@ export function configFromDocument(document: unknown): HorizonConfig {
     if (value !== "loopback") bounded(`transports.${name} must be loopback`);
   }
 
+  const contextKernel = asContextKernel(doc.context_kernel);
+
   return {
     deployment_profile: profile,
     bind_host: bindHost,
@@ -116,6 +134,7 @@ export function configFromDocument(document: unknown): HorizonConfig {
     world_ref: asString(doc.world_ref, "world_ref"),
     runtime_store: asString(doc.runtime_store, "runtime_store"),
     research_command: asOptionalCommand(doc.research_command, "research_command"),
+    ...(contextKernel === undefined ? {} : { context_kernel: contextKernel }),
     identity,
     secrets,
     transports,

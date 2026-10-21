@@ -16,7 +16,7 @@ import type { Caller, RuntimeService } from "@godspeedai/cognate-runtime-api";
 import type { NavigationFrame } from "../../domain/navigation.ts";
 import { OperationalLinkV1, OperationalObjectV1 } from "../../domain/operational.ts";
 import type { GuiView } from "../surface2/project.ts";
-import { loadingWorkspace, buildWorkspace, WORKSPACE_SCHEMA, type WorkspaceFrameRef, type WorkspaceTheme } from "./model.ts";
+import { loadingWorkspace, buildWorkspace, WORKSPACE_SCHEMA, type WorkspaceDebugger, type WorkspaceFrameRef, type WorkspaceRetrieval, type WorkspaceTheme } from "./model.ts";
 import type { WorkspaceChoice, WorkspaceEvidence, WorkspaceSnapshot } from "./model.ts";
 
 export interface WorkspaceProps {
@@ -184,6 +184,111 @@ function Evidence({ evidence, snapshot, basePath }: { readonly evidence: Workspa
     </article>
   );
 }
+/**
+ * One debugger answer (T10).
+ *
+ * The block is a table of labelled facts, never a sentence assembled from them: the class and the
+ * source travel with each value, and the authority/settlement refusal is restated literally so a
+ * reader cannot mistake an answer for a decision. An `unknown` value shows exactly what the source
+ * does not record.
+ */
+function DebuggerAnswer({ answer }: { readonly answer: WorkspaceDebugger }): ReactNode {
+  return (
+    <div id="debugger-answer" data-operation={answer.operation} data-status={answer.status}>
+      <h3>{`${answer.operation}: ${answer.question}`}</h3>
+      {answer.status === "ok" ? null : (
+        <p role="status">
+          {answer.status === "refused" ? "Refused" : "Unavailable"}
+          {answer.code === null ? "" : ` (${answer.code})`}
+          {answer.message === null ? "" : `: ${answer.message}`}
+        </p>
+      )}
+      {answer.values.length === 0 ? (
+        <p>No labelled value was produced.</p>
+      ) : (
+        <table>
+          <caption>{`Values for ${answer.operation}`}</caption>
+          <thead>
+            <tr><th scope="col">Fact</th><th scope="col">Value</th><th scope="col">Class</th><th scope="col">Source</th></tr>
+          </thead>
+          <tbody>
+            {answer.values.map((entry) => (
+              <tr key={`${entry.key}:${entry.source}`}>
+                <th scope="row">{entry.key}</th>
+                <td>{entry.value}</td>
+                <td><code>{entry.class}</code></td>
+                <td><code>{entry.source}</code>{entry.missing_source === null ? null : <span> (not recorded: {entry.missing_source})</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {answer.unknown_remainder.length === 0 ? null : (
+        <details>
+          <summary>What this answer does not claim</summary>
+          <ul>{answer.unknown_remainder.map((note) => <li key={note}>{note}</li>)}</ul>
+        </details>
+      )}
+      <p>
+        <small>
+          {answer.authority ? "Authority granted." : "Grants no authority."} {answer.settles ? "Settles." : "Settles nothing."}
+          {answer.compared_checkpoint === null ? null : <> Answered about checkpoint <code>{answer.compared_checkpoint}</code>.</>}
+        </small>
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Cited reference material beside the focus (T10, REQ-STACK-005).
+ *
+ * The outcome and the observed liveness are printed before the citations, because "nothing
+ * matched", "the kernel refused", "the kernel is down" and "no kernel is configured" are four
+ * different facts. Excerpts are shown as quoted text: they can inform a reader, and cannot become
+ * an action, a label or a claim about the world.
+ */
+function ReferenceCitations({ retrieval }: { readonly retrieval: WorkspaceRetrieval }): ReactNode {
+  return (
+    <div id="reference-citations" data-outcome={retrieval.outcome} data-canonical="false">
+      <h3>Reference material</h3>
+      <p>
+        <strong>{retrieval.outcome}</strong>: {retrieval.detail}
+      </p>
+      <p>
+        <small>
+          Retrieval {retrieval.liveness.observed ? (retrieval.liveness.ok ? "observed live" : "observed unavailable") : "liveness not observed"}
+          {retrieval.liveness.observed ? ` (${retrieval.liveness.detail})` : ""}
+          {retrieval.corpus_id === null ? "" : ` · corpus ${retrieval.corpus_id}`}
+          {retrieval.query === null ? "" : ` · query “${retrieval.query}”`}
+          {retrieval.truncated ? " · truncated" : ""}
+        </small>
+      </p>
+      {retrieval.references.length === 0 ? (
+        <p>No reference text is cited.</p>
+      ) : (
+        <ol>
+          {retrieval.references.map((reference) => (
+            <li key={`${reference.uri}:${reference.anchor ?? ""}`}>
+              <blockquote cite={reference.uri}>
+                {reference.heading === null ? null : <p><strong>{reference.heading}</strong></p>}
+                <p>{reference.excerpt}</p>
+              </blockquote>
+              <cite>
+                {reference.uri}
+                {reference.anchor === null ? "" : `#${reference.anchor}`}
+              </cite>
+              {reference.score === null ? null : <span> · score {reference.score}</span>}
+              <span> · <code>{reference.class}</code></span>
+            </li>
+          ))}
+        </ol>
+      )}
+      <p><small>{retrieval.canonical ? "Canonical." : "Not canonical: scoped reference material, not organizational truth."}</small></p>
+    </div>
+  );
+}
+
+
 
 export function Workspace({ snapshot, basePath = "/workspace", intentPath = "/workspace/intent" }: WorkspaceProps): ReactNode {
   const nextTheme = snapshot.theme === "dark" ? "light" : "dark";
@@ -324,6 +429,8 @@ export function Workspace({ snapshot, basePath = "/workspace", intentPath = "/wo
                 </tbody>
               </table>
             )}
+            {snapshot.debugger === null ? null : <DebuggerAnswer answer={snapshot.debugger} />}
+            {snapshot.retrieval === null ? null : <ReferenceCitations retrieval={snapshot.retrieval} />}
             <details>
               <summary>Raw refs and gates</summary>
               <p>Frame: <code>{snapshot.frame.frame_id}</code> revision {snapshot.frame.revision}</p>
@@ -431,6 +538,9 @@ export interface ProjectionWorkspaceProps {
   readonly current: WorkspaceFrameRef;
   readonly evidenceRef?: string | null;
   readonly theme?: WorkspaceTheme;
+  /** Already-answered inspection material (T10). Omitted means the surface was not asked. */
+  readonly debuggerAnswer?: WorkspaceDebugger | null;
+  readonly retrievalAnswer?: WorkspaceRetrieval | null;
 }
 
 /**
@@ -438,7 +548,7 @@ export interface ProjectionWorkspaceProps {
  * renders this component under a real `CognateProvider`; `useProjection` is the only source of
  * object and link rows. A read that has not converged renders the explicit loading state.
  */
-export function ProjectionWorkspace({ frame, view, current, evidenceRef = null, theme = "dark" }: ProjectionWorkspaceProps): ReactNode {
+export function ProjectionWorkspace({ frame, view, current, evidenceRef = null, theme = "dark", debuggerAnswer = null, retrievalAnswer = null }: ProjectionWorkspaceProps): ReactNode {
   const rows = useProjection("horizon.operational-objects");
   if (rows === undefined) return <Workspace snapshot={loadingWorkspace(frame, current, theme)} />;
   const objects: import("../../domain/operational.ts").OperationalObjectV1[] = [];
@@ -466,6 +576,8 @@ export function ProjectionWorkspace({ frame, view, current, evidenceRef = null, 
         ...(evidenceRef === null ? {} : { evidenceRef }),
         theme,
         ...(parseError === null ? {} : { error: parseError }),
+        debugger: debuggerAnswer,
+        retrieval: retrievalAnswer,
       })}
     />
   );
@@ -516,6 +628,8 @@ export async function renderWorkspacePage(input: WorkspacePageInput): Promise<st
           current={input.current}
           evidenceRef={input.evidenceRef ?? null}
           theme={input.theme ?? "dark"}
+          debuggerAnswer={input.debuggerAnswer ?? null}
+          retrievalAnswer={input.retrievalAnswer ?? null}
         />
       </CognateProvider>,
     )}`;

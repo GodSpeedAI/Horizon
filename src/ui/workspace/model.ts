@@ -138,6 +138,57 @@ export interface WorkspaceNotice {
   readonly text: string;
 }
 
+/**
+ * Inspector material (T10). These are read-only inspection facts, so they live inside the
+ * owner-pinned inspector region and add no region, no order and no second layout policy.
+ */
+
+/** One debugger answer, flattened for display. Its provenance travels with every value. */
+export interface WorkspaceDebugger {
+  readonly operation: string;
+  readonly question: string;
+  readonly status: "ok" | "refused" | "unavailable";
+  readonly code: string | null;
+  readonly message: string | null;
+  readonly values: readonly {
+    readonly key: string;
+    readonly value: string;
+    readonly class: string;
+    readonly source: string;
+    readonly missing_source: string | null;
+  }[];
+  readonly unknown_remainder: readonly string[];
+  /** Literal, restated by the renderer: an answer is not authority and settles nothing. */
+  readonly authority: false;
+  readonly settles: false;
+  readonly compared_checkpoint: string | null;
+}
+
+/** One cited retrieval result. `class` is always `untrusted_reference`; nothing here is canonical. */
+export interface WorkspaceReference {
+  readonly uri: string;
+  readonly anchor: string | null;
+  readonly heading: string | null;
+  readonly excerpt: string;
+  readonly score: number | null;
+  readonly source_id: string | null;
+  readonly version: string | null;
+  readonly class: "untrusted_reference";
+}
+
+export interface WorkspaceRetrieval {
+  readonly corpus_id: string | null;
+  readonly query: string | null;
+  /** The typed observation: `results`, `no-match`, `unavailable`, `denied`, `absent`, … */
+  readonly outcome: string;
+  readonly detail: string;
+  readonly truncated: boolean;
+  readonly liveness: { readonly observed: boolean; readonly ok: boolean; readonly detail: string };
+  readonly references: readonly WorkspaceReference[];
+  /** Literal: retrieved text is scoped reference material, never canonical truth. */
+  readonly canonical: false;
+}
+
 export interface WorkspaceSnapshot {
   readonly schema: typeof WORKSPACE_SCHEMA;
   readonly scope: WorkspaceScope;
@@ -160,6 +211,10 @@ export interface WorkspaceSnapshot {
   readonly unresolved: number;
   readonly evidence_ref: string | null;
   readonly notices: readonly WorkspaceNotice[];
+  /** The debugger answer about this exact focus, or `null` when the surface was not asked. */
+  readonly debugger: WorkspaceDebugger | null;
+  /** Reference material cited beside this focus, or `null` when the surface was not asked. */
+  readonly retrieval: WorkspaceRetrieval | null;
 }
 
 export interface WorkspaceInput {
@@ -172,6 +227,9 @@ export interface WorkspaceInput {
   readonly theme?: WorkspaceTheme;
   readonly error?: { readonly code: string; readonly message: string } | null;
   readonly graphLimit?: number;
+  /** Already-answered inspection material; the model never asks a question itself. */
+  readonly debugger?: WorkspaceDebugger | null;
+  readonly retrieval?: WorkspaceRetrieval | null;
 }
 
 const REGION_TITLES: Readonly<Record<WorkspaceRegionId, string>> = {
@@ -452,6 +510,8 @@ export function buildWorkspace(input: WorkspaceInput): WorkspaceSnapshot {
     unresolved,
     evidence_ref: input.evidenceRef ?? null,
     notices: Object.freeze(notices),
+    debugger: input.debugger ?? null,
+    retrieval: input.retrieval ?? null,
   });
 }
 
@@ -490,5 +550,7 @@ export function loadingWorkspace(
     unresolved: 0,
     evidence_ref: null,
     notices: Object.freeze([{ tone: "state" as const, text: "Reading the workspace." }]),
+    debugger: null,
+    retrieval: null,
   });
 }

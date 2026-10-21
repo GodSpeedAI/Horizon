@@ -1,0 +1,236 @@
+preregistration:
+  id: T10.prereg
+  task: T10
+  title: Bind Context Kernel and source-grounded seven-operation world debugger
+  recorded_at: "2026-10-21T17:14:00Z"
+  recorded_before_artifacts: true
+
+  claim: >-
+    A source-grounded read-only debugger can answer why, impact, diff, timeline, counterfactual,
+    reach and replay from the same focus the navigation frame and the renderers already share,
+    and Context Kernel retrieval can be cited beside that focus, without creating a second event
+    history, a second authority or a second availability policy. Every answer names which
+    operation produced it and whether its value was recorded, derived, unknown or an observed
+    effect; retrieved reference text stays a citation below the world and can never enter the
+    frame, the available set, a label or an action. When Context Kernel is down, refuses a
+    corpus or is absent from configuration, read-only navigation and every local debugger
+    answer remain operable and the retrieval region says which of those three facts occurred.
+
+  upstream_pins:
+    - id: horizon-spec
+      version: 1.0.1
+      sha256: 14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    - id: plan-task
+      artifact: .agents/plans/horizon.plan.yaml
+      note: >-
+        T10 changes, proves, teeth, gate and does_not_prove are taken verbatim. T10 depends on T06
+        and T07 (both settled); T16 and T19 consume its answers.
+    - id: navigation-frame
+      artifact: src/domain/navigation.ts
+      note: >-
+        The debugger is a function of one navigation frame's context (observer, tenant, world,
+        checkpoint, focus, case) and the T06 projection read behind it. It does not read another
+        world, observe another actor, or re-derive a frame.
+    - id: world-debugger
+      artifact: ~/projects/product-actualizer/docs/world-debugger.md
+      note: >-
+        Donor semantics only: the seven questions, the explicit known/derived/expected/unknown/
+        observation-required classification, `authority: possibility` and `settles: false` for a
+        counterfactual, `not-selected` for an empty replay selection, the reach ladder whose
+        probed/reachable/authorized rungs stay unknown until a prober supplies them, and the
+        "navigation never mutates" rule. The Product Model, its version history, its run files,
+        its inbox and its product-level authority are not adopted.
+    - id: context-kernel
+      artifact: ~/projects/Context_Kernel/docs/mcp-contracts.md
+      path: ~/projects/Context_Kernel/target/release/context-kernal
+      note: >-
+        `query_reference` arguments {canonical_id, query, mode, top_k, version, filters} and result
+        {results[{result_id, canonical_id, document_id, chunk_id, title, heading, excerpt,
+        citation, score, score_breakdown, metadata}], query_id, mode, truncated}; `get_status`
+        arguments {} and result {service, storage, sources, sessions, jobs, retrieval}. `ingest_source`
+        is used only by the operator profile so a citation can be produced live; Horizon never
+        writes context. Confirmed against a live probe (kind `filesystem_tree`, corpus_id required).
+
+  settles:
+    - REQ-STACK-005
+    - REQ-UI-007
+    - REQ-SAFE-004
+
+  positive_expectations:
+    - id: PE-01
+      expectation: >-
+        Seven debugger operations (why, impact, diff, timeline, counterfactual, reach, replay) are
+        available from one shared focus and each answer carries its operation id and the frame
+        context it was answered in (world, checkpoint, focus, case).
+    - id: PE-02
+      expectation: >-
+        Every substantive value names its source and a class: `recorded` (a row or field a
+        projection actually holds), `derived` (a documented per-operation rule applied to recorded
+        rows), `unknown` (the source records nothing), `effect` (a committed intent record only,
+        never proof of an external effect) or `untrusted_reference` (retrieved text).
+    - id: PE-03
+      expectation: >-
+        `why` explains a focus only through recorded rows and links (the object's provenance, its
+        declared semantic type, the links whose endpoints are that object, its lineage edges); it
+        reports an absent record as unknown rather than inventing an edge.
+    - id: PE-04
+      expectation: >-
+        `impact` follows only operational links, in the requested direction and within an explicit
+        bounded depth and node cap, reports the folded remainder and states that all relations
+        outside declared vocabulary are unknown.
+    - id: PE-05
+      expectation: >-
+        `diff` compares the frame's checkpoint with another checkpoint the caller names, both read
+        through the T06 adapter; a checkpoint that cannot be read is `unavailable`, not an empty
+        diff, and an unreadable object never counts as removed.
+    - id: PE-06
+      expectation: >-
+        `timeline` is built from operational row provenance (`observed_at`, `checkpoint_ref`),
+        ordered and immutable; when rows share an observation time the order is time then object
+        ref, not event position.
+    - id: PE-07
+      expectation: >-
+        `counterfactual` is a preview with `authority: "possibility"` and `settles: false`. It
+        reports only derived and unknown consequences and never states an outcome as current.
+    - id: PE-08
+      expectation: >-
+        `reach` reports the capability a gap needs, the provider ladder with the rungs this
+        environment actually observed, and the first failing or unknown rung; it runs nothing and
+        contacts nothing.
+    - id: PE-09
+      expectation: >-
+        `replay` re-reads recorded rows against a declared expectation and reports pass, fail or
+        `not-selected`; it writes no event, changes no row and returns `settles: false`.
+    - id: PE-10
+      expectation: >-
+        Context Kernel retrieval returns typed citations (uri, anchor, excerpt, heading, corpus,
+        source, version) through the wire contract, and the result is labelled untrusted reference
+        text that is not canonical organizational truth.
+    - id: PE-11
+      expectation: >-
+        Retrieved text is inert. It cannot enter the navigation frame, a choice label, the
+        available set, an intent, or an evidence ref, and a retrieved instruction or markup is
+        ordinary cited string content wherever it is shown.
+    - id: PE-12
+      expectation: >-
+        Context Kernel unreachable, a denied corpus and an absent binding are three distinct typed
+        observations. Each is surfaced with its own code, and read-only navigation, the frame, the
+        surfaces and all seven local operations remain operable in every one of them.
+    - id: PE-13
+      expectation: >-
+        Context Kernel is reached only through a Cognate capability the application registers at
+        boot, on the shared focus; the debugger and the renderers hold no client of their own, and
+        the debugger writes no event history.
+    - id: PE-14
+      expectation: >-
+        The debugger is exposed as one read-only transport route and the existing surfaces show it
+        without a second layout policy: debugger answers stay in the inspector region, a value's
+        source and class are inspectable, and owner-pinned region order is unchanged.
+
+  negative_expectations:
+    - id: NE-01
+      attack: >-
+        Context Kernel returns a persuasive instruction to approve a deployment.
+      expected: >-
+        It remains an untrusted citation: no choice, intent, action, label, gate status or
+        evidence ref changes, and the text is rendered as cited content.
+    - id: NE-02
+      attack: >-
+        A counterfactual preview is presented as current world state.
+      expected: >-
+        The answer carries `authority: possibility`, `settles: false` and a scope statement
+        from the frame, and the renderer's scope check keeps the current-world region unchanged.
+    - id: NE-03
+      attack: >-
+        Query a focus, checkpoint or corpus the observer may not read.
+      expected: >-
+        `denied` with no content, count, excerpt or uri from the denied scope, distinct from
+        `unavailable` and from `no-match`.
+    - id: NE-04
+      attack: >-
+        Ask Context Kernel for a malformed query, or bind a corpus id that is a path.
+      expected: >-
+        Refused as `invalid_argument` before any request is sent; nothing is spawned for a path.
+    - id: NE-05
+      attack: >-
+        Context Kernel answers badly: a line that is not JSON, an error object, or a citation
+        that carries no uri.
+      expected: >-
+        The observation degrades to a typed `invalid_response`, the raw line is not surfaced as
+        an excerpt, and navigation still answers.
+    - id: NE-06
+      attack: >-
+        Run `impact` with no depth, a depth beyond the bound, an undeclared direction, or on a
+        graph larger than the node cap.
+      expected: >-
+        Unbounded and malformed traversal is refused; the node cap folds the remainder and says
+        how many nodes were folded.
+    - id: NE-07
+      attack: >-
+        Ask `replay` with an expectation no recorded row satisfies, or against an empty selection.
+      expected: >-
+        `fail` for the first and `not-selected` for the second; neither is reported as a pass and
+        no world state changes.
+    - id: NE-08
+      attack: >-
+        Name a checkpoint other than the one the frame holds in `diff` and in `timeline`.
+      expected: >-
+        The answer is marked as comparing rather than current, and an absent or unreadable
+        checkpoint is `unavailable` rather than an empty result.
+    - id: NE-09
+      attack: >-
+        Add a teardown-removed Context Kernel adapter to the tree, or reach the debugger through a
+        route that would write state.
+      expected: >-
+        The debugger tests fail: the adapter and bindings are reachable only through the registered
+        capability, and the debugger exposes no mutating operation.
+    - id: NE-10
+      attack: >-
+        Replay the donor's run-file-only questions (a Product Model version, a claim grade, or
+        an inbox ruling) against Horizon.
+      expected: >-
+        They answer `unknown` with the missing source named; no Product Model, inbox or claim
+        grade is fabricated.
+
+  falsifier: >-
+    Context Kernel returns a persuasive instruction to approve a deployment and any surface
+    presents it as governance (an action, an affordance, a label, an authority statement or a
+    settlement claim); or Context Kernel is unavailable and read-only navigation or the debugger
+    stops answering for its own focus.
+
+  known_confounds:
+    - Mocks and fixture-only results are not live settlement evidence.
+    - Pinned external API and skill versions may differ from prose documentation.
+    - Context Kernel is a local build from the sibling checkout, not a published release; the
+      live retrieval observation states the commit it was built from.
+    - Horizon operational rows remain fixture-produced (the T06 known confound), so debugger
+      answers describe fixture rows; integration_level stays `fixture`.
+    - The reach rungs observed on this machine are installed and configured only; the probed,
+      reachable and authorized rungs stay `unknown` because no prober exists.
+    - Counterfactual `derived` consequences are this project documented rules, not a model of
+      any external engine; the answers say so.
+
+  evidence_plan:
+    - Run the prereg shape check before implementation and inside the narrow gate.
+    - Run the adapter, debugger and surface tests over a real T06 projection read and a real
+      spawned Context Kernel process for the live retrieval case.
+    - Run the teeth suite attacking the injected instruction, counterfactual scope, denied scope,
+      malformed arguments, invalid responses, unbounded traversal, failed replay, alternate
+      checkpoints, a removed adapter and donor-only questions.
+    - Run `just gate-t10`, then `just verify`, retaining exact output.
+    - Record decisions (DEC-T10-*), the live Context Kernel transcript and remaining unknowns in
+      `.agents/evidence/horizon/T10/`.
+
+  redesign_trigger: >-
+    World debugger cannot produce evidence-backed answers from actual sources unless it invents
+    edges.
+
+  confirmation_condition: >-
+    Builder demonstrates preregistered positive and negative checks with stable evidence and
+    documents plausible alternate failures.
+
+  notes: >-
+    T10 adapts the donor's question set and classification vocabulary; it does not adopt the
+    donor's Product Model storage, its run files or its product-authority engine. Context Kernel
+    is reached only through a Cognate capability (REQ-STACK-010), and no answer from it is
+    promoted into `horizon.navigation/2`.

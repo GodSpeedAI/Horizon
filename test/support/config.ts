@@ -13,6 +13,9 @@ export function horizonDocument(options: {
   readonly researchCommand?: readonly string[];
   readonly secretPath: string;
   readonly worldRef?: string;
+  /** Omit entirely to leave Context Kernel unbound (`absent`); a list binds it. */
+  readonly contextKernelCommand?: readonly string[];
+  readonly corpusId?: string;
 }): Record<string, unknown> {
   return {
     deployment_profile: "local_operator",
@@ -22,6 +25,9 @@ export function horizonDocument(options: {
     world_ref: options.worldRef ?? PINNED_WORLD_REF,
     runtime_store: options.storePath,
     research_command: [...(options.researchCommand ?? RESEARCH_COMMAND)],
+    ...(options.contextKernelCommand === undefined
+      ? {}
+      : { context_kernel: { command: [...options.contextKernelCommand], corpus_id: options.corpusId ?? "horizon" } }),
     identity: { source: "os_session", operator_prefix: "os:", agent_prefix: "agent:" },
     secrets: { mode: "per_launch", path: options.secretPath },
     transports: { connect: "loopback", http: "loopback", gui: "loopback" },

@@ -6,6 +6,9 @@ import type { Component, Policy } from "@godspeedai/cognate-kernel-api";
 import type { HorizonConfig } from "../config/types.ts";
 import type { LoadedWorld } from "../adapters/semantic.ts";
 import { healthAgent } from "../agents/health.ts";
+import type { ContextKernelAdapter } from "../adapters/context-kernel.ts";
+import { contextReferenceComponent } from "../capabilities/context.ts";
+import { CONTEXT_REFERENCE } from "../capabilities/context.ts";
 import { semanticWorldComponent } from "../capabilities/semantic.ts";
 import { navigationContextProjection } from "../projections/navigation-context.ts";
 import { operationalObjectsProjection } from "../projections/operational-objects.ts";
@@ -19,12 +22,16 @@ function fail(message: string): never {
 }
 
 /** Capabilities the structural skeleton resolves. Anything else is denied (spec §32). */
-const READ_ONLY_CAPABILITIES = new Set(["horizon.semantics.world", "horizon.navigation.intent.commit"]);
+const READ_ONLY_CAPABILITIES = new Set(["horizon.semantics.world", "horizon.navigation.intent.commit", CONTEXT_REFERENCE.id]);
 
 const policy: Policy = {
   authorize(request) {
     if (READ_ONLY_CAPABILITIES.has(request.capability.id) && (request.actor.kind === "user" || request.actor.kind === "agent")) {
-      return { allow: true, policyId: "horizon.local.read-only-semantics", reason: "read-only semantic projection or intent commit" };
+      return {
+        allow: true,
+        policyId: "horizon.local.read-only-semantics",
+        reason: "read-only semantic projection, reference retrieval or intent commit",
+      };
     }
     return { allow: false, policyId: "horizon.local.default-deny", reason: "capability is not part of the structural skeleton" };
   },
@@ -71,6 +78,12 @@ export async function createHorizonRuntime(
     readonly components?: readonly Component[];
     /** Agent definitions; the application injects its intent-bound observation agent here. */
     readonly agents?: readonly AgentDefinition[];
+    /**
+     * The Context Kernel adapter the boot-registered capability binds, instead of building one
+     * from `context_kernel.command`. This changes what the capability talks to, never whether it
+     * is registered, so the capability stays the only path (REQ-STACK-010).
+     */
+    readonly contextAdapter?: ContextKernelAdapter;
   },
 ): Promise<HorizonRuntime> {
   const storePath = assertStoreBoundary(config, options.storePath ?? config.runtime_store);
@@ -79,7 +92,9 @@ export async function createHorizonRuntime(
     policy,
     actions,
     agents: options.agents ?? [healthAgent],
-    components: [semanticWorldComponent(world), ...(options.components ?? [])],
+    // Retrieval is registered at boot whether or not a Context Kernel is configured: the capability
+    // answers `absent` itself, so a route has one path and no configuration branch (REQ-STACK-010).
+    components: [semanticWorldComponent(world), contextReferenceComponent(config.context_kernel, options.contextAdapter === undefined ? {} : { adapter: options.contextAdapter }), ...(options.components ?? [])],
     projections: [
       { projection: navigationContextProjection, public: true },
       { projection: operationalObjectsProjection, public: true },

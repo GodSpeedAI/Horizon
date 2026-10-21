@@ -177,9 +177,22 @@ teeth-t09:
 gate-t09: check-t09 teeth-t09 test check boundaries idm-integrity acceptance-claims witness-claims contract-modals ledger wayfinder teeth
     @echo "gate-t09: ok — atomic GUI projection in Cognate React"
 
-gate-t10:
-    @echo "gate-t10: not implemented; fails closed until T10 settles"
-    @exit 1
+# T10: the seven-operation world debugger over the shared frame, and CK retrieval through the
+# boot-registered capability. The narrow target proves shape and coverage; the teeth separately
+# attack untrusted citations, counterfactual authority, denied/absent retrieval, unbounded
+# traversal and unreadable checkpoints, and a mutation runner proves those teeth actually bite.
+check-t10:
+    bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/T10.prereg.yaml
+    bun test test/retrieval-debugger.test.ts
+
+teeth-t10:
+    bun test test/retrieval-debugger-teeth.test.ts
+
+teeth-t10-mutation:
+    bun run scripts/teeth-t10-mutation.ts
+
+gate-t10: check-t10 teeth-t10 teeth-t10-mutation test check boundaries idm-integrity acceptance-claims witness-claims contract-modals ledger wayfinder teeth
+    @echo "gate-t10: ok — source-grounded seven-operation world debugger with CK retrieval"
 
 gate-t11:
     @echo "gate-t11: not implemented; fails closed until T11 settles"
