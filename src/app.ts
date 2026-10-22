@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { statSync } from "node:fs";
 import type { Caller } from "@godspeedai/cognate-runtime-api";
+import { governanceFromEnv, type GovernanceOptions } from "@godspeedai/cognate-runtime-bun";
 import { loadWorld, type LoadedWorld } from "./adapters/semantic.ts";
 import { observeResearch, requireResearch, type ResearchStatus } from "./adapters/research.ts";
 import { loadConfig } from "./config/load.ts";
@@ -153,6 +154,12 @@ export async function createApplication(
      * policy and the binding shape under test are the production ones (REQ-STACK-010).
      */
     readonly contextAdapter?: ContextKernelAdapter;
+    /**
+     * The external authority for consequential operations (J02 IS3). Defaults to Cognate's
+     * `COGNATE_GOVERNANCE` / `COGNATE_SEA_FORGE_SOCKET` / `COGNATE_WORLD_REF`; off when unset, and a
+     * partial configuration is a startup error, never a silent fallback.
+     */
+    readonly governance?: GovernanceOptions;
   } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath);
@@ -166,6 +173,7 @@ export async function createApplication(
     components: [navigationIntentComponent(frames)],
     agents: [structuralObservationAgent(frames)],
     ...(options.contextAdapter === undefined ? {} : { contextAdapter: options.contextAdapter }),
+    governance: options.governance ?? governanceFromEnv(process.env),
   });
   let issued: FrameView | null = null;
 
