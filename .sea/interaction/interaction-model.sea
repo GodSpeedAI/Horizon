@@ -204,6 +204,86 @@ entity "FocusSet" {
     page_cursor: string optional
 }
 
+// HORIZON-001 1.1.0 (SPEC-CR-002): payment is a vector of non-fungible currencies (manifesto v17 §8).
+// Horizon's currency set is a design choice adopting v17 §8's minimum list; extending it is a spec version.
+enum Currency {
+    steering_attention = "steering_attention",
+    orchestration = "orchestration",
+    compute = "compute",
+    verification = "verification",
+    recovery = "recovery",
+    structural_maintenance = "structural_maintenance",
+    representational_formation = "representational_formation",
+    risk_irreversibility = "risk_irreversibility",
+    opportunity = "opportunity"
+}
+
+enum PaymentBasis {
+    declared_bound = "declared_bound",
+    predicted = "predicted"
+}
+
+enum CapacityPeriod {
+    none = "none",
+    day = "day"
+}
+
+enum ExpectationModality {
+    obligation = "obligation",
+    prohibition = "prohibition",
+    permission = "permission"
+}
+
+// The closed type model has no nested records: payment entries, allowances, reservations and expectations are
+// entities, referenced by key.
+
+// REQ-NAV-008. `amount` absent means unknown; entries are never summed, weighted or converted.
+entity "PaymentEntry" {
+    key entry_id: uuid
+    currency: Currency
+    unit: string
+    amount: decimal optional (min 0)
+    basis: PaymentBasis
+    source_ref: string
+}
+
+// REQ-NAV-009. `allowance` absent means unbounded; `day` resets consumption at each UTC midnight.
+entity "CapacityAllowance" {
+    key allowance_id: string
+    currency: Currency
+    unit: string
+    allowance: decimal optional (min 0)
+    period: CapacityPeriod
+}
+
+// The capacity ledger aggregate: one per tenant. A reservation commits atomically with its intent and becomes
+// consumption (terminal_at set) when the intent is terminal.
+entity "CapacityLedger" {
+    key ledger_id: string
+    tenant: string
+}
+
+entity "CapacityReservation" {
+    key reservation_id: string
+    ledger: ref<CapacityLedger>
+    intent_id: uuid
+    bounds: list<ref<PaymentEntry>>
+    reserved_at: timestamp
+    terminal_at: timestamp optional
+}
+
+// REQ-NAV-011 (manifesto v17 §5): formed before the outcome is observable and never revised; keyed by digest.
+entity "ExpectedOutcome" {
+    key expectation_digest: string
+    modality: ExpectationModality
+    statement: string
+    refuted_by: string
+    irrelevant: list<string>
+    unaccounted: list<string>
+    verifier_template_ref: string
+    window_s: int (min 1)
+}
+
 entity "AffordanceAssessment" {
     key assessment_id: uuid
     operation_ref: string
@@ -211,7 +291,7 @@ entity "AffordanceAssessment" {
     reversibility: ReversibilityClass
     authority_outcome: AuthorityOutcome
     first_blocker: string optional
-    payment_estimate: string optional
+    payment_estimate: list<ref<PaymentEntry>>
     estimate_provenance: string optional
 }
 
@@ -223,6 +303,10 @@ entity "NavigationIntentRecord" {
     operation_ref: string
     authority_ref: string optional
     correlation_ref: string optional
+    contract_version: int (min 1)
+    expected_outcome: ref<ExpectedOutcome> optional
+    realitytrace_threshold_id: string optional
+    realitytrace_threshold_position: int optional (min 0)
 }
 
 entity "SurfaceSpecRecord" {
@@ -444,6 +528,10 @@ record CommitIntentInput {
     frame_revision: int (min 0)
     actor_ref: string
     operation_ref: string
+    contract_version: int (min 1)
+    expected_outcome: ref<ExpectedOutcome> optional
+    realitytrace_threshold_id: string optional
+    realitytrace_threshold_position: int optional (min 0)
 }
 
 record CommitIntentOutput {
@@ -752,10 +840,10 @@ instance oq_cognitiveos_refs of "OpenSemanticQuestion" {
 
 instance oq_payment_model of "OpenSemanticQuestion" {
     question_id: "OQ-IDM-02",
-    statement: "The concrete payment model (units, estimation source, affordability gate inputs) is not yet specified.",
+    statement: "The concrete payment model (units, estimation source, affordability gate inputs) is not yet specified. Resolved by HORIZON-001 1.1.0 (SPEC-CR-002): PaymentEntry vectors, per-(currency, unit) CapacityAllowance and the CapacityLedger.",
     evidence_class: "unknown",
-    status: "open",
-    blocks: "binding the payment gate to a real capability contract"
+    status: "resolved",
+    blocks: "nothing since HORIZON-001 1.1.0"
 }
 
 instance oq_authority_preview of "OpenSemanticQuestion" {

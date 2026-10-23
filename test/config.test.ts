@@ -17,7 +17,7 @@ function fixture(overrides: Record<string, unknown> = {}): Record<string, unknow
     port: 4319,
     world_alias: "horizon",
     world_ref:
-      "world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0",
+      "world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290",
     runtime_store: ".cognate/app.sqlite",
     research_command: ["uv", "run", "--project", "research", "python", "-m", "horizon_research.contract"],
     identity: { source: "os_session", operator_prefix: "os:", agent_prefix: "agent:" },

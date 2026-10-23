@@ -16,7 +16,7 @@ import {
   type PaymentEstimate,
 } from "../../src/domain/navigation.ts";
 
-export const WORLD = "world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0";
+export const WORLD = "world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290";
 export const CHECKPOINT = "cognate:projection@1";
 export const OBSERVER = "os:operator:1000";
 export const TENANT = "tenant:godspeed";
