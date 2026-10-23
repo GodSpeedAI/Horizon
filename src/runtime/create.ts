@@ -1,7 +1,8 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { AgentDefinition, Caller } from "@godspeedai/cognate-runtime-api";
-import { createRuntime, type ActionPolicy, type GovernanceOptions, type Runtime } from "@godspeedai/cognate-runtime-bun";
+import { createRuntime, type ActionPolicy, type GovernanceOptions, type PendingEvent, type Runtime } from "@godspeedai/cognate-runtime-bun";
+import type { OutboxIntent } from "@godspeedai/cognate-events";
 import type { Component, Policy } from "@godspeedai/cognate-kernel-api";
 import type { HorizonConfig } from "../config/types.ts";
 import type { LoadedWorld } from "../adapters/semantic.ts";
@@ -90,6 +91,11 @@ export async function createHorizonRuntime(
      * carries the decision and never grants authority itself (AGENTS.md §9). Absent: governance is off.
      */
     readonly governance?: GovernanceOptions;
+    /**
+     * Outbox intents committed atomically with each run event (J02 IS6): the application asks for a
+     * RealityTrace observation of each governed navigation commit. Absent: no observations.
+     */
+    readonly outboxFor?: (event: PendingEvent) => readonly OutboxIntent[];
   },
 ): Promise<HorizonRuntime> {
   const storePath = assertStoreBoundary(config, options.storePath ?? config.runtime_store);
@@ -107,6 +113,7 @@ export async function createHorizonRuntime(
     ],
     tickMs: 5,
     ...(options.governance ? { governance: options.governance } : {}),
+    ...(options.outboxFor ? { outboxFor: options.outboxFor } : {}),
   });
   return { runtime, caller: options.caller, storePath };
 }
