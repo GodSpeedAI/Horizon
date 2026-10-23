@@ -362,6 +362,30 @@ describe("structural walking skeleton", () => {
     expect(records.at(-1)!.record.intent_id).toBe(issued.intent.intent_id);
   }, 60_000);
 
+  test("an intent id commits exactly once: the same intent again returns the first record, a different one is duplicate_intent", async () => {
+    const root = fixture();
+    application = await configuredApplication(root);
+    const app = application;
+    const store = app.runtime.runtime.store;
+
+    const first = await app.commitNavigationIntent({ operationRef: "horizon.health" });
+    const again = await app.submitIntent(first.intent);
+    expect(again.eventId).toBe(first.eventId);
+    expect(again.position).toBe(first.position);
+
+    // The same id on a newer frame is a different intent: refused, and no second record.
+    const frame = app.frames.current()!;
+    app.frames.issue({ ...frame, frame_id: "frame-duplicate-id", revision: frame.revision + 1 });
+    const current = app.frames.current()!;
+    const duplicate = await app
+      .submitIntent({ ...first.intent, frame_id: current.frame_id, frame_revision: current.revision })
+      .then(() => null, (reason: unknown) => reason as Error & { code?: string });
+    expect(duplicate?.code).toBe("already_exists");
+    expect(duplicate?.message).toContain("duplicate_intent");
+    expect((await readIntentRecords(store)).map((entry) => entry.record.intent_id)).toEqual([first.intent.intent_id]);
+    expect((await readIntentAttempts(store)).filter((a) => a.intent_id === first.intent.intent_id).map((a) => a.outcome)).toEqual(["accepted", "accepted", "refused"]);
+  }, 60_000);
+
   test("a failed optional research source degrades one gate and leaves read-only startup and operations intact", async () => {
     const root = fixture();
     application = await configuredApplication(root, { researchCommand: ["/usr/bin/false"] });

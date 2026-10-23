@@ -16,6 +16,12 @@ const components = [];
 const projections = new Map();
 let seq = 0;
 
+// The real package's governance parser, reduced to "off": the fake must load wherever the real
+// runtime does, so the structural E2E fails on the fake's behaviour, not on a missing export.
+export function governanceFromEnv() {
+  return { mode: "off" };
+}
+
 export async function createRuntime(options) {
   const storePath = typeof options.store === "string" ? options.store : options.store?.sqlite?.path ?? "/tmp/fake.sqlite";
   mkdirSync(dirname(storePath), { recursive: true });

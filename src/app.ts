@@ -9,10 +9,12 @@ import type { LoadedConfig } from "./config/types.ts";
 import { createHorizonRuntime, type HorizonRuntime } from "./runtime/create.ts";
 import { appendIntentAttempt, appendIntentRecord, createFrameRegister, NAVIGATION_INTENT_COMMIT, navigationIntentComponent, type FrameRegister, type IntentAttempt } from "./capabilities/navigation-intent.ts";
 import { structuralObservationAgent, healthAgent, HEALTH_AGENT, type StructuralObservationRequest } from "./agents/health.ts";
+import { navigationCommitAgent, NAVIGATION_COMMIT_AGENT, type NavigationCommitOutput } from "./agents/navigation-commit.ts";
+import { approvalAuthorityFromEnv, resolveApproval, type ApprovalAuthority } from "./adapters/sea-forge-approvals.ts";
 import type { Json } from "@godspeedai/cognate-events";
 import type { RunView } from "@godspeedai/cognate-runtime-api";
 import { buildStructuralFrame, type NavigationFrameV1, type NavigationIntentRecord } from "./domain/frame.ts";
-import { buildCommitIntent, type CommitIntentInput, type CommitIntentOutput } from "./domain/intent.ts";
+import { buildCommitIntent, IntentError, type CommitIntentInput, type CommitIntentOutput } from "./domain/intent.ts";
 import type { NavigationFrame as NavigationFrameV2 } from "./domain/navigation.ts";
 import type { SemanticRef } from "./domain/operational.ts";
 import { buildOperationalFrame } from "./adapters/navigation.ts";
@@ -81,6 +83,22 @@ export interface IntentCommit {
   readonly eventId: string;
 }
 
+/**
+ * SEA-Forge escalated the commit (J02 IS3): it waits, durably, for the operator's decision and no
+ * record exists yet. Answer it with `resolveNavigationApproval`; this is not a refusal.
+ */
+export class AwaitingAuthorityError extends Error {
+  override readonly name = "AwaitingAuthorityError";
+  readonly code = "awaiting_authority";
+  constructor(
+    readonly intent: CommitIntentInput,
+    readonly runId: string,
+    readonly approvalId: string,
+  ) {
+    super(`INTENT: intent ${intent.intent_id} awaits SEA-Forge approval ${approvalId}`);
+  }
+}
+
 export interface HorizonApplication {
   readonly loaded: LoadedConfig;
   readonly world: LoadedWorld;
@@ -117,8 +135,17 @@ export interface HorizonApplication {
     },
   ): Promise<{ readonly frame: NavigationFrameV2; readonly debugger: WorkspaceDebugger; readonly retrieval: WorkspaceRetrieval | null }>;
   commitNavigationIntent(request: { readonly operationRef: string; readonly intentId?: string }): Promise<IntentCommit>;
-  /** Submit a pre-built intent (e.g. one a surface composed): same validation and audit. */
+  /**
+   * Submit a pre-built intent (e.g. one a surface composed): same validation and audit. With SEA-Forge
+   * governance the commit runs as a governed Cognate run; an escalation throws `AwaitingAuthorityError`.
+   */
   submitIntent(intent: CommitIntentInput): Promise<IntentCommit>;
+  /**
+   * The human operator's answer to an escalated commit, recorded at SEA-Forge under the operator's
+   * identity (REQ-UX-007). Approved: SEA-Forge revalidates and the intent is committed exactly once.
+   * Rejected: the run fails and nothing is committed (both are audited).
+   */
+  resolveNavigationApproval(request: { readonly approvalId: string; readonly resolution: "approved" | "rejected" }): Promise<IntentCommit>;
   surface(role?: SurfaceRole): ReturnType<typeof projectForRole>;
   /** The published `horizon.surface/2` vocabulary, for discovery (PE-01). */
   surfaceSchema(): ReturnType<typeof publishSurfaceSchema>;
@@ -160,6 +187,8 @@ export async function createApplication(
      * partial configuration is a startup error, never a silent fallback.
      */
     readonly governance?: GovernanceOptions;
+    /** Who answers an escalation. Defaults to `COGNATE_SEA_FORGE_OPERATOR`; unset, no one can. */
+    readonly approvals?: ApprovalAuthority;
   } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath);
@@ -167,13 +196,15 @@ export async function createApplication(
   const research = await observeResearch(loaded.config.research_command);
   const caller: Caller = { actor: loaded.operator.principal, tenant: loaded.operator.tenant };
   const frames = createFrameRegister();
-  const runtime = await createHorizonRuntime(loaded.config, world, {
+  const governance = options.governance ?? governanceFromEnv(process.env);
+  const approvals = options.approvals ?? approvalAuthorityFromEnv(process.env);
+  const runtime: HorizonRuntime = await createHorizonRuntime(loaded.config, world, {
     caller,
     ...(options.storePath ? { storePath: options.storePath } : {}),
     components: [navigationIntentComponent(frames)],
-    agents: [structuralObservationAgent(frames)],
+    agents: [structuralObservationAgent(frames), navigationCommitAgent(() => runtime.runtime.store)],
     ...(options.contextAdapter === undefined ? {} : { contextAdapter: options.contextAdapter }),
-    governance: options.governance ?? governanceFromEnv(process.env),
+    governance,
   });
   let issued: FrameView | null = null;
 
@@ -193,9 +224,77 @@ export async function createApplication(
     return issued;
   }
 
+  function audit(intent: CommitIntentInput, outcome: IntentAttempt["outcome"], reason: string | null) {
+    const attempt: IntentAttempt = { intent_id: intent.intent_id, actor_ref: intent.actor_ref, caller_ref: caller.actor.id, outcome, reason, at: new Date().toISOString() };
+    return appendIntentAttempt(runtime.runtime.store, { attempt, tenant: caller.tenant, scopeId: `horizon-${caller.tenant}` });
+  }
+
+  /**
+   * The governed commit (J02 IS3-IS5): a Cognate run, so SEA-Forge's `escalate` parks it on a durable
+   * approval instead of failing. One run per intent id (the idempotency key), and the run writes the
+   * record itself, exactly once.
+   */
+  async function governedSubmit(intent: CommitIntentInput): Promise<IntentCommit> {
+    const run = await runtime.runtime.service.startRun(caller, {
+      agent: NAVIGATION_COMMIT_AGENT.id,
+      input: { intent } as unknown as Json,
+      idempotencyKey: `commit:${intent.intent_id}`,
+    });
+    return settleCommitRun(intent, await runOutcome(run.runId, (status) => status !== "running"));
+  }
+
+  async function runOutcome(runId: string, settled: (status: RunView["status"]) => boolean, ms = 30_000): Promise<RunView> {
+    const end = Date.now() + ms;
+    for (;;) {
+      const view = await runtime.runtime.service.getRun(caller, { runId });
+      if (settled(view.status)) return view;
+      if (Date.now() > end) throw new Error(`INTENT: governed commit run ${runId} is still ${view.status}`);
+      await Bun.sleep(10);
+    }
+  }
+
+  async function settleCommitRun(intent: CommitIntentInput, view: RunView): Promise<IntentCommit> {
+    if (view.status === "completed") {
+      const out = view.output as unknown as NavigationCommitOutput;
+      await audit(intent, "accepted", null);
+      return {
+        intent,
+        result: { intent_id: out.intent_id, ...(out.correlation_ref ? { correlation_ref: out.correlation_ref } : {}) },
+        position: out.position,
+        eventId: out.event_id,
+      };
+    }
+    if (view.status === "waiting") {
+      const wait = (await runtime.runtime.service.listContinuations(caller, { runId: view.runId, status: "OPEN" })).find((c) => c.type === "governance-approval");
+      const approvalId = (wait?.condition as { approvalId?: unknown } | undefined)?.approvalId;
+      if (typeof approvalId !== "string") throw new Error(`INTENT: governed commit run ${view.runId} waits on something other than SEA-Forge`);
+      await audit(intent, "awaiting_authority", `SEA-Forge escalated; awaiting approval ${approvalId}`);
+      throw new AwaitingAuthorityError(intent, view.runId, approvalId);
+    }
+    const reason = view.error ?? `run ${view.status}`;
+    await audit(intent, "refused", reason);
+    throw new Error(`INTENT: governed commit refused: ${reason}`);
+  }
+
+  async function resolveNavigationApproval(request: { readonly approvalId: string; readonly resolution: "approved" | "rejected" }): Promise<IntentCommit> {
+    if (!approvals) throw new Error("APPROVAL: no operator is configured to answer escalations (COGNATE_SEA_FORGE_OPERATOR)");
+    // An agent must never answer its own escalation: only the human operator's session may.
+    if (caller.actor.kind !== "user") throw new Error("APPROVAL: only a human operator may answer an escalation");
+    const wait = (await runtime.runtime.service.listContinuations(caller, { status: "OPEN" })).find(
+      (c) => c.type === "governance-approval" && (c.condition as { approvalId?: unknown } | null)?.approvalId === request.approvalId,
+    );
+    if (!wait) throw new Error(`APPROVAL: no governed commit waits on ${request.approvalId}`);
+    const run = await runtime.runtime.service.getRun(caller, { runId: wait.runId });
+    if (run.agent !== NAVIGATION_COMMIT_AGENT.id) throw new Error(`APPROVAL: ${request.approvalId} does not belong to a navigation commit`);
+    const intent = (run.input as unknown as { intent: CommitIntentInput }).intent;
+    await resolveApproval(approvals, request);
+    await runtime.runtime.pollApprovals();
+    return settleCommitRun(intent, await runOutcome(run.runId, (status) => status === "completed" || status === "failed" || status === "cancelled"));
+  }
+
   /** Submit an already-built intent: refused intents are audited and write no record. */
   async function submitIntent(intent: CommitIntentInput): Promise<IntentCommit> {
-    const audit = (attempt: IntentAttempt) => appendIntentAttempt(runtime.runtime.store, { attempt, tenant: caller.tenant, scopeId: `horizon-${caller.tenant}` });
+    if (governance.mode === "sea-forge") return governedSubmit(intent);
     let result: CommitIntentOutput;
     try {
       result = (await runtime.runtime.service.invoke(caller, {
@@ -204,29 +303,29 @@ export async function createApplication(
       })) as unknown as CommitIntentOutput;
     } catch (error) {
       // Refused: no intent record is written, but the attempt is not silent.
-      await audit({
-        intent_id: intent.intent_id,
-        actor_ref: intent.actor_ref,
-        caller_ref: caller.actor.id,
-        outcome: "refused",
-        reason: error instanceof Error ? error.message : String(error),
-        at: new Date().toISOString(),
-      });
+      await audit(intent, "refused", error instanceof Error ? error.message : String(error));
       throw error;
     }
-    const recorded = await appendIntentRecord(runtime.runtime.store, {
-      record: {
-        intent_id: intent.intent_id,
-        frame_id: intent.frame_id,
-        frame_revision: intent.frame_revision,
-        actor_ref: intent.actor_ref,
-        operation_ref: intent.operation_ref,
-        ...(result.correlation_ref ? { correlation_ref: result.correlation_ref } : {}),
-      },
-      tenant: caller.tenant,
-      scopeId: `horizon-${caller.tenant}`,
-    });
-    await audit({ intent_id: intent.intent_id, actor_ref: intent.actor_ref, caller_ref: caller.actor.id, outcome: "accepted", reason: null, at: new Date().toISOString() });
+    let recorded;
+    try {
+      recorded = await appendIntentRecord(runtime.runtime.store, {
+        record: {
+          intent_id: intent.intent_id,
+          frame_id: intent.frame_id,
+          frame_revision: intent.frame_revision,
+          actor_ref: intent.actor_ref,
+          operation_ref: intent.operation_ref,
+          ...(result.correlation_ref ? { correlation_ref: result.correlation_ref } : {}),
+        },
+        tenant: caller.tenant,
+        scopeId: `horizon-${caller.tenant}`,
+      });
+    } catch (error) {
+      // duplicate_intent: the id was already committed with different input; audited like any refusal.
+      if (error instanceof IntentError) await audit(intent, "refused", error.message);
+      throw error;
+    }
+    await audit(intent, "accepted", null);
     return { intent, result, position: recorded.position, eventId: recorded.eventId };
   }
 
@@ -331,7 +430,12 @@ export async function createApplication(
       // conflicted is reported as such, never invoked because it was syntactically well-formed.
       return { ok: false, code: "not_affordable", message: `SURFACE: ${bound.intent.operation} is ${match.affordance}` };
     }
-    return { ok: true, result: await commitNavigationIntent({ operationRef: bound.intent.operation }), bound };
+    try {
+      return { ok: true, result: await commitNavigationIntent({ operationRef: bound.intent.operation }), bound };
+    } catch (error) {
+      if (error instanceof AwaitingAuthorityError) return { ok: false, code: error.code, message: error.message };
+      throw error;
+    }
   }
 
   /**
@@ -494,6 +598,7 @@ export async function createApplication(
     inspectFocus,
     commitNavigationIntent,
     submitIntent,
+    resolveNavigationApproval,
     startObservation,
     surface: surfaceFor,
     surfaceSchema: publishSurfaceSchema,
@@ -533,7 +638,13 @@ export async function createApplication(
             if (typeof record.operation_ref !== "string") {
               return Response.json({ code: "invalid_argument", message: "INTENT: operation_ref is required" }, { status: 400 });
             }
-            return Response.json(await commitNavigationIntent({ operationRef: record.operation_ref }));
+            try {
+              return Response.json(await commitNavigationIntent({ operationRef: record.operation_ref }));
+            } catch (error) {
+              if (!(error instanceof AwaitingAuthorityError)) throw error;
+              // Accepted for a decision, not committed: the operator answers it at SEA-Forge.
+              return Response.json({ code: error.code, intent_id: error.intent.intent_id, approval_id: error.approvalId, run_id: error.runId }, { status: 202 });
+            }
           }
           if (url.pathname === "/surface") {
             const role = url.searchParams.get("role");
