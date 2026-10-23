@@ -12,6 +12,7 @@ import {
   available,
   consume,
   emptyLedger,
+  formatPayment,
   paymentGate,
   reserve,
   validateBinding,
@@ -125,5 +126,28 @@ describe("REQ-NAV-009 the payment gate", () => {
     expect(() => assertAllowance({ currency: "compute", unit: "s", allowance: -1 })).toThrow(/non-negative/);
     expect(() => assertAllowance({ currency: "compute", unit: "s", allowance: 1, period: "week" })).toThrow(/period/);
     expect(assertAllowance({ currency: "compute", unit: "s", allowance: "unbounded" }).period).toBe("none");
+  });
+});
+
+describe("REQ-NAV-008 / REQ-NAV-010 presentation", () => {
+  test("every currency at 0 says so, and an unknown bound is never shown as a number", () => {
+    expect(formatPayment({ entries: binding() })).toBe("declared bound: 0 in every currency");
+    expect(formatPayment({ entries: binding({ compute: "unknown" }) })).toBe("declared bound: compute unknown units; 0 in the 8 other");
+    expect(formatPayment(null)).toBe("No payment is declared.");
+  });
+
+  test("an observed spend is shown beside the bound it was declared against, never alone", () => {
+    const view = { entries: binding({ steering_attention: 1 }), observed: [{ currency: "steering_attention" as const, unit: "units", amount: 2, source_ref: "sea-forge:authority_approvals" }] };
+    expect(formatPayment(view)).toBe("declared bound: steering_attention declared 1 units, observed 2 units (sea-forge:authority_approvals); 0 in the 8 other");
+    const zeroBound = { entries: binding(), observed: [{ currency: "steering_attention" as const, unit: "units", amount: 0, source_ref: "sea-forge:authority_approvals" }] };
+    expect(formatPayment(zeroBound)).toContain("steering_attention declared 0 units, observed 0 units");
+  });
+
+  test("predictions are labelled advisory with their source; nothing is summed across currencies", () => {
+    const view = { entries: [...binding({ compute: 3, verification: 2 }), { currency: "compute" as const, unit: "units", amount: 9, basis: "predicted" as const, source_ref: "model:estimate" }] };
+    const text = formatPayment(view);
+    expect(text).toContain("compute 3 units; verification 2 units");
+    expect(text).toContain("predicted (advisory): compute 9 units (model:estimate)");
+    expect(text).not.toContain("5 ");
   });
 });

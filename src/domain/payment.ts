@@ -225,3 +225,51 @@ export function consume(ledger: CapacityLedger, intentId: string, terminalAt: Da
 }
 
 export const holdsReservation = (ledger: CapacityLedger, intentId: string): boolean => ledger.reservations.some((entry) => entry.intent_id === intentId);
+
+/* --------------------------------------------------------------------------------------------
+ * Presentation (REQ-NAV-008, REQ-NAV-010)
+ * ------------------------------------------------------------------------------------------ */
+
+/** A spend an owner recorded, e.g. steering_attention / decisions read from SEA-Forge's approvals. */
+export interface ObservedPayment {
+  readonly currency: Currency;
+  readonly unit: string;
+  readonly amount: number;
+  readonly source_ref: string;
+}
+
+/** What a move costs: its entries (declared bounds, and advisory predictions) and, once committed, what was observed. */
+export interface PaymentView {
+  readonly entries: readonly PaymentEntry[];
+  readonly observed?: readonly ObservedPayment[];
+}
+
+const amountText = (entry: { readonly amount: number | "unknown"; readonly unit: string }) => (entry.amount === "unknown" ? `unknown ${entry.unit}` : `${entry.amount} ${entry.unit}`);
+
+/**
+ * One line every renderer uses, so a payment is never shown without its basis and an observed spend is never
+ * shown without the bound it was declared against. Nothing is summed or converted across currencies.
+ */
+export function formatPayment(view: PaymentView | null): string {
+  if (view === null) return "No payment is declared.";
+  const bounds = view.entries.filter((entry) => entry.basis === "declared_bound");
+  const predicted = view.entries.filter((entry) => entry.basis === "predicted");
+  const observed = view.observed ?? [];
+  const parts: string[] = [];
+  const shown = bounds.filter((entry) => entry.amount !== 0 || observed.some((o) => o.currency === entry.currency && o.unit === entry.unit));
+  if (bounds.length === 0) parts.push("no declared bound");
+  else if (shown.length === 0) parts.push("declared bound: 0 in every currency");
+  else {
+    const rest = bounds.length - shown.length;
+    const items = shown.map((entry) => {
+      const seen = observed.find((o) => o.currency === entry.currency && o.unit === entry.unit);
+      return seen ? `${entry.currency} declared ${amountText(entry)}, observed ${seen.amount} ${seen.unit} (${seen.source_ref})` : `${entry.currency} ${amountText(entry)}`;
+    });
+    parts.push(`declared bound: ${items.join("; ")}${rest > 0 ? `; 0 in the ${rest} other` : ""}`);
+  }
+  for (const seen of observed) {
+    if (!bounds.some((entry) => entry.currency === seen.currency && entry.unit === seen.unit)) parts.push(`observed ${seen.currency} ${seen.amount} ${seen.unit} (${seen.source_ref}) with no declared bound`);
+  }
+  if (predicted.length > 0) parts.push(`predicted (advisory): ${predicted.map((entry) => `${entry.currency} ${amountText(entry)} (${entry.source_ref})`).join("; ")}`);
+  return parts.join(" · ");
+}

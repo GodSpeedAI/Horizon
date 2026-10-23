@@ -43,7 +43,7 @@ function move(overrides: Partial<CandidateOperation> = {}): CandidateOperation {
     responsibility: "commit",
     reversibility: "reversible",
     gates: gates(),
-    payment: { estimate: "1 credit", provenance: "fixture:estimate" },
+    payment: { entries: [{ currency: "compute" as const, unit: "credits", amount: 1, basis: "predicted" as const, source_ref: "fixture:estimate" }] },
     expected_evidence: ["execution_record"],
     escalation: { behavior: "approval", approval_ref: "approval:queue-1" },
     ...overrides,
@@ -103,12 +103,12 @@ describe("T07 navigation controller — negative evidence (NE-01…NE-11)", () =
     const unauthorized = {
       ...move({
         operation_ref: "horizon.operation.high-value",
-        payment: { estimate: "1000000 credits", provenance: "fixture:estimate" },
+        payment: { entries: [{ currency: "compute" as const, unit: "credits", amount: 1000000, basis: "predicted" as const, source_ref: "fixture:estimate" }] },
         gates: gates({ authority: { verdict: "fail", authority_outcome: "denied", reason: "policy denies high-value operations" } }),
       }),
       rank: 0,
     } as CandidateOperation;
-    const authorized = move({ operation_ref: "horizon.operation.authorized", payment: { estimate: "1 credit", provenance: "fixture:estimate" } });
+    const authorized = move({ operation_ref: "horizon.operation.authorized", payment: { entries: [{ currency: "compute" as const, unit: "credits", amount: 1, basis: "predicted" as const, source_ref: "fixture:estimate" }] } });
     const f = frame({ material: true, candidates: [unauthorized, authorized] });
     expect(f.choices.find((choice) => choice.operation_ref === "horizon.operation.high-value")?.spendable).toBe(false);
     expect(f.allowed_choice_refs).not.toContain("horizon.operation.high-value");

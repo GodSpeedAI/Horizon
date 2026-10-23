@@ -13,7 +13,7 @@ import {
   type DerivedCase,
   type EscalationBehavior,
   type NavigationFrame,
-  type PaymentEstimate,
+  type PaymentView,
 } from "../../src/domain/navigation.ts";
 
 export const WORLD = "world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290";
@@ -53,7 +53,7 @@ export function consequential(input: {
   readonly operation_ref: string;
   readonly label: string;
   readonly authority?: { verdict: "pass" | "fail" | "unknown" | "conflicted"; authority_outcome: string; reason?: string; prerequisite_ref?: string };
-  readonly payment?: PaymentEstimate;
+  readonly payment?: PaymentView;
   readonly escalation?: EscalationBehavior;
   readonly reversibility?: "reversible" | "compensable" | "irreversible" | "unknown";
 }): CandidateOperation {
@@ -65,7 +65,7 @@ export function consequential(input: {
     responsibility: "commit",
     reversibility: input.reversibility ?? "compensable",
     gates: gates({ authority: { ...authority, basis_ref: CHECKPOINT } }),
-    payment: input.payment ?? { estimate: "2 credits", provenance: "heuristic estimate, never a hard gate" },
+    payment: input.payment ?? { entries: [{ currency: "compute" as const, unit: "credits", amount: 2, basis: "predicted" as const, source_ref: "heuristic estimate, never a hard gate" }] },
     expected_evidence: ["evidence:receipt"],
     escalation: input.escalation ?? { behavior: "approval", approval_ref: "sea-forge:approval" },
   };

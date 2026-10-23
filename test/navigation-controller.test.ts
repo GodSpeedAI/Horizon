@@ -47,7 +47,7 @@ function move(overrides: Partial<CandidateOperation> = {}): CandidateOperation {
     responsibility: "commit",
     reversibility: "reversible",
     gates: gates(),
-    payment: { estimate: "2 credits", provenance: "fixture:estimate" },
+    payment: { entries: [{ currency: "compute" as const, unit: "credits", amount: 2, basis: "predicted" as const, source_ref: "fixture:estimate" }] },
     expected_evidence: ["execution_record", "realitytrace_observation"],
     escalation: { behavior: "approval", approval_ref: "approval:queue-1", note: "requests approval when authority escalates" },
     ...overrides,
@@ -259,7 +259,7 @@ describe("T07 navigation controller — positive evidence (PE-01…PE-12)", () =
     const f = frame({ candidates: [move()] });
     const choice = f.choices.find((entry) => entry.operation_ref === "horizon.operation.commit");
     expect(choice?.reversibility).toBe("reversible");
-    expect(choice?.payment).toEqual({ estimate: "2 credits", provenance: "fixture:estimate" });
+    expect(choice?.payment).toEqual({ entries: [{ currency: "compute" as const, unit: "credits", amount: 2, basis: "predicted" as const, source_ref: "fixture:estimate" }] });
     expect(choice?.expected_evidence).toEqual(["execution_record", "realitytrace_observation"]);
     expect(choice?.escalation?.behavior).toBe("approval");
     expect(choice?.escalation?.approval_ref).toBe("approval:queue-1");

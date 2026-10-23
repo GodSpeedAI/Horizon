@@ -20,6 +20,7 @@ import { INTENT_INDEX_COLLECTION, NAVIGATION_INTENT_COMMIT, readIntentRecords } 
 import { readLedger } from "../src/capabilities/capacity-ledger.ts";
 import { readPending } from "../src/capabilities/pending-intent.ts";
 import { CURRENCIES, type Currency } from "../src/domain/payment.ts";
+import { applySequential, openSequential, renderSequentialText } from "../src/ui/sequential/controller.ts";
 import { PINNED_WORLD_REF, horizonDocument, writeConfig } from "./support/config.ts";
 
 const BIN = process.env.SEA_FORGE_SERVER_BIN;
@@ -82,7 +83,7 @@ async function until(ok: () => boolean | Promise<boolean>, what: string, ms = 30
 }
 
 const bounds = (overrides: Partial<Record<Currency, number>> = {}, source = "binding:horizon.intent.record@1") =>
-  CURRENCIES.map((currency) => ({ currency, unit: "units", amount: overrides[currency] ?? 0, basis: "declared_bound", source_ref: source }));
+  CURRENCIES.map((currency) => ({ currency, unit: currency === "steering_attention" ? "decisions" : "units", amount: overrides[currency] ?? 0, basis: "declared_bound", source_ref: source }));
 
 interface Cell {
   readonly root: string;
@@ -140,11 +141,14 @@ async function cell(commit: "allow" | "deny" | "escalate", options: { computeAll
   const doc = {
     ...horizonDocument({ storePath: store, secretPath: join(root, "launch.secret") }),
     operations: [
-      { operation_ref: RECORD, label: "Record a navigation intent", reversibility: "reversible", payment: bounds({ compute: 1 }), verifier: verifier(TENANT_PLACEHOLDER) },
+      { operation_ref: RECORD, label: "Record a navigation intent", reversibility: "reversible", payment: bounds({ compute: 1, steering_attention: 1 }), verifier: verifier(TENANT_PLACEHOLDER) },
       { operation_ref: WRONG_TENANT, label: "Record, checked under another tenant", reversibility: "reversible", payment: bounds({}, "binding:elsewhere@1"), verifier: verifier("tenant-that-is-not-this-one") },
       { operation_ref: EXEMPT, label: "Note (read only)", reversibility: "read_only", payment: bounds({}, "binding:note@1") },
     ],
-    capacity: [{ currency: "compute", unit: "units", allowance: options.computeAllowance ?? 10, period: "none" }],
+    capacity: [
+      { currency: "compute", unit: "units", allowance: options.computeAllowance ?? 10, period: "none" },
+      { currency: "steering_attention", unit: "decisions", allowance: 20, period: "day" },
+    ],
     settlement: { launcher, close_grace_s: GRACE_S },
   };
   const governance = governanceFromEnv({ COGNATE_GOVERNANCE: "sea-forge", COGNATE_SEA_FORGE_SOCKET: socket, COGNATE_WORLD_REF: loadWorld(PINNED_WORLD_REF).cognateWorldRef });
@@ -287,6 +291,29 @@ describe("J02 revision 2 (live)", () => {
     c.app = await c.reopen();
     const settlement = await c.app.settleNavigationIntent(id);
     expect(settlement.settlement_reference).toMatchObject({ status: "rejected", final: true, epistemic_status: "unresolved" });
+  }, 240_000);
+
+  live("REQ-NAV-010: observed steering attention equals SEA-Forge's recorded decisions, beside the declared bound in the frame and the Clack render", async () => {
+    const c = await cell("escalate");
+    const waiting = await c.app.commitNavigationIntent({ operationRef: RECORD, expectation: expectation() }).then(() => null, (e: unknown) => e as { approvalId?: string });
+    expect(waiting?.approvalId).toMatch(/^apr-/);
+    const committed = await c.app.resolveNavigationApproval({ approvalId: waiting!.approvalId!, resolution: "approved" });
+    // SEA-Forge's own record of human authority decisions for that approval.
+    const listed = await seaForgeCall(c.socket, { verb: "authority_approvals", actor: { actor_id: "cognate-service", role: "service" } }, 15_000);
+    const decided = (listed.approvals as { approval_id: string; resolved_by: unknown }[]).filter((a) => a.approval_id === waiting!.approvalId && a.resolved_by);
+    expect(decided).toHaveLength(1);
+    const observed = (await readPending(c.app.runtime.runtime.store, c.app.caller.tenant, committed.intent.intent_id))!.pending.observed;
+    expect(observed).toEqual([{ currency: "steering_attention", unit: "decisions", amount: decided.length, source_ref: "sea-forge:authority_approvals" }]);
+    // The frame projection carries it beside the declared bound ...
+    const frame = await c.app.navigationFrame();
+    const choice = frame.choices.find((ch) => ch.operation_ref === RECORD)!;
+    expect(choice.payment?.observed).toEqual(observed!);
+    expect(choice.payment?.entries.find((entry) => entry.currency === "steering_attention")).toMatchObject({ amount: 1, unit: "decisions", basis: "declared_bound" });
+    // ... and so does the Clack render of the move's review.
+    const reviewed = applySequential(openSequential(frame), { type: "select", choice_id: RECORD, frame_id: frame.frame_id, revision: frame.revision });
+    expect(reviewed.session.prompt.kind).toBe("review");
+    const text = renderSequentialText(reviewed.session.prompt);
+    expect(text).toContain("steering_attention declared 1 decisions, observed 1 decisions (sea-forge:authority_approvals)");
   }, 240_000);
 
   live("an exempt read_only intent settles not_required without an expectation", async () => {

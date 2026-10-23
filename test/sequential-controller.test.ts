@@ -239,7 +239,7 @@ function consequentialAgain() {
       recovery: { verdict: "pass" as const, basis_ref: CHECKPOINT },
       settlement_access: { verdict: "pass" as const, basis_ref: CHECKPOINT },
     },
-    payment: { estimate: "2 credits", provenance: "fixture" },
+    payment: { entries: [{ currency: "compute" as const, unit: "credits", amount: 2, basis: "predicted" as const, source_ref: "fixture" }] },
     expected_evidence: ["evidence:receipt"],
     escalation: { behavior: "approval" as const, approval_ref: "sea-forge:approval" },
   };

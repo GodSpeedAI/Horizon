@@ -149,6 +149,8 @@ export function deriveOperationalNavigation(input: OperationalNavigationInput): 
 export function buildOperationalFrame(
   input: OperationalNavigationInput,
   frame: { readonly revision?: number; readonly frame_id?: string } = {},
+  /** Candidates whose gates a caller evaluated for real (bound operations); assessed like any other. */
+  evaluated: readonly CandidateOperation[] = [],
 ): { readonly frame: NavigationFrame; readonly navigation: OperationalNavigation } {
   const navigation = deriveOperationalNavigation(input);
   const frameId = frame.frame_id ?? `frame:${input.world_ref}:${input.checkpoint_ref}:${input.focus_ref}`;
@@ -167,7 +169,7 @@ export function buildOperationalFrame(
       },
       case: navigation.case,
       possible_operations: navigation.possible_operations,
-      candidates: navigation.candidates,
+      candidates: [...navigation.candidates, ...evaluated],
     }),
     navigation,
   };

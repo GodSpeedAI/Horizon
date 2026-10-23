@@ -15,6 +15,8 @@ import { listPending, readPending, terminate, updatePending, type PendingIntent 
 import { type ObligationDeps, ObligationRefusal, bindingGates, close as closeWindow, prepare as prepareObligation, verifyRun } from "./settlement/obligation.ts";
 import { windowOpen } from "./domain/expectation.ts";
 import type { StructuralChoice } from "./domain/frame.ts";
+import type { CandidateOperation } from "./domain/navigation.ts";
+import type { ObservedPayment } from "./domain/payment.ts";
 import { structuralObservationAgent, healthAgent, HEALTH_AGENT, type StructuralObservationRequest } from "./agents/health.ts";
 import { navigationCommitAgent, NAVIGATION_COMMIT_AGENT, type NavigationCommitOutput } from "./agents/navigation-commit.ts";
 import { approvalAuthorityFromEnv, resolveApproval, seaForgeCall, type ApprovalAuthority } from "./adapters/sea-forge-approvals.ts";
@@ -410,11 +412,13 @@ export async function createApplication(
     if (!committed) throw new Error(`SETTLEMENT: intent ${intentId} was never executed`);
     const invocation = await governedInvocationOf(intentId);
     const authority = invocation ? authorityOf(invocation) : undefined;
+    const pendingObserved = (await readPending(store, caller.tenant, intentId))?.pending.observed;
     const settlement: NavigationSettlement = {
       intent_id: intentId,
       execution_record: { record_event_id: committed.event.eventId, position: committed.event.position, invocation_event_id: invocation?.eventId ?? null, operation_id: authority?.operationId ?? null },
       realitytrace_observation: observed ?? prior?.realitytrace_observation ?? null,
       settlement_reference: reference,
+      ...(pendingObserved ? { observed_payment: pendingObserved } : {}),
       at: new Date().toISOString(),
     };
     await appendSettlement(store, { settlement, tenant: caller.tenant, scopeId: `horizon-${caller.tenant}` });
@@ -590,7 +594,8 @@ export async function createApplication(
       await recordSettlementFor(intentId, { status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason: "the commit carries no recorded SEA-Forge decision" });
       return;
     }
-    const executed = await updatePending(store, caller.tenant, intentId, () => ({ stage: "executed", operation_id: authority.operationId }));
+    const steering = await observedSteeringAttention(intentId).catch(() => null);
+    const executed = await updatePending(store, caller.tenant, intentId, () => ({ stage: "executed", operation_id: authority.operationId, ...(steering ? { observed: [steering] } : {}) }));
     try {
       await submitExecutionEvidence(intentId, invocation, authority);
     } catch (error) {
@@ -793,8 +798,72 @@ export async function createApplication(
         projection: read.view,
         declared,
       },
+      {},
+      await boundCandidates(),
     ).frame;
     return { frame, projection: read.view };
+  }
+
+  /**
+   * Bound operations as T07 candidates with their real gates: payment and settlement_access from the binding
+   * and the capacity ledger, authority deferred to invocation (SEA-Forge has no evaluate-only preview), and the
+   * payment the binding declares beside what owners observed for its latest committed intent (REQ-NAV-010).
+   */
+  async function boundCandidates(): Promise<readonly CandidateOperation[]> {
+    const pendings = await listPending(runtime.runtime.store, caller.tenant);
+    const out: CandidateOperation[] = [];
+    for (const binding of loaded.config.operations) {
+      const basis = `binding:${binding.operation_ref}`;
+      const placeholder = binding.verifier
+        ? { modality: "obligation", statement: "-", refuted_by: "-", irrelevant: [], unaccounted: [], verifier: { template_ref: `${binding.verifier.template_id}@${binding.verifier.version}` }, window_s: 60 }
+        : undefined;
+      const gates = await bindingGates(obligationDeps, binding, placeholder);
+      const pass = { verdict: "pass" as const, basis_ref: basis };
+      const governed = governance.mode === "sea-forge";
+      const latest = pendings.filter((pending) => pending.operation_ref === binding.operation_ref && (pending.observed?.length ?? 0) > 0).at(-1);
+      out.push({
+        operation_ref: binding.operation_ref,
+        label: binding.label,
+        kind: "move",
+        responsibility: "commit",
+        reversibility: binding.reversibility,
+        gates: {
+          visibility: pass,
+          reach: pass,
+          payment: gates.payment,
+          authority: governed
+            ? { verdict: "pass", authority_outcome: "deferred_to_invocation", basis_ref: "sea-forge:authority_request" }
+            : binding.reversibility === "read_only"
+              ? { verdict: "pass", authority_outcome: "not_applicable", basis_ref: basis }
+              : { verdict: "unknown", authority_outcome: "unknown", reason: "no SEA-Forge authority is configured", basis_ref: basis },
+          capability: pass,
+          recovery: pass,
+          settlement_access: gates.settlement_access,
+        },
+        payment: { entries: binding.payment, ...(latest?.observed ? { observed: latest.observed } : {}) },
+        expected_evidence: binding.verifier ? [`verifier:${binding.verifier.template_id}@${binding.verifier.version}`] : [],
+        escalation: governed ? { behavior: "approval", approval_ref: "sea-forge:authority_approval", note: "SEA-Forge may escalate to an operator's approval" } : { behavior: "none" },
+      });
+    }
+    return out;
+  }
+
+  /** REQ-NAV-010: the human authority decisions SEA-Forge recorded for the approvals this intent's commit waited on. */
+  async function observedSteeringAttention(intentId: string): Promise<ObservedPayment | null> {
+    if (!closureSocket || !approvals) return null;
+    const run = (await runtime.runtime.service.listRuns(caller, { agent: NAVIGATION_COMMIT_AGENT.id })).find((r) => (r.input as { intent?: { intent_id?: unknown } } | null)?.intent?.intent_id === intentId);
+    if (!run) return null;
+    const waited = new Set(
+      (await runtime.runtime.service.listContinuations(caller, { runId: run.runId }))
+        .filter((c) => c.type === "governance-approval")
+        .map((c) => (c.condition as { approvalId?: unknown } | null)?.approvalId)
+        .filter((id): id is string => typeof id === "string"),
+    );
+    const listed = await seaForgeCall(closureSocket, { verb: "authority_approvals", actor: approvals.service }, 15_000);
+    if (listed.ok !== true || !Array.isArray(listed.approvals)) return null;
+    const decided = (listed.approvals as { approval_id?: unknown; resolved_by?: unknown }[]).filter((a) => typeof a.approval_id === "string" && waited.has(a.approval_id) && a.resolved_by !== null && a.resolved_by !== undefined);
+    const unit = bindingFor((run.input as { intent: { operation_ref: string } }).intent.operation_ref)?.payment.find((entry) => entry.currency === "steering_attention" && entry.basis === "declared_bound")?.unit ?? "decisions";
+    return { currency: "steering_attention", unit, amount: decided.length, source_ref: "sea-forge:authority_approvals" };
   }
 
   async function navigationFrame(options: NavigationOptions = {}): Promise<NavigationFrameV2> {

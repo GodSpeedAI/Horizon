@@ -12,7 +12,7 @@
 import { ConcurrencyError, RecordConflictError, type DurableStore, type Json } from "@godspeedai/cognate-events";
 import { type ExpectedOutcome, type SettlementWindow, expectationDigest } from "../domain/expectation.ts";
 import type { CommitIntentInput } from "../domain/intent.ts";
-import { type CapacityAllowance, type PaymentEntry, reserve } from "../domain/payment.ts";
+import { type CapacityAllowance, type ObservedPayment, type PaymentEntry, reserve } from "../domain/payment.ts";
 import { CONTRACT_VERSION, consumeReservation, contractVersionOf, ledgerWrite, readLedger } from "./capacity-ledger.ts";
 import type { DeclaredThreshold, VerifierRun } from "../adapters/realitytrace-obligation.ts";
 import { IntentError } from "../domain/intent.ts";
@@ -40,6 +40,8 @@ export interface PendingIntent {
   readonly discrimination?: VerifierRun;
   readonly verifications?: readonly VerifierRun[];
   readonly closure?: { readonly b: number; readonly c: number; readonly committed_at: string; readonly on_time: boolean };
+  /** REQ-NAV-010: what owners recorded this intent spent, e.g. steering_attention decisions from SEA-Forge. */
+  readonly observed?: readonly ObservedPayment[];
   /** Why the intent became terminal: refused (with its reason), settled, rejected, unsettled, suspended, failed. */
   readonly terminal?: { readonly outcome: string; readonly reason: string | null; readonly at: string };
 }

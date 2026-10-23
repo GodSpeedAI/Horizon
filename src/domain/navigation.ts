@@ -150,11 +150,13 @@ export function assertGates(value: unknown): AffordanceGates {
  * Candidates and assessment
  * ------------------------------------------------------------------------------------------ */
 
-export interface PaymentEstimate {
-  readonly estimate: string;
-  /** Where the estimate came from. Advisory only; it never changes a gate (REQ-NAV-002). */
-  readonly provenance: string;
-}
+/**
+ * A move's payment (HORIZON-001 1.1.0, REQ-NAV-008): entries of currency, unit, amount, basis and source.
+ * Presentation only here; the payment *gate* is judged from declared bounds and capacity (payment.ts), and a
+ * predicted entry never changes a gate (REQ-NAV-002).
+ */
+export type { PaymentView } from "./payment.ts";
+import type { PaymentView } from "./payment.ts";
 
 export interface EscalationBehavior {
   readonly behavior: "none" | "approval" | "unknown";
@@ -170,7 +172,7 @@ export interface CandidateOperation {
   readonly responsibility: NavigationResponsibility;
   readonly reversibility: ReversibilityClass;
   readonly gates: AffordanceGates;
-  readonly payment?: PaymentEstimate;
+  readonly payment?: PaymentView;
   readonly expected_evidence?: readonly string[];
   readonly escalation?: EscalationBehavior;
 }
@@ -193,7 +195,7 @@ export interface AffordanceAssessment {
   readonly first_blocker: string | null;
   readonly next_prerequisite_ref: string | null;
   readonly reversibility: ReversibilityClass;
-  readonly payment: PaymentEstimate | null;
+  readonly payment: PaymentView | null;
   readonly expected_evidence: readonly string[];
   readonly escalation: EscalationBehavior | null;
   readonly spendable: boolean;
