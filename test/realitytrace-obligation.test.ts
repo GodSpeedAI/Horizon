@@ -31,7 +31,7 @@ beforeAll(async () => {
   storeDir = join(root, "store");
   mkdirSync(storeDir);
   const store = openSqliteStore({ path: join(storeDir, "app.sqlite") });
-  await appendIntentRecord(store, { record: { intent_id: RECORDED, frame_id: "f", frame_revision: 1, actor_ref: "o", operation_ref: "horizon.write" }, tenant: "local", scopeId: "s", contract: { expectation: null, threshold: null, window: null, payment: null, now: new Date() } });
+  await appendIntentRecord(store, { record: { intent_id: RECORDED, frame_id: "f", frame_revision: 1, actor_ref: "o", operation_ref: "horizon.write" }, tenant: "local", scopeId: "s", contract: { expectation: null, threshold: null, window: null } });
 }, 120_000);
 afterAll(() => {
   if (root) rmSync(root, { recursive: true, force: true });

@@ -20,17 +20,17 @@ import { ConcurrencyError, RecordConflictError, type DurableStore, type Json, ty
 import { assertCommitIntent, IntentError, type CommitIntentInput, type CommitIntentOutput } from "../domain/intent.ts";
 import type { NavigationFrameV1, NavigationIntentRecord } from "../domain/frame.ts";
 import { type ExpectedOutcome, type SettlementWindow, expectationDigest } from "../domain/expectation.ts";
-import { type CapacityAllowance, type PaymentEntry, reserve } from "../domain/payment.ts";
-import { CONTRACT_VERSION, contractVersionOf, ledgerWrite, readLedger } from "./capacity-ledger.ts";
+import { CONTRACT_VERSION, contractVersionOf } from "./capacity-ledger.ts";
 
-/** What a HORIZON-001 1.1.0 commit records beyond the intent fields (REQ-NAV-009, REQ-NAV-011). */
+/**
+ * What a HORIZON-001 1.1.0 record carries beyond the intent fields (REQ-NAV-011). The capacity reservation is
+ * not here: it commits with the pending intent (pending-intent.ts), before authority is requested; this record
+ * is the operation's effect, written on execution.
+ */
 export interface IntentContract {
   readonly expectation: ExpectedOutcome | null;
   readonly threshold: { readonly id: string; readonly position: number } | null;
   readonly window: SettlementWindow | null;
-  /** The binding's entries and the configured allowances; null for an operation that reserves nothing. */
-  readonly payment: { readonly entries: readonly PaymentEntry[]; readonly allowances: readonly CapacityAllowance[] } | null;
-  readonly now: Date;
 }
 
 export const NAVIGATION_INTENT_COMMIT = {
@@ -117,14 +117,6 @@ export async function appendIntentRecord(
     const committed = await committedRecord(store, key, record);
     if (committed) return committed;
     const eventId = randomUUID();
-    // REQ-NAV-009: the reservation is evaluated against the ledger as read now and written with its
-    // expected version in the same commit as the record; a concurrent commit forces a re-evaluation.
-    const reservation = contract?.payment
-      ? await (async () => {
-          const { ledger, version } = await readLedger(store, options.tenant, contract.payment!.allowances);
-          return ledgerWrite(options.tenant, reserve(ledger, record.intent_id, contract.payment!.entries, contract.now), version);
-        })()
-      : null;
     let outcome;
     try {
       outcome = await store.commit({
@@ -173,12 +165,10 @@ export async function appendIntentRecord(
             expectedVersion: 0,
             value: { event_id: eventId, ...intentFields(record), ...(contract ? { contract_version: CONTRACT_VERSION, expectation_digest: digest } : {}) },
           },
-          ...(reservation ? [reservation] : []),
         ],
       });
     } catch (error) {
-      // Another commit landed between the read and this commit (this id, any intent, or the ledger):
-      // re-check, which re-evaluates the payment gate against the ledger that won.
+      // Another commit landed between the read and this commit (this id, or any intent): re-check.
       if ((error instanceof ConcurrencyError || error instanceof RecordConflictError) && attempt < 16) continue;
       throw error;
     }

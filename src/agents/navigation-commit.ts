@@ -50,7 +50,7 @@ export function navigationCommitAgent(store: () => DurableStore): AgentDefinitio
           record: { ...intent, ...(correlationRef ? { correlation_ref: correlationRef } : {}) },
           tenant: context.tenant,
           scopeId: `horizon-${context.tenant}`,
-          contract: { expectation: null, threshold: null, window: null, payment: null, now: new Date() },
+          contract: { expectation: null, threshold: null, window: null },
         });
         return { event_id: r.eventId, position: r.position };
       });

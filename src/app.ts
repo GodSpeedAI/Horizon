@@ -430,7 +430,7 @@ export async function createApplication(
         },
         tenant: caller.tenant,
         scopeId: `horizon-${caller.tenant}`,
-        contract: { expectation: null, threshold: null, window: null, payment: null, now: new Date() },
+        contract: { expectation: null, threshold: null, window: null },
       });
     } catch (error) {
       // duplicate_intent: the id was already committed with different input; audited like any refusal.

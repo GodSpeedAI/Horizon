@@ -106,7 +106,7 @@ describe("rollback guard", () => {
 
   test("a v2 intent record refuses it even without the marker", async () => {
     const store = open();
-    await appendIntentRecord(store, { record: INTENT, tenant: "local", scopeId: "s", contract: { expectation: null, threshold: null, window: null, payment: null, now: NOW } });
+    await appendIntentRecord(store, { record: INTENT, tenant: "local", scopeId: "s", contract: { expectation: null, threshold: null, window: null } });
     expect((await rollbackVerdict(store)).reasons).toEqual(["1 intent record(s) carry contract_version 2 or later"]);
   });
 

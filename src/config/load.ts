@@ -2,13 +2,18 @@ import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { hostname, userInfo } from "node:os";
 import { dirname, resolve } from "node:path";
+import { assertVerifierTemplate } from "../domain/expectation.ts";
+import { assertAllowance, assertPaymentEntry } from "../domain/payment.ts";
+import { REVERSIBILITY_CLASSES } from "../domain/navigation.ts";
 import type {
   ContextKernelConfig,
   DeploymentProfile,
   HorizonConfig,
   IdentityConfig,
   LoadedConfig,
+  OperationBindingConfig,
   SecretsConfig,
+  SettlementConfig,
   TransportConfig,
 } from "./types.ts";
 
@@ -75,6 +80,64 @@ function asContextKernel(value: unknown): ContextKernelConfig | undefined {
   return { command, corpus_id: corpus };
 }
 
+/** Run a domain validator, reporting its refusal as a config error naming the field. */
+function validated<T>(field: string, check: () => T): T {
+  try {
+    return check();
+  } catch (error) {
+    return bounded(`${field}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function asList(value: unknown, field: string): readonly unknown[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) bounded(`${field} must be a list of tables`);
+  return value as unknown[];
+}
+
+function asOperations(value: unknown): readonly OperationBindingConfig[] {
+  const seen = new Set<string>();
+  return asList(value, "operations").map((raw, index) => {
+    const field = `operations[${index}]`;
+    const doc = asRecord(raw, field);
+    const operationRef = asString(doc.operation_ref, `${field}.operation_ref`);
+    if (operationRef === "horizon.health" || operationRef === "horizon.research.health") bounded(`${field}: ${operationRef} is a structural move and cannot be rebound`);
+    if (seen.has(operationRef)) bounded(`${field}: duplicate binding for ${operationRef}`);
+    seen.add(operationRef);
+    const reversibility = asString(doc.reversibility, `${field}.reversibility`);
+    if (!(REVERSIBILITY_CLASSES as readonly string[]).includes(reversibility)) bounded(`${field}.reversibility must be one of ${REVERSIBILITY_CLASSES.join(", ")}`);
+    if (doc.settlement !== undefined && doc.settlement !== "required") bounded(`${field}.settlement may only be "required"`);
+    const payment = asList(doc.payment, `${field}.payment`).map((entry, n) => validated(`${field}.payment[${n}]`, () => assertPaymentEntry(entry)));
+    let verifier;
+    const paths: Record<string, string> = {};
+    if (doc.verifier !== undefined) {
+      const verifierDoc = asRecord(doc.verifier, `${field}.verifier`);
+      verifier = validated(`${field}.verifier`, () => assertVerifierTemplate(verifierDoc));
+      for (const [n, artifact] of asList(verifierDoc.artifacts, `${field}.verifier.artifacts`).entries()) {
+        const artifactDoc = asRecord(artifact, `${field}.verifier.artifacts[${n}]`);
+        paths[asString(artifactDoc.name, `${field}.verifier.artifacts[${n}].name`)] = asString(artifactDoc.path, `${field}.verifier.artifacts[${n}].path`);
+      }
+    }
+    return {
+      operation_ref: operationRef,
+      label: asString(doc.label, `${field}.label`),
+      reversibility: reversibility as OperationBindingConfig["reversibility"],
+      ...(doc.settlement === "required" ? { settlement: "required" as const } : {}),
+      payment,
+      ...(verifier ? { verifier } : {}),
+      verifier_paths: paths,
+    };
+  });
+}
+
+function asSettlement(value: unknown): SettlementConfig | undefined {
+  if (value === undefined) return undefined;
+  const doc = asRecord(value, "settlement");
+  const grace = doc.close_grace_s ?? 30;
+  if (typeof grace !== "number" || !Number.isInteger(grace) || grace < 0 || grace > 3600) bounded("settlement.close_grace_s must be an integer from 0 to 3600");
+  return { launcher: asStringList(doc.launcher, "settlement.launcher"), close_grace_s: grace };
+}
+
 export function configFromDocument(document: unknown): HorizonConfig {
   const doc = asRecord(document, "config");
   const profile = asString(doc.deployment_profile, "deployment_profile") as DeploymentProfile;
@@ -138,6 +201,9 @@ export function configFromDocument(document: unknown): HorizonConfig {
     identity,
     secrets,
     transports,
+    operations: asOperations(doc.operations),
+    capacity: asList(doc.capacity, "capacity").map((entry, index) => validated(`capacity[${index}]`, () => assertAllowance(entry))),
+    ...(doc.settlement === undefined ? {} : { settlement: asSettlement(doc.settlement)! }),
   };
 }
 
