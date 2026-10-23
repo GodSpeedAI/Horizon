@@ -7,10 +7,12 @@ import { observeResearch, requireResearch, type ResearchStatus } from "./adapter
 import { loadConfig } from "./config/load.ts";
 import type { LoadedConfig } from "./config/types.ts";
 import { createHorizonRuntime, type HorizonRuntime } from "./runtime/create.ts";
-import { appendIntentAttempt, appendIntentRecord, createFrameRegister, NAVIGATION_INTENT_COMMIT, navigationIntentComponent, type FrameRegister, type IntentAttempt } from "./capabilities/navigation-intent.ts";
+import { appendIntentAttempt, appendIntentRecord, createFrameRegister, NAVIGATION_INTENT_COMMIT, navigationIntentComponent, readIntentRecords, type FrameRegister, type IntentAttempt } from "./capabilities/navigation-intent.ts";
 import { structuralObservationAgent, healthAgent, HEALTH_AGENT, type StructuralObservationRequest } from "./agents/health.ts";
 import { navigationCommitAgent, NAVIGATION_COMMIT_AGENT, type NavigationCommitOutput } from "./agents/navigation-commit.ts";
 import { approvalAuthorityFromEnv, resolveApproval, type ApprovalAuthority } from "./adapters/sea-forge-approvals.ts";
+import { authorityOf, defaultRealityTraceRepo, observationOutbox, realityTraceFromEnv, RealityTraceEvidence, type GovernedInvocation, type RealityTraceConfig, type SettlementAuthority } from "./adapters/settlement.ts";
+import { appendSettlement, latestSettlement, type ExecutionRecord, type NavigationSettlement, type SettlementReference } from "./capabilities/navigation-settlement.ts";
 import type { Json } from "@godspeedai/cognate-events";
 import type { RunView } from "@godspeedai/cognate-runtime-api";
 import { buildStructuralFrame, type NavigationFrameV1, type NavigationIntentRecord } from "./domain/frame.ts";
@@ -146,6 +148,12 @@ export interface HorizonApplication {
    * Rejected: the run fails and nothing is committed (both are audited).
    */
   resolveNavigationApproval(request: { readonly approvalId: string; readonly resolution: "approved" | "rejected" }): Promise<IntentCommit>;
+  /**
+   * J02 IS6/IS7: the committed intent's execution record, its RealityTrace observation and SEA-Forge's
+   * settlement reference. A completion trace alone is `unsettled`; what cannot be obtained is marked
+   * `unavailable` with the reason, never invented. A final settlement is returned as recorded.
+   */
+  settleNavigationIntent(intentId: string): Promise<NavigationSettlement>;
   surface(role?: SurfaceRole): ReturnType<typeof projectForRole>;
   /** The published `horizon.surface/2` vocabulary, for discovery (PE-01). */
   surfaceSchema(): ReturnType<typeof publishSurfaceSchema>;
@@ -189,6 +197,12 @@ export async function createApplication(
     readonly governance?: GovernanceOptions;
     /** Who answers an escalation. Defaults to `COGNATE_SEA_FORGE_OPERATOR`; unset, no one can. */
     readonly approvals?: ApprovalAuthority;
+    /**
+     * Where governed commits are observed (J02 IS6). Defaults to `COGNATE_REALITYTRACE_BIN` /
+     * `_DATA_HOME` / `_STATE_HOME`, with the repository beside the store; `null` or unset: none, and
+     * settlement references say RealityTrace is unavailable.
+     */
+    readonly realityTrace?: RealityTraceConfig | null;
   } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath);
@@ -202,6 +216,12 @@ export async function createApplication(
   const governance: GovernanceOptions =
     configured.mode === "sea-forge" ? { ...configured, approvalPollMs: configured.approvalPollMs ?? 2_000 } : configured;
   const approvals = options.approvals ?? approvalAuthorityFromEnv(process.env);
+  const realityTrace =
+    governance.mode !== "sea-forge"
+      ? undefined
+      : options.realityTrace === null
+        ? undefined
+        : (options.realityTrace ?? realityTraceFromEnv(process.env, defaultRealityTraceRepo(options.storePath ?? process.env.HORIZON_STORE ?? loaded.config.runtime_store)));
   const runtime: HorizonRuntime = await createHorizonRuntime(loaded.config, world, {
     caller,
     ...(options.storePath ? { storePath: options.storePath } : {}),
@@ -209,7 +229,10 @@ export async function createApplication(
     agents: [structuralObservationAgent(frames), navigationCommitAgent(() => runtime.runtime.store)],
     ...(options.contextAdapter === undefined ? {} : { contextAdapter: options.contextAdapter }),
     governance,
+    // The observation commits with the governed invocation itself (the outbox), so it cannot be lost.
+    ...(realityTrace ? { outboxFor: observationOutbox(NAVIGATION_INTENT_COMMIT.id) } : {}),
   });
+  const evidence = realityTrace ? new RealityTraceEvidence(runtime.runtime.store, realityTrace) : undefined;
   let issued: FrameView | null = null;
 
   /** Issue a frame for the current request and register it as the one an intent may name. */
@@ -315,6 +338,61 @@ export async function createApplication(
     await resolveApproval(approvals, request);
     await runtime.runtime.pollApprovals();
     return settleCommitRun(intent, await runOutcome(run.runId, terminal));
+  }
+
+  async function settleNavigationIntent(intentId: string): Promise<NavigationSettlement> {
+    const store = runtime.runtime.store;
+    const prior = await latestSettlement(store, caller.tenant, intentId);
+    if (prior?.settlement_reference.final) return prior;
+    const committed = (await readIntentRecords(store)).find((entry) => entry.record.intent_id === intentId && entry.event.tenant === caller.tenant);
+    if (!committed) throw new Error(`SETTLEMENT: intent ${intentId} was never committed`);
+    let execution: ExecutionRecord = { record_event_id: committed.event.eventId, position: committed.event.position, invocation_event_id: null, operation_id: null };
+    let observation = prior?.realitytrace_observation ?? null;
+    const record = async (reference: SettlementReference): Promise<NavigationSettlement> => {
+      const settlement: NavigationSettlement = { intent_id: intentId, execution_record: execution, realitytrace_observation: observation, settlement_reference: reference, at: new Date().toISOString() };
+      await appendSettlement(store, { settlement, tenant: caller.tenant, scopeId: `horizon-${caller.tenant}` });
+      return settlement;
+    };
+    const unavailable = (reason: string) => record({ status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason });
+    const refused = (reason: string) => record({ status: "refused", final: false, envelope_id: null, ledger_entry: null, reason });
+
+    if (governance.mode !== "sea-forge") return unavailable("SEA-Forge governance is off: the commit carries no authority decision to settle");
+    const invocation = await governedInvocationOf(intentId);
+    const authority = invocation ? authorityOf(invocation) : undefined;
+    if (!invocation || !authority) return unavailable("the commit carries no recorded SEA-Forge decision");
+    execution = { ...execution, invocation_event_id: invocation.eventId, operation_id: authority.operationId };
+    const seaForge = governance.authority as Partial<SettlementAuthority> | undefined;
+    if (typeof seaForge?.submitEvidence !== "function" || typeof seaForge.settle !== "function") return unavailable("the configured authority cannot settle");
+    if (!evidence) return unavailable("RealityTrace is not configured (COGNATE_REALITYTRACE_BIN)");
+
+    if (!observation) {
+      try {
+        const targetRef = await evidence.observe(invocation);
+        const derived = await evidence.evidenceFor(targetRef);
+        const packet = await evidence.packet(authority.worldRef, authority, derived);
+        const receipt = await seaForge.submitEvidence(packet);
+        if (!receipt.ok) return refused(`SEA-Forge refused the evidence: ${receipt.errorClass}: ${receipt.error}`);
+        observation = { target_ref: targetRef, sxr_observation_id: derived.sxrObservationId, evidence_id: derived.evidenceId, evidence_packet_id: receipt.envelopeId, evidence_ledger_entry: receipt.ledgerEntry };
+      } catch (error) {
+        return unavailable(`RealityTrace: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    const settled = await seaForge.settle(authority.operationId, authority.worldRef);
+    if (!settled.ok) {
+      return settled.errorClass === "unreachable" ? unavailable(`SEA-Forge: ${settled.error}`) : refused(`SEA-Forge refused the settlement: ${settled.errorClass}: ${settled.error}`);
+    }
+    return record({ status: settled.status, final: settled.final, envelope_id: String(settled.envelope.envelope_id), ledger_entry: settled.ledgerEntry, reason: null });
+  }
+
+  /** The governed `run.invocation` of the commit capability in this intent's commit run. */
+  async function governedInvocationOf(intentId: string): Promise<GovernedInvocation | undefined> {
+    for (const run of await runtime.runtime.service.listRuns(caller, { agent: NAVIGATION_COMMIT_AGENT.id })) {
+      if ((run.input as { intent?: { intent_id?: unknown } } | null)?.intent?.intent_id !== intentId) continue;
+      const events = await runtime.runtime.store.readStream(`run-${run.runId}`, {});
+      const invocation = events.find((e) => e.eventType === "run.invocation" && (e.metadata as { capability?: unknown } | undefined)?.capability === NAVIGATION_INTENT_COMMIT.id);
+      if (invocation) return { eventId: invocation.eventId, correlationId: invocation.correlationId, occurredAt: invocation.occurredAt, metadata: (invocation.metadata ?? {}) as Record<string, unknown> };
+    }
+    return undefined;
   }
 
   /** Submit an already-built intent: refused intents are audited and write no record. */
@@ -624,6 +702,7 @@ export async function createApplication(
     commitNavigationIntent,
     submitIntent,
     resolveNavigationApproval,
+    settleNavigationIntent,
     startObservation,
     surface: surfaceFor,
     surfaceSchema: publishSurfaceSchema,

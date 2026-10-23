@@ -7,13 +7,19 @@
 //               operator's approval (on_behalf_of) commits it exactly once; a rejection commits nothing.
 // The world SEA-Forge registers is Horizon's own `domain/` source set; an unknown world would refuse the
 // allow case, so it passing proves both sides derive the same world_ref.
-// Opt-in: SEA_FORGE_SERVER_BIN (a sea-forge-server with the policy `resources` filter).
+//   settle   -> the commit's execution_trace is recorded by RealityTrace (content hash re-derivable from the
+//               committed event); RealityTrace's own evidence goes to SEA-Forge, which corroborates it against
+//               RealityTrace's ledger and answers `unsettled`: execution is not settlement (IS6/IS7).
+// Opt-in: SEA_FORGE_SERVER_BIN (a sea-forge-server with the policy `resources` filter and RealityTrace
+// corroboration); the settlement test also needs REALITYTRACE_BIN (a realitytrace binary).
 import { afterAll, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { governanceFromEnv } from "@godspeedai/cognate-runtime-bun";
+import { governedTraceFor } from "@godspeedai/cognate-realitytrace";
 import { AwaitingAuthorityError, createApplication, type HorizonApplication } from "../src/app.ts";
 import { loadWorld } from "../src/adapters/semantic.ts";
 import { approvalAuthority, seaForgeCall } from "../src/adapters/sea-forge-approvals.ts";
@@ -21,7 +27,9 @@ import { NAVIGATION_INTENT_COMMIT, readIntentAttempts, readIntentRecords } from 
 import { PINNED_WORLD_REF, horizonDocument, writeConfig } from "./support/config.ts";
 
 const BIN = process.env.SEA_FORGE_SERVER_BIN;
+const RT = process.env.REALITYTRACE_BIN;
 const liveTest = BIN ? test : test.skip;
+const settlementTest = BIN && RT ? test : test.skip;
 const cleanups: (() => void)[] = [];
 afterAll(() => { for (const c of cleanups.reverse()) c(); });
 
@@ -46,6 +54,8 @@ ${commit === "escalate" ? "    requires_approval: true\n" : ""}    actor_role: s
   - { name: horizon-capabilities, verdict: allow, actor_role: service, operation_kind: cognate_capability }
   - { name: horizon-actions, verdict: allow, actor_role: service, operation_kind: cognate_action }
   - { name: operator-approves, verdict: allow, actor_role: operator, operation_kind: approval_resolution }
+  - { name: evidence, verdict: allow, actor_role: service, operation_kind: evidence_mutation }
+  - { name: settlement, verdict: allow, actor_role: service, operation_kind: settlement_declaration }
 `;
 
 async function until(ok: () => boolean, what: string, ms = 30_000): Promise<void> {
@@ -58,7 +68,7 @@ async function until(ok: () => boolean, what: string, ms = 30_000): Promise<void
 
 /** A real sea-forge-server governing Horizon's own world. One uid = one actor: this process is the
  * service and the gateway; the operator has no uid and is reached only through on_behalf_of. */
-async function seaForge(commit: Commit) {
+async function seaForge(commit: Commit, withRealityTrace = false) {
   const root = mkdtempSync(join(tmpdir(), "horizon-j02-"));
   const socket = join(tmpdir(), `horizon-j02-${process.pid}-${randomUUID().slice(0, 8)}.sock`);
   cleanups.push(() => rmSync(root, { recursive: true, force: true }), () => rmSync(socket, { force: true }));
@@ -69,12 +79,17 @@ async function seaForge(commit: Commit) {
   }
   writeFileSync(join(root, "policy.yaml"), policy(commit));
   const uid = process.getuid!();
+  const rt = withRealityTrace ? { bin: RT!, dataHome: join(root, "rt-data"), stateHome: join(root, "rt-state"), repoDir: join(root, "rt-repo") } : undefined;
   writeFileSync(join(root, "server.yaml"), JSON.stringify({
     socket_path: socket,
     root,
     identity: { bindings: [{ uid, actor_id: "cognate-service", roles: ["service"] }, { actor_id: "operator", roles: ["operator"] }] },
     gateway: { uid, actor: "cognate-service", delegable_actors: ["operator"] },
-    cep_authority: { enabled: true, policy: "policy.yaml", worlds: [{ name: "horizon", base: "worlds", entry: "interaction-model.sea", files }] },
+    cep_authority: {
+      enabled: true, policy: "policy.yaml", worlds: [{ name: "horizon", base: "worlds", entry: "interaction-model.sea", files }],
+      // SEA-Forge reads RealityTrace's own ledger and refuses evidence it did not record.
+      ...(rt ? { realitytrace: { bin: rt.bin, data_home: rt.dataHome, state_home: rt.stateHome, require_corroboration: true } } : {}),
+    },
   }));
   const server = Bun.spawn([BIN!], { env: { ...process.env, SEA_FORGE_ROOT: root, SEA_FORGE_SOCKET: socket }, stdout: "ignore", stderr: process.env.HZ_SF_LOG ? Bun.file(process.env.HZ_SF_LOG) : "ignore" });
   cleanups.push(() => server.kill());
@@ -83,11 +98,11 @@ async function seaForge(commit: Commit) {
   const governance = governanceFromEnv({ COGNATE_GOVERNANCE: "sea-forge", COGNATE_SEA_FORGE_SOCKET: socket, COGNATE_WORLD_REF: loadWorld(PINNED_WORLD_REF).cognateWorldRef });
   expect(governance.mode).toBe("sea-forge");
   const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "app.sqlite"), secretPath: join(root, "launch.secret") }));
-  const app: HorizonApplication = await createApplication({ configPath, governance, approvals: approvalAuthority({ socketPath: socket, operatorId: "operator" }) });
+  const app: HorizonApplication = await createApplication({ configPath, governance, approvals: approvalAuthority({ socketPath: socket, operatorId: "operator" }), realityTrace: rt ?? null });
   cleanups.push(() => void app.close?.());
   const records = async () => (await readIntentRecords(app.runtime.runtime.store)).map((r) => r.record.intent_id);
   const attempts = async () => readIntentAttempts(app.runtime.runtime.store);
-  return { root, socket, server, app, records, attempts };
+  return { root, socket, server, app, records, attempts, rt };
 }
 
 const failure = (p: Promise<unknown>) => p.then(() => null, (e: unknown) => e as Error);
@@ -107,6 +122,13 @@ liveTest("J02: SEA-Forge, not Horizon, decides whether a navigation intent is co
   const refused = (await attempts()).filter((a) => a.outcome === "refused");
   expect(refused.length).toBeGreaterThanOrEqual(1);
   expect(JSON.stringify(refused.at(-1))).toMatch(/deny|denied|SEA-Forge|authority/i);
+
+  // Without RealityTrace, the settlement reference says so; nothing is invented.
+  const noEvidence = await app.settleNavigationIntent(allowed.intent.intent_id);
+  expect(noEvidence.settlement_reference).toMatchObject({ status: "unavailable", final: false });
+  expect(noEvidence.settlement_reference.reason).toContain("RealityTrace is not configured");
+  expect(noEvidence.realitytrace_observation).toBeNull();
+  expect(noEvidence.execution_record.operation_id).toMatch(/\S/);
 
   // offline: no authority, no commit.
   writeFileSync(join(root, "policy.yaml"), policy("allow"));
@@ -185,3 +207,40 @@ liveTest("J02 IS3-IS5: an escalated commit waits; only the operator's approval a
   expect(await records()).toEqual([intent.intent_id, direct.intent.intent_id]);
   expect((await attempts()).at(-1)).toMatchObject({ intent_id: second.intent.intent_id, outcome: "refused" });
 }, 120_000);
+
+settlementTest("J02 IS6/IS7: RealityTrace records the commit's trace; SEA-Forge settles on RealityTrace's evidence: unsettled", async () => {
+  const { app, rt } = await seaForge("allow", true);
+  const committed = await app.commitNavigationIntent({ operationRef: "horizon.health" });
+
+  const settlement = await app.settleNavigationIntent(committed.intent.intent_id);
+  // execution_record: the committed record and the governed invocation that carried SEA-Forge's decision.
+  expect(settlement.execution_record).toMatchObject({ record_event_id: committed.eventId, position: committed.position });
+  expect(settlement.execution_record.operation_id).toMatch(/\S/);
+  // settlement_reference: SEA-Forge's own answer. A completion trace's evidence is `unknown`: not settled.
+  expect(settlement.settlement_reference).toMatchObject({ status: "unsettled", final: false, reason: null });
+  expect(settlement.settlement_reference.envelope_id).toMatch(/^env-settlement_packet-/);
+
+  // realitytrace_observation: RealityTrace holds exactly the trace re-derived from the committed event.
+  const observation = settlement.realitytrace_observation!;
+  expect(observation.target_ref).toMatch(/:\d+$/);
+  const run = (await app.runtime.runtime.service.listRuns(app.caller, { agent: "horizon.navigation.commit" })).find((r) => (r.input as { intent: { intent_id: string } }).intent.intent_id === committed.intent.intent_id)!;
+  const invocation = (await app.runtime.runtime.store.readStream(`run-${run.runId}`, {})).find((e) => e.eventType === "run.invocation")!;
+  const trace = governedTraceFor(invocation as never)!;
+  const rtEnv = { ...process.env, XDG_DATA_HOME: rt!.dataHome, XDG_STATE_HOME: rt!.stateHome };
+  const listed = Bun.spawnSync([rt!.bin, "repo", "list", "--json"], { cwd: rt!.repoDir, env: rtEnv });
+  expect(listed.exitCode, listed.stderr.toString()).toBe(0);
+  const repos = JSON.parse(listed.stdout.toString()) as unknown;
+  const repoIds = (Array.isArray(repos) ? repos : ((repos as { repos?: unknown[] }).repos ?? [])).map((r) => String((r as { repo_id?: unknown }).repo_id));
+  const rows = repoIds.flatMap((repo) => {
+    const exported = Bun.spawnSync([rt!.bin, "ledger", "export", "--repo", repo], { cwd: rt!.repoDir, env: rtEnv });
+    return exported.exitCode === 0 ? (JSON.parse(exported.stdout.toString()) as { ledger_id: string; append_ordinal: number; payload: unknown }[]) : [];
+  });
+  const sha = createHash("sha256").update(JSON.stringify(trace)).digest("hex");
+  const row = rows.find((r) => `${r.ledger_id}:${r.append_ordinal}` === observation.target_ref);
+  expect(JSON.stringify(row?.payload ?? null)).toContain(sha);
+
+  // Settling again reuses the evidence already recorded (no second derivation) and SEA-Forge still answers unsettled.
+  const again = await app.settleNavigationIntent(committed.intent.intent_id);
+  expect(again.realitytrace_observation).toEqual(observation);
+  expect(again.settlement_reference.status).toBe("unsettled");
+}, 240_000);

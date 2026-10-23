@@ -1,10 +1,12 @@
 # Horizon Current Status
 
-**Revision:** 27 · **Recorded:** 2026-10-23T03:35:06Z · **Stage:** T10 settled; readiness P04 step 2 (escalation waits for the operator's SEA-Forge approval) landed; next ready task **T11**
+**Revision:** 28 · **Recorded:** 2026-10-23T03:43:29Z · **Stage:** T10 settled; readiness P04 step 3 (J02 IS6 evidence and SEA-Forge settlement reference) landed; next ready task **T11**
 
 **Spec:** HORIZON-001 v1.0.1, frozen; SHA-256 `14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4`.
 
-## Readiness P04 steps 1-2 — SEA-Forge decides navigation commits; escalations wait for the operator
+## Readiness P04 steps 1-3 — SEA-Forge decides navigation commits; escalations wait for the operator; settlement is SEA-Forge's
+
+Step 3: `settleNavigationIntent` records J02 IS6's `execution_record`, `realitytrace_observation` and `settlement_reference`. The governed commit's trace reaches RealityTrace through Cognate's outbox; RealityTrace's own evidence goes to SEA-Forge, which corroborates it against RealityTrace's ledger and answers `unsettled` (execution is not settlement). What cannot be obtained is `unavailable` with the reason. Live: `test/J02-live.test.ts`. Limit: re-vendor Cognate 0.6.3 for a deterministic trace hash.
 
 Step 1: createHorizonRuntime and createApplication accept Cognate GovernanceOptions (default from COGNATE_GOVERNANCE / COGNATE_SEA_FORGE_SOCKET / COGNATE_WORLD_REF; off when unset). Cognate SDK 0.6.2.
 
