@@ -1,8 +1,14 @@
 # Horizon Current Status
 
-**Revision:** 24 · **Recorded:** 2026-10-21T14:55:00Z · **Stage:** T10 settled (P2 builder + teeth + mutation); next ready task **T11**
+**Revision:** 25 · **Recorded:** 2026-10-22T22:02:30Z · **Stage:** T10 settled; readiness P04 step 1 (SEA-Forge governance) landed; next ready task **T11**
 
 **Spec:** HORIZON-001 v1.0.1, frozen; SHA-256 `14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4`.
+
+## Readiness P04 step 1 — SEA-Forge decides navigation commits
+
+Readiness P04 step 1 (no spec change): createHorizonRuntime and createApplication accept Cognate GovernanceOptions, defaulting from COGNATE_GOVERNANCE / COGNATE_SEA_FORGE_SOCKET / COGNATE_WORLD_REF (off when unset). With sea-forge mode, every capability invoke, including horizon.navigation.intent.commit, is decided by SEA-Forge; Horizon never grants authority. The vendored Cognate SDK moves 0.6.1 -> 0.6.2 (the stack release; an approval governs only its own operation) and adds cognate-realitytrace for the next step.
+
+Live proof: `test/J02-live.test.ts` (real sea-forge-server): allow commits once, a SEA-Forge deny commits nothing and is audited, an unreachable SEA-Forge fails closed. Next: approval inside a run (IS3), RealityTrace observation and settlement reference (IS6); IS2/IS7 need a SPEC-CR candidate.
 
 ## T10 — Source-grounded seven-operation world debugger
 

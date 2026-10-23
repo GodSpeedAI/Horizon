@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { AgentDefinition, Caller } from "@godspeedai/cognate-runtime-api";
-import { createRuntime, type ActionPolicy, type Runtime } from "@godspeedai/cognate-runtime-bun";
+import { createRuntime, type ActionPolicy, type GovernanceOptions, type Runtime } from "@godspeedai/cognate-runtime-bun";
 import type { Component, Policy } from "@godspeedai/cognate-kernel-api";
 import type { HorizonConfig } from "../config/types.ts";
 import type { LoadedWorld } from "../adapters/semantic.ts";
@@ -84,6 +84,12 @@ export async function createHorizonRuntime(
      * is registered, so the capability stays the only path (REQ-STACK-010).
      */
     readonly contextAdapter?: ContextKernelAdapter;
+    /**
+     * The external authority (J02 IS3). With `mode: "sea-forge"`, Cognate's Governor sends every
+     * capability invoke and consequential action to SEA-Forge as a CEP authority_request; Horizon only
+     * carries the decision and never grants authority itself (AGENTS.md §9). Absent: governance is off.
+     */
+    readonly governance?: GovernanceOptions;
   },
 ): Promise<HorizonRuntime> {
   const storePath = assertStoreBoundary(config, options.storePath ?? config.runtime_store);
@@ -100,6 +106,7 @@ export async function createHorizonRuntime(
       { projection: operationalObjectsProjection, public: true },
     ],
     tickMs: 5,
+    ...(options.governance ? { governance: options.governance } : {}),
   });
   return { runtime, caller: options.caller, storePath };
 }
