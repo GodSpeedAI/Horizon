@@ -34,16 +34,25 @@ export function horizonDocument(options: {
   };
 }
 
+/** A TOML value: strings, numbers and booleans as literals, arrays inline, objects as inline tables. */
+function tomlValue(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(tomlValue).join(", ")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{ ${Object.entries(value).map(([key, inner]) => `${JSON.stringify(key)} = ${tomlValue(inner)}`).join(", ")} }`;
+  }
+  return JSON.stringify(value);
+}
+
 export function toToml(document: Record<string, unknown>): string {
   const lines: string[] = [];
   for (const [key, value] of Object.entries(document)) {
     if (value && typeof value === "object" && !Array.isArray(value)) continue;
-    lines.push(`${key} = ${JSON.stringify(value)}`);
+    lines.push(`${key} = ${tomlValue(value)}`);
   }
   for (const [key, value] of Object.entries(document)) {
     if (!value || typeof value !== "object" || Array.isArray(value)) continue;
     lines.push(`\n[${key}]`);
-    for (const [inner, innerValue] of Object.entries(value)) lines.push(`${inner} = ${JSON.stringify(innerValue)}`);
+    for (const [inner, innerValue] of Object.entries(value)) lines.push(`${inner} = ${tomlValue(innerValue)}`);
   }
   return lines.join("\n");
 }
