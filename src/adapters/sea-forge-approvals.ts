@@ -7,7 +7,7 @@
  * accepts only for an actor its gateway configuration lists as delegable. SEA-Forge refuses the
  * requester approving its own escalation; the operator must differ from the service actor.
  *
- * Cognate 0.6.2 exports no approval-resolution call, so this mirrors Cognate-Workbench's
+ * Cognate 0.6.3 exports no approval-resolution call, so this mirrors Cognate-Workbench's
  * `seaForgeCall` (one NDJSON request over the Unix socket). Readiness debt: export it from Cognate.
  */
 export const ENV_OPERATOR = "COGNATE_SEA_FORGE_OPERATOR";
