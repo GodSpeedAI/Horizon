@@ -7,20 +7,21 @@ metadata:
   id: HORIZON-001
   title: Horizon — observer-relative operational navigation environment
   status: frozen
-  version: "1.0.1"
+  version: "1.1.0"
   approval:
     approved_by: owner (GodSpeed AI)
     approved_on: "2026-10-19"
     frozen_on: "2026-10-20"
     amendments:
       - { version: "1.0.1", approved_by: owner, approved_on: "2026-10-20", change: "adds REQ-CMP-001" }
+      - { version: "1.1.0", approved_by: "owner (DEC-OWNER-2026-10-23-01) on an independent ACCEPT verdict (.agents/candidates/horizon/SPEC-CR-002/REVIEW.md)", approved_on: "2026-10-23", change: "SPEC-CR-002: payment entries and capacity (REQ-NAV-008..010), expected outcome and IS7 settlement of committed intents (REQ-NAV-011..013); resolves OQ-IDM-02" }
     freeze_rule: >-
       This file is immutable while frozen. Any change in meaning or acceptance requires a
       new version, explicit owner approval, a new SHA-256 and a plan rebind. The binding
       hash is recorded in .agents/plans/horizon.plan.yaml and .agents/CURRENT_STATUS.jsonl,
       not here, because a file cannot contain its own hash.
   created: "2026-10-19"
-  revised: "2026-10-20"
+  revised: "2026-10-23"
   revision_note: >-
     0.2.0 grounds every subsystem claim against workspace source (see
     .agents/reports/horizon-spec-adversarial-review.md), corrects workspace paths,
@@ -519,6 +520,7 @@ core_domain_model:
         - Availability is provisional and does not grant invocation authority.
         - The authority gate uses the vocabulary of REQ-NAV-006; deferred_to_invocation and requires_approval are known states, not unknown.
         - Estimates from predictive models are advisory, carry estimate_provenance, and MUST NOT change any gate outcome.
+        - payment_estimate is a list of PaymentEntry {currency, unit, amount, basis, source_ref} (REQ-NAV-008), never a single number.
     - name: NavigationIntent
       purpose: Durable renderer-independent user or agent choice.
       used_by: [reducer, Cognate runtime, governance boundary]
@@ -722,6 +724,12 @@ core_behavior_requirements:
     - { id: "REQ-NAV-006", text: "The authority gate MUST take one of likely_allow, requires_approval, deferred_to_invocation, denied, unreachable or unknown. likely_allow requires a non-granting SEA-Forge evaluation; deferred_to_invocation means SEA-Forge is reachable and the exact operation is policy-covered but no preview exists; denied, unreachable and unknown block availability. No gate value grants authority." }
     - { id: "REQ-CMP-001", text: "Hypothetical comparison MUST NOT change world state or grant authority; a simulated alternative MUST NOT commit an intent or stand in for an authorization." }
     - { id: "REQ-NAV-007", text: "Before any consequential commitment the observer MUST see the operation's reversibility class, payment, expected evidence and what happens if authority escalates." }
+    - { id: "REQ-NAV-008", text: "Payment MUST be represented as entries of currency, unit, amount (non-negative or unknown), basis and source reference. Horizon's currency set is steering_attention, orchestration, compute, verification, recovery, structural_maintenance, representational_formation, risk_irreversibility and opportunity; extending it requires a spec version. An operation binding MUST declare a declared_bound entry for every currency, exactly one per (currency, unit), or it is invalid. Entries MUST NOT be summed, weighted or converted, and predicted estimates MUST NOT be gate inputs." }
+    - { id: "REQ-NAV-009", text: "The payment gate's inputs are the binding's declared bounds and the observer's available capacity per (currency, unit): allowance (non-negative or unbounded, optionally per UTC day) minus reserved and consumed bounds. An entry with a positive or unknown bound and no allowance is unknown; an unknown bound against a numeric capacity is unknown; a bound above available capacity is blocked. Committing MUST reserve every declared bound atomically with recording the intent, so concurrent intents cannot jointly exceed capacity; a reservation becomes consumption when the intent is terminal. The gate is never weighed against expected value." }
+    - { id: "REQ-NAV-010", text: "For a committed intent, the observed steering_attention (human authority decisions) MUST be taken from SEA-Forge's record for the intent's operation and presented beside its declared bound wherever the intent's payment is presented." }
+    - { id: "REQ-NAV-011", text: "An intent requires operational settlement unless its operation is read_only and its binding does not require settlement. Such an intent MUST carry an expected outcome (modality, statement, refuted_by, irrelevant distinctions, unaccounted factors, window) whose verifier is the operation binding's vetted, read-only template, every executed or loaded artifact of which is pinned by sha256 and checked before each run, instantiated only with the operation's effect identity. The expectation is registered with RealityTrace as a question and threshold before authority is requested; its digest, threshold id and threshold position are carried exactly in the SEA-Forge authority request; it is covered by the intent's idempotency key and never revised. After authority and before execution, a confined read-only discrimination run MUST NOT already observe the statement; if it does, or cannot complete, the operation MUST NOT be executed. An invocation that would start after the window closes MUST be refused." }
+    - { id: "REQ-NAV-012", text: "Settlement of an intent that requires operational settlement MUST be decided by SEA-Forge from RealityTrace evidence of verification runs started after execution whose ledger positions lie after the discrimination run and at or before the ledger head recorded in a durable closure record no later than the window deadline plus the close grace; each run's timeout ends before the deadline; only evidence whose RealityTrace-recorded completion time is at or before the deadline is admissible, and evidence without one is undefined; when no on-time closure record exists the intent is unresolved and rejected. Only known exit codes decide; timeouts, crashes, null exits and digest or argv mismatches are undefined. Known 0 with no known non-zero is supported and settled; known non-zero with no known 0 is contradicted and rejected; both is inconsistent and unsettled; no known result is unresolved and rejected for an obligation; before the window closes the intent is pending. Only the obligation modality with the command verifier is supported in this version. An exempt intent without an expectation is not_required, never settled. Disposition remains the observer's authorized judgment." }
+    - { id: "REQ-NAV-013", text: "For an intent that requires operational settlement, the settlement_access gate MUST be available only if its expectation is valid, its modality and verifier are supported, the operation binding declares a vetted read-only verifier template whose pinned artifact digests all match, and SEA-Forge settlement with RealityTrace corroboration is configured; otherwise it is blocked or unknown with the missing prerequisite. Assessment, inspection and diagnostics MUST NOT depend on this gate." }
   presentation_and_atomic_ui:
     - { id: "REQ-UI-001", text: "A closed versioned declarative surface schema MUST separate agents from executable UI code." }
     - { id: "REQ-UI-002", text: "Schema validation MUST reject unknown blocks, unauthorized actions, invalid refs and unsafe source expressions." }

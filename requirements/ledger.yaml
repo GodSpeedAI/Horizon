@@ -1,12 +1,12 @@
 # Horizon requirement ledger (generated) — see scripts/gen-requirement-ledger.py
 ledger_version: 1
 project: Horizon
-freeze_hash: sha256:387f92e9c06f7eff727cf1767bcc80f0197b86fb4fd64aa1632890ab6610289a
+freeze_hash: sha256:a66376de71b77386a493db686a82d8830b17d2819d00313dc3739b134a244348
 generated_from:
   spec: .agents/specs/horizon.agent.spec.yaml
-  spec_sha256: 14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+  spec_sha256: d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   plan: .agents/plans/horizon.plan.yaml
-  plan_sha256: 7d5fae12e974f4ac0c2cbdb650a487a28fea367a910ad705b5af8883a9a04175
+  plan_sha256: 62e85f4cddc5144a7939cd4515627fe6d307a3976b286e40ff8263e193a4cce3
   semantic_sources:
   - .sea/interaction/interaction-model.sea
   - .sea/interaction/research-artifacts.sea
@@ -23,7 +23,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.case_and_development[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CaseRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -79,7 +79,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.case_and_development[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CaseRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -121,7 +121,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.case_and_development[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CaseRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -140,6 +140,7 @@ requirements:
   dependencies:
   - REQ-GOAL-002
   - REQ-INT-001
+  - REQ-NAV-012
   - REQ-OUT-003
   - REQ-RES-001
   - REQ-RES-002
@@ -175,7 +176,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[6]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CandidateRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -199,6 +200,11 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SAFE-004
@@ -212,7 +218,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.resolution_rules[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -238,7 +244,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.resolution_rules[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -264,7 +270,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.resolution_rules[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -290,7 +296,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.resolution_rules[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -316,7 +322,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.startup_preflight.requirements[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -342,7 +348,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.startup_preflight.requirements[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -372,6 +378,10 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SEC-006
@@ -384,7 +394,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.startup_preflight.requirements[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -414,6 +424,10 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SEC-006
@@ -426,7 +440,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.case_and_development[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -450,6 +464,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -470,7 +490,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.case_and_development[4]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -494,6 +514,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -514,7 +540,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.case_and_development[5]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -538,6 +564,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -558,7 +590,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.requirements.goals[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -579,6 +611,10 @@ requirements:
   - REQ-CONFIG-012
   - REQ-INT-004
   - REQ-NAV-006
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SAFE-002
@@ -609,7 +645,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.requirements.goals[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -635,7 +671,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.requirements.goals[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -664,6 +700,11 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   critic_predicate: source-fidelity
@@ -674,7 +715,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.requirements.goals[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -704,6 +745,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -746,7 +793,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.requirements.goals[4]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -770,6 +817,7 @@ requirements:
   - REQ-INT-004
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-011
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SEC-001
@@ -798,7 +846,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.interactions[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -824,7 +872,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.interactions[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -853,6 +901,11 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   critic_predicate: source-fidelity
@@ -863,7 +916,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.interactions[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -887,6 +940,10 @@ requirements:
   - REQ-INT-004
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-SAFE-002
   - REQ-SAFE-003
   - REQ-SAFE-005
@@ -924,7 +981,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.interactions[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -954,6 +1011,10 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SEC-006
@@ -966,7 +1027,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1008,7 +1069,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1050,7 +1111,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1092,7 +1153,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1141,7 +1202,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[4]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1183,7 +1244,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[5]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1235,7 +1296,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[7]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1273,13 +1334,297 @@ requirements:
   - REQ-WORLD-007
   critic_predicate: source-fidelity
   status: candidate
+- id: REQ-NAV-008
+  title: REQ-NAV-008
+  statement: Payment MUST be represented as entries of currency, unit, amount (non-negative or unknown), basis and source reference. Horizon's currency set is steering_attention, orchestration, compute, verification, recovery, structural_maintenance, representational_formation, risk_irreversibility and opportunity; extending it requires a spec version. An operation binding MUST declare a declared_bound entry for every currency, exactly one per (currency, unit), or it is invalid. Entries MUST NOT be summed, weighted or converted, and predicted estimates MUST NOT be gate inputs.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.navigation_and_affordances[8]
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+  semantic_binding:
+    entity: AffordanceAssessment
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an affordance is assessed on its gates before any commitment, never on possibility
+    invariant_source: family
+  acceptance:
+  - AC-NAV-008-01
+  proof: &id033
+  - just gate-t07
+  settling_tasks:
+  - T07
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-SAFE-003
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-NAV-009
+  title: REQ-NAV-009
+  statement: 'The payment gate''s inputs are the binding''s declared bounds and the observer''s available capacity per (currency, unit): allowance (non-negative or unbounded, optionally per UTC day) minus reserved and consumed bounds. An entry with a positive or unknown bound and no allowance is unknown; an unknown bound against a numeric capacity is unknown; a bound above available capacity is blocked. Committing MUST reserve every declared bound atomically with recording the intent, so concurrent intents cannot jointly exceed capacity; a reservation becomes consumption when the intent is terminal. The gate is never weighed against expected value.'
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.navigation_and_affordances[9]
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+  semantic_binding:
+    entity: AffordanceAssessment
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an affordance is assessed on its gates before any commitment, never on possibility
+    invariant_source: family
+  acceptance:
+  - AC-NAV-009-01
+  proof: &id034
+  - just gate-t07
+  settling_tasks:
+  - T07
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-SAFE-003
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-NAV-010
+  title: REQ-NAV-010
+  statement: For a committed intent, the observed steering_attention (human authority decisions) MUST be taken from SEA-Forge's record for the intent's operation and presented beside its declared bound wherever the intent's payment is presented.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.navigation_and_affordances[10]
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+  semantic_binding:
+    entity: AffordanceAssessment
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an affordance is assessed on its gates before any commitment, never on possibility
+    invariant_source: family
+  acceptance:
+  - AC-NAV-010-01
+  proof: &id035
+  - just gate-t07
+  - just gate-t13
+  settling_tasks:
+  - T07
+  - T13
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-INT-004
+  - REQ-SAFE-001
+  - REQ-SAFE-003
+  - REQ-SEC-001
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-NAV-011
+  title: REQ-NAV-011
+  statement: An intent requires operational settlement unless its operation is read_only and its binding does not require settlement. Such an intent MUST carry an expected outcome (modality, statement, refuted_by, irrelevant distinctions, unaccounted factors, window) whose verifier is the operation binding's vetted, read-only template, every executed or loaded artifact of which is pinned by sha256 and checked before each run, instantiated only with the operation's effect identity. The expectation is registered with RealityTrace as a question and threshold before authority is requested; its digest, threshold id and threshold position are carried exactly in the SEA-Forge authority request; it is covered by the intent's idempotency key and never revised. After authority and before execution, a confined read-only discrimination run MUST NOT already observe the statement; if it does, or cannot complete, the operation MUST NOT be executed. An invocation that would start after the window closes
+    MUST be refused.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.navigation_and_affordances[11]
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+  semantic_binding:
+    entity: AffordanceAssessment
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an affordance is assessed on its gates before any commitment, never on possibility
+    invariant_source: family
+  acceptance:
+  - AC-NAV-011-01
+  proof: &id036
+  - just gate-t07
+  - just gate-t11
+  settling_tasks:
+  - T07
+  - T11
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-001
+  - REQ-CONFIG-002
+  - REQ-CONFIG-003
+  - REQ-CONFIG-004
+  - REQ-CONFIG-010
+  - REQ-GOAL-002
+  - REQ-GOAL-005
+  - REQ-INT-001
+  - REQ-SAFE-003
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-SEC-006
+  - REQ-STACK-002
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-NAV-012
+  title: REQ-NAV-012
+  statement: Settlement of an intent that requires operational settlement MUST be decided by SEA-Forge from RealityTrace evidence of verification runs started after execution whose ledger positions lie after the discrimination run and at or before the ledger head recorded in a durable closure record no later than the window deadline plus the close grace; each run's timeout ends before the deadline; only evidence whose RealityTrace-recorded completion time is at or before the deadline is admissible, and evidence without one is undefined; when no on-time closure record exists the intent is unresolved and rejected. Only known exit codes decide; timeouts, crashes, null exits and digest or argv mismatches are undefined. Known 0 with no known non-zero is supported and settled; known non-zero with no known 0 is contradicted and rejected; both is inconsistent and unsettled; no known result is unresolved and rejected for an obligation; before the window closes the intent is pending. Only the obligation
+    modality with the command verifier is supported in this version. An exempt intent without an expectation is not_required, never settled. Disposition remains the observer's authorized judgment.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.navigation_and_affordances[12]
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+  semantic_binding:
+    entity: AffordanceAssessment
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an affordance is assessed on its gates before any commitment, never on possibility
+    invariant_source: family
+  acceptance:
+  - AC-NAV-012-01
+  proof: &id037
+  - just gate-t13
+  settling_tasks:
+  - T13
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-INT-004
+  - REQ-NAV-006
+  - REQ-NAV-011
+  - REQ-SAFE-001
+  - REQ-SEC-001
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  critic_predicate: source-fidelity
+  status: candidate
+- id: REQ-NAV-013
+  title: REQ-NAV-013
+  statement: For an intent that requires operational settlement, the settlement_access gate MUST be available only if its expectation is valid, its modality and verifier are supported, the operation binding declares a vetted read-only verifier template whose pinned artifact digests all match, and SEA-Forge settlement with RealityTrace corroboration is configured; otherwise it is blocked or unknown with the missing prerequisite. Assessment, inspection and diagnostics MUST NOT depend on this gate.
+  source:
+    file: .agents/specs/horizon.agent.spec.yaml
+    section: $.core_behavior_requirements.navigation_and_affordances[13]
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+  semantic_binding:
+    entity: AffordanceAssessment
+    entity_source: .sea/interaction/interaction-model.sea
+    invariant: an affordance is assessed on its gates before any commitment, never on possibility
+    invariant_source: family
+  acceptance:
+  - AC-NAV-013-01
+  proof: &id038
+  - just gate-t07
+  - just gate-t13
+  settling_tasks:
+  - T07
+  - T13
+  mutable_surfaces: *id001
+  frozen_surfaces: *id002
+  dependencies:
+  - REQ-CONFIG-011
+  - REQ-CONFIG-012
+  - REQ-GOAL-002
+  - REQ-INT-001
+  - REQ-INT-004
+  - REQ-SAFE-001
+  - REQ-SAFE-003
+  - REQ-SEC-001
+  - REQ-SEC-002
+  - REQ-SEC-003
+  - REQ-SEC-004
+  - REQ-SEC-005
+  - REQ-STACK-003
+  - REQ-STACK-009
+  - REQ-STACK-010
+  - REQ-UI-001
+  - REQ-UI-002
+  - REQ-UI-003
+  - REQ-UI-006
+  - REQ-UI-007
+  - REQ-UI-008
+  - REQ-UX-006
+  - REQ-UX-007
+  - REQ-VERIFY-002
+  - REQ-WORLD-001
+  - REQ-WORLD-002
+  - REQ-WORLD-003
+  - REQ-WORLD-005
+  - REQ-WORLD-006
+  - REQ-WORLD-007
+  critic_predicate: source-fidelity
+  status: candidate
 - id: REQ-OUT-001
   title: REQ-OUT-001
   statement: Every frame MUST identify observer, pinned semantic world, operational checkpoint or explicit unknown, current focus, view mode, and allowed choices.
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.output_produced.requirements[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: OperationRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -1287,7 +1632,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-OUT-001-01
-  proof: &id033
+  proof: &id039
   - just gate-t07
   settling_tasks:
   - T07
@@ -1321,7 +1666,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.output_produced.requirements[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: OperationRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -1329,7 +1674,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-OUT-002-01
-  proof: &id034
+  proof: &id040
   - just gate-t07
   settling_tasks:
   - T07
@@ -1363,7 +1708,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.output_produced.requirements[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: OperationRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -1371,7 +1716,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-OUT-003-01
-  proof: &id035
+  proof: &id041
   - just gate-t11
   - just gate-t13
   - just gate-t15
@@ -1397,6 +1742,8 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SAFE-003
@@ -1416,7 +1763,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.output_produced.requirements[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: OperationRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -1424,7 +1771,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-OUT-004-01
-  proof: &id036
+  proof: &id042
   - just gate-t09
   - just gate-t18
   settling_tasks:
@@ -1447,6 +1794,11 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-006
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -1471,7 +1823,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -1479,7 +1831,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-RES-001-01
-  proof: &id037
+  proof: &id043
   - just gate-t21
   settling_tasks:
   - T21
@@ -1496,6 +1848,10 @@ requirements:
   - REQ-GOAL-005
   - REQ-INT-004
   - REQ-NAV-006
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SAFE-002
@@ -1527,7 +1883,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -1535,7 +1891,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-RES-002-01
-  proof: &id038
+  proof: &id044
   - just gate-t21
   settling_tasks:
   - T21
@@ -1552,6 +1908,10 @@ requirements:
   - REQ-GOAL-005
   - REQ-INT-004
   - REQ-NAV-006
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SAFE-002
@@ -1583,7 +1943,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -1591,7 +1951,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-RES-003-01
-  proof: &id039
+  proof: &id045
   - just gate-t21
   settling_tasks:
   - T21
@@ -1608,6 +1968,10 @@ requirements:
   - REQ-GOAL-005
   - REQ-INT-004
   - REQ-NAV-006
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SAFE-002
@@ -1639,7 +2003,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -1647,7 +2011,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-RES-004-01
-  proof: &id040
+  proof: &id046
   - just gate-t21
   settling_tasks:
   - T21
@@ -1664,6 +2028,10 @@ requirements:
   - REQ-GOAL-005
   - REQ-INT-004
   - REQ-NAV-006
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SAFE-002
@@ -1695,7 +2063,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[4]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -1703,7 +2071,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-RES-005-01
-  proof: &id041
+  proof: &id047
   - just gate-t17
   - just gate-t21
   settling_tasks:
@@ -1730,6 +2098,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -1761,7 +2135,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[5]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -1769,7 +2143,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-RES-006-01
-  proof: &id042
+  proof: &id048
   - just gate-t21
   settling_tasks:
   - T21
@@ -1786,6 +2160,10 @@ requirements:
   - REQ-GOAL-005
   - REQ-INT-004
   - REQ-NAV-006
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SAFE-002
@@ -1817,7 +2195,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[6]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -1825,7 +2203,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-RES-007-01
-  proof: &id043
+  proof: &id049
   - just gate-t21
   settling_tasks:
   - T21
@@ -1842,6 +2220,10 @@ requirements:
   - REQ-GOAL-005
   - REQ-INT-004
   - REQ-NAV-006
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SAFE-002
@@ -1873,7 +2255,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.failure_model_and_recovery.safe_failure_requirements[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -1881,7 +2263,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-SAFE-001-01
-  proof: &id044
+  proof: &id050
   - just gate-t11
   - just gate-t15
   settling_tasks:
@@ -1905,6 +2287,11 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SAFE-002
@@ -1929,7 +2316,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.failure_model_and_recovery.safe_failure_requirements[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -1937,7 +2324,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-SAFE-002-01
-  proof: &id045
+  proof: &id051
   - just gate-t13
   settling_tasks:
   - T13
@@ -1948,6 +2335,7 @@ requirements:
   - REQ-CONFIG-012
   - REQ-INT-004
   - REQ-NAV-006
+  - REQ-NAV-011
   - REQ-SAFE-001
   - REQ-SEC-001
   - REQ-SEC-005
@@ -1964,7 +2352,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.failure_model_and_recovery.safe_failure_requirements[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -1972,7 +2360,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-SAFE-003-01
-  proof: &id046
+  proof: &id052
   - just gate-t06
   settling_tasks:
   - T06
@@ -1998,7 +2386,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.failure_model_and_recovery.safe_failure_requirements[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -2006,7 +2394,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-SAFE-004-01
-  proof: &id047
+  proof: &id053
   - just gate-t10
   - just gate-t19
   settling_tasks:
@@ -2032,6 +2420,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -2081,7 +2475,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.failure_model_and_recovery.safe_failure_requirements[4]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -2089,7 +2483,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-SAFE-005-01
-  proof: &id048
+  proof: &id054
   - just gate-t13
   - just gate-t16
   settling_tasks:
@@ -2110,6 +2504,9 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-011
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SAFE-001
@@ -2131,7 +2528,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.security_safety_trust_boundaries.mandatory_requirements[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ObserverActor
     entity_source: .sea/interaction/interaction-model.sea
@@ -2139,7 +2536,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-SEC-001-01
-  proof: &id049
+  proof: &id055
   - just gate-t11
   settling_tasks:
   - T11
@@ -2161,6 +2558,10 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SEC-006
@@ -2173,7 +2574,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.security_safety_trust_boundaries.mandatory_requirements[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ObserverActor
     entity_source: .sea/interaction/interaction-model.sea
@@ -2181,7 +2582,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-SEC-002-01
-  proof: &id050
+  proof: &id056
   - just gate-t05
   settling_tasks:
   - T05
@@ -2204,7 +2605,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.security_safety_trust_boundaries.mandatory_requirements[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ObserverActor
     entity_source: .sea/interaction/interaction-model.sea
@@ -2212,7 +2613,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-SEC-003-01
-  proof: &id051
+  proof: &id057
   - just gate-t05
   settling_tasks:
   - T05
@@ -2235,7 +2636,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.security_safety_trust_boundaries.mandatory_requirements[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ObserverActor
     entity_source: .sea/interaction/interaction-model.sea
@@ -2243,7 +2644,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-SEC-004-01
-  proof: &id052
+  proof: &id058
   - just gate-t05
   - just gate-t19
   settling_tasks:
@@ -2266,6 +2667,9 @@ requirements:
   - REQ-GOAL-005
   - REQ-INT-003
   - REQ-NAV-004
+  - REQ-NAV-010
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-OUT-004
   - REQ-RES-001
@@ -2309,7 +2713,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.security_safety_trust_boundaries.mandatory_requirements[4]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ObserverActor
     entity_source: .sea/interaction/interaction-model.sea
@@ -2317,7 +2721,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-SEC-005-01
-  proof: &id053
+  proof: &id059
   - just gate-t11
   settling_tasks:
   - T11
@@ -2339,6 +2743,10 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SEC-006
@@ -2351,7 +2759,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.security_safety_trust_boundaries.mandatory_requirements[5]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: ObserverActor
     entity_source: .sea/interaction/interaction-model.sea
@@ -2359,7 +2767,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-SEC-006-01
-  proof: &id054
+  proof: &id060
   - just gate-t04
   - just gate-t19
   settling_tasks:
@@ -2378,6 +2786,9 @@ requirements:
   - REQ-INT-002
   - REQ-INT-003
   - REQ-NAV-004
+  - REQ-NAV-010
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-OUT-004
   - REQ-RES-001
@@ -2422,7 +2833,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2430,7 +2841,7 @@ requirements:
     invariant_source: sea:INV-06
   acceptance:
   - AC-STACK-001-01
-  proof: &id055
+  proof: &id061
   - just gate-t01
   - just gate-t14
   settling_tasks:
@@ -2443,6 +2854,10 @@ requirements:
   - REQ-CONFIG-012
   - REQ-INT-004
   - REQ-NAV-006
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SAFE-002
@@ -2473,7 +2888,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2481,7 +2896,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-STACK-002-01
-  proof: &id056
+  proof: &id062
   - just gate-t04
   settling_tasks:
   - T04
@@ -2499,7 +2914,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2507,7 +2922,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-STACK-003-01
-  proof: &id057
+  proof: &id063
   - just gate-t11
   settling_tasks:
   - T11
@@ -2529,6 +2944,10 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SEC-006
@@ -2541,7 +2960,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2549,7 +2968,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-STACK-004-01
-  proof: &id058
+  proof: &id064
   - just gate-t12
   settling_tasks:
   - T12
@@ -2560,6 +2979,7 @@ requirements:
   - REQ-CONFIG-012
   - REQ-INT-004
   - REQ-NAV-006
+  - REQ-NAV-011
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SEC-001
@@ -2577,7 +2997,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[4]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2585,7 +3005,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-STACK-005-01
-  proof: &id059
+  proof: &id065
   - just gate-t10
   settling_tasks:
   - T10
@@ -2602,6 +3022,11 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SAFE-003
@@ -2619,7 +3044,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[5]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2627,7 +3052,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-STACK-006-01
-  proof: &id060
+  proof: &id066
   - just gate-t13
   settling_tasks:
   - T13
@@ -2638,6 +3063,7 @@ requirements:
   - REQ-CONFIG-012
   - REQ-INT-004
   - REQ-NAV-006
+  - REQ-NAV-011
   - REQ-SAFE-001
   - REQ-SEC-001
   - REQ-SEC-005
@@ -2654,7 +3080,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[6]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2662,7 +3088,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-STACK-007-01
-  proof: &id061
+  proof: &id067
   - just gate-t13
   - just gate-t17
   settling_tasks:
@@ -2683,6 +3109,9 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-011
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-RES-001
@@ -2707,7 +3136,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[7]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2715,7 +3144,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-STACK-008-01
-  proof: &id062
+  proof: &id068
   - just gate-t19
   settling_tasks:
   - T19
@@ -2731,6 +3160,9 @@ requirements:
   - REQ-GOAL-005
   - REQ-INT-003
   - REQ-NAV-004
+  - REQ-NAV-010
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-OUT-004
   - REQ-RES-001
@@ -2774,7 +3206,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[8]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2782,7 +3214,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-STACK-009-01
-  proof: &id063
+  proof: &id069
   - just gate-t11
   settling_tasks:
   - T11
@@ -2804,6 +3236,10 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SEC-006
@@ -2816,7 +3252,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[9]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2824,7 +3260,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-STACK-010-01
-  proof: &id064
+  proof: &id070
   - just gate-t11
   - just gate-t19
   settling_tasks:
@@ -2854,6 +3290,11 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-004
@@ -2897,7 +3338,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[10]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2905,7 +3346,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-STACK-011-01
-  proof: &id065
+  proof: &id071
   - just gate-t20
   settling_tasks:
   - T20
@@ -2925,6 +3366,11 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -2950,7 +3396,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[11]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2958,7 +3404,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-STACK-012-01
-  proof: &id066
+  proof: &id072
   - just gate-t20
   settling_tasks:
   - T20
@@ -2978,6 +3424,11 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -3003,7 +3454,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[13]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -3011,7 +3462,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-STACK-013-01
-  proof: &id067
+  proof: &id073
   - just gate-t20
   settling_tasks:
   - T20
@@ -3031,6 +3482,11 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -3056,7 +3512,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[12]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -3064,7 +3520,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-STACK-014-01
-  proof: &id068
+  proof: &id074
   - just gate-t19
   - just gate-t20
   settling_tasks:
@@ -3093,6 +3549,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -3144,7 +3606,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3152,7 +3614,7 @@ requirements:
     invariant_source: sea:INV-09
   acceptance:
   - AC-UI-001-01
-  proof: &id069
+  proof: &id075
   - just gate-t05
   settling_tasks:
   - T05
@@ -3175,7 +3637,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3183,7 +3645,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UI-002-01
-  proof: &id070
+  proof: &id076
   - just gate-t05
   settling_tasks:
   - T05
@@ -3206,7 +3668,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3214,7 +3676,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UI-003-01
-  proof: &id071
+  proof: &id077
   - just gate-t05
   settling_tasks:
   - T05
@@ -3237,7 +3699,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3245,7 +3707,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UI-004-01
-  proof: &id072
+  proof: &id078
   - just gate-t08
   - just gate-t18
   settling_tasks:
@@ -3267,6 +3729,11 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -3295,7 +3762,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[4]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3303,7 +3770,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UI-005-01
-  proof: &id073
+  proof: &id079
   - just gate-t03
   - just gate-t09
   settling_tasks:
@@ -3323,6 +3790,11 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-006
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   critic_predicate: source-fidelity
@@ -3333,7 +3805,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[5]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3341,7 +3813,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UI-006-01
-  proof: &id074
+  proof: &id080
   - just gate-t05
   - just gate-t09
   settling_tasks:
@@ -3367,6 +3839,11 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-006
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SEC-006
@@ -3379,7 +3856,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[6]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3387,7 +3864,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UI-007-01
-  proof: &id075
+  proof: &id081
   - just gate-t05
   - just gate-t10
   settling_tasks:
@@ -3412,6 +3889,11 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SAFE-003
@@ -3431,7 +3913,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[7]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3439,7 +3921,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UI-008-01
-  proof: &id076
+  proof: &id082
   - just gate-t05
   settling_tasks:
   - T05
@@ -3462,7 +3944,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -3470,7 +3952,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UX-001-01
-  proof: &id077
+  proof: &id083
   - just gate-t22
   settling_tasks:
   - T22
@@ -3492,6 +3974,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -3523,7 +4011,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -3531,7 +4019,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UX-002-01
-  proof: &id078
+  proof: &id084
   - just gate-t18
   - just gate-t22
   settling_tasks:
@@ -3555,6 +4043,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -3584,7 +4078,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -3592,7 +4086,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UX-003-01
-  proof: &id079
+  proof: &id085
   - just gate-t18
   - just gate-t22
   settling_tasks:
@@ -3616,6 +4110,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -3645,7 +4145,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -3653,7 +4153,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UX-004-01
-  proof: &id080
+  proof: &id086
   - just gate-t22
   settling_tasks:
   - T22
@@ -3675,6 +4175,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -3706,7 +4212,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[4]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -3714,7 +4220,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UX-005-01
-  proof: &id081
+  proof: &id087
   - just gate-t08
   - just gate-t09
   settling_tasks:
@@ -3732,6 +4238,11 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-006
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   critic_predicate: source-fidelity
@@ -3742,7 +4253,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[5]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -3750,7 +4261,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UX-006-01
-  proof: &id082
+  proof: &id088
   - just gate-t05
   - just gate-t09
   settling_tasks:
@@ -3776,6 +4287,11 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-006
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-SEC-006
@@ -3788,7 +4304,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[6]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -3796,7 +4312,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UX-007-01
-  proof: &id083
+  proof: &id089
   - just gate-t11
   - just gate-t22
   settling_tasks:
@@ -3822,6 +4338,11 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-004
@@ -3847,7 +4368,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[7]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -3855,7 +4376,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UX-008-01
-  proof: &id084
+  proof: &id090
   - just gate-t08
   - just gate-t09
   settling_tasks:
@@ -3873,6 +4394,11 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-006
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   critic_predicate: source-fidelity
@@ -3883,7 +4409,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[8]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -3891,7 +4417,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UX-009-01
-  proof: &id085
+  proof: &id091
   - just gate-t19
   - just gate-t22
   settling_tasks:
@@ -3922,6 +4448,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -3970,7 +4502,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[9]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -3978,7 +4510,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UX-010-01
-  proof: &id086
+  proof: &id092
   - just gate-t22
   settling_tasks:
   - T22
@@ -4000,6 +4532,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -4031,7 +4569,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[10]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4039,7 +4577,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UX-011-01
-  proof: &id087
+  proof: &id093
   - just gate-t09
   settling_tasks:
   - T09
@@ -4057,6 +4595,11 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-006
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   critic_predicate: source-fidelity
@@ -4067,7 +4610,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[11]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4075,7 +4618,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-UX-012-01
-  proof: &id088
+  proof: &id094
   - just gate-t15
   - just gate-t22
   settling_tasks:
@@ -4099,6 +4642,12 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-004
@@ -4135,7 +4684,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.outcome_verified.signals[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: InteractionInvariant
     entity_source: .sea/interaction/interaction-model.sea
@@ -4143,7 +4692,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-VERIFY-001-01
-  proof: &id089
+  proof: &id095
   - just gate-t18
   settling_tasks:
   - T18
@@ -4157,6 +4706,7 @@ requirements:
   - REQ-INT-004
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-011
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SEC-001
@@ -4185,7 +4735,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.outcome_verified.signals[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: InteractionInvariant
     entity_source: .sea/interaction/interaction-model.sea
@@ -4193,7 +4743,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-VERIFY-002-01
-  proof: &id090
+  proof: &id096
   - just gate-t11
   - just gate-t19
   settling_tasks:
@@ -4223,6 +4773,11 @@ requirements:
   - REQ-NAV-004
   - REQ-NAV-005
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-004
@@ -4266,7 +4821,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.outcome_verified.signals[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: InteractionInvariant
     entity_source: .sea/interaction/interaction-model.sea
@@ -4274,7 +4829,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-VERIFY-003-01
-  proof: &id091
+  proof: &id097
   - just gate-t18
   settling_tasks:
   - T18
@@ -4288,6 +4843,7 @@ requirements:
   - REQ-INT-004
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-011
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SEC-001
@@ -4316,7 +4872,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.outcome_verified.signals[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: InteractionInvariant
     entity_source: .sea/interaction/interaction-model.sea
@@ -4324,7 +4880,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-VERIFY-004-01
-  proof: &id092
+  proof: &id098
   - just gate-t13
   - just gate-t17
   settling_tasks:
@@ -4345,6 +4901,9 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-011
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-RES-001
@@ -4369,7 +4928,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.outcome_verified.signals[4]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: InteractionInvariant
     entity_source: .sea/interaction/interaction-model.sea
@@ -4377,7 +4936,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-VERIFY-005-01
-  proof: &id093
+  proof: &id099
   - just gate-t19
   settling_tasks:
   - T19
@@ -4393,6 +4952,9 @@ requirements:
   - REQ-GOAL-005
   - REQ-INT-003
   - REQ-NAV-004
+  - REQ-NAV-010
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-OUT-004
   - REQ-RES-001
@@ -4436,7 +4998,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[0]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -4444,7 +5006,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-WORLD-001-01
-  proof: &id094
+  proof: &id100
   - just gate-t06
   settling_tasks:
   - T06
@@ -4470,7 +5032,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[1]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -4478,7 +5040,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-WORLD-002-01
-  proof: &id095
+  proof: &id101
   - just gate-t06
   settling_tasks:
   - T06
@@ -4504,7 +5066,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[2]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -4512,7 +5074,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-WORLD-003-01
-  proof: &id096
+  proof: &id102
   - just gate-t06
   settling_tasks:
   - T06
@@ -4538,7 +5100,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[3]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -4546,7 +5108,7 @@ requirements:
     invariant_source: sea:INV-05
   acceptance:
   - AC-WORLD-004-01
-  proof: &id097
+  proof: &id103
   - just gate-t01
   - just gate-t14
   settling_tasks:
@@ -4559,6 +5121,10 @@ requirements:
   - REQ-CONFIG-012
   - REQ-INT-004
   - REQ-NAV-006
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SAFE-002
@@ -4589,7 +5155,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[4]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -4597,7 +5163,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-WORLD-005-01
-  proof: &id098
+  proof: &id104
   - just gate-t06
   settling_tasks:
   - T06
@@ -4623,7 +5189,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[5]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -4631,7 +5197,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-WORLD-006-01
-  proof: &id099
+  proof: &id105
   - just gate-t06
   settling_tasks:
   - T06
@@ -4657,7 +5223,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[6]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -4665,7 +5231,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-WORLD-007-01
-  proof: &id100
+  proof: &id106
   - just gate-t06
   - just gate-t20
   settling_tasks:
@@ -4694,6 +5260,11 @@ requirements:
   - REQ-NAV-005
   - REQ-NAV-006
   - REQ-NAV-007
+  - REQ-NAV-008
+  - REQ-NAV-009
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-013
   - REQ-OUT-001
   - REQ-OUT-002
   - REQ-OUT-003
@@ -4717,7 +5288,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[7]
-    digest: sha256:14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -4725,7 +5296,7 @@ requirements:
     invariant_source: family
   acceptance:
   - AC-WORLD-008-01
-  proof: &id101
+  proof: &id107
   - just gate-t14
   settling_tasks:
   - T14
@@ -4736,6 +5307,10 @@ requirements:
   - REQ-CONFIG-012
   - REQ-INT-004
   - REQ-NAV-006
+  - REQ-NAV-010
+  - REQ-NAV-011
+  - REQ-NAV-012
+  - REQ-NAV-013
   - REQ-OUT-003
   - REQ-SAFE-001
   - REQ-SAFE-002
@@ -4911,348 +5486,380 @@ acceptance_contracts:
   expected: Before any consequential commitment the observer is observed to see the operation's reversibility class, payment, expected evidence and what happens if authority escalates.
   gate_command: *id032
   status: candidate
+- id: AC-NAV-008-01
+  requirement: REQ-NAV-008
+  expected: Payment is observed to be represented as entries of currency, unit, amount (non-negative or unknown), basis and source reference. Horizon's currency set is steering_attention, orchestration, compute, verification, recovery, structural_maintenance, representational_formation, risk_irreversibility and opportunity; extending it requires a spec version. An operation binding is observed to declare a declared_bound entry for every currency, exactly one per (currency, unit), or it is invalid. Entries are never observed to be summed, weighted or converted, and predicted estimates MUST NOT be gate inputs.
+  gate_command: *id033
+  status: candidate
+- id: AC-NAV-009-01
+  requirement: REQ-NAV-009
+  expected: 'Observed: the payment gate''s inputs are the binding''s declared bounds and the observer''s available capacity per (currency, unit): allowance (non-negative or unbounded, optionally per UTC day) minus reserved and consumed bounds. An entry with a positive or unknown bound and no allowance is unknown; an unknown bound against a numeric capacity is unknown; a bound above available capacity is blocked. Committing is observed to reserve every declared bound atomically with recording the intent, so concurrent intents cannot jointly exceed capacity; a reservation becomes consumption when the intent is terminal. The gate is never weighed against expected value.'
+  gate_command: *id034
+  status: candidate
+- id: AC-NAV-010-01
+  requirement: REQ-NAV-010
+  expected: For a committed intent, the observed steering_attention (human authority decisions) are observed to be taken from SEA-Forge's record for the intent's operation and presented beside its declared bound wherever the intent's payment is presented.
+  gate_command: *id035
+  status: candidate
+- id: AC-NAV-011-01
+  requirement: REQ-NAV-011
+  expected: 'Observed: an intent requires operational settlement unless its operation is read_only and its binding does not require settlement. Such an intent is observed to carry an expected outcome (modality, statement, refuted_by, irrelevant distinctions, unaccounted factors, window) whose verifier is the operation binding''s vetted, read-only template, every executed or loaded artifact of which is pinned by sha256 and checked before each run, instantiated only with the operation''s effect identity. The expectation is registered with RealityTrace as a question and threshold before authority is requested; its digest, threshold id and threshold position are carried exactly in the SEA-Forge authority request; it is covered by the intent''s idempotency key and never revised. After authority and before execution, a confined read-only discrimination run is never observed to already observe the statement. If it does, or cannot complete, the operation is never observed to be executed. An invocation
+    that would start after the window closes are observed to be refused.'
+  gate_command: *id036
+  status: candidate
+- id: AC-NAV-012-01
+  requirement: REQ-NAV-012
+  expected: Settlement of an intent that requires operational settlement is observed to be decided by SEA-Forge from RealityTrace evidence of verification runs started after execution whose ledger positions lie after the discrimination run and at or before the ledger head recorded in a durable closure record no later than the window deadline plus the close grace; each run's timeout ends before the deadline; only evidence whose RealityTrace-recorded completion time is at or before the deadline is admissible, and evidence without one is undefined; when no on-time closure record exists the intent is unresolved and rejected. Only known exit codes decide; timeouts, crashes, null exits and digest or argv mismatches are undefined. Known 0 with no known non-zero is supported and settled; known non-zero with no known 0 is contradicted and rejected; both is inconsistent and unsettled; no known result is unresolved and rejected for an obligation; before the window closes the intent is pending. Only
+    the obligation modality with the command verifier is supported in this version. An exempt intent without an expectation is not_required, never settled. Disposition remains the observer's authorized judgment.
+  gate_command: *id037
+  status: candidate
+- id: AC-NAV-013-01
+  requirement: REQ-NAV-013
+  expected: For an intent that requires operational settlement, the settlement_access gate is observed to be available only if its expectation is valid, its modality and verifier are supported, the operation binding declares a vetted read-only verifier template whose pinned artifact digests all match, and SEA-Forge settlement with RealityTrace corroboration is configured; otherwise it is blocked or unknown with the missing prerequisite. Assessment, inspection and diagnostics is never observed to depend on this gate.
+  gate_command: *id038
+  status: candidate
 - id: AC-OUT-001-01
   requirement: REQ-OUT-001
   expected: Every frame is observed to identify observer, pinned semantic world, operational checkpoint or explicit unknown, current focus, view mode, and allowed choices.
-  gate_command: *id033
+  gate_command: *id039
   status: candidate
 - id: AC-OUT-002-01
   requirement: REQ-OUT-002
   expected: Every choice is observed to bind a typed semantic operation and its current affordance assessment. It is never observed to gain authority from UI enablement.
-  gate_command: *id034
+  gate_command: *id040
   status: candidate
 - id: AC-OUT-003-01
   requirement: REQ-OUT-003
   expected: Each consequential attempt is observed to preserve predeclared expectations, authorization correlation, execution references, and observation status.
-  gate_command: *id035
+  gate_command: *id041
   status: candidate
 - id: AC-OUT-004-01
   requirement: REQ-OUT-004
   expected: Both renderers are observed to project the same behavior without duplicating source-of-truth rules or creating a second approval path.
-  gate_command: *id036
+  gate_command: *id042
   status: candidate
 - id: AC-RES-001-01
   requirement: REQ-RES-001
   expected: 'Research runs as a Python process behind a versioned typed contract: a recorded experiment run shows the dataset, corpora, calibration and evaluation artifacts produced by that subsystem, and the TypeScript tree contains no training or evaluation implementation of its own.'
-  gate_command: *id037
+  gate_command: *id043
   status: candidate
 - id: AC-RES-002-01
   requirement: REQ-RES-002
   expected: Research artifacts (datasets and corpora, preregistrations, experiment runs, results and verdicts, models, shadow evaluations) are observed to be navigable world objects with content-hash provenance. Migrated results are observed to keep their original claim level and verdict and MUST NOT be upgraded by migration.
-  gate_command: *id038
+  gate_command: *id044
   status: candidate
 - id: AC-RES-003-01
   requirement: REQ-RES-003
   expected: Starting a research run is observed to be a consequential governed operation with a compute/payment gate and a preregistration frozen before execution; long runs use Gauntlet or a bounded Cognate execution world, and results become evidence, not settlement by assertion.
-  gate_command: *id039
+  gate_command: *id045
   status: candidate
 - id: AC-RES-004-01
   requirement: REQ-RES-004
   expected: 'Predictive estimates may be observed to inform payment, consequence or ranking only after governed activation: a frozen preregistered held-out criterion, retained evaluation evidence and an authorized promotion. Active, heuristic and disabled estimator states are observed to be visible, and estimates are never observed to change hard-gate outcomes.'
-  gate_command: *id040
+  gate_command: *id046
   status: candidate
 - id: AC-RES-005-01
   requirement: REQ-RES-005
   expected: Settled, failed and contradicted Horizon episodes are observed to be exportable to the research subsystem as versioned, scope-filtered datasets with provenance and without secrets or cross-scope leakage.
-  gate_command: *id041
+  gate_command: *id047
   status: candidate
 - id: AC-RES-006-01
   requirement: REQ-RES-006
   expected: Existing agent workflows using the cybernetic_nav MCP tools and godspeed-nav CLI is observed to receive an explicit mapping to Horizon equivalents or a documented deprecation; no tool may silently disappear or change meaning.
-  gate_command: *id042
+  gate_command: *id048
   status: candidate
 - id: AC-RES-007-01
   requirement: REQ-RES-007
   expected: Migrated ledgers, data and reports are observed to preserve append-only history, original timestamps and content hashes. Large data are observed to be referenced by hash and location rather than committed to the repository.
-  gate_command: *id043
+  gate_command: *id049
   status: candidate
 - id: AC-SAFE-001-01
   requirement: REQ-SAFE-001
   expected: Horizon is observed to fail closed on unknown runtime authorization, unsafe world revision or unreconciled duplicate commit.
-  gate_command: *id044
+  gate_command: *id050
   status: candidate
 - id: AC-SAFE-002-01
   requirement: REQ-SAFE-002
   expected: Horizon is observed to preserve immutable expectation, evidence and error history during recovery and reframing.
-  gate_command: *id045
+  gate_command: *id051
   status: candidate
 - id: AC-SAFE-003-01
   requirement: REQ-SAFE-003
   expected: Horizon is observed to distinguish source unavailable, access denied, empty result and no matching object.
-  gate_command: *id046
+  gate_command: *id052
   status: candidate
 - id: AC-SAFE-004-01
   requirement: REQ-SAFE-004
   expected: Horizon is observed to permit valid read-only navigation and diagnostics when an unrelated executor is unavailable.
-  gate_command: *id047
+  gate_command: *id053
   status: candidate
 - id: AC-SAFE-005-01
   requirement: REQ-SAFE-005
   expected: Horizon is observed to prevent a candidate, historical view or simulated outcome being presented as current observed fact.
-  gate_command: *id048
+  gate_command: *id054
   status: candidate
 - id: AC-SEC-001-01
   requirement: REQ-SEC-001
   expected: An attempt to reach a consequential capability without passing Cognate capability resolution and SEA-Forge invocation checks has no external effect and is refused.
-  gate_command: *id049
+  gate_command: *id055
   status: candidate
 - id: AC-SEC-002-01
   requirement: REQ-SEC-002
   expected: Agent, human and system presentation roles are observed to remain separated in transport and reducer enforcement.
-  gate_command: *id050
+  gate_command: *id056
   status: candidate
 - id: AC-SEC-003-01
   requirement: REQ-SEC-003
   expected: All untrusted source and UI strings are observed to be schema-validated, scoped, and escaped; no arbitrary executable markup may be submitted.
-  gate_command: *id051
+  gate_command: *id057
   status: candidate
 - id: AC-SEC-004-01
   requirement: REQ-SEC-004
   expected: A multi-user or remote deployment refuses a request whose authority is only the Product Actualizer loopback token assumption, and the refusal names the missing trust boundary rather than silently admitting the request.
-  gate_command: *id052
+  gate_command: *id058
   status: candidate
 - id: AC-SEC-005-01
   requirement: REQ-SEC-005
   expected: Credential and private reference material is never observed to be exposed through shared UI context, logs or evidence.
-  gate_command: *id053
+  gate_command: *id059
   status: candidate
 - id: AC-SEC-006-01
   requirement: REQ-SEC-006
   expected: 'Initial conformance targets the local_operator profile: loopback-bound, per-launch secrets, operator identity from the OS session, and agent principals distinct from the human. shared_remote is never observed to be enabled without a real identity provider at Cognate''s authenticate boundary. Conformance claims are observed to name their profile.'
-  gate_command: *id054
+  gate_command: *id060
   status: candidate
 - id: AC-STACK-001-01
   requirement: REQ-STACK-001
   expected: DomainForge alone is observed to own canonical semantic compilation and world_ref identity.
-  gate_command: *id055
+  gate_command: *id061
   status: candidate
 - id: AC-STACK-002-01
   requirement: REQ-STACK-002
   expected: Cognate is observed to own app events/capability invocation/projection state. Adapters are never observed to create a second authoritative event history.
-  gate_command: *id056
+  gate_command: *id062
   status: candidate
 - id: AC-STACK-003-01
   requirement: REQ-STACK-003
   expected: SEA-Forge is observed to authorize each consequential invocation. Preflight is never observed to substitute for invocation authorization.
-  gate_command: *id057
+  gate_command: *id063
   status: candidate
 - id: AC-STACK-004-01
   requirement: REQ-STACK-004
   expected: 'Gauntlet is used only for tasks that require bounded long-horizon work: a task that does not require bounded long-horizon work is never observed to run through Gauntlet. Gauntlet freezes its Reference at the start of a run and preserves it unchanged for the rest of the run. The restriction is on what Gauntlet is used for; it does not make Gauntlet the sole executor of bounded long-horizon work.'
-  gate_command: *id058
+  gate_command: *id064
   status: candidate
 - id: AC-STACK-005-01
   requirement: REQ-STACK-005
   expected: Context Kernel results are observed to remain scoped/cited and MUST NOT be interpreted as canonical organizational truth.
-  gate_command: *id059
+  gate_command: *id065
   status: candidate
 - id: AC-STACK-006-01
   requirement: REQ-STACK-006
   expected: RealityTrace delivery receipts are never observed to be treated as evidence derivation or settlement.
-  gate_command: *id060
+  gate_command: *id066
   status: candidate
 - id: AC-STACK-007-01
   requirement: REQ-STACK-007
   expected: Operational obligation settlement and GodSpeed developmental interpretation is observed to be separately referenced.
-  gate_command: *id061
+  gate_command: *id067
   status: candidate
 - id: AC-STACK-008-01
   requirement: REQ-STACK-008
   expected: Every cross-system episode is observed to preserve correlation through observer/world/case/intent/authority/execution/evidence/settlement refs.
-  gate_command: *id062
+  gate_command: *id068
   status: candidate
 - id: AC-STACK-009-01
   requirement: REQ-STACK-009
   expected: Only a SEA-Forge allow disposition with a matching invocation grant (bound to the exact action, targets, world_ref and unexpired) may be observed to permit a side effect. Deny, escalate, boundary, degraded and any unrecognized disposition is observed to produce no effect and a visible typed status.
-  gate_command: *id063
+  gate_command: *id069
   status: candidate
 - id: AC-STACK-010-01
   requirement: REQ-STACK-010
   expected: Horizon is observed to reach SEA-Forge, Gauntlet, RealityTrace, Context Kernel and the research subsystem only through Cognate capabilities or Cognate-owned adapters. The navigation controller and renderers are never observed to hold a second client to an authority or evidence owner.
-  gate_command: *id064
+  gate_command: *id070
   status: candidate
 - id: AC-STACK-011-01
   requirement: REQ-STACK-011
   expected: 'A product joins the world only through the product integration contract: a DomainForge module for its types, links and operations; a read connector emitting provenance-bearing observations into Cognate; capability bindings for actions, each covered by SEA-Forge policy; and optional RealityTrace evidence hooks. A product that attempts to join by a route outside that contract is refused. Its integration level (visible, queryable, actionable, evidenced) is derived from which facets are proven.'
-  gate_command: *id065
+  gate_command: *id071
   status: candidate
 - id: AC-STACK-012-01
   requirement: REQ-STACK-012
   expected: Products are never observed to be required to adopt Horizon's language, storage or UI; non-TypeScript products integrate through process, CLI, MCP or Connect boundaries owned by Cognate.
-  gate_command: *id066
+  gate_command: *id072
   status: candidate
 - id: AC-STACK-013-01
   requirement: REQ-STACK-013
   expected: A product with its own UI may be observed to be reachable as a hosted surface via deep links that carry focus refs in and return typed intents or focus out. A hosted surface is never observed to run inside Horizon's trust boundary or acquire Horizon authority.
-  gate_command: *id067
+  gate_command: *id073
   status: candidate
 - id: AC-STACK-014-01
   requirement: REQ-STACK-014
   expected: 'Dependency is one-way: every stack owner (DomainForge, Cognate, SEA-Forge, Gauntlet, RealityTrace, Context Kernel) and every joined product remains fully operable with Horizon stopped or absent. Horizon is never observed to require changes that make a product depend on Horizon, and Horizon''s integration with each product uses that product''s own public surfaces; a product unaware of Horizon is a valid product.'
-  gate_command: *id068
+  gate_command: *id074
   status: candidate
 - id: AC-UI-001-01
   requirement: REQ-UI-001
   expected: A submitted surface specification containing executable code is rejected at validation, and the accepted specification consists only of declarative elements, groups and actions.
-  gate_command: *id069
+  gate_command: *id075
   status: candidate
 - id: AC-UI-002-01
   requirement: REQ-UI-002
   expected: Schema validation is observed to reject unknown blocks, unauthorized actions, invalid refs and unsafe source expressions.
-  gate_command: *id070
+  gate_command: *id076
   status: candidate
 - id: AC-UI-003-01
   requirement: REQ-UI-003
   expected: Deterministic source-binding and pure composition/reducer behavior is observed to define displayed facts and resulting intents.
-  gate_command: *id071
+  gate_command: *id077
   status: candidate
 - id: AC-UI-004-01
   requirement: REQ-UI-004
   expected: Clack and GUI is observed to consume the same behavioral contract and produce equivalent typed intents for equivalent frames.
-  gate_command: *id072
+  gate_command: *id078
   status: candidate
 - id: AC-UI-005-01
   requirement: REQ-UI-005
   expected: Atomic UI is observed to derive elements, groups, regions and views from proved behavioral necessities, preserving accessible loading, empty, blocked and recovery states.
-  gate_command: *id073
+  gate_command: *id079
   status: candidate
 - id: AC-UI-006-01
   requirement: REQ-UI-006
   expected: Agent-composed content is never observed to reorder owner-pinned surfaces or seize presentation control; owner choices govern layout.
-  gate_command: *id074
+  gate_command: *id080
   status: candidate
 - id: AC-UI-007-01
   requirement: REQ-UI-007
   expected: The source of every substantive value is observed to be inspectable, and agent-supplied values MUST be visibly marked as such.
-  gate_command: *id075
+  gate_command: *id081
   status: candidate
 - id: AC-UI-008-01
   requirement: REQ-UI-008
   expected: Contextual MCP, WebMCP and CLI tools are observed to share the same validation and role boundaries. Tool discovery is never observed to imply authorization.
-  gate_command: *id076
+  gate_command: *id082
   status: candidate
 - id: AC-UX-001-01
   requirement: REQ-UX-001
   expected: Opening the application lands on a home view that resumes the last focus and lists, in mode-precedence order, pending human decisions, work in flight, contradicted or unresolved evidence, degraded sources and changes to watched objects.
-  gate_command: *id077
+  gate_command: *id083
   status: candidate
 - id: AC-UX-002-01
   requirement: REQ-UX-002
   expected: A keyboard-first command palette is observed to reach search, focus, traversal and every currently derived choice. It is a renderer of the same frame and is observed to emit the same typed intents as Clack and GUI.
-  gate_command: *id078
+  gate_command: *id084
   status: candidate
 - id: AC-UX-003-01
   requirement: REQ-UX-003
   expected: Every focus and frame is observed to be addressable by a stable link pinning world_ref, checkpoint and focus; opening a link reproduces that context or states explicitly that newer state exists and offers to move to it.
-  gate_command: *id079
+  gate_command: *id085
   status: candidate
 - id: AC-UX-004-01
   requirement: REQ-UX-004
   expected: Navigation is observed to keep a traversal trail with back/forward and breadcrumbs that preserve selections; read-only navigation is always reversible.
-  gate_command: *id080
+  gate_command: *id086
   status: candidate
 - id: AC-UX-005-01
   requirement: REQ-UX-005
   expected: Explanations are observed to lead with plain language (what this is, why it is blocked, the single next prerequisite) with progressive drill-down to gates, evidence, provenance and raw refs. Internal vocabulary is never observed to be required to operate.
-  gate_command: *id081
+  gate_command: *id087
   status: candidate
 - id: AC-UX-006-01
   requirement: REQ-UX-006
   expected: Every action, answer and composition is observed to show its actor. An agent acting for a human is observed to be visibly distinct from the human.
-  gate_command: *id082
+  gate_command: *id088
   status: candidate
 - id: AC-UX-007-01
   requirement: REQ-UX-007
   expected: SEA-Forge approvals are observed to be presented and resolved as SEA-Forge approval records under the approver's own authenticated identity. Horizon is never observed to keep a local approval state.
-  gate_command: *id083
+  gate_command: *id089
   status: candidate
 - id: AC-UX-008-01
   requirement: REQ-UX-008
   expected: The GUI and terminal renderers are observed to be fully keyboard operable, meet WCAG 2.2 AA for the GUI, respect reduced motion, support light and dark themes, and announce frame changes to assistive technology.
-  gate_command: *id084
+  gate_command: *id090
   status: candidate
 - id: AC-UX-009-01
   requirement: REQ-UX-009
   expected: Read-only navigation interactions should be observed to respond within 300 ms p95 on the local_operator profile. Operations exceeding 1 s are observed to show progress tied to real events and remain cancellable where the owner supports cancellation.
-  gate_command: *id085
+  gate_command: *id091
   status: candidate
 - id: AC-UX-010-01
   requirement: REQ-UX-010
   expected: First run and empty states are observed to guide the observer to connect a world and a product, and MUST explain each unavailable capability with its next prerequisite instead of showing blank regions.
-  gate_command: *id086
+  gate_command: *id092
   status: candidate
 - id: AC-UX-011-01
   requirement: REQ-UX-011
   expected: Graph and lineage views are observed to open fit-to-content, aggregate beyond a bounded node count, and always offer an equivalent table or list projection.
-  gate_command: *id087
+  gate_command: *id093
   status: candidate
 - id: AC-UX-012-01
   requirement: REQ-UX-012
   expected: Notices are observed to be deduplicated by source identity and severity-ranked; repeated identical conditions update one notice rather than creating new ones.
-  gate_command: *id088
+  gate_command: *id094
   status: candidate
 - id: AC-VERIFY-001-01
   requirement: REQ-VERIFY-001
   expected: The same fixture and frame revision yield the same typed choices and intent ids through both Clack and the graphical renderer, differing only in presentation.
-  gate_command: *id089
+  gate_command: *id095
   status: candidate
 - id: AC-VERIFY-002-01
   requirement: REQ-VERIFY-002
   expected: An invalid, stale, unauthorized, unpayable or unverifiable operation produces no external side effect, and its refusal names which of those conditions applied.
-  gate_command: *id090
+  gate_command: *id096
   status: candidate
 - id: AC-VERIFY-003-01
   requirement: REQ-VERIFY-003
   expected: After a restart, focus, provenance, committed intentions and outstanding human decisions are reconstructed from the durable store, not re-derived from scratch.
-  gate_command: *id091
+  gate_command: *id097
   status: candidate
 - id: AC-VERIFY-004-01
   requirement: REQ-VERIFY-004
   expected: An operational settlement claim and a developmental conclusion are recorded with separate strength and scope, and neither exceeds what its own evidence supports.
-  gate_command: *id092
+  gate_command: *id098
   status: candidate
 - id: AC-VERIFY-005-01
   requirement: REQ-VERIFY-005
   expected: Six canonical journeys J01 Explore, J02 Operate, J03 Build, J04 Monitor, J05 Compare and J06 Develop each pass recorded happy, blocked and recovery fixtures, and a skipped required integration fails conformance instead of passing.
-  gate_command: *id093
+  gate_command: *id099
   status: candidate
 - id: AC-WORLD-001-01
   requirement: REQ-WORLD-001
   expected: A single search returns semantic types, live objects, resources and applications as distinctly typed results, and no result is presented as belonging to a different kind than its source declares.
-  gate_command: *id094
+  gate_command: *id100
   status: candidate
 - id: AC-WORLD-002-01
   requirement: REQ-WORLD-002
   expected: Horizon is observed to filter typed operational sets and traverse declared relationships at a known checkpoint.
-  gate_command: *id095
+  gate_command: *id101
   status: candidate
 - id: AC-WORLD-003-01
   requirement: REQ-WORLD-003
   expected: Horizon is observed to preserve focus, object-set selection, observer and world across surfaces and journeys.
-  gate_command: *id096
+  gate_command: *id102
   status: candidate
 - id: AC-WORLD-004-01
   requirement: REQ-WORLD-004
   expected: Historical, current and candidate revisions of one world are shown with distinct immutable references, and no surface presents a candidate revision as the active world.
-  gate_command: *id097
+  gate_command: *id103
   status: candidate
 - id: AC-WORLD-005-01
   requirement: REQ-WORLD-005
   expected: The import graph, operational relation graph, and data lineage is observed to retain distinct identities and semantics.
-  gate_command: *id098
+  gate_command: *id104
   status: candidate
 - id: AC-WORLD-006-01
   requirement: REQ-WORLD-006
   expected: Operational objects and links are observed to be typed Cognate projections over durable events and connector observations, keyed by DomainForge semantic IDs. Checkpoint_ref is observed to identify the Cognate commit position and the projection versions read. Horizon is never observed to keep a separate mutable object database outside Cognate.
-  gate_command: *id099
+  gate_command: *id105
   status: candidate
 - id: AC-WORLD-007-01
   requirement: REQ-WORLD-007
   expected: Every object, set and link is observed to expose its owning product, connector, checkpoint age and integration level, and stale or degraded sources MUST be visibly marked.
-  gate_command: *id100
+  gate_command: *id106
   status: candidate
 - id: AC-WORLD-008-01
   requirement: REQ-WORLD-008
   expected: An active world is observed to be selected through a DomainForge world alias pinned to an immutable world_ref. A candidate-versus-active semantic diff may be observed to be a Horizon-derived read-only view but is never observed to mint or verify identity.
-  gate_command: *id101
+  gate_command: *id107
   status: candidate

@@ -1,0 +1,11 @@
+**One r4 major is closed; the deadline major remains partial and must be fixed before apply.** Both source hashes match. Review was read-only.
+
+- **Closed — verifier integrity.** [REQ-NAV-011](/home/sprime01/projects/_wt/horizon-cr2/.agents/candidates/horizon/SPEC-CR-002/DELTA.md:240) now pins every executed or loaded artifact and checks it before each run. The changed-script falsifier preserves argv and interpreter digest. This addresses r4’s first major without introducing a new conflict.
+
+- **Major remains — a configured timeout does not prove timely completion.** [REQ-NAV-012](/home/sprime01/projects/_wt/horizon-cr2/.agents/candidates/horizon/SPEC-CR-002/DELTA.md:250) permits C to be recorded during the grace period and assumes earlier timeout expiry prevents late positive evidence. RealityTrace [checks child completion before checking timeout](/home/sprime01/projects/gsr-heads/realitytrace/sxr-verify/src/verifier.rs:155). If its watchdog pauses before timeout expiry and resumes after the window deadline, an already-exited child can return known 0. That observation can append before a grace-period C and qualify as supported. [Persisted evidence lacks completion timestamps](/home/sprime01/projects/gsr-heads/realitytrace/sxr-cli/src/commands.rs:1017), so the record does not establish timely completion.
+
+  **Required fix:** make the exact requirement demand trustworthy deadline-bound evidence or cutoff provenance, with failure closed when that proof is absent—even if the closure record falls within grace. Add a falsifier where the watchdog pauses across timeout and deadline, the child completes late, and closure occurs within grace. This preserves the frozen spec’s [uncertain-evidence recovery rule](/home/sprime01/projects/_wt/horizon-cr2/.agents/specs/horizon.agent.spec.yaml:1232) and [v17’s frozen-criterion relation](/home/sprime01/projects/godspeed-growth/world/cognitive_os_manifesto_v17.md:495).
+
+The confinement minor is now explicitly assigned an implementation test. No other new blocker or major conflict found in r5.
+
+VERDICT: ACCEPT_WITH_CHANGES

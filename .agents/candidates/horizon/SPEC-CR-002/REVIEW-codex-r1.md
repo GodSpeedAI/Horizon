@@ -1,0 +1,23 @@
+Verified both source pins. Frozen spec SHA-256: `14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4`. Its 99 requirements match the claimed count. No files modified.
+
+The settlement table correctly preserves undefined by modality; scalar weighting is explicitly forbidden. Findings:
+
+1. **Blocker — predictive estimates can control a hard gate.** [DELTA:37](/home/sprime01/projects/_wt/horizon-cr2/.agents/candidates/horizon/SPEC-CR-002/DELTA.md:37) admits estimator output into payment gating. **REQ-RES-004** says “estimates MUST NOT change hard-gate outcomes” ([spec:765](/home/sprime01/projects/_wt/horizon-cr2/.agents/specs/horizon.agent.spec.yaml:765)). **Fix:** keep predictions advisory; gate on independently established bounds.
+
+2. **Blocker — incomplete or split payment passes.** Under [DELTA:51](/home/sprime01/projects/_wt/horizon-cr2/.agents/candidates/horizon/SPEC-CR-002/DELTA.md:51), an empty list passes; two same-unit entries of 6 each pass against 10 remaining. This violates every-currency affordability ([manifesto:254](/home/sprime01/projects/godspeed-growth/world/cognitive_os_manifesto_v17.md:254)). **Fix:** require explicit currency coverage, treating omissions as unknown, and unique `(currency, unit)` totals.
+
+3. **Major — “remaining” capacity lacks consumption semantics.** [DELTA:48](/home/sprime01/projects/_wt/horizon-cr2/.agents/candidates/horizon/SPEC-CR-002/DELTA.md:48) permits two intents to reuse the same remaining budget. **Fix:** define budget scope, checkpoint, outstanding commitments and invocation-time revalidation; test concurrent spending.
+
+4. **Major — template existence does not validate the submitted expectation.** Both [DELTA:119](/home/sprime01/projects/_wt/horizon-cr2/.agents/candidates/horizon/SPEC-CR-002/DELTA.md:119) conditions can hold with no concrete outcome, contradicting the claimed preflight refusal at line 214. **Fix:** require a valid instantiated expectation and supported verifier parameters before availability.
+
+5. **Major — settlement dependencies unnecessarily block read-only operations.** [DELTA:152](/home/sprime01/projects/_wt/horizon-cr2/.agents/candidates/horizon/SPEC-CR-002/DELTA.md:152) has no applicability exception. **REQ-SAFE-004** requires permitting “valid read-only navigation and diagnostics” during unrelated executor outages ([spec:1242](/home/sprime01/projects/_wt/horizon-cr2/.agents/specs/horizon.agent.spec.yaml:1242)). **Fix:** scope these prerequisites to operations requiring independent operational settlement.
+
+6. **Major — freezing before authority does not prevent hindsight.** [DELTA:79](/home/sprime01/projects/_wt/horizon-cr2/.agents/candidates/horizon/SPEC-CR-002/DELTA.md:79) allows already-observed outcomes; the duration lacks a window origin. [Manifesto:122](/home/sprime01/projects/godspeed-growth/world/cognitive_os_manifesto_v17.md:122) requires formation before observability. **Fix:** define admissible evidence timing and persist the observation window across recovery.
+
+7. **Major — acceptance can pass while undefined becomes confirmation.** [DELTA:206](/home/sprime01/projects/_wt/horizon-cr2/.agents/candidates/horizon/SPEC-CR-002/DELTA.md:206) tests obligations only. Incorrect prohibition/permission handling, contradictory evidence, premature closure and expectation-changing retries can escape. **Fix:** require every table branch plus adversarial idempotency and recovery checks.
+
+8. **Major — migration and rollback omit compatibility boundaries.** [DELTA:175](/home/sprime01/projects/_wt/horizon-cr2/.agents/candidates/horizon/SPEC-CR-002/DELTA.md:175) does not retain executable old-world closures or address pending approvals. Old validation rejects new fields ([intent:78](/home/sprime01/projects/_wt/horizon-cr2/src/domain/intent.ts:78)); duplicate comparison ignores expectations ([implementation:146](/home/sprime01/projects/_wt/horizon-cr2/src/capabilities/navigation-intent.ts:146)). **Fix:** retain original pins/closures, version records, and prohibit old writers from resuming new-contract intents.
+
+9. **Minor — “closed v17 vocabulary” is inaccurate.** [DELTA:29](/home/sprime01/projects/_wt/horizon-cr2/.agents/candidates/horizon/SPEC-CR-002/DELTA.md:29) contradicts v17’s “At minimum” ([manifesto:275](/home/sprime01/projects/godspeed-growth/world/cognitive_os_manifesto_v17.md:275)). **Fix:** label closure as Horizon’s explicit design choice.
+
+VERDICT: REJECT

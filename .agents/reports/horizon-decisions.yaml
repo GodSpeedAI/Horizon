@@ -859,6 +859,24 @@ decisions:
       - ".agents/candidates/horizon/SPEC-CR-001/DELTA.md"
 
 
+  - id: DEC-OWNER-2026-10-23-01
+    date: "2026-10-23"
+    task: none (spec version)
+    requirement: OQ-IDM-02 (payment, IS2); IS7 settlement of navigation intents
+    decision: >-
+      The owner delegated the spec change request process for IS2/IS7 to the readiness session, to be
+      run end to end: prepare SPEC-CR-002, obtain an independent verdict from a reviewer that is not
+      the builder, and, on ACCEPT, apply it as spec 1.1.0 with a re-freeze and a plan rebind. The
+      delegation does not waive any step of the freeze rule; it supplies the owner approval that the
+      rule requires, conditional on the independent verdict.
+    rationale:
+      - "Owner instruction 2026-10-23: \"do the spec change request process, using your best judgement ... you are allowed to run through the whole process, for the purposes of your ultimate task\"."
+      - "The builder cannot approve its own candidate; the independent verdict is the condition that keeps authority external (invariant 7)."
+    reversible: true
+    evidence:
+      - ".agents/candidates/horizon/SPEC-CR-002/CANDIDATE.yaml"
+      - ".agents/candidates/horizon/SPEC-CR-002/DELTA.md"
+
 open_questions:
 
   - id: OQ-001

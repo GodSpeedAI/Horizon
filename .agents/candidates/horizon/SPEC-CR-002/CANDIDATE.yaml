@@ -1,0 +1,29 @@
+candidate_revision:
+  id: SPEC-CR-002
+  task: none (spec version 1.1.0; unblocks J02 IS2 and IS7)
+  prepared_at: "2026-10-23"
+  prepared_by: builder (GodSpeed readiness session)
+  status: applied 2026-10-23 as HORIZON-001 1.1.0 (independent verdict ACCEPT, REVIEW.md); implementation pending (J02 revision 2)
+  authorization:
+    decision: DEC-OWNER-2026-10-23-01
+    scope: >-
+      The owner delegated the whole process. Application still requires an independent ACCEPT
+      verdict in REVIEW.md, the version bump to 1.1.0, a new SHA-256, the plan rebind and the
+      interaction-model migration in the same change.
+  active_pins:
+    spec_sha256: 14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    manifesto_v17_sha256: b45f4a1e29dacfd1257df91804d925c5ea52ceffdd5697de45bab8a98e799e2e  # ~/projects/godspeed-growth/world/cognitive_os_manifesto_v17.md
+  resolves: [OQ-IDM-02]
+  unblocks: [J02 IS2, J02 IS7]
+  adds_requirements: [REQ-NAV-008, REQ-NAV-009, REQ-NAV-010, REQ-NAV-011, REQ-NAV-012, REQ-NAV-013]
+  changes_fields:
+    - "AffordanceAssessment.payment_estimate: string -> list-of PaymentEntry"
+    - "CommitIntentInput / NavigationIntentRecord: + expected_outcome (ExpectedOutcome)"
+  preserves: all 99 existing requirements verbatim; J01-J06 phases; REQ-NAV-006 vocabulary
+  relation: implements SPEC-CR-001 D1 and the IS7 part of D2; SPEC-CR-001 stays proposed
+  semantic_diff: DELTA.md
+  independent_verdict_required: >-
+    A reviewer independent of the builder (a different model) checks DELTA.md against the frozen
+    spec, manifesto v17 §5, §8 and invariant 21, and files ACCEPT, ACCEPT_WITH_CHANGES or REJECT in
+    REVIEW.md. Nothing is applied before ACCEPT.
+  post_apply_evidence: gate J02 revision 2 (live) per DELTA.md "Independent evaluation required"
