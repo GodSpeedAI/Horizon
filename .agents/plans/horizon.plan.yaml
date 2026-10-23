@@ -15,10 +15,10 @@ source:
     intended_repository_path: ".agents/specs/horizon.agent.spec.yaml"
     artifact_name: "horizon.agent.spec.yaml"
     spec_id: "HORIZON-001"
-    spec_version: "1.0.1"
-    sha256: "14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4"
+    spec_version: "1.1.0"
+    sha256: "d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907"
     authority: "normative"
-    current_status: "approved and frozen by the owner on 2026-10-19; amended to 1.0.1 (adds REQ-CMP-001, mapped to T16) and re-frozen on 2026-10-20"
+    current_status: "approved and frozen by the owner on 2026-10-19; amended to 1.0.1 (adds REQ-CMP-001, mapped to T16) and re-frozen on 2026-10-20; amended to 1.1.0 by SPEC-CR-002 (REQ-NAV-008..013, mapped to T07, T11, T13) and re-frozen on 2026-10-23"
   implementation_brief:
     intended_repository_path: ".agents/reports/implementation-context.md"
     authority: "non_normative_execution_context"
@@ -764,6 +764,11 @@ tasks:
       - "REQ-OUT-002"
       - "REQ-NAV-006"
       - "REQ-NAV-007"
+      - "REQ-NAV-008"
+      - "REQ-NAV-009"
+      - "REQ-NAV-010"
+      - "REQ-NAV-011"
+      - "REQ-NAV-013"
     changes: "A pure context/focus/case selector derives candidate operations and explanations, evaluates visible/reachable/payable/governable/executable/recoverable/settleable gates, and emits revisioned frames."
     proves: "Available, blocked, unknown and conflicted alternatives remain distinct, a single primary move is evidence-responsive and optional-only cases are not spuriously forced to settle."
     does_not_prove: "Gate evaluation is a provisional representation and not invocation authority or developmental settlement."
@@ -970,6 +975,7 @@ tasks:
       - "REQ-STACK-010"
       - "REQ-UX-007"
       - "REQ-NAV-006"
+      - "REQ-NAV-011"
     changes: "Consequential intent freezes expectation/targets then passes actual SEA-Forge invocation authority, with durable decision, scope, idempotency and rollback/recovery status."
     proves: "Denied, unknown, changed-scope or stale-authority requests cannot perform external effects even when preflight showed available."
     does_not_prove: "Does not prove the executor completed work or the environmental outcome settled."
@@ -1084,6 +1090,9 @@ tasks:
       - "REQ-VERIFY-004"
       - "REQ-SAFE-002"
       - "REQ-SAFE-005"
+      - "REQ-NAV-010"
+      - "REQ-NAV-012"
+      - "REQ-NAV-013"
     changes: "Frozen expectations, execution events, outbox receipts, independent observations and distinct operational settlement refs are correlated with case status without false promotion."
     proves: "Receipt acknowledgment, trace evidence, operational settlement and developmental evaluation are separate observable states; unresolved evidence fails closed."
     does_not_prove: "Does not prove durable developmental capability, which requires repeated variation and transfer."
@@ -1793,6 +1802,21 @@ traceability:
     "REQ-NAV-007":
       - "T07"
       - "T09"
+    "REQ-NAV-008":
+      - "T07"
+    "REQ-NAV-009":
+      - "T07"
+    "REQ-NAV-010":
+      - "T07"
+      - "T13"
+    "REQ-NAV-011":
+      - "T07"
+      - "T11"
+    "REQ-NAV-012":
+      - "T13"
+    "REQ-NAV-013":
+      - "T07"
+      - "T13"
     "REQ-OUT-001":
       - "T07"
     "REQ-OUT-002":

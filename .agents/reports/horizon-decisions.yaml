@@ -839,6 +839,43 @@ decisions:
       - "test/workspace-model.test.ts"
       - "test/workspace-render.test.tsx"
 
+  - id: DEC-OWNER-2026-10-21-01
+    date: "2026-10-21"
+    task: none (spec source)
+    requirement: spec sources.evidence_source (line 60)
+    decision: >-
+      The canonical CognitiveOS Manifesto is v17
+      (godspeed-growth/world/cognitive_os_manifesto_v17.md), not the v13.1 the frozen spec cites.
+      The frozen spec is NOT edited. A spec candidate (SPEC-CR-001) records the citation change and
+      the requirement deltas v17 implies; it applies only through a new spec version with an
+      independent verdict, a re-freeze and a plan rebind.
+    rationale:
+      - "Owner instruction 2026-10-21: the latest manifesto is v17."
+      - "A comparison found v17 stricter on payment (non-scalar vector), expectation (two-sided, three-valued), capability (discrimination term), criterion revision (new frozen identity) and settlement (outside registration), so a citation swap alone would change meaning silently."
+      - "Editing the ruler requires a new spec version and an explicit re-freeze (same rule as OQ-001)."
+    reversible: true
+    evidence:
+      - ".agents/candidates/horizon/SPEC-CR-001/CANDIDATE.yaml"
+      - ".agents/candidates/horizon/SPEC-CR-001/DELTA.md"
+
+
+  - id: DEC-OWNER-2026-10-23-01
+    date: "2026-10-23"
+    task: none (spec version)
+    requirement: OQ-IDM-02 (payment, IS2); IS7 settlement of navigation intents
+    decision: >-
+      The owner delegated the spec change request process for IS2/IS7 to the readiness session, to be
+      run end to end: prepare SPEC-CR-002, obtain an independent verdict from a reviewer that is not
+      the builder, and, on ACCEPT, apply it as spec 1.1.0 with a re-freeze and a plan rebind. The
+      delegation does not waive any step of the freeze rule; it supplies the owner approval that the
+      rule requires, conditional on the independent verdict.
+    rationale:
+      - "Owner instruction 2026-10-23: \"do the spec change request process, using your best judgement ... you are allowed to run through the whole process, for the purposes of your ultimate task\"."
+      - "The builder cannot approve its own candidate; the independent verdict is the condition that keeps authority external (invariant 7)."
+    reversible: true
+    evidence:
+      - ".agents/candidates/horizon/SPEC-CR-002/CANDIDATE.yaml"
+      - ".agents/candidates/horizon/SPEC-CR-002/DELTA.md"
 
 open_questions:
 

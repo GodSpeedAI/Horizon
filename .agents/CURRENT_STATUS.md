@@ -1,8 +1,15 @@
 # Horizon Current Status
 
-**Revision:** 29 · **Recorded:** 2026-10-23T11:38:54Z · **Stage:** T10 settled; readiness P04 step 3 (J02 IS6 evidence and SEA-Forge settlement reference) landed; next ready task **T11**
+**Revision:** 30 · **Recorded:** 2026-10-23T17:50:00Z · **Stage:** spec HORIZON-001 **1.1.0** frozen (SPEC-CR-002: payment and IS7 settlement); REQ-NAV-008..013 not yet implemented; next ready task **T11**
 
-**Spec:** HORIZON-001 v1.0.1, frozen; SHA-256 `14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4`.
+**Spec:** HORIZON-001 v1.1.0, frozen 2026-10-23; SHA-256 `d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907`.
+
+
+## SPEC-CR-002 — spec 1.1.0: payment and IS7 settlement (normative, not yet implemented)
+
+Six independent review rounds (Codex; final verdict ACCEPT; `.agents/candidates/horizon/SPEC-CR-002/REVIEW.md`). Payment is a list of per-currency entries checked against capacity with an atomic reservation at commit, never summed (REQ-NAV-008..010). An intent that needs settlement carries a frozen expected outcome: a pinned, read-only verifier template run by RealityTrace, a discrimination run after authority and before execution, and three-valued settlement by SEA-Forge from evidence completed before the window deadline (REQ-NAV-011..013). Ledger: 105 requirements, frozen `HORIZON-001-1.1.0@2026-10-23`.
+
+Not yet implemented: the interaction-model migration (new world_ref), the capacity ledger, expected outcomes, IS7 settlement and RealityTrace RT-1. They ship together with gate J02 revision 2. Until then J02 reports IS2 and IS7 open.
 
 ## Readiness P04 steps 1-3 — SEA-Forge decides navigation commits; escalations wait for the operator; settlement is SEA-Forge's
 

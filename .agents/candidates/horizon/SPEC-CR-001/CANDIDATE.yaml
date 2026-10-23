@@ -1,0 +1,74 @@
+candidate_revision:
+  id: SPEC-CR-001
+  task: none (spec source and requirement deltas; applies to the next spec version)
+  prepared_at: "2026-10-21"
+  prepared_by: builder (GodSpeed readiness session), from an owner decision
+  status: proposed — NOT applied. The frozen spec v1.0.0 is unchanged.
+  authorization:
+    decision: DEC-OWNER-2026-10-21-01
+    scope: >-
+      The owner declared manifesto v17 canonical. That decision authorizes preparing this
+      candidate; it does not authorize applying it. Application needs a new spec version, an
+      independent verdict, a re-freeze and a plan rebind (source.spec.sha256).
+  active_pins:
+    spec_sha256: 14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4
+    manifesto_v13_1_sha256: da85f42a9788fb36363458a57b45669e6b28edf260b2566f28b00fdaaf3e414a  # ~/projects/Fable/cognitive_os_manifesto_v13_1.md
+    manifesto_v17_sha256: b45f4a1e29dacfd1257df91804d925c5ea52ceffdd5697de45bab8a98e799e2e    # ~/projects/godspeed-growth/world/cognitive_os_manifesto_v17.md
+  change_1_citation:
+    spec_location: "sources.evidence_source.path (line 60)"
+    from: "CognitiveOS Manifesto v13.1"
+    to: "CognitiveOS Manifesto v17"
+  requirement_deltas:
+    # Classified from DELTA.md. "material" means meaning changes; each needs a requirement edit and
+    # its own teeth in the next spec version. None is applied here.
+    - id: D1
+      weight: material
+      topic: payment is a non-fungible cost vector; gates admit or refuse, never weigh
+      v17: "§8 (L272), invariant 21"
+      spec: "payment_estimate (L513-516), L1329"
+      proposal: replace the scalar estimate with per-currency fields; forbid scalarizing a gate decision
+    - id: D2
+      weight: material
+      topic: expectations are two-sided and three-valued (match, mismatch, undefined)
+      v17: "§5 (L112, L126)"
+      spec: "L199, L440"
+      proposal: require two-sided expectations; `undefined` never counts as match; retire binary discrepancy
+    - id: D3
+      weight: material
+      topic: capability claims need a discrimination (negative-control) term; transfer is held-out, novel surface, same structure
+      v17: "§11 (L371)"
+      spec: "L237-250, REQ-DEV-002 (L759)"
+      proposal: add discrimination and the v17 definition of transfer to REQ-DEV-002
+    - id: D4
+      weight: medium
+      topic: changing a criterion, reference or authority envelope starts a new frozen identity; superseded evidence is preserved
+      v17: "§13 (L503-535), §17 (L737), invariant 26"
+      spec: "L614, L682"
+      proposal: state it as a requirement on world/criterion revision
+    - id: D5
+      weight: medium
+      topic: consequential settlement is registered outside the observer in general, not only when declared
+      v17: "§10 (L320)"
+      spec: "L587"
+      proposal: make outside registration unconditional for consequential settlement
+    - id: D6
+      weight: medium
+      topic: developmental evidence never auto-revises normative representation
+      v17: "§12.2 (L448), invariant 33"
+      spec: "L246, L559"
+      proposal: add as an explicit requirement
+    - id: D7
+      weight: documentation
+      topic: affordance gate keys map to v17 §7 seven conditions (adds recoverable, per-currency payable)
+      v17: "§7 (L247)"
+      spec: "L60, L718"
+      proposal: re-cite and document the key mapping
+  not_covered: >-
+    The comparison did not read v13.1 Ledgers, Algorithms or the Mathematical Projection Layer, nor
+    v17 §§4, 6.1-6.6, 9, 14, 15.1-15.2, 15.4-15.7, 16, 19-28, 30-32. "Case" semantics come from the
+    separate Purposeful Case Navigation document, which neither manifesto settles. The Mathematical
+    Specification v2.3 cited beside the manifesto was not checked against v17.
+  independent_verdict_required: >-
+    A reviewer independent of the builder must confirm or reject each delta against both manifesto
+    texts before any of it enters a spec version. The comparison in DELTA.md was produced by a
+    read-only subagent and has not been independently checked.
