@@ -196,7 +196,11 @@ export async function createApplication(
   const research = await observeResearch(loaded.config.research_command);
   const caller: Caller = { actor: loaded.operator.principal, tenant: loaded.operator.tenant };
   const frames = createFrameRegister();
-  const governance = options.governance ?? governanceFromEnv(process.env);
+  const configured = options.governance ?? governanceFromEnv(process.env);
+  // Poll SEA-Forge for decided escalations, so a commit approved or rejected at SEA-Forge directly
+  // (not through resolveNavigationApproval) still resumes or fails on its own.
+  const governance: GovernanceOptions =
+    configured.mode === "sea-forge" ? { ...configured, approvalPollMs: configured.approvalPollMs ?? 2_000 } : configured;
   const approvals = options.approvals ?? approvalAuthorityFromEnv(process.env);
   const runtime: HorizonRuntime = await createHorizonRuntime(loaded.config, world, {
     caller,
@@ -235,28 +239,41 @@ export async function createApplication(
    * record itself, exactly once.
    */
   async function governedSubmit(intent: CommitIntentInput): Promise<IntentCommit> {
-    const run = await runtime.runtime.service.startRun(caller, {
-      agent: NAVIGATION_COMMIT_AGENT.id,
-      input: { intent } as unknown as Json,
-      idempotencyKey: `commit:${intent.intent_id}`,
-    });
+    let run: RunView;
+    try {
+      run = await runtime.runtime.service.startRun(caller, {
+        agent: NAVIGATION_COMMIT_AGENT.id,
+        input: { intent } as unknown as Json,
+        idempotencyKey: `commit:${intent.intent_id}`,
+      });
+    } catch (error) {
+      // The id already started a commit run for a different intent: duplicate_intent, audited.
+      if ((error as { code?: unknown } | null)?.code !== "already_exists") throw error;
+      const duplicate = new IntentError("already_exists", `duplicate_intent: intent ${intent.intent_id} was already submitted with different input`);
+      await audit(intent, "refused", duplicate.message);
+      throw duplicate;
+    }
     return settleCommitRun(intent, await runOutcome(run.runId, (status) => status !== "running"));
   }
 
+  const terminal = (status: RunView["status"]) => status === "completed" || status === "failed" || status === "cancelled";
+
   async function runOutcome(runId: string, settled: (status: RunView["status"]) => boolean, ms = 30_000): Promise<RunView> {
     const end = Date.now() + ms;
-    for (;;) {
+    for (let delay = 5; ; delay = Math.min(delay * 2, 200)) {
       const view = await runtime.runtime.service.getRun(caller, { runId });
       if (settled(view.status)) return view;
-      if (Date.now() > end) throw new Error(`INTENT: governed commit run ${runId} is still ${view.status}`);
-      await Bun.sleep(10);
+      if (Date.now() > end) {
+        throw new Error(`INTENT: governed commit run ${runId} is still ${view.status}; it continues durably and records its own outcome`);
+      }
+      await Bun.sleep(delay);
     }
   }
 
   async function settleCommitRun(intent: CommitIntentInput, view: RunView): Promise<IntentCommit> {
     if (view.status === "completed") {
+      // The run audited its own acceptance, in the step that wrote the record.
       const out = view.output as unknown as NavigationCommitOutput;
-      await audit(intent, "accepted", null);
       return {
         intent,
         result: { intent_id: out.intent_id, ...(out.correlation_ref ? { correlation_ref: out.correlation_ref } : {}) },
@@ -280,16 +297,24 @@ export async function createApplication(
     if (!approvals) throw new Error("APPROVAL: no operator is configured to answer escalations (COGNATE_SEA_FORGE_OPERATOR)");
     // An agent must never answer its own escalation: only the human operator's session may.
     if (caller.actor.kind !== "user") throw new Error("APPROVAL: only a human operator may answer an escalation");
-    const wait = (await runtime.runtime.service.listContinuations(caller, { status: "OPEN" })).find(
+    // Pick up a decision already made at SEA-Forge directly before answering again.
+    await runtime.runtime.pollApprovals();
+    const wait = (await runtime.runtime.service.listContinuations(caller, {})).find(
       (c) => c.type === "governance-approval" && (c.condition as { approvalId?: unknown } | null)?.approvalId === request.approvalId,
     );
     if (!wait) throw new Error(`APPROVAL: no governed commit waits on ${request.approvalId}`);
     const run = await runtime.runtime.service.getRun(caller, { runId: wait.runId });
     if (run.agent !== NAVIGATION_COMMIT_AGENT.id) throw new Error(`APPROVAL: ${request.approvalId} does not belong to a navigation commit`);
     const intent = (run.input as unknown as { intent: CommitIntentInput }).intent;
+    if (wait.status !== "OPEN") {
+      // Already decided (at SEA-Forge directly, or by an earlier resolution): report that outcome, never
+      // a second decision. A finished commit is not answered again.
+      if (terminal(run.status) && run.status !== "completed") return settleCommitRun(intent, run);
+      throw new Error(`APPROVAL: ${request.approvalId} was already decided (run ${run.status})`);
+    }
     await resolveApproval(approvals, request);
     await runtime.runtime.pollApprovals();
-    return settleCommitRun(intent, await runOutcome(run.runId, (status) => status === "completed" || status === "failed" || status === "cancelled"));
+    return settleCommitRun(intent, await runOutcome(run.runId, terminal));
   }
 
   /** Submit an already-built intent: refused intents are audited and write no record. */

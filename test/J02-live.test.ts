@@ -149,11 +149,39 @@ liveTest("J02 IS3-IS5: an escalated commit waits; only the operator's approval a
   expect((await app.submitIntent(intent)).eventId).toBe(committed.eventId);
   expect(await records()).toEqual([intent.intent_id]);
 
+  // The same id with a different intent is duplicate_intent on the governed path too, and audited.
+  const frame = app.frames.current()!;
+  app.frames.issue({ ...frame, frame_id: "frame-j02-duplicate", revision: frame.revision + 1 });
+  const duplicate = (await failure(app.submitIntent({ ...intent, frame_id: "frame-j02-duplicate", frame_revision: frame.revision + 1 }))) as Error & { code?: string };
+  expect(duplicate?.code).toBe("already_exists");
+  expect(duplicate?.message).toContain("duplicate_intent");
+  expect((await attempts()).at(-1)).toMatchObject({ intent_id: intent.intent_id, outcome: "refused" });
+  expect(await records()).toEqual([intent.intent_id]);
+
+  // An approval made at SEA-Forge directly, not through Horizon, still resumes the commit (Horizon polls
+  // SEA-Forge) and is audited by the run itself; answering it again through Horizon is refused.
+  const direct = (await failure(app.commitNavigationIntent({ operationRef: "horizon.health" }))) as AwaitingAuthorityError;
+  expect(direct).toBeInstanceOf(AwaitingAuthorityError);
+  const approvedAtSeaForge = await seaForgeCall(socket, {
+    verb: "authority_approval", approval_id: direct.approvalId, resolution: "approved", request_id: `direct-${direct.approvalId}`,
+    actor: { actor_id: "cognate-service", role: "service" }, on_behalf_of: { actor_id: "operator", role: "operator" },
+  });
+  expect(approvedAtSeaForge.ok).toBe(true);
+  const deadline = Date.now() + 20_000;
+  while (!(await records()).includes(direct.intent.intent_id)) {
+    if (Date.now() > deadline) throw new Error("the commit approved at SEA-Forge did not resume");
+    await Bun.sleep(100);
+  }
+  expect(await records()).toEqual([intent.intent_id, direct.intent.intent_id]);
+  expect((await attempts()).filter((a) => a.intent_id === direct.intent.intent_id).map((a) => a.outcome)).toEqual(["awaiting_authority", "accepted"]);
+  expect(await failure(app.resolveNavigationApproval({ approvalId: direct.approvalId, resolution: "rejected" }))).not.toBeNull();
+  expect(await records()).toEqual([intent.intent_id, direct.intent.intent_id]);
+
   // A rejected escalation commits nothing, and the refusal is audited.
   const second = (await failure(app.commitNavigationIntent({ operationRef: "horizon.health" }))) as AwaitingAuthorityError;
   expect(second).toBeInstanceOf(AwaitingAuthorityError);
   const rejected = await failure(app.resolveNavigationApproval({ approvalId: second.approvalId, resolution: "rejected" }));
   expect(rejected).not.toBeNull();
-  expect(await records()).toEqual([intent.intent_id]);
+  expect(await records()).toEqual([intent.intent_id, direct.intent.intent_id]);
   expect((await attempts()).at(-1)).toMatchObject({ intent_id: second.intent.intent_id, outcome: "refused" });
 }, 120_000);

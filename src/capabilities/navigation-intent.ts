@@ -16,7 +16,7 @@
  */
 import type { Component } from "@godspeedai/cognate-kernel-api";
 import { randomUUID } from "node:crypto";
-import { ConcurrencyError, fingerprint, IdempotencyMismatchError, type DurableStore, type Json, type StoredEvent } from "@godspeedai/cognate-events";
+import { ConcurrencyError, RecordConflictError, type DurableStore, type StoredEvent } from "@godspeedai/cognate-events";
 import { assertCommitIntent, IntentError, type CommitIntentInput, type CommitIntentOutput } from "../domain/intent.ts";
 import type { NavigationFrameV1, NavigationIntentRecord } from "../domain/frame.ts";
 
@@ -47,6 +47,8 @@ export function createFrameRegister(): FrameRegister {
 export const INTENT_STREAM = "horizon.navigation-intents";
 /** Stream that holds one record per attempted intent, refused or committed. */
 export const INTENT_ATTEMPT_STREAM = "horizon.navigation-intent-attempts";
+/** One entry per committed intent, keyed `<tenant>/<intent_id>`: the exactly-once guard and its O(1) lookup. */
+export const INTENT_INDEX_COLLECTION = "horizon.navigation-intent-index";
 /** Highest outcome recorded per intent id (stream-local keys avoid collisions across keys). */
 export const INTENT_AUDIT_COLLECTION = "horizon.navigation-intent-audit";
 
@@ -72,24 +74,27 @@ export interface EventRecorded {
  * It runs as a separate step after a successful commit, so a refused intent provably
  * writes no record (REQ-INT-004, REQ-VERIFY-002).
  *
- * Exactly once per `intent_id` (J02 IS5): the same intent again returns the record already
- * committed, and the same id with a different intent is `duplicate_intent` (`already_exists`).
- * The store's idempotency key makes this atomic under concurrent commits; the stream check
- * also covers records committed before the key existed. A resumed or replayed governed run
- * may therefore call this again safely.
+ * Exactly once per `intent_id` within a tenant (J02 IS5): the same intent again returns the record
+ * already committed, and the same id with a different intent is `duplicate_intent`
+ * (`already_exists`). The event and an index record keyed `<tenant>/<intent_id>` (expected version 0,
+ * "must not exist") commit atomically, so concurrent commits of one id cannot both land, and the
+ * duplicate check is one record read rather than a scan of every intent. A resumed or replayed
+ * governed run may therefore call this again safely. Records committed before the index existed are
+ * indexed once per process, on first use.
  */
 export async function appendIntentRecord(
   store: DurableStore,
   options: { readonly record: NavigationIntentRecord; readonly tenant: string; readonly scopeId: string },
 ): Promise<EventRecorded> {
-  const committed = await committedRecord(store, options.record);
-  if (committed) return committed;
-  const eventId = randomUUID();
+  await backfillIntentIndex(store);
+  const key = indexKey(options.tenant, options.record.intent_id);
   for (let attempt = 0; ; attempt++) {
+    const committed = await committedRecord(store, key, options.record);
+    if (committed) return committed;
+    const eventId = randomUUID();
     let outcome;
     try {
       outcome = await store.commit({
-        idempotency: { scope: INTENT_STREAM, key: options.record.intent_id, fingerprint: fingerprint(intentFields(options.record) as unknown as Json) },
         appends: [
           {
             streamId: INTENT_STREAM,
@@ -119,27 +124,22 @@ export async function appendIntentRecord(
             ],
           },
         ],
+        records: [{ collection: INTENT_INDEX_COLLECTION, id: key, expectedVersion: 0, value: { event_id: eventId, ...intentFields(options.record) } }],
       });
     } catch (error) {
-      if (error instanceof IdempotencyMismatchError) throw duplicateIntent(options.record.intent_id);
-      // Another intent was committed between reading the version and committing: re-check, retry.
-      if (error instanceof ConcurrencyError && attempt < 4) {
-        const raced = await committedRecord(store, options.record);
-        if (raced) return raced;
-        continue;
-      }
+      // Another commit landed between the read and this commit (this id, or any intent): re-check.
+      if ((error instanceof ConcurrencyError || error instanceof RecordConflictError) && attempt < 4) continue;
       throw error;
     }
-    if (outcome.kind === "duplicate") {
-      const replayed = await committedRecord(store, options.record);
-      if (!replayed) throw new Error("INTENT: an idempotent replay found no committed intent record");
-      return replayed;
-    }
-    const events = await store.readStream(INTENT_STREAM, {});
-    const recorded = events.find((event) => event.eventId === eventId);
+    if (outcome.kind !== "committed") throw new Error(`INTENT: intent record was not committed (${outcome.kind})`);
+    const recorded = outcome.events.find((event) => event.eventId === eventId);
     if (!recorded) throw new Error("INTENT: committed intent record is not readable from the store");
     return { eventId: recorded.eventId, position: recorded.position, streamVersion: recorded.streamSequence };
   }
+}
+
+function indexKey(tenant: string, intentId: string): string {
+  return `${tenant}/${intentId}`;
 }
 
 /** The intent fields a duplicate is judged on; `correlation_ref` names the invocation, not the intent. */
@@ -157,15 +157,35 @@ function duplicateIntent(intentId: string): IntentError {
   return new IntentError("already_exists", `duplicate_intent: intent ${intentId} was already committed with different input`);
 }
 
-/** The record already committed for this intent id, or null; a different intent under that id throws. */
-async function committedRecord(store: DurableStore, record: CommitIntentInput): Promise<EventRecorded | null> {
-  const events = await store.readStream(INTENT_STREAM, {});
-  const existing = events.find((event) => (event.payload as Record<string, unknown> | null)?.intent_id === record.intent_id);
-  if (!existing) return null;
+/** The record already committed under this key, or null; a different intent under that id throws. */
+async function committedRecord(store: DurableStore, key: string, record: CommitIntentInput): Promise<EventRecorded | null> {
+  const entry = await store.getRecord(INTENT_INDEX_COLLECTION, key);
+  if (!entry) return null;
+  const have = entry.value as unknown as CommitIntentInput & { readonly event_id: string };
   const want = intentFields(record);
-  const have = existing.payload as unknown as CommitIntentInput;
-  if ((Object.keys(want) as (keyof CommitIntentInput)[]).some((key) => have[key] !== want[key])) throw duplicateIntent(record.intent_id);
-  return { eventId: existing.eventId, position: existing.position, streamVersion: existing.streamSequence };
+  if ((Object.keys(want) as (keyof CommitIntentInput)[]).some((field) => have[field] !== want[field])) throw duplicateIntent(record.intent_id);
+  const event = (await store.readStream(INTENT_STREAM, {})).find((e) => e.eventId === have.event_id);
+  if (!event) throw new Error(`INTENT: the index names event ${have.event_id}, which the intent stream does not hold`);
+  return { eventId: event.eventId, position: event.position, streamVersion: event.streamSequence };
+}
+
+const indexed = new WeakSet<DurableStore>();
+
+/** Index intents committed before the index existed; once per store per process. */
+async function backfillIntentIndex(store: DurableStore): Promise<void> {
+  if (indexed.has(store)) return;
+  for (const event of await store.readStream(INTENT_STREAM, {})) {
+    const payload = event.payload as unknown as CommitIntentInput | null;
+    if (!payload || typeof payload.intent_id !== "string") continue;
+    const key = indexKey(event.tenant, payload.intent_id);
+    if (await store.getRecord(INTENT_INDEX_COLLECTION, key)) continue;
+    try {
+      await store.commit({ appends: [], records: [{ collection: INTENT_INDEX_COLLECTION, id: key, expectedVersion: 0, value: { event_id: event.eventId, ...intentFields(payload) } }] });
+    } catch (error) {
+      if (!(error instanceof RecordConflictError)) throw error;
+    }
+  }
+  indexed.add(store);
 }
 
 /** Read committed intent records back from the durable log. */

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { StoredEvent } from "@godspeedai/cognate-events";
 import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
-import { readIntentAttempts, readIntentRecords } from "../src/capabilities/navigation-intent.ts";
+import { INTENT_STREAM, readIntentAttempts, readIntentRecords } from "../src/capabilities/navigation-intent.ts";
 import { REQUIRED_COGNATE } from "../src/runtime/required-cognate.ts";
 import { bindingContextOf, projectFrame } from "../src/ui/surface.ts";
 import { PINNED_WORLD_REF, horizonDocument, writeConfig } from "./support/config.ts";
@@ -384,6 +384,34 @@ describe("structural walking skeleton", () => {
     expect(duplicate?.message).toContain("duplicate_intent");
     expect((await readIntentRecords(store)).map((entry) => entry.record.intent_id)).toEqual([first.intent.intent_id]);
     expect((await readIntentAttempts(store)).filter((a) => a.intent_id === first.intent.intent_id).map((a) => a.outcome)).toEqual(["accepted", "accepted", "refused"]);
+  }, 60_000);
+
+  test("an intent recorded before the exactly-once index existed is still committed only once", async () => {
+    const root = fixture();
+    application = await configuredApplication(root);
+    const app = application;
+    await app.commitNavigationIntent({ operationRef: "horizon.health" });
+    const frame = app.frames.current()!;
+    const legacy = { intent_id: crypto.randomUUID(), frame_id: frame.frame_id, frame_revision: frame.revision, actor_ref: frame.observer_ref, operation_ref: "horizon.health" };
+    // An intent event as the previous code wrote it: no index entry.
+    const store = app.runtime.runtime.store;
+    const eventId = crypto.randomUUID();
+    await store.commit({
+      appends: [{
+        streamId: INTENT_STREAM,
+        expectedVersion: await store.streamVersion(INTENT_STREAM),
+        events: [{ eventId, eventType: "horizon.navigation.intent.committed", schemaVersion: 1, occurredAt: new Date().toISOString(), tenant: app.caller.tenant, correlationId: eventId, causationId: null, runId: null, scopeId: `horizon-${app.caller.tenant}`, componentId: "horizon.navigation-intent", payload: { ...legacy, correlation_ref: null } }],
+      }],
+    });
+    await app.close();
+
+    // A new process indexes it on first use, so resubmitting it returns the legacy record.
+    application = await configuredApplication(root);
+    const reopened = application;
+    reopened.frames.issue(frame);
+    const again = await reopened.submitIntent(legacy);
+    expect(again.eventId).toBe(eventId);
+    expect((await readIntentRecords(reopened.runtime.runtime.store)).filter((entry) => entry.record.intent_id === legacy.intent_id)).toHaveLength(1);
   }, 60_000);
 
   test("a failed optional research source degrades one gate and leaves read-only startup and operations intact", async () => {

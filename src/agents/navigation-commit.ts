@@ -1,7 +1,7 @@
 import type { AgentDefinition } from "@godspeedai/cognate-runtime-api";
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
 import type { CommitIntentInput, CommitIntentOutput } from "../domain/intent.ts";
-import { appendIntentRecord, NAVIGATION_INTENT_COMMIT } from "../capabilities/navigation-intent.ts";
+import { appendIntentAttempt, appendIntentRecord, NAVIGATION_INTENT_COMMIT } from "../capabilities/navigation-intent.ts";
 
 export const NAVIGATION_COMMIT_AGENT = {
   id: "horizon.navigation.commit",
@@ -48,6 +48,16 @@ export function navigationCommitAgent(store: () => DurableStore): AgentDefinitio
           scopeId: `horizon-${context.tenant}`,
         });
         return { event_id: r.eventId, position: r.position };
+      });
+      // Audited here, not by whoever happens to observe the run: a commit resumed by SEA-Forge polling
+      // after an approval made outside Horizon is audited exactly like one resolved through Horizon.
+      await context.step("audit", async () => {
+        await appendIntentAttempt(store(), {
+          attempt: { intent_id: intent.intent_id, actor_ref: intent.actor_ref, caller_ref: context.actor.id, outcome: "accepted", reason: null, at: new Date().toISOString() },
+          tenant: context.tenant,
+          scopeId: `horizon-${context.tenant}`,
+        });
+        return null;
       });
       const output: NavigationCommitOutput = { intent_id: intent.intent_id, correlation_ref: correlationRef, ...recorded };
       return output as unknown as Json;

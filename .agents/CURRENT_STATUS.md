@@ -1,6 +1,6 @@
 # Horizon Current Status
 
-**Revision:** 26 · **Recorded:** 2026-10-23T03:24:20Z · **Stage:** T10 settled; readiness P04 step 2 (escalation waits for the operator's SEA-Forge approval) landed; next ready task **T11**
+**Revision:** 27 · **Recorded:** 2026-10-23T03:35:06Z · **Stage:** T10 settled; readiness P04 step 2 (escalation waits for the operator's SEA-Forge approval) landed; next ready task **T11**
 
 **Spec:** HORIZON-001 v1.0.1, frozen; SHA-256 `14a42936fe3a17c3726ee57fbc9278fd6f6e92276f67519fd9bf0f605f3324a4`.
 
@@ -10,7 +10,7 @@ Step 1: createHorizonRuntime and createApplication accept Cognate GovernanceOpti
 
 Step 2: with governance on, a commit runs as `horizon.navigation.commit`, so SEA-Forge's escalate parks it on a durable approval. `submitIntent` throws `AwaitingAuthorityError` (audited `awaiting_authority`; `POST /intent` answers 202). `resolveNavigationApproval` records the human operator's decision at SEA-Forge (`on_behalf_of` the operator in `COGNATE_SEA_FORGE_OPERATOR`); SEA-Forge revalidates on resume and the run writes the record. A rejection commits nothing.
 
-Exactly once per `intent_id`: the same intent returns the first record; a different intent under that id is `duplicate_intent` (audited). The guard was documented before but not implemented.
+Exactly once per `intent_id` (per tenant): an index record written atomically with the intent event; the same intent returns the first record; a different intent under that id is `duplicate_intent` (audited, on both paths). The guard was documented before but not implemented. Horizon polls SEA-Forge, so an approval made there directly still resumes the commit; the run audits its own acceptance.
 
 Live proof: `test/J02-live.test.ts` (real sea-forge-server): allow / deny / offline, and escalate -> self-approval refused -> operator approval commits once -> rejection commits nothing. Limits: an approval never revives a stale frame (the frame register is in memory); no HTTP approval route. Next: IS6 (RealityTrace observation, settlement reference); IS2/IS7 need a SPEC-CR candidate.
 
