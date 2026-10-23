@@ -877,6 +877,24 @@ decisions:
       - ".agents/candidates/horizon/SPEC-CR-002/CANDIDATE.yaml"
       - ".agents/candidates/horizon/SPEC-CR-002/DELTA.md"
 
+  - id: DEC-OWNER-2026-10-23-02
+    date: "2026-10-23"
+    task: SPEC-CR-002 implementation (no spec change)
+    requirement: REQ-NAV-011, REQ-NAV-013 (applicability of operational settlement)
+    decision: >-
+      The two structural moves, horizon.health and horizon.research.health, are classified read_only.
+      They only check the structural world and the research subsystem; their one effect is Horizon's own
+      intent record and the observation run it starts. Under HORIZON-001 1.1.0 they therefore need no
+      expected outcome and settle as not_required, so a local Horizon without SEA-Forge and RealityTrace
+      keeps working. Any consequential operation still requires a binding, an expectation and SEA-Forge
+      settlement; the J02 revision 2 gate proves that flow with a bound operation.
+    rationale:
+      - "Owner answer 2026-10-23 to the question of how the health moves are treated under 1.1.0: \"Reclassify as read-only (Recommended)\"."
+      - "Classifying a pure check as reversible made every local commit depend on a settlement nothing in it needs, and fail closed without SEA-Forge; the spec's own exemption is read_only without settlement: required."
+    reversible: true
+    evidence:
+      - "src/domain/frame.ts"
+
 open_questions:
 
   - id: OQ-001

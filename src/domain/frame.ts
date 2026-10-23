@@ -7,7 +7,7 @@ export interface StructuralChoice {
   readonly assessment: {
     readonly status: AffordanceStatus;
     readonly first_blocker: string | null;
-    readonly reversibility: "reversible" | "compensable" | "irreversible" | "unknown";
+    readonly reversibility: "read_only" | "reversible" | "compensable" | "irreversible" | "unknown";
   };
 }
 
@@ -82,16 +82,20 @@ export function buildStructuralFrame(options: {
     focus_ref: "semantic:HorizonHost",
     case_ref: null,
     responsibility: "orient",
+    // Both structural moves only *check* things: their one effect is Horizon's own record of the intent and
+    // the observation run it starts, never a change to the world. They are read_only (owner decision
+    // 2026-10-23), so under HORIZON-001 1.1.0 they need no expected outcome and settle as not_required;
+    // a consequential operation still requires a binding, an expectation and SEA-Forge settlement.
     choices: [
       {
         operation_ref: "horizon.health",
         label: "Check the structural world and Cognate projection",
-        assessment: { ...statusOf("horizon.health"), reversibility: "reversible" },
+        assessment: { ...statusOf("horizon.health"), reversibility: "read_only" },
       },
       {
         operation_ref: "horizon.research.health",
         label: "Check the optional Python research subsystem contract",
-        assessment: { ...statusOf("horizon.research.health"), reversibility: "reversible" },
+        assessment: { ...statusOf("horizon.research.health"), reversibility: "read_only" },
       },
     ],
   };
