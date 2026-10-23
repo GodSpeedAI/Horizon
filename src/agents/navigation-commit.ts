@@ -2,6 +2,7 @@ import type { AgentDefinition } from "@godspeedai/cognate-runtime-api";
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
 import type { CommitIntentInput, CommitIntentOutput } from "../domain/intent.ts";
 import { appendIntentAttempt, appendIntentRecord, NAVIGATION_INTENT_COMMIT } from "../capabilities/navigation-intent.ts";
+import { assertCurrentRunInput } from "../capabilities/contract-upgrade.ts";
 
 export const NAVIGATION_COMMIT_AGENT = {
   id: "horizon.navigation.commit",
@@ -38,14 +39,18 @@ export function navigationCommitAgent(store: () => DurableStore): AgentDefinitio
     version: NAVIGATION_COMMIT_AGENT.version,
     async run(input, context) {
       const intent = readIntent(input);
+      // A v1 run (started before the 1.1.0 upgrade) is suspended and never executes, even once approved.
+      assertCurrentRunInput(input, intent.intent_id);
       const result = (await context.invoke(NAVIGATION_INTENT_COMMIT.id, intent as unknown as Json)) as unknown as CommitIntentOutput;
       if (result?.intent_id !== intent.intent_id) throw new Error("INTENT: the commit answered for a different intent");
       const correlationRef = result.correlation_ref ?? null;
       const recorded = await context.step("record", async () => {
+        assertCurrentRunInput(input, intent.intent_id);
         const r = await appendIntentRecord(store(), {
           record: { ...intent, ...(correlationRef ? { correlation_ref: correlationRef } : {}) },
           tenant: context.tenant,
           scopeId: `horizon-${context.tenant}`,
+          contract: { expectation: null, threshold: null, window: null, payment: null, now: new Date() },
         });
         return { event_id: r.eventId, position: r.position };
       });

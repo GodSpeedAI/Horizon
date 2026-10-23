@@ -79,11 +79,14 @@ async function seaForge(commit: Commit, withRealityTrace = false) {
   }
   writeFileSync(join(root, "policy.yaml"), policy(commit));
   const uid = process.getuid!();
+  const UNUSED_UID = 4_294_967_000;
   const rt = withRealityTrace ? { bin: RT!, dataHome: join(root, "rt-data"), stateHome: join(root, "rt-state"), repoDir: join(root, "rt-repo") } : undefined;
   writeFileSync(join(root, "server.yaml"), JSON.stringify({
     socket_path: socket,
     root,
-    identity: { bindings: [{ uid, actor_id: "cognate-service", roles: ["service"] }, { actor_id: "operator", roles: ["operator"] }] },
+    // Every binding names a uid (SEA-Forge security round 4). The operator acts only through the gateway
+    // (on_behalf_of), so it is bound to a uid no process here connects with.
+    identity: { bindings: [{ uid, actor_id: "cognate-service", roles: ["service"] }, { uid: UNUSED_UID, actor_id: "operator", roles: ["operator"] }] },
     gateway: { uid, actor: "cognate-service", delegable_actors: ["operator"] },
     cep_authority: {
       enabled: true, policy: "policy.yaml", worlds: [{ name: "horizon", base: "worlds", entry: "interaction-model.sea", files }],

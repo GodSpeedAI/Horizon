@@ -8,6 +8,8 @@ import { loadConfig } from "./config/load.ts";
 import type { LoadedConfig } from "./config/types.ts";
 import { createHorizonRuntime, type HorizonRuntime } from "./runtime/create.ts";
 import { appendIntentAttempt, appendIntentRecord, createFrameRegister, NAVIGATION_INTENT_COMMIT, navigationIntentComponent, readIntentRecords, type FrameRegister, type IntentAttempt } from "./capabilities/navigation-intent.ts";
+import { CONTRACT_VERSION, contractVersionOf } from "./capabilities/capacity-ledger.ts";
+import { activateContract } from "./capabilities/contract-upgrade.ts";
 import { structuralObservationAgent, healthAgent, HEALTH_AGENT, type StructuralObservationRequest } from "./agents/health.ts";
 import { navigationCommitAgent, NAVIGATION_COMMIT_AGENT, type NavigationCommitOutput } from "./agents/navigation-commit.ts";
 import { approvalAuthorityFromEnv, resolveApproval, type ApprovalAuthority } from "./adapters/sea-forge-approvals.ts";
@@ -232,6 +234,8 @@ export async function createApplication(
     // The observation commits with the governed invocation itself (the outbox), so it cannot be lost.
     ...(realityTrace ? { outboxFor: observationOutbox(NAVIGATION_INTENT_COMMIT.id) } : {}),
   });
+  // HORIZON-001 1.1.0: suspend pending v1 commit runs and mark the store before anything is served.
+  await activateContract(runtime.runtime.store, new Date());
   const evidence = realityTrace ? new RealityTraceEvidence(runtime.runtime.store, realityTrace) : undefined;
   let issued: FrameView | null = null;
 
@@ -266,7 +270,7 @@ export async function createApplication(
     try {
       run = await runtime.runtime.service.startRun(caller, {
         agent: NAVIGATION_COMMIT_AGENT.id,
-        input: { intent } as unknown as Json,
+        input: { intent, contract_version: CONTRACT_VERSION } as unknown as Json,
         idempotencyKey: `commit:${intent.intent_id}`,
       });
     } catch (error) {
@@ -353,6 +357,10 @@ export async function createApplication(
       await appendSettlement(store, { settlement, tenant: caller.tenant, scopeId: `horizon-${caller.tenant}` });
       return settlement;
     };
+    // A v1 intent stays readable and is never backfilled: it carries no expected outcome to settle against.
+    if (contractVersionOf(committed.record) === 1) {
+      return record({ status: "unsettled", final: true, envelope_id: null, ledger_entry: null, reason: "contract_version 1: no expected outcome" });
+    }
     const unavailable = (reason: string) => record({ status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason });
     const refused = (reason: string) => record({ status: "refused", final: false, envelope_id: null, ledger_entry: null, reason });
 
@@ -422,6 +430,7 @@ export async function createApplication(
         },
         tenant: caller.tenant,
         scopeId: `horizon-${caller.tenant}`,
+        contract: { expectation: null, threshold: null, window: null, payment: null, now: new Date() },
       });
     } catch (error) {
       // duplicate_intent: the id was already committed with different input; audited like any refusal.

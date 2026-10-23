@@ -13,6 +13,10 @@ setup:
 check:
     bun run scripts/check.ts
 
+# Refuse to start a 1.0.1 build against a store holding contract_version 2 state (SPEC-CR-002 Rollback).
+rollback-guard store:
+    bun run scripts/rollback-guard.ts {{store}}
+
 boundaries:
     bun run scripts/check-boundaries.ts
 
