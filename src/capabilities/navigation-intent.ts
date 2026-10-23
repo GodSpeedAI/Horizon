@@ -16,8 +16,8 @@
  */
 import type { Component } from "@godspeedai/cognate-kernel-api";
 import { randomUUID } from "node:crypto";
-import type { DurableStore, StoredEvent } from "@godspeedai/cognate-events";
-import { assertCommitIntent, type CommitIntentInput, type CommitIntentOutput } from "../domain/intent.ts";
+import { ConcurrencyError, RecordConflictError, type DurableStore, type StoredEvent } from "@godspeedai/cognate-events";
+import { assertCommitIntent, IntentError, type CommitIntentInput, type CommitIntentOutput } from "../domain/intent.ts";
 import type { NavigationFrameV1, NavigationIntentRecord } from "../domain/frame.ts";
 
 export const NAVIGATION_INTENT_COMMIT = {
@@ -47,6 +47,8 @@ export function createFrameRegister(): FrameRegister {
 export const INTENT_STREAM = "horizon.navigation-intents";
 /** Stream that holds one record per attempted intent, refused or committed. */
 export const INTENT_ATTEMPT_STREAM = "horizon.navigation-intent-attempts";
+/** One entry per committed intent, keyed `<tenant>/<intent_id>`: the exactly-once guard and its O(1) lookup. */
+export const INTENT_INDEX_COLLECTION = "horizon.navigation-intent-index";
 /** Highest outcome recorded per intent id (stream-local keys avoid collisions across keys). */
 export const INTENT_AUDIT_COLLECTION = "horizon.navigation-intent-audit";
 
@@ -71,48 +73,119 @@ export interface EventRecorded {
  *
  * It runs as a separate step after a successful commit, so a refused intent provably
  * writes no record (REQ-INT-004, REQ-VERIFY-002).
+ *
+ * Exactly once per `intent_id` within a tenant (J02 IS5): the same intent again returns the record
+ * already committed, and the same id with a different intent is `duplicate_intent`
+ * (`already_exists`). The event and an index record keyed `<tenant>/<intent_id>` (expected version 0,
+ * "must not exist") commit atomically, so concurrent commits of one id cannot both land, and the
+ * duplicate check is one record read rather than a scan of every intent. A resumed or replayed
+ * governed run may therefore call this again safely. Records committed before the index existed are
+ * indexed once per process, on first use.
  */
 export async function appendIntentRecord(
   store: DurableStore,
   options: { readonly record: NavigationIntentRecord; readonly tenant: string; readonly scopeId: string },
 ): Promise<EventRecorded> {
-  const eventId = randomUUID();
-  const outcome = await store.commit({
-    appends: [
-      {
-        streamId: INTENT_STREAM,
-        expectedVersion: await store.streamVersion(INTENT_STREAM),
-        events: [
+  await backfillIntentIndex(store);
+  const key = indexKey(options.tenant, options.record.intent_id);
+  for (let attempt = 0; ; attempt++) {
+    const committed = await committedRecord(store, key, options.record);
+    if (committed) return committed;
+    const eventId = randomUUID();
+    let outcome;
+    try {
+      outcome = await store.commit({
+        appends: [
           {
-            eventId,
-            eventType: "horizon.navigation.intent.committed",
-            schemaVersion: 1,
-            occurredAt: new Date().toISOString(),
-            tenant: options.tenant,
-            correlationId: options.record.correlation_ref ?? eventId,
-            causationId: null,
-            runId: null,
-            scopeId: options.scopeId,
-            componentId: "horizon.navigation-intent",
-            payload: {
-              intent_id: options.record.intent_id,
-              frame_id: options.record.frame_id,
-              frame_revision: options.record.frame_revision,
-              actor_ref: options.record.actor_ref,
-              operation_ref: options.record.operation_ref,
-              ...(options.record.authority_ref ? { authority_ref: options.record.authority_ref } : {}),
-              correlation_ref: options.record.correlation_ref ?? null,
-            },
+            streamId: INTENT_STREAM,
+            expectedVersion: await store.streamVersion(INTENT_STREAM),
+            events: [
+              {
+                eventId,
+                eventType: "horizon.navigation.intent.committed",
+                schemaVersion: 1,
+                occurredAt: new Date().toISOString(),
+                tenant: options.tenant,
+                correlationId: options.record.correlation_ref ?? eventId,
+                causationId: null,
+                runId: null,
+                scopeId: options.scopeId,
+                componentId: "horizon.navigation-intent",
+                payload: {
+                  intent_id: options.record.intent_id,
+                  frame_id: options.record.frame_id,
+                  frame_revision: options.record.frame_revision,
+                  actor_ref: options.record.actor_ref,
+                  operation_ref: options.record.operation_ref,
+                  ...(options.record.authority_ref ? { authority_ref: options.record.authority_ref } : {}),
+                  correlation_ref: options.record.correlation_ref ?? null,
+                },
+              },
+            ],
           },
         ],
-      },
-    ],
-  });
-  if (outcome.kind !== "committed") throw new Error(`INTENT: intent record was not committed (${outcome.kind})`);
-  const events = await store.readStream(INTENT_STREAM, {});
-  const last = events[events.length - 1];
-  if (!last || last.eventId !== eventId) throw new Error("INTENT: committed intent record is not readable from the store");
-  return { eventId: last.eventId, position: last.position, streamVersion: last.streamSequence };
+        records: [{ collection: INTENT_INDEX_COLLECTION, id: key, expectedVersion: 0, value: { event_id: eventId, ...intentFields(options.record) } }],
+      });
+    } catch (error) {
+      // Another commit landed between the read and this commit (this id, or any intent): re-check.
+      if ((error instanceof ConcurrencyError || error instanceof RecordConflictError) && attempt < 4) continue;
+      throw error;
+    }
+    if (outcome.kind !== "committed") throw new Error(`INTENT: intent record was not committed (${outcome.kind})`);
+    const recorded = outcome.events.find((event) => event.eventId === eventId);
+    if (!recorded) throw new Error("INTENT: committed intent record is not readable from the store");
+    return { eventId: recorded.eventId, position: recorded.position, streamVersion: recorded.streamSequence };
+  }
+}
+
+function indexKey(tenant: string, intentId: string): string {
+  return `${tenant}/${intentId}`;
+}
+
+/** The intent fields a duplicate is judged on; `correlation_ref` names the invocation, not the intent. */
+function intentFields(record: CommitIntentInput): CommitIntentInput {
+  return {
+    intent_id: record.intent_id,
+    frame_id: record.frame_id,
+    frame_revision: record.frame_revision,
+    actor_ref: record.actor_ref,
+    operation_ref: record.operation_ref,
+  };
+}
+
+function duplicateIntent(intentId: string): IntentError {
+  return new IntentError("already_exists", `duplicate_intent: intent ${intentId} was already committed with different input`);
+}
+
+/** The record already committed under this key, or null; a different intent under that id throws. */
+async function committedRecord(store: DurableStore, key: string, record: CommitIntentInput): Promise<EventRecorded | null> {
+  const entry = await store.getRecord(INTENT_INDEX_COLLECTION, key);
+  if (!entry) return null;
+  const have = entry.value as unknown as CommitIntentInput & { readonly event_id: string };
+  const want = intentFields(record);
+  if ((Object.keys(want) as (keyof CommitIntentInput)[]).some((field) => have[field] !== want[field])) throw duplicateIntent(record.intent_id);
+  const event = (await store.readStream(INTENT_STREAM, {})).find((e) => e.eventId === have.event_id);
+  if (!event) throw new Error(`INTENT: the index names event ${have.event_id}, which the intent stream does not hold`);
+  return { eventId: event.eventId, position: event.position, streamVersion: event.streamSequence };
+}
+
+const indexed = new WeakSet<DurableStore>();
+
+/** Index intents committed before the index existed; once per store per process. */
+async function backfillIntentIndex(store: DurableStore): Promise<void> {
+  if (indexed.has(store)) return;
+  for (const event of await store.readStream(INTENT_STREAM, {})) {
+    const payload = event.payload as unknown as CommitIntentInput | null;
+    if (!payload || typeof payload.intent_id !== "string") continue;
+    const key = indexKey(event.tenant, payload.intent_id);
+    if (await store.getRecord(INTENT_INDEX_COLLECTION, key)) continue;
+    try {
+      await store.commit({ appends: [], records: [{ collection: INTENT_INDEX_COLLECTION, id: key, expectedVersion: 0, value: { event_id: event.eventId, ...intentFields(payload) } }] });
+    } catch (error) {
+      if (!(error instanceof RecordConflictError)) throw error;
+    }
+  }
+  indexed.add(store);
 }
 
 /** Read committed intent records back from the durable log. */
@@ -129,7 +202,8 @@ export interface IntentAttempt {
   readonly actor_ref: string | null;
   /** The authenticated caller that submitted it. */
   readonly caller_ref: string | null;
-  readonly outcome: "accepted" | "refused";
+  /** `awaiting_authority`: SEA-Forge escalated; the commit waits for an operator's decision (no record yet). */
+  readonly outcome: "accepted" | "refused" | "awaiting_authority";
   readonly reason: string | null;
   readonly at: string;
 }
@@ -160,10 +234,7 @@ export async function appendIntentAttempt(
         events: [
           {
             eventId,
-            eventType:
-              options.attempt.outcome === "accepted"
-                ? "horizon.navigation.intent.accepted"
-                : "horizon.navigation.intent.refused",
+            eventType: `horizon.navigation.intent.${options.attempt.outcome}`,
             schemaVersion: 1,
             occurredAt: options.attempt.at,
             tenant: options.tenant,
@@ -214,7 +285,12 @@ export async function readIntentAttempts(store: DurableStore): Promise<readonly 
       intent_id: typeof payload.intent_id === "string" ? payload.intent_id : null,
       actor_ref: typeof payload.actor_ref === "string" ? payload.actor_ref : null,
       caller_ref: typeof payload.caller_ref === "string" ? payload.caller_ref : null,
-      outcome: event.eventType === "horizon.navigation.intent.accepted" ? "accepted" : "refused",
+      outcome:
+        event.eventType === "horizon.navigation.intent.accepted"
+          ? "accepted"
+          : event.eventType === "horizon.navigation.intent.awaiting_authority"
+            ? "awaiting_authority"
+            : "refused",
       reason: typeof payload.reason === "string" ? payload.reason : null,
       at: event.occurredAt,
     };

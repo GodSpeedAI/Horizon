@@ -14,7 +14,7 @@ import type { NavigationFrameV1 } from "./frame.ts";
 export class IntentError extends Error {
   override readonly name = "IntentError";
   constructor(
-    readonly code: "invalid_argument" | "failed_precondition",
+    readonly code: "invalid_argument" | "failed_precondition" | "already_exists",
     message: string,
   ) {
     super(`INTENT: ${message}`);
