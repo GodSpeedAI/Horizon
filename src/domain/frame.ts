@@ -1,3 +1,5 @@
+import type { ExpectedOutcome, SettlementWindow } from "./expectation.ts";
+
 export type AffordanceStatus = "available" | "blocked" | "unknown" | "conflicted";
 export interface StructuralChoice {
   readonly operation_ref: string;
@@ -40,6 +42,15 @@ export interface NavigationIntentRecord {
   readonly operation_ref: string;
   readonly authority_ref?: string;
   readonly correlation_ref?: string;
+  /** HORIZON-001 1.1.0 records carry 2; absent means 1. Readers refuse an unknown version. */
+  readonly contract_version?: number;
+  /** REQ-NAV-011: frozen with the intent; its digest is part of the duplicate check. */
+  readonly expected_outcome?: ExpectedOutcome | null;
+  readonly expectation_digest?: string | null;
+  /** RealityTrace threshold id and ledger position T, declared before authority was requested. */
+  readonly realitytrace_threshold?: { readonly id: string; readonly position: number } | null;
+  /** Window bounds, stored so they survive restarts. */
+  readonly window?: SettlementWindow | null;
 }
 
 export function buildStructuralFrame(options: {

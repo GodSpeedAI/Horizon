@@ -16,9 +16,22 @@
  */
 import type { Component } from "@godspeedai/cognate-kernel-api";
 import { randomUUID } from "node:crypto";
-import { ConcurrencyError, RecordConflictError, type DurableStore, type StoredEvent } from "@godspeedai/cognate-events";
+import { ConcurrencyError, RecordConflictError, type DurableStore, type Json, type StoredEvent } from "@godspeedai/cognate-events";
 import { assertCommitIntent, IntentError, type CommitIntentInput, type CommitIntentOutput } from "../domain/intent.ts";
 import type { NavigationFrameV1, NavigationIntentRecord } from "../domain/frame.ts";
+import { type ExpectedOutcome, type SettlementWindow, expectationDigest } from "../domain/expectation.ts";
+import { type CapacityAllowance, type PaymentEntry, reserve } from "../domain/payment.ts";
+import { CONTRACT_VERSION, contractVersionOf, ledgerWrite, readLedger } from "./capacity-ledger.ts";
+
+/** What a HORIZON-001 1.1.0 commit records beyond the intent fields (REQ-NAV-009, REQ-NAV-011). */
+export interface IntentContract {
+  readonly expectation: ExpectedOutcome | null;
+  readonly threshold: { readonly id: string; readonly position: number } | null;
+  readonly window: SettlementWindow | null;
+  /** The binding's entries and the configured allowances; null for an operation that reserves nothing. */
+  readonly payment: { readonly entries: readonly PaymentEntry[]; readonly allowances: readonly CapacityAllowance[] } | null;
+  readonly now: Date;
+}
 
 export const NAVIGATION_INTENT_COMMIT = {
   id: "horizon.navigation.intent.commit",
@@ -84,14 +97,34 @@ export interface EventRecorded {
  */
 export async function appendIntentRecord(
   store: DurableStore,
-  options: { readonly record: NavigationIntentRecord; readonly tenant: string; readonly scopeId: string },
+  options: { readonly record: NavigationIntentRecord; readonly tenant: string; readonly scopeId: string; readonly contract?: IntentContract },
 ): Promise<EventRecorded> {
   await backfillIntentIndex(store);
   const key = indexKey(options.tenant, options.record.intent_id);
+  const contract = options.contract;
+  const digest = contract?.expectation ? expectationDigest(contract.expectation) : null;
+  const record: NavigationIntentRecord = contract
+    ? {
+        ...options.record,
+        contract_version: CONTRACT_VERSION,
+        expected_outcome: contract.expectation,
+        expectation_digest: digest,
+        realitytrace_threshold: contract.threshold,
+        window: contract.window,
+      }
+    : options.record;
   for (let attempt = 0; ; attempt++) {
-    const committed = await committedRecord(store, key, options.record);
+    const committed = await committedRecord(store, key, record);
     if (committed) return committed;
     const eventId = randomUUID();
+    // REQ-NAV-009: the reservation is evaluated against the ledger as read now and written with its
+    // expected version in the same commit as the record; a concurrent commit forces a re-evaluation.
+    const reservation = contract?.payment
+      ? await (async () => {
+          const { ledger, version } = await readLedger(store, options.tenant, contract.payment!.allowances);
+          return ledgerWrite(options.tenant, reserve(ledger, record.intent_id, contract.payment!.entries, contract.now), version);
+        })()
+      : null;
     let outcome;
     try {
       outcome = await store.commit({
@@ -106,29 +139,47 @@ export async function appendIntentRecord(
                 schemaVersion: 1,
                 occurredAt: new Date().toISOString(),
                 tenant: options.tenant,
-                correlationId: options.record.correlation_ref ?? eventId,
+                correlationId: record.correlation_ref ?? eventId,
                 causationId: null,
                 runId: null,
                 scopeId: options.scopeId,
                 componentId: "horizon.navigation-intent",
                 payload: {
-                  intent_id: options.record.intent_id,
-                  frame_id: options.record.frame_id,
-                  frame_revision: options.record.frame_revision,
-                  actor_ref: options.record.actor_ref,
-                  operation_ref: options.record.operation_ref,
-                  ...(options.record.authority_ref ? { authority_ref: options.record.authority_ref } : {}),
-                  correlation_ref: options.record.correlation_ref ?? null,
-                },
+                  intent_id: record.intent_id,
+                  frame_id: record.frame_id,
+                  frame_revision: record.frame_revision,
+                  actor_ref: record.actor_ref,
+                  operation_ref: record.operation_ref,
+                  ...(record.authority_ref ? { authority_ref: record.authority_ref } : {}),
+                  correlation_ref: record.correlation_ref ?? null,
+                  ...(contract
+                    ? {
+                        contract_version: CONTRACT_VERSION,
+                        expected_outcome: (contract.expectation ?? null),
+                        expectation_digest: digest,
+                        realitytrace_threshold: (contract.threshold ?? null),
+                        window: (contract.window ?? null),
+                      }
+                    : {}),
+                } as unknown as Json,
               },
             ],
           },
         ],
-        records: [{ collection: INTENT_INDEX_COLLECTION, id: key, expectedVersion: 0, value: { event_id: eventId, ...intentFields(options.record) } }],
+        records: [
+          {
+            collection: INTENT_INDEX_COLLECTION,
+            id: key,
+            expectedVersion: 0,
+            value: { event_id: eventId, ...intentFields(record), ...(contract ? { contract_version: CONTRACT_VERSION, expectation_digest: digest } : {}) },
+          },
+          ...(reservation ? [reservation] : []),
+        ],
       });
     } catch (error) {
-      // Another commit landed between the read and this commit (this id, or any intent): re-check.
-      if ((error instanceof ConcurrencyError || error instanceof RecordConflictError) && attempt < 4) continue;
+      // Another commit landed between the read and this commit (this id, any intent, or the ledger):
+      // re-check, which re-evaluates the payment gate against the ledger that won.
+      if ((error instanceof ConcurrencyError || error instanceof RecordConflictError) && attempt < 16) continue;
       throw error;
     }
     if (outcome.kind !== "committed") throw new Error(`INTENT: intent record was not committed (${outcome.kind})`);
@@ -158,12 +209,15 @@ function duplicateIntent(intentId: string): IntentError {
 }
 
 /** The record already committed under this key, or null; a different intent under that id throws. */
-async function committedRecord(store: DurableStore, key: string, record: CommitIntentInput): Promise<EventRecorded | null> {
+async function committedRecord(store: DurableStore, key: string, record: NavigationIntentRecord): Promise<EventRecorded | null> {
   const entry = await store.getRecord(INTENT_INDEX_COLLECTION, key);
   if (!entry) return null;
-  const have = entry.value as unknown as CommitIntentInput & { readonly event_id: string };
+  contractVersionOf(entry.value);
+  const have = entry.value as unknown as CommitIntentInput & { readonly event_id: string; readonly expectation_digest?: string | null };
   const want = intentFields(record);
   if ((Object.keys(want) as (keyof CommitIntentInput)[]).some((field) => have[field] !== want[field])) throw duplicateIntent(record.intent_id);
+  // The expectation is part of the canonical input: the same id with a changed expectation is a new intent.
+  if ((have.expectation_digest ?? null) !== (record.expectation_digest ?? null)) throw duplicateIntent(record.intent_id);
   const event = (await store.readStream(INTENT_STREAM, {})).find((e) => e.eventId === have.event_id);
   if (!event) throw new Error(`INTENT: the index names event ${have.event_id}, which the intent stream does not hold`);
   return { eventId: event.eventId, position: event.position, streamVersion: event.streamSequence };
@@ -193,7 +247,10 @@ export async function readIntentRecords(
   store: DurableStore,
 ): Promise<readonly { readonly event: StoredEvent; readonly record: NavigationIntentRecord }[]> {
   const events = await store.readStream(INTENT_STREAM, {});
-  return events.map((event) => ({ event, record: event.payload as unknown as NavigationIntentRecord }));
+  return events.map((event) => {
+    contractVersionOf(event.payload);
+    return { event, record: event.payload as unknown as NavigationIntentRecord };
+  });
 }
 
 export interface IntentAttempt {
