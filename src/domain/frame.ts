@@ -64,6 +64,8 @@ export function buildStructuralFrame(options: {
    * never render as an affordance (REQ-NAV-001, INV-01).
    */
   readonly availability?: { readonly status: AffordanceStatus; readonly firstBlockers: Readonly<Record<string, string>> };
+  /** HORIZON-001 1.1.0: bound operations, each with the status its payment and settlement gates gave it. */
+  readonly bound?: readonly StructuralChoice[];
 }): NavigationFrameV1 {
   const availability = options.availability;
   const statusOf = (operationRef: string): { readonly status: AffordanceStatus; readonly first_blocker: string | null } => {
@@ -97,6 +99,7 @@ export function buildStructuralFrame(options: {
         label: "Check the optional Python research subsystem contract",
         assessment: { ...statusOf("horizon.research.health"), reversibility: "read_only" },
       },
+      ...(options.bound ?? []),
     ],
   };
 }

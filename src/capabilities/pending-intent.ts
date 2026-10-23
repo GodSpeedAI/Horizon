@@ -25,13 +25,17 @@ export type PendingStage = "awaiting_authority" | "executed" | "terminal";
 export interface PendingIntent {
   readonly contract_version: number;
   readonly intent: CommitIntentInput;
-  readonly expectation: ExpectedOutcome;
-  readonly expectation_digest: string;
-  readonly threshold: DeclaredThreshold;
-  readonly window: SettlementWindow;
+  readonly operation_ref: string;
+  /** Null for an exempt intent (read_only without settlement: required): it settles as not_required. */
+  readonly expectation: ExpectedOutcome | null;
+  readonly expectation_digest: string | null;
+  readonly threshold: DeclaredThreshold | null;
+  readonly window: SettlementWindow | null;
   /** The instantiated verifier argv; its digest is frozen in the authority request's claims. */
-  readonly verifier_argv: readonly string[];
+  readonly verifier_argv: readonly string[] | null;
   readonly stage: PendingStage;
+  /** Whether committing it reserved capacity (so becoming terminal consumes it). */
+  readonly reserved: boolean;
   readonly operation_id?: string;
   readonly discrimination?: VerifierRun;
   readonly verifications?: readonly VerifierRun[];
@@ -67,13 +71,13 @@ export async function reservePendingIntent(
   store: DurableStore,
   options: {
     readonly tenant: string;
-    readonly pending: Omit<PendingIntent, "contract_version" | "stage" | "expectation_digest">;
+    readonly pending: Omit<PendingIntent, "contract_version" | "stage" | "expectation_digest" | "reserved">;
     readonly payment: { readonly entries: readonly PaymentEntry[]; readonly allowances: readonly CapacityAllowance[] } | null;
     readonly now: Date;
   },
 ): Promise<PendingIntent> {
-  const digest = expectationDigest(options.pending.expectation);
-  const record: PendingIntent = { ...options.pending, contract_version: CONTRACT_VERSION, expectation_digest: digest, stage: "awaiting_authority" };
+  const digest = options.pending.expectation ? expectationDigest(options.pending.expectation) : null;
+  const record: PendingIntent = { ...options.pending, contract_version: CONTRACT_VERSION, expectation_digest: digest, stage: "awaiting_authority", reserved: options.payment !== null };
   const id = key(options.tenant, record.intent.intent_id);
   for (let attempt = 0; ; attempt++) {
     const existing = await readPending(store, options.tenant, record.intent.intent_id);
@@ -115,8 +119,8 @@ export async function updatePending(store: DurableStore, tenant: string, intentI
 }
 
 /** The intent is terminal: record why, and its reservation becomes consumption (idempotent). */
-export async function terminate(store: DurableStore, tenant: string, intentId: string, outcome: string, reason: string | null, at: Date, reserved: boolean): Promise<PendingIntent> {
+export async function terminate(store: DurableStore, tenant: string, intentId: string, outcome: string, reason: string | null, at: Date): Promise<PendingIntent> {
   const done = await updatePending(store, tenant, intentId, (current) => (current.terminal ? {} : { stage: "terminal", terminal: { outcome, reason, at: at.toISOString() } }));
-  if (reserved) await consumeReservation(store, { tenant, intentId, at });
+  if (done.reserved) await consumeReservation(store, { tenant, intentId, at });
   return done;
 }

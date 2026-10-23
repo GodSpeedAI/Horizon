@@ -26,7 +26,7 @@ const THRESHOLD = { question_id: "q-1", threshold_id: "thr-1", position: { ledge
 const reservePending = (store: ReturnType<typeof openSqliteStore>, intentId: string, options: { compute?: number; statement?: string } = {}) =>
   reservePendingIntent(store, {
     tenant: TENANT,
-    pending: { intent: intent(intentId), expectation: expectation(options.statement), threshold: THRESHOLD, window: openWindow(NOW, 600), verifier_argv: ["/v", "--intent", intentId] },
+    pending: { intent: intent(intentId), operation_ref: "horizon.write", expectation: expectation(options.statement), threshold: THRESHOLD, window: openWindow(NOW, 600), verifier_argv: ["/v", "--intent", intentId] },
     payment: { entries: binding({ compute: options.compute ?? 3 }), allowances: ALLOWANCES },
     now: NOW,
   });
@@ -57,8 +57,8 @@ describe("capacity reservation with the pending intent", () => {
   test("a terminal intent's reservation becomes consumption, once, and still counts", async () => {
     const store = openSqliteStore({ path: storePath() });
     await reservePending(store, ID_A);
-    await terminate(store, TENANT, ID_A, "refused", "expected outcome already holds before acting", NOW, true);
-    await terminate(store, TENANT, ID_A, "settled", null, NOW, true);
+    await terminate(store, TENANT, ID_A, "refused", "expected outcome already holds before acting", NOW);
+    await terminate(store, TENANT, ID_A, "settled", null, NOW);
     const { ledger } = await readLedger(store, TENANT, ALLOWANCES);
     expect(ledger.reservations).toHaveLength(0);
     expect(ledger.consumptions.map((entry) => entry.intent_id)).toEqual([ID_A]);
