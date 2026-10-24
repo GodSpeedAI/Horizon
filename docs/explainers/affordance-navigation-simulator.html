@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Horizon — Affordance Navigation & Frame Lifecycle Simulator</title>
+  <style>
+    :root {
+      --bg: #070b12;
+      --surface: #0e1624;
+      --surface-raised: #152236;
+      --surface-border: #1f334d;
+      --text: #e2e8f0;
+      --text-muted: #8ba1b7;
+      --text-dim: #556c82;
+      --cyan: #38bdf8;
+      --cyan-soft: rgba(56, 189, 248, 0.12);
+      --emerald: #34d399;
+      --emerald-soft: rgba(52, 211, 153, 0.12);
+      --amber: #fbbf24;
+      --amber-soft: rgba(251, 191, 36, 0.12);
+      --rose: #f87171;
+      --rose-soft: rgba(248, 113, 113, 0.12);
+      --purple: #c084fc;
+      --purple-soft: rgba(192, 132, 252, 0.12);
+      --indigo: #818cf8;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --radius: 8px;
+      --transition: 160ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.55;
+      min-height: 100vh;
+      padding: 24px 20px 80px;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    header.top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      border-bottom: 1px solid var(--surface-border);
+      padding-bottom: 20px;
+      margin-bottom: 28px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--cyan-soft);
+      color: var(--cyan);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    .tagline {
+      color: var(--text-muted);
+      font-size: 14px;
+      max-width: 780px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 10px;
+    }
+
+    .nav-links a {
+      color: var(--cyan);
+      text-decoration: none;
+      font-size: 12px;
+      font-family: var(--mono);
+      padding: 6px 12px;
+      border-radius: var(--radius);
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      transition: background var(--transition), border-color var(--transition);
+    }
+
+    .nav-links a:hover {
+      background: var(--surface-raised);
+      border-color: var(--cyan);
+    }
+
+    .formula-banner {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-left: 4px solid var(--cyan);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .formula-statement {
+      font-size: 15px;
+      color: #fff;
+    }
+
+    .formula-statement strong {
+      color: var(--cyan);
+      font-family: var(--mono);
+    }
+
+    .formula-meta {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+
+    @media (max-width: 1000px) {
+      .grid-2col { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--surface-border);
+      padding-bottom: 12px;
+    }
+
+    .panel-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-sub {
+      font-size: 12px;
+      color: var(--text-dim);
+      font-family: var(--mono);
+    }
+
+    .preset-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+
+    .btn-preset {
+      background: var(--surface-raised);
+      color: var(--text-muted);
+      border: 1px solid var(--surface-border);
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: var(--mono);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .btn-preset:hover, .btn-preset.active {
+      color: #fff;
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--cyan);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    select, input[type="text"] {
+      background: var(--bg);
+      color: #fff;
+      border: 1px solid var(--surface-border);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 13px;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+
+    select:focus, input[type="text"]:focus {
+      border-color: var(--cyan);
+    }
+
+    .gates-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .gates-table th {
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-dim);
+      padding: 8px 6px;
+      border-bottom: 1px solid var(--surface-border);
+    }
+
+    .gates-table td {
+      padding: 8px 6px;
+      border-bottom: 1px solid rgba(31, 51, 77, 0.5);
+      vertical-align: middle;
+    }
+
+    .gate-key {
+      font-family: var(--mono);
+      font-weight: 600;
+      color: #fff;
+      font-size: 12px;
+    }
+
+    .gate-select {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--surface-border);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .verdict-pill {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+
+    .verdict-pass { background: var(--emerald-soft); color: var(--emerald); border: 1px solid rgba(52, 211, 153, 0.3); }
+    .verdict-fail { background: var(--rose-soft); color: var(--rose); border: 1px solid rgba(248, 113, 113, 0.3); }
+    .verdict-unknown { background: var(--amber-soft); color: var(--amber); border: 1px solid rgba(251, 191, 36, 0.3); }
+    .verdict-conflicted { background: var(--purple-soft); color: var(--purple); border: 1px solid rgba(192, 132, 252, 0.3); }
+
+    .status-hero {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface-raised);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+    }
+
+    .status-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .status-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-family: var(--mono);
+      letter-spacing: 0.05em;
+    }
+
+    .status-value {
+      font-size: 22px;
+      font-weight: 700;
+      font-family: var(--mono);
+      letter-spacing: -0.01em;
+    }
+
+    .spendable-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: var(--mono);
+      text-transform: uppercase;
+    }
+
+    .spendable-true {
+      background: var(--emerald-soft);
+      color: var(--emerald);
+      border: 1px solid rgba(52, 211, 153, 0.4);
+    }
+
+    .spendable-false {
+      background: var(--rose-soft);
+      color: var(--rose);
+      border: 1px solid rgba(248, 113, 113, 0.4);
+    }
+
+    .blockers-box {
+      background: var(--bg);
+      border: 1px solid var(--surface-border);
+      border-radius: 4px;
+      padding: 12px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .blocker-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 12px;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(31, 51, 77, 0.5);
+    }
+
+    .blocker-item:last-child { border-bottom: none; }
+
+    .blocker-sev {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+
+    .sev-blocked { background: var(--rose-soft); color: var(--rose); border: 1px solid rgba(248, 113, 113, 0.3); }
+    .sev-unknown { background: var(--amber-soft); color: var(--amber); border: 1px solid rgba(251, 191, 36, 0.3); }
+
+    .blocker-text {
+      flex: 1;
+      color: var(--text);
+    }
+
+    .blocker-prereq {
+      font-family: var(--mono);
+      color: var(--cyan);
+      font-size: 11px;
+    }
+
+    .json-view {
+      background: var(--bg);
+      color: #9cdcfe;
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 12px;
+      border-radius: 4px;
+      border: 1px solid var(--surface-border);
+      max-height: 250px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    .interactive-commit {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--surface-raised);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn-act {
+      background: var(--cyan);
+      color: #040910;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--mono);
+      cursor: pointer;
+      transition: filter var(--transition);
+    }
+
+    .btn-act:hover { filter: brightness(1.15); }
+
+    .btn-act-subtle {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--surface-border);
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: var(--mono);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .btn-act-subtle:hover {
+      background: var(--surface-border);
+      color: #fff;
+    }
+
+    .console-log {
+      background: var(--bg);
+      border: 1px solid var(--surface-border);
+      border-radius: 4px;
+      padding: 12px;
+      font-family: var(--mono);
+      font-size: 11px;
+      min-height: 100px;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+
+    .log-line {
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+
+    .log-ts { color: var(--text-dim); margin-right: 8px; }
+    .log-ok { color: var(--emerald); }
+    .log-err { color: var(--rose); }
+    .log-warn { color: var(--amber); }
+
+    .teeth-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .tooth-card {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius);
+      padding: 14px;
+      cursor: pointer;
+      transition: all var(--transition);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .tooth-card:hover {
+      border-color: var(--cyan);
+      transform: translateY(-2px);
+    }
+
+    .tooth-id {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+
+    .tooth-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .tooth-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header class="top-bar">
+    <div>
+      <div class="badge">Horizon Architecture · Verified Model</div>
+      <h1>Affordance Navigation & Frame Lifecycle Simulator</h1>
+      <p class="tagline">Explore how Horizon evaluates candidate operations against the 7 canonical affordance gates, derives purpose-relative Cases, freezes immutable Navigation Frames, and enforces that <strong>possibility ≠ affordance</strong>.</p>
+    </div>
+    <div class="nav-links">
+      <a href="../index.md">← Documentation Index</a>
+      <a href="../subsystems/navigation.md">Navigation Subsystem</a>
+      <a href="world-debugger-workbench.html">World Debugger Workbench →</a>
+    </div>
+  </header>
+
+  <div class="formula-banner">
+    <div class="formula-statement">
+      Core Invariant: <strong>Possibility ≠ Affordance</strong>. An operation may be structurally reachable in DomainForge, but unless every hard gate clears, it is <strong>not spendable</strong>.
+    </div>
+    <div class="formula-meta">Schema: <code>horizon.navigation/2</code> · Contract: REQ-NAV-001..006</div>
+  </div>
+
+  <div class="grid-2col">
+    <!-- LEFT PANEL: CANDIDATE CONFIGURATION -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">1. Candidate Operation & Affordance Gates</div>
+          <div class="panel-sub">Configure candidate parameters or load a verified test scenario</div>
+        </div>
+      </div>
+
+      <div class="preset-bar">
+        <button class="btn-preset active" onclick="loadScenario('j01_inspect')">PE-01: Read-Only Inspect</button>
+        <button class="btn-preset" onclick="loadScenario('j02_expedite')">PE-06: Approval Required</button>
+        <button class="btn-preset" onclick="loadScenario('denied_op')">NE-01: Denied Move</button>
+        <button class="btn-preset" onclick="loadScenario('unknown_auth')">NE-04: Unknown Authority</button>
+        <button class="btn-preset" onclick="loadScenario('payment_fail')">Payment Blocked</button>
+      </div>
+
+      <div class="form-group">
+        <label>Operation Ref</label>
+        <input type="text" id="opRef" value="horizon.inspect" oninput="runEvaluation()">
+      </div>
+
+      <div class="grid-2col" style="margin-bottom: 0;">
+        <div class="form-group">
+          <label>Reversibility Class</label>
+          <select id="opReversibility" onchange="runEvaluation()">
+            <option value="read_only">read_only (no hard recovery)</option>
+            <option value="reversible">reversible (no hard recovery)</option>
+            <option value="compensable">compensable (hard recovery)</option>
+            <option value="irreversible">irreversible (hard recovery)</option>
+            <option value="unknown">unknown (hard recovery)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Responsibility</label>
+          <select id="opResp" onchange="runEvaluation()">
+            <option value="orient">orient</option>
+            <option value="inspect" selected>inspect</option>
+            <option value="choose">choose</option>
+            <option value="commit">commit</option>
+            <option value="observe">observe</option>
+            <option value="review">review</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label>The 7 Canonical Affordance Gates (GATE_KEYS)</label>
+        <table class="gates-table">
+          <thead>
+            <tr>
+              <th>Gate Key</th>
+              <th>Verdict / Outcome</th>
+              <th>Reason & Prerequisite</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="gate-key">authority</td>
+              <td>
+                <select id="gate_authority_outcome" class="gate-select" onchange="runEvaluation()">
+                  <option value="likely_allow">likely_allow (pass)</option>
+                  <option value="requires_approval">requires_approval (pending)</option>
+                  <option value="deferred_to_invocation">deferred_to_invocation (pass)</option>
+                  <option value="denied">denied (blocked)</option>
+                  <option value="unreachable">unreachable (unknown)</option>
+                  <option value="unknown">unknown (unknown)</option>
+                  <option value="not_applicable">not_applicable (read-only only)</option>
+                </select>
+              </td>
+              <td><input type="text" id="gate_authority_reason" value="Policy admitted" style="font-size: 11px; padding: 4px;" oninput="runEvaluation()"></td>
+            </tr>
+            <tr>
+              <td class="gate-key">visibility</td>
+              <td>
+                <select id="gate_visibility" class="gate-select" onchange="runEvaluation()">
+                  <option value="pass">pass</option>
+                  <option value="fail">fail</option>
+                  <option value="unknown">unknown</option>
+                  <option value="conflicted">conflicted</option>
+                </select>
+              </td>
+              <td><input type="text" id="gate_visibility_reason" value="Visible in focus" style="font-size: 11px; padding: 4px;" oninput="runEvaluation()"></td>
+            </tr>
+            <tr>
+              <td class="gate-key">reach</td>
+              <td>
+                <select id="gate_reach" class="gate-select" onchange="runEvaluation()">
+                  <option value="pass">pass</option>
+                  <option value="fail">fail</option>
+                  <option value="unknown">unknown</option>
+                  <option value="conflicted">conflicted</option>
+                </select>
+              </td>
+              <td><input type="text" id="gate_reach_reason" value="Reachable via links" style="font-size: 11px; padding: 4px;" oninput="runEvaluation()"></td>
+            </tr>
+            <tr>
+              <td class="gate-key">payment</td>
+              <td>
+                <select id="gate_payment" class="gate-select" onchange="runEvaluation()">
+                  <option value="pass">pass</option>
+                  <option value="fail">fail</option>
+                  <option value="unknown">unknown</option>
+                  <option value="conflicted">conflicted</option>
+                </select>
+              </td>
+              <td><input type="text" id="gate_payment_reason" value="Budget available" style="font-size: 11px; padding: 4px;" oninput="runEvaluation()"></td>
+            </tr>
+            <tr>
+              <td class="gate-key">capability</td>
+              <td>
+                <select id="gate_capability" class="gate-select" onchange="runEvaluation()">
+                  <option value="pass">pass</option>
+                  <option value="fail">fail</option>
+                  <option value="unknown">unknown</option>
+                  <option value="conflicted">conflicted</option>
+                </select>
+              </td>
+              <td><input type="text" id="gate_capability_reason" value="Handler registered" style="font-size: 11px; padding: 4px;" oninput="runEvaluation()"></td>
+            </tr>
+            <tr>
+              <td class="gate-key">recovery</td>
+              <td>
+                <select id="gate_recovery" class="gate-select" onchange="runEvaluation()">
+                  <option value="pass">pass</option>
+                  <option value="fail">fail</option>
+                  <option value="unknown">unknown</option>
+                  <option value="conflicted">conflicted</option>
+                </select>
+              </td>
+              <td><input type="text" id="gate_recovery_reason" value="Compensating action defined" style="font-size: 11px; padding: 4px;" oninput="runEvaluation()"></td>
+            </tr>
+            <tr>
+              <td class="gate-key">settlement_access</td>
+              <td>
+                <select id="gate_settlement_access" class="gate-select" onchange="runEvaluation()">
+                  <option value="pass">pass</option>
+                  <option value="fail">fail</option>
+                  <option value="unknown">unknown</option>
+                  <option value="conflicted">conflicted</option>
+                </select>
+              </td>
+              <td><input type="text" id="gate_settlement_access_reason" value="Ledger write accessible" style="font-size: 11px; padding: 4px;" oninput="runEvaluation()"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: ASSESSMENT & FRAME OUTPUT -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">2. Controller Evaluation & Frame Resolution</div>
+          <div class="panel-sub">Executable logic derived directly from <code>src/domain/navigation.ts:assessAffordance</code></div>
+        </div>
+      </div>
+
+      <div class="status-hero">
+        <div class="status-left">
+          <div class="status-label">Affordance Status</div>
+          <div id="statusResult" class="status-value" style="color: var(--emerald);">available</div>
+        </div>
+        <div id="spendableResult" class="spendable-badge spendable-true">✓ Spendable</div>
+      </div>
+
+      <div>
+        <label>Blockers & Critical Path (Ordered by severity, then gate key)</label>
+        <div class="blockers-box" id="blockersContainer">
+          <div style="color: var(--text-dim); font-size: 12px;">Zero active blockers. Path is spendable.</div>
+        </div>
+      </div>
+
+      <div>
+        <label>Frozen Navigation Frame Snapshot (<code>NavigationFrameV1</code>)</label>
+        <div class="json-view" id="frameJsonView"></div>
+      </div>
+
+      <div class="interactive-commit">
+        <label>3. Intent Commitment & Adversarial Proving</label>
+        <div class="action-row">
+          <button class="btn-act" onclick="submitIntent(false)">Commit Typed Intent</button>
+          <button class="btn-act-subtle" onclick="submitIntent(true)">Simulate Stale Frame (Attack NE-11)</button>
+          <button class="btn-act-subtle" onclick="simulateUIEnablementAttack()">Simulate UI Enablement (Attack NE-09)</button>
+        </div>
+        <div class="console-log" id="intentLog">
+          <div class="log-line"><span class="log-ts">00:00:00</span><span>Horizon navigation runtime initialized. Frame register ready.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOWER SECTION: THE 12 POSITIVE & 11 NEGATIVE VERIFICATION TEETH -->
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Adversarial Teeth & Formal Evidence Suite</div>
+        <div class="panel-sub">Verified against <code>test/navigation-controller.test.ts</code> (PE-01..12) and <code>test/navigation-negative.test.ts</code> (NE-01..11)</div>
+      </div>
+    </div>
+
+    <div class="teeth-grid">
+      <div class="tooth-card" onclick="loadScenario('denied_op')">
+        <div class="tooth-id">NE-01 · PRIORITY TEETH</div>
+        <div class="tooth-title">Unauthorized High-Value Candidate</div>
+        <div class="tooth-desc">Even if ranked highest by an advisory ML model, an unauthorized candidate is strictly eliminated from spendable options.</div>
+      </div>
+      <div class="tooth-card" onclick="loadScenario('j02_expedite')">
+        <div class="tooth-id">NE-05 · PREREQUISITE TEETH</div>
+        <div class="tooth-title">Approval Is Pending, Not Discarded</div>
+        <div class="tooth-desc"><code>requires_approval</code> blocks immediate commit but synthesizes <code>authority:approval</code> as the next spendable prerequisite.</div>
+      </div>
+      <div class="tooth-card" onclick="loadScenario('unknown_auth')">
+        <div class="tooth-id">NE-04 · UNKNOWN TEETH</div>
+        <div class="tooth-title">Unknown Authority Remains Unknown</div>
+        <div class="tooth-desc">Unknown authority never silently falls back to 'allow' or 'denied'. It produces an unknown severity blocker.</div>
+      </div>
+      <div class="tooth-card" onclick="simulateUIEnablementAttack()">
+        <div class="tooth-id">NE-09 · TAMPER TEETH</div>
+        <div class="tooth-title">UI Enablement Grants Nothing</div>
+        <div class="tooth-desc">A compromised frontend or agent enabling a blocked button in the DOM has zero effect: the controller enforces gates at intent commit.</div>
+      </div>
+      <div class="tooth-card" onclick="submitIntent(true)">
+        <div class="tooth-id">NE-11 · FRESHNESS TEETH</div>
+        <div class="tooth-title">Stale Frame Revision Refusal</div>
+        <div class="tooth-desc">Submitting an intent against frame revision 1 after frame revision 2 was issued is strictly refused and audited as an attempt.</div>
+      </div>
+      <div class="tooth-card" onclick="loadScenario('j01_inspect')">
+        <div class="tooth-id">PE-10 · SETTLEMENT TEETH</div>
+        <div class="tooth-title">Reachable vs Settle Now</div>
+        <div class="tooth-desc">Settlement reachability is distinct from <code>should_settle_now</code>; settlement requires an explicit authorized judgment.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentFrameId = "frame_019a3b4c";
+  let currentRevision = 1;
+
+  const GATE_KEYS = [
+    "visibility",
+    "reach",
+    "payment",
+    "authority",
+    "capability",
+    "recovery",
+    "settlement_access"
+  ];
+
+  function isConsequential(reversibility) {
+    return reversibility !== "read_only";
+  }
+
+  function recoveryIsHard(reversibility) {
+    return reversibility === "compensable" || reversibility === "irreversible" || reversibility === "unknown";
+  }
+
+  function runEvaluation() {
+    const opRef = document.getElementById("opRef").value;
+    const reversibility = document.getElementById("opReversibility").value;
+    const consequential = isConsequential(reversibility);
+
+    const authorityOutcome = document.getElementById("gate_authority_outcome").value;
+    const authorityReason = document.getElementById("gate_authority_reason").value;
+
+    const blockers = [];
+
+    // Authority evaluation (exact parity with src/domain/navigation.ts:227-249)
+    if (consequential && authorityOutcome === "not_applicable") {
+      blockers.push({ gate: "authority", severity: "unknown", reason: "consequential operation declares authority not applicable" });
+    } else if (authorityOutcome === "denied") {
+      blockers.push({ gate: "authority", severity: "blocked", reason: authorityReason || "authority denied" });
+    } else if (authorityOutcome === "requires_approval") {
+      blockers.push({
+        gate: "authority",
+        severity: "blocked",
+        reason: authorityReason || "approval required",
+        prerequisite_ref: "authority:approval"
+      });
+    } else if (authorityOutcome === "unreachable" || authorityOutcome === "unknown") {
+      blockers.push({
+        gate: "authority",
+        severity: "unknown",
+        reason: authorityReason || `authority outcome ${authorityOutcome}`
+      });
+    }
+
+    // Evaluate remaining 6 gates (src/domain/navigation.ts:250-261)
+    for (const key of GATE_KEYS) {
+      if (key === "authority") continue;
+      const verdict = document.getElementById(`gate_${key}`).value;
+      const reason = document.getElementById(`gate_${key}_reason`).value;
+
+      if (verdict === "pass") continue;
+      if (key === "recovery" && !recoveryIsHard(reversibility)) continue;
+
+      blockers.push({
+        gate: key,
+        severity: (verdict === "conflicted" || verdict === "fail") ? "blocked" : "unknown",
+        reason: reason || `${key} is ${verdict}`,
+        prerequisite_ref: verdict === "fail" ? `prereq:${key}` : undefined
+      });
+    }
+
+    // Determine status (src/domain/navigation.ts:263-266)
+    const hasConflicted = blockers.some(b => {
+      if (b.gate === "authority") return false;
+      return document.getElementById(`gate_${b.gate}`).value === "conflicted";
+    });
+
+    let status = "available";
+    if (hasConflicted) {
+      status = "conflicted";
+    } else if (blockers.some(b => b.severity === "blocked")) {
+      status = "blocked";
+    } else if (blockers.length > 0) {
+      status = "unknown";
+    }
+
+    const spendable = (status === "available");
+
+    // Order blockers: blocked severity first, then GATE_KEYS order
+    const ordered = [...blockers].sort((a, b) => {
+      if (a.severity !== b.severity) return a.severity === "blocked" ? -1 : 1;
+      return GATE_KEYS.indexOf(a.gate) - GATE_KEYS.indexOf(b.gate);
+    });
+
+    // Render results
+    const statusElem = document.getElementById("statusResult");
+    statusElem.textContent = status;
+    if (status === "available") statusElem.style.color = "var(--emerald)";
+    else if (status === "blocked") statusElem.style.color = "var(--rose)";
+    else if (status === "conflicted") statusElem.style.color = "var(--purple)";
+    else statusElem.style.color = "var(--amber)";
+
+    const spendableElem = document.getElementById("spendableResult");
+    if (spendable) {
+      spendableElem.className = "spendable-badge spendable-true";
+      spendableElem.textContent = "✓ Spendable";
+    } else {
+      spendableElem.className = "spendable-badge spendable-false";
+      spendableElem.textContent = "✕ Not Spendable";
+    }
+
+    // Render blockers box
+    const container = document.getElementById("blockersContainer");
+    if (ordered.length === 0) {
+      container.innerHTML = '<div style="color: var(--emerald); font-size: 12px; font-family: var(--mono);">✓ Zero blockers. Path meets all affordance gates and is spendable.</div>';
+    } else {
+      container.innerHTML = ordered.map(b => `
+        <div class="blocker-item">
+          <span class="blocker-sev sev-${b.severity}">${b.severity}</span>
+          <div class="blocker-text">
+            <strong>${b.gate}:</strong> ${b.reason}
+            ${b.prerequisite_ref ? `<div class="blocker-prereq">↳ Prerequisite: ${b.prerequisite_ref}</div>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Update frame JSON
+    const frame = {
+      schema: "horizon.navigation/2",
+      frame_id: currentFrameId,
+      frame_revision: currentRevision,
+      focus_ref: "prod_order:PO-9042",
+      checkpoint_ref: "chk_001_initial",
+      view_mode: "inspect",
+      choices: [
+        {
+          operation_ref: opRef,
+          status: status,
+          spendable: spendable,
+          reversibility: reversibility,
+          first_blocker: ordered[0] ? `${ordered[0].gate}: ${ordered[0].reason}` : null,
+          next_prerequisite_ref: ordered.find(b => b.prerequisite_ref)?.prerequisite_ref || null
+        }
+      ],
+      observer_controls: ["inspect", "defer", "reframe", "disagree"]
+    };
+
+    document.getElementById("frameJsonView").textContent = JSON.stringify(frame, null, 2);
+  }
+
+  function logConsole(msg, type = "ok") {
+    const log = document.getElementById("intentLog");
+    const d = new Date();
+    const ts = d.toTimeString().split(' ')[0];
+    const line = document.createElement("div");
+    line.className = "log-line";
+    line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-${type}">${msg}</span>`;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function submitIntent(stale = false) {
+    const targetRev = stale ? (currentRevision - 1) : currentRevision;
+    const spendable = document.getElementById("spendableResult").textContent.includes("✓");
+    const opRef = document.getElementById("opRef").value;
+
+    if (targetRev < currentRevision) {
+      logConsole(`REFUSAL: Intent submitted against stale frame revision ${targetRev} (Current is ${currentRevision}). Audit attempt recorded in event stream.`, "err");
+      return;
+    }
+
+    if (!spendable) {
+      logConsole(`REFUSAL: Choice '${opRef}' is NOT available (Blocked by controller). UI enablement ignored.`, "err");
+      return;
+    }
+
+    currentRevision++;
+    logConsole(`SUCCESS: Committed intent for '${opRef}' against frame ${currentFrameId}@rev${targetRev}. Observation run started; projection updated.`, "ok");
+    runEvaluation();
+  }
+
+  function simulateUIEnablementAttack() {
+    logConsole(`ATTACK SIMULATION: Malicious client or agent set 'button.disabled = false' in DOM for a blocked candidate.`, "warn");
+    const spendable = document.getElementById("spendableResult").textContent.includes("✓");
+    if (!spendable) {
+      logConsole(`CONTROLLER ENFORCEMENT (NE-09): Horizon controller validates gates server-side at commit time. Commit rejected with NavigationError('unavailable_choice').`, "err");
+    } else {
+      logConsole(`NOTICE: Candidate is currently spendable anyway. Try this on 'NE-01: Denied Move' scenario.`, "warn");
+    }
+  }
+
+  function loadScenario(name) {
+    document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+
+    if (name === 'j01_inspect') {
+      document.getElementById("opRef").value = "horizon.inspect";
+      document.getElementById("opReversibility").value = "read_only";
+      document.getElementById("gate_authority_outcome").value = "likely_allow";
+      GATE_KEYS.forEach(k => {
+        if (k !== 'authority') document.getElementById(`gate_${k}`).value = "pass";
+      });
+    } else if (name === 'j02_expedite') {
+      document.getElementById("opRef").value = "horizon.expedite";
+      document.getElementById("opReversibility").value = "compensable";
+      document.getElementById("gate_authority_outcome").value = "requires_approval";
+      document.getElementById("gate_authority_reason").value = "Material change requires supervisor sign-off";
+      GATE_KEYS.forEach(k => {
+        if (k !== 'authority') document.getElementById(`gate_${k}`).value = "pass";
+      });
+    } else if (name === 'denied_op') {
+      document.getElementById("opRef").value = "horizon.deprovision";
+      document.getElementById("opReversibility").value = "irreversible";
+      document.getElementById("gate_authority_outcome").value = "denied";
+      document.getElementById("gate_authority_reason").value = "Actor lacks DEPROVISION_ROLE";
+      GATE_KEYS.forEach(k => {
+        if (k !== 'authority') document.getElementById(`gate_${k}`).value = "pass";
+      });
+    } else if (name === 'unknown_auth') {
+      document.getElementById("opRef").value = "horizon.recalibrate";
+      document.getElementById("opReversibility").value = "reversible";
+      document.getElementById("gate_authority_outcome").value = "unknown";
+      document.getElementById("gate_authority_reason").value = "SEA-Forge authority server unreachable";
+      GATE_KEYS.forEach(k => {
+        if (k !== 'authority') document.getElementById(`gate_${k}`).value = "pass";
+      });
+    } else if (name === 'payment_fail') {
+      document.getElementById("opRef").value = "horizon.batch_compute";
+      document.getElementById("opReversibility").value = "reversible";
+      document.getElementById("gate_authority_outcome").value = "likely_allow";
+      GATE_KEYS.forEach(k => {
+        if (k !== 'authority') document.getElementById(`gate_${k}`).value = "pass";
+      });
+      document.getElementById("gate_payment").value = "fail";
+      document.getElementById("gate_payment_reason").value = "Gas/budget exceeded (required 50 credits, available 12)";
+    }
+
+    runEvaluation();
+  }
+
+  // Initial evaluation on load
+  runEvaluation();
+</script>
+
+</body>
+</html>
