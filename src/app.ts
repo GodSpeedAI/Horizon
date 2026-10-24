@@ -13,6 +13,7 @@ import { activateContract } from "./capabilities/contract-upgrade.ts";
 import { RealityTraceObligation } from "./adapters/realitytrace-obligation.ts";
 import { listPending, readPending, terminate, updatePending, type PendingIntent } from "./capabilities/pending-intent.ts";
 import { type ObligationDeps, ObligationRefusal, bindingGates, close as closeWindow, prepare as prepareObligation, verifyRun } from "./settlement/obligation.ts";
+import { isClosurePending, settleAwaitingClosure } from "./settlement/settle-awaiting-closure.ts";
 import { windowOpen } from "./domain/expectation.ts";
 import type { StructuralChoice } from "./domain/frame.ts";
 import type { CandidateOperation } from "./domain/navigation.ts";
@@ -643,8 +644,12 @@ export async function createApplication(
     const seaForge = governance.authority as Partial<SettlementAuthority> | undefined;
     const worldRef = (await governedInvocationOf(intentId).then((inv) => (inv ? authorityOf(inv)?.worldRef : undefined))) ?? world.cognateWorldRef;
     if (typeof seaForge?.settle !== "function") return recordSettlementFor(intentId, { status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason: "the configured authority cannot settle" });
-    const settled = await seaForge.settle(pending.operation_id!, worldRef);
+    // "Settlement is pending" means SEA-Forge has not recorded the closure yet: wait for it (bounded by window close + grace), never refuse.
+    const settle = seaForge.settle.bind(seaForge);
+    const deadlineAt = Date.parse(pending.window!.closes_at) +(obligationDeps.settlement?.close_grace_s ?? 0) * 1000;
+    const settled = await settleAwaitingClosure(() => settle(pending.operation_id!, worldRef), { deadlineAt });
     if (!settled.ok) {
+      if (isClosurePending(settled)) return recordSettlementFor(intentId, { status: "pending", final: false, envelope_id: null, ledger_entry: null, reason: "settlement is pending: the closure is not recorded yet" });
       return recordSettlementFor(intentId, { status: settled.errorClass === "unreachable" ? "unavailable" : "refused", final: false, envelope_id: null, ledger_entry: null, reason: `SEA-Forge: ${settled.errorClass}: ${settled.error}` });
     }
     const ext = (settled.envelope.extensions as Record<string, Record<string, unknown>> | undefined)?.["godspeed.settlement_packet"] ?? {};
