@@ -187,9 +187,21 @@ export async function seaForgeSettlement(c: Cell, operationId: string): Promise<
   return seaForgeCall(c.socket, { verb: "authority_settle", operation_id: operationId, request_id: `test:${operationId}`, actor: { actor_id: "cognate-service", role: "service" } }, 30_000);
 }
 
+/**
+ * Wait until SEA-Forge's closure (C) is recorded on the pending operation, or it reached a terminal state.
+ * Observes the pending record instead of sleeping a fixed pad past window close.
+ */
+export async function awaitClosureRecorded(c: Cell, intentId: string, timeoutMs = 30_000) {
+  const until = Date.now() + timeoutMs;
+  for (;;) {
+    const pending = (await readPending(c.app.runtime.runtime.store, c.app.caller.tenant, intentId))?.pending;
+    if (!pending || pending.closure || pending.terminal) return pending;
+    if (Date.now() > until) throw new Error(`closure not recorded for ${intentId} within ${timeoutMs} ms`);
+    await Bun.sleep(25);
+  }
+}
+
 export async function settleAfterClose(c: Cell, intentId: string) {
-  const pending = (await readPending(c.app.runtime.runtime.store, c.app.caller.tenant, intentId))!.pending;
-  const wait = Date.parse(pending.window!.closes_at) - Date.now() + 500;
-  if (wait > 0) await Bun.sleep(wait);
+  await awaitClosureRecorded(c, intentId);
   return c.app.settleNavigationIntent(intentId);
 }

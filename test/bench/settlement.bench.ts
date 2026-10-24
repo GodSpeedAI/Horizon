@@ -12,7 +12,7 @@ import { cpus, homedir, release, totalmem, type } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import type { PendingIntent } from "../../src/capabilities/pending-intent.ts";
 import { readPending } from "../../src/capabilities/pending-intent.ts";
-import { BIN, BWRAP, RECORD, RT, WINDOW_S, type Cell, cell, ensureVerifier, expectation, rtRows, runCleanups, settleAfterClose, seaForgeSettlement } from "../support/j02r2-rig.ts";
+import { BIN, BWRAP, RECORD, RT, WINDOW_S, type Cell, awaitClosureRecorded, cell, ensureVerifier, expectation, rtRows, runCleanups, settleAfterClose, seaForgeSettlement } from "../support/j02r2-rig.ts";
 
 const REPO = resolve(import.meta.dir, "../..");
 process.chdir(REPO); // the rig reads domain/ and scripts/ relative to the repo root
@@ -171,10 +171,8 @@ async function main(): Promise<void> {
       const tCommit = Date.now();
       const id = commit.intent.intent_id;
       sample.intent_id = id;
-      const pendingAtCommit = (await readPending(store, tenant, id))!.pending;
-      // Same wait as settleAfterClose (the rig), timed from the window close.
-      const wait = Date.parse(pendingAtCommit.window!.closes_at) - Date.now() + 500;
-      if (wait > 0) await Bun.sleep(wait);
+      // Same wait as settleAfterClose (the rig): until SEA-Forge's closure is recorded, not a fixed pad.
+      await awaitClosureRecorded(c, id);
       const tSettle = Date.now();
       const settlement = await c.app.settleNavigationIntent(id);
       const tEnd = Date.now();
