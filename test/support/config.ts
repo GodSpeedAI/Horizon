@@ -4,7 +4,7 @@
  * store path inside the application (the defect the T04 verdict called F5).
  */
 export const PINNED_WORLD_REF =
-  "world:horizon@sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0";
+  "world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290";
 
 export const RESEARCH_COMMAND = ["uv", "run", "--project", "research", "python", "-m", "horizon_research.contract"];
 
@@ -34,16 +34,25 @@ export function horizonDocument(options: {
   };
 }
 
+/** A TOML value: strings, numbers and booleans as literals, arrays inline, objects as inline tables. */
+function tomlValue(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(tomlValue).join(", ")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{ ${Object.entries(value).map(([key, inner]) => `${JSON.stringify(key)} = ${tomlValue(inner)}`).join(", ")} }`;
+  }
+  return JSON.stringify(value);
+}
+
 export function toToml(document: Record<string, unknown>): string {
   const lines: string[] = [];
   for (const [key, value] of Object.entries(document)) {
     if (value && typeof value === "object" && !Array.isArray(value)) continue;
-    lines.push(`${key} = ${JSON.stringify(value)}`);
+    lines.push(`${key} = ${tomlValue(value)}`);
   }
   for (const [key, value] of Object.entries(document)) {
     if (!value || typeof value !== "object" || Array.isArray(value)) continue;
     lines.push(`\n[${key}]`);
-    for (const [inner, innerValue] of Object.entries(value)) lines.push(`${inner} = ${JSON.stringify(innerValue)}`);
+    for (const [inner, innerValue] of Object.entries(value)) lines.push(`${inner} = ${tomlValue(innerValue)}`);
   }
   return lines.join("\n");
 }

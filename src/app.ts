@@ -8,11 +8,20 @@ import { loadConfig } from "./config/load.ts";
 import type { LoadedConfig } from "./config/types.ts";
 import { createHorizonRuntime, type HorizonRuntime } from "./runtime/create.ts";
 import { appendIntentAttempt, appendIntentRecord, createFrameRegister, NAVIGATION_INTENT_COMMIT, navigationIntentComponent, readIntentRecords, type FrameRegister, type IntentAttempt } from "./capabilities/navigation-intent.ts";
+import { CONTRACT_VERSION, contractVersionOf } from "./capabilities/capacity-ledger.ts";
+import { activateContract } from "./capabilities/contract-upgrade.ts";
+import { RealityTraceObligation } from "./adapters/realitytrace-obligation.ts";
+import { listPending, readPending, terminate, updatePending, type PendingIntent } from "./capabilities/pending-intent.ts";
+import { type ObligationDeps, ObligationRefusal, bindingGates, close as closeWindow, prepare as prepareObligation, verifyRun } from "./settlement/obligation.ts";
+import { windowOpen } from "./domain/expectation.ts";
+import type { StructuralChoice } from "./domain/frame.ts";
+import type { CandidateOperation } from "./domain/navigation.ts";
+import type { ObservedPayment } from "./domain/payment.ts";
 import { structuralObservationAgent, healthAgent, HEALTH_AGENT, type StructuralObservationRequest } from "./agents/health.ts";
 import { navigationCommitAgent, NAVIGATION_COMMIT_AGENT, type NavigationCommitOutput } from "./agents/navigation-commit.ts";
-import { approvalAuthorityFromEnv, resolveApproval, type ApprovalAuthority } from "./adapters/sea-forge-approvals.ts";
+import { approvalAuthorityFromEnv, resolveApproval, seaForgeCall, type ApprovalAuthority } from "./adapters/sea-forge-approvals.ts";
 import { authorityOf, defaultRealityTraceRepo, observationOutbox, realityTraceFromEnv, RealityTraceEvidence, type GovernedInvocation, type RealityTraceConfig, type SettlementAuthority } from "./adapters/settlement.ts";
-import { appendSettlement, latestSettlement, type ExecutionRecord, type NavigationSettlement, type SettlementReference } from "./capabilities/navigation-settlement.ts";
+import { appendSettlement, latestSettlement, type ExecutionRecord, type NavigationSettlement, type RealityTraceObservation, type SettlementReference } from "./capabilities/navigation-settlement.ts";
 import type { Json } from "@godspeedai/cognate-events";
 import type { RunView } from "@godspeedai/cognate-runtime-api";
 import { buildStructuralFrame, type NavigationFrameV1, type NavigationIntentRecord } from "./domain/frame.ts";
@@ -136,7 +145,8 @@ export interface HorizonApplication {
       readonly arguments?: Omit<DebuggerArguments, "operation">;
     },
   ): Promise<{ readonly frame: NavigationFrameV2; readonly debugger: WorkspaceDebugger; readonly retrieval: WorkspaceRetrieval | null }>;
-  commitNavigationIntent(request: { readonly operationRef: string; readonly intentId?: string }): Promise<IntentCommit>;
+  /** `expectation` is the expected outcome (REQ-NAV-011) a bound operation that requires settlement must carry. */
+  commitNavigationIntent(request: { readonly operationRef: string; readonly intentId?: string; readonly expectation?: unknown }): Promise<IntentCommit>;
   /**
    * Submit a pre-built intent (e.g. one a surface composed): same validation and audit. With SEA-Forge
    * governance the commit runs as a governed Cognate run; an escalation throws `AwaitingAuthorityError`.
@@ -203,6 +213,8 @@ export async function createApplication(
      * settlement references say RealityTrace is unavailable.
      */
     readonly realityTrace?: RealityTraceConfig | null;
+    /** The SEA-Forge socket for `authority_closure`. Defaults to the approvals socket or `COGNATE_SEA_FORGE_SOCKET`. */
+    readonly seaForgeSocket?: string;
   } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath);
@@ -222,18 +234,68 @@ export async function createApplication(
       : options.realityTrace === null
         ? undefined
         : (options.realityTrace ?? realityTraceFromEnv(process.env, defaultRealityTraceRepo(options.storePath ?? process.env.HORIZON_STORE ?? loaded.config.runtime_store)));
+  // HORIZON-001 1.1.0: bound operations, capacity and the obligation flow (SPEC-CR-002).
+  const bindingFor = (operationRef: string) => loaded.config.operations.find((binding) => binding.operation_ref === operationRef);
+  const obligationDeps: ObligationDeps = {
+    store: () => runtime.runtime.store,
+    tenant: caller.tenant,
+    // Its own repository in the same RealityTrace home, so SEA-Forge reads both through one data home.
+    realityTrace: realityTrace ? new RealityTraceObligation({ bin: realityTrace.bin, dataHome: realityTrace.dataHome, stateHome: realityTrace.stateHome, repoDir: `${realityTrace.repoDir}-obligations` }) : null,
+    settlement: loaded.config.settlement ?? null,
+    allowances: loaded.config.capacity,
+    settlementConfigured: governance.mode === "sea-forge" && realityTrace !== undefined,
+    now: () => new Date(),
+  };
   const runtime: HorizonRuntime = await createHorizonRuntime(loaded.config, world, {
     caller,
     ...(options.storePath ? { storePath: options.storePath } : {}),
     components: [navigationIntentComponent(frames)],
-    agents: [structuralObservationAgent(frames), navigationCommitAgent(() => runtime.runtime.store)],
+    agents: [structuralObservationAgent(frames), navigationCommitAgent(() => runtime.runtime.store, { bindingFor, deps: obligationDeps })],
     ...(options.contextAdapter === undefined ? {} : { contextAdapter: options.contextAdapter }),
     governance,
     // The observation commits with the governed invocation itself (the outbox), so it cannot be lost.
     ...(realityTrace ? { outboxFor: observationOutbox(NAVIGATION_INTENT_COMMIT.id) } : {}),
   });
+  // HORIZON-001 1.1.0: suspend pending v1 commit runs and mark the store before anything is served.
+  await activateContract(runtime.runtime.store, new Date());
   const evidence = realityTrace ? new RealityTraceEvidence(runtime.runtime.store, realityTrace) : undefined;
   let issued: FrameView | null = null;
+  let boundChoices: readonly StructuralChoice[] = [];
+  const windowTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const closureSocket = options.seaForgeSocket ?? approvals?.socketPath ?? process.env.COGNATE_SEA_FORGE_SOCKET?.trim() ?? "";
+
+  /**
+   * Bound operations as frame choices. At frame time no expectation exists, so settlement readiness is assessed
+   * with a well-formed placeholder naming the binding's template (template, digests, configuration); the
+   * concrete expectation is assessed when the intent is committed.
+   */
+  async function refreshBoundChoices(): Promise<void> {
+    const choices: StructuralChoice[] = [];
+    for (const binding of loaded.config.operations) {
+      const placeholder = binding.verifier
+        ? { modality: "obligation", statement: "-", refuted_by: "-", irrelevant: [], unaccounted: [], verifier: { template_ref: `${binding.verifier.template_id}@${binding.verifier.version}` }, window_s: 60 }
+        : undefined;
+      const gates = await bindingGates(obligationDeps, binding, placeholder);
+      const failing = (Object.entries(gates) as [string, { verdict: string; reason?: string }][]).filter(([, gate]) => gate.verdict !== "pass");
+      const blocked = failing.find(([, gate]) => gate.verdict === "fail");
+      choices.push({
+        operation_ref: binding.operation_ref,
+        label: binding.label,
+        assessment: {
+          status: blocked ? "blocked" : failing.length > 0 ? "unknown" : "available",
+          first_blocker: failing.length > 0 ? `${failing[0]![0]}: ${failing[0]![1].reason ?? failing[0]![1].verdict}` : null,
+          reversibility: binding.reversibility,
+        },
+      });
+    }
+    boundChoices = choices;
+  }
+  await refreshBoundChoices();
+  // Resume stored windows. A restart mid-window resumes the same window; a window that closed while Horizon was
+  // down is closed late, which SEA-Forge settles unresolved (C cannot be proven on time), never from late evidence.
+  for (const pending of await listPending(runtime.runtime.store, caller.tenant)) {
+    if (!pending.terminal && pending.stage === "executed") scheduleClose(pending);
+  }
 
   /** Issue a frame for the current request and register it as the one an intent may name. */
   function issueFrame(checkpointRef = checkpointRefOf(runtime.storePath)): FrameView {
@@ -242,6 +304,7 @@ export async function createApplication(
       observerRef: caller.actor.id,
       world,
       checkpointRef,
+      bound: boundChoices,
       ...(research.kind === "research"
         ? {}
         : { availability: { status: "unknown" as const, firstBlockers: { "horizon.research.health": `research_source: ${research.code}` } } }),
@@ -266,7 +329,7 @@ export async function createApplication(
     try {
       run = await runtime.runtime.service.startRun(caller, {
         agent: NAVIGATION_COMMIT_AGENT.id,
-        input: { intent } as unknown as Json,
+        input: { intent, contract_version: CONTRACT_VERSION } as unknown as Json,
         idempotencyKey: `commit:${intent.intent_id}`,
       });
     } catch (error) {
@@ -297,6 +360,7 @@ export async function createApplication(
     if (view.status === "completed") {
       // The run audited its own acceptance, in the step that wrote the record.
       const out = view.output as unknown as NavigationCommitOutput;
+      await afterExecution(intent.intent_id);
       return {
         intent,
         result: { intent_id: out.intent_id, ...(out.correlation_ref ? { correlation_ref: out.correlation_ref } : {}) },
@@ -340,10 +404,57 @@ export async function createApplication(
     return settleCommitRun(intent, await runOutcome(run.runId, terminal));
   }
 
+  /** Append a settlement record for an executed intent, keeping the RealityTrace observation already recorded. */
+  async function recordSettlementFor(intentId: string, reference: SettlementReference, observed?: RealityTraceObservation | null): Promise<NavigationSettlement> {
+    const store = runtime.runtime.store;
+    const prior = await latestSettlement(store, caller.tenant, intentId);
+    const committed = (await readIntentRecords(store)).find((entry) => entry.record.intent_id === intentId && entry.event.tenant === caller.tenant);
+    if (!committed) throw new Error(`SETTLEMENT: intent ${intentId} was never executed`);
+    const invocation = await governedInvocationOf(intentId);
+    const authority = invocation ? authorityOf(invocation) : undefined;
+    const pendingObserved = (await readPending(store, caller.tenant, intentId))?.pending.observed;
+    const settlement: NavigationSettlement = {
+      intent_id: intentId,
+      execution_record: { record_event_id: committed.event.eventId, position: committed.event.position, invocation_event_id: invocation?.eventId ?? null, operation_id: authority?.operationId ?? null },
+      realitytrace_observation: observed ?? prior?.realitytrace_observation ?? null,
+      settlement_reference: reference,
+      ...(pendingObserved ? { observed_payment: pendingObserved } : {}),
+      at: new Date().toISOString(),
+    };
+    await appendSettlement(store, { settlement, tenant: caller.tenant, scopeId: `horizon-${caller.tenant}` });
+    return settlement;
+  }
+
+  /** The execution trace, as RealityTrace recorded it, submitted to SEA-Forge: SEA-Forge's execution floor. */
+  async function submitExecutionEvidence(intentId: string, invocation: GovernedInvocation, authority: NonNullable<ReturnType<typeof authorityOf>>): Promise<void> {
+    const seaForge = governance.authority as Partial<SettlementAuthority> | undefined;
+    if (!evidence || typeof seaForge?.submitEvidence !== "function") throw new Error("RealityTrace and SEA-Forge evidence submission are both required");
+    const prior = await latestSettlement(runtime.runtime.store, caller.tenant, intentId);
+    if (prior?.realitytrace_observation) return;
+    const targetRef = await evidence.observe(invocation);
+    const derived = await evidence.evidenceFor(targetRef);
+    const packet = await evidence.packet(authority.worldRef, authority, derived);
+    const receipt = await seaForge.submitEvidence(packet);
+    if (!receipt.ok) throw new Error(`SEA-Forge refused the execution evidence: ${receipt.errorClass}: ${receipt.error}`);
+    await recordSettlementFor(
+      intentId,
+      { status: "pending", final: false, envelope_id: null, ledger_entry: null, reason: "executed; the window is open" },
+      { target_ref: targetRef, sxr_observation_id: derived.sxrObservationId, evidence_id: derived.evidenceId, evidence_packet_id: receipt.envelopeId, evidence_ledger_entry: receipt.ledgerEntry },
+    );
+  }
+
   async function settleNavigationIntent(intentId: string): Promise<NavigationSettlement> {
     const store = runtime.runtime.store;
     const prior = await latestSettlement(store, caller.tenant, intentId);
     if (prior?.settlement_reference.final) return prior;
+    // A bound operation settles through its obligation flow (or as not_required), never the evidence-item rule.
+    const obligationPending = await readPending(store, caller.tenant, intentId);
+    if (obligationPending) {
+      const settled = await closeAndSettle(intentId);
+      const latest = settled ?? (await latestSettlement(store, caller.tenant, intentId));
+      if (latest) return latest;
+      throw new Error(`SETTLEMENT: intent ${intentId} has not executed (${obligationPending.pending.terminal ? `${obligationPending.pending.terminal.outcome}: ${obligationPending.pending.terminal.reason ?? ""}` : obligationPending.pending.stage})`);
+    }
     const committed = (await readIntentRecords(store)).find((entry) => entry.record.intent_id === intentId && entry.event.tenant === caller.tenant);
     if (!committed) throw new Error(`SETTLEMENT: intent ${intentId} was never committed`);
     let execution: ExecutionRecord = { record_event_id: committed.event.eventId, position: committed.event.position, invocation_event_id: null, operation_id: null };
@@ -353,6 +464,10 @@ export async function createApplication(
       await appendSettlement(store, { settlement, tenant: caller.tenant, scopeId: `horizon-${caller.tenant}` });
       return settlement;
     };
+    // A v1 intent stays readable and is never backfilled: it carries no expected outcome to settle against.
+    if (contractVersionOf(committed.record) === 1) {
+      return record({ status: "unsettled", final: true, envelope_id: null, ledger_entry: null, reason: "contract_version 1: no expected outcome" });
+    }
     const unavailable = (reason: string) => record({ status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason });
     const refused = (reason: string) => record({ status: "refused", final: false, envelope_id: null, ledger_entry: null, reason });
 
@@ -422,6 +537,7 @@ export async function createApplication(
         },
         tenant: caller.tenant,
         scopeId: `horizon-${caller.tenant}`,
+        contract: { expectation: null, threshold: null, window: null },
       });
     } catch (error) {
       // duplicate_intent: the id was already committed with different input; audited like any refusal.
@@ -429,20 +545,119 @@ export async function createApplication(
       throw error;
     }
     await audit(intent, "accepted", null);
+    await afterExecution(intent.intent_id);
     return { intent, result, position: recorded.position, eventId: recorded.eventId };
   }
 
   /** Source → frame → typed intent → commit. The route never supplies an observer. */
-  async function commitNavigationIntent(request: { readonly operationRef: string; readonly intentId?: string }): Promise<IntentCommit> {
+  async function commitNavigationIntent(request: { readonly operationRef: string; readonly intentId?: string; readonly expectation?: unknown }): Promise<IntentCommit> {
+    const binding = bindingFor(request.operationRef);
+    if (binding) await refreshBoundChoices();
     const { frame } = issueFrame();
-    return submitIntent(
-      buildCommitIntent({
-        frame,
-        operationRef: request.operationRef,
-        intentId: request.intentId ?? randomUUID(),
-      }),
-    );
+    const intent = buildCommitIntent({ frame, operationRef: request.operationRef, intentId: request.intentId ?? randomUUID() });
+    if (binding) {
+      // Steps 1-2: gates, RealityTrace threshold, then the pending intent and its reservation, atomically.
+      try {
+        await prepareObligation(obligationDeps, binding, intent, request.expectation);
+      } catch (error) {
+        if (error instanceof ObligationRefusal || error instanceof IntentError) await audit(intent, "refused", error.message);
+        throw error;
+      } finally {
+        await refreshBoundChoices();
+      }
+    } else if (request.expectation !== undefined) {
+      throw new IntentError("invalid_argument", `INTENT: ${request.operationRef} is not a bound operation; it takes no expected outcome`);
+    }
+    return submitIntent(intent);
   }
+
+  /**
+   * Steps 5-6 after the commit run executed: an exempt intent settles not_required; otherwise record the
+   * SEA-Forge operation, submit the execution evidence (SEA-Forge's execution floor), run one verification and
+   * schedule the closure at window close. Idempotent: only an intent still awaiting authority moves on.
+   */
+  async function afterExecution(intentId: string): Promise<void> {
+    const store = runtime.runtime.store;
+    const found = await readPending(store, caller.tenant, intentId);
+    if (!found || found.pending.stage !== "awaiting_authority") return;
+    const pending = found.pending;
+    const binding = bindingFor(pending.operation_ref);
+    if (!pending.expectation || !binding) {
+      await terminate(store, caller.tenant, intentId, "not_required", "read_only: nothing to settle", new Date());
+      await recordSettlementFor(intentId, { status: "not_required", final: true, envelope_id: null, ledger_entry: null, reason: "read_only: nothing to settle" });
+      await refreshBoundChoices();
+      return;
+    }
+    const invocation = await governedInvocationOf(intentId);
+    const authority = invocation ? authorityOf(invocation) : undefined;
+    if (!invocation || !authority) {
+      await recordSettlementFor(intentId, { status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason: "the commit carries no recorded SEA-Forge decision" });
+      return;
+    }
+    const steering = await observedSteeringAttention(intentId).catch(() => null);
+    const executed = await updatePending(store, caller.tenant, intentId, () => ({ stage: "executed", operation_id: authority.operationId, ...(steering ? { observed: [steering] } : {}) }));
+    try {
+      await submitExecutionEvidence(intentId, invocation, authority);
+    } catch (error) {
+      await recordSettlementFor(intentId, { status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason: `execution evidence: ${error instanceof Error ? error.message : String(error)}` });
+    }
+    await verifyRun(obligationDeps, binding, executed);
+    scheduleClose(executed);
+  }
+
+  function scheduleClose(pending: PendingIntent): void {
+    if (!pending.window || windowTimers.has(pending.intent.intent_id)) return;
+    const delay = Math.max(0, Date.parse(pending.window.closes_at) - Date.now() + 50);
+    const timer = setTimeout(() => {
+      windowTimers.delete(pending.intent.intent_id);
+      void closeAndSettle(pending.intent.intent_id).catch(() => {});
+    }, delay);
+    windowTimers.set(pending.intent.intent_id, timer);
+  }
+
+  /** Steps 7-8: SEA-Forge records C at window close, then settles from RealityTrace's ledger. */
+  async function closeAndSettle(intentId: string): Promise<NavigationSettlement | null> {
+    const store = runtime.runtime.store;
+    const found = await readPending(store, caller.tenant, intentId);
+    if (!found) return null;
+    let pending = found.pending;
+    if (pending.terminal) return latestSettlement(store, caller.tenant, intentId);
+    if (pending.stage !== "executed" || !pending.window || !pending.operation_id) return latestSettlement(store, caller.tenant, intentId);
+    if (windowOpen(pending.window, new Date())) {
+      scheduleClose(pending);
+      return recordSettlementFor(intentId, { status: "pending", final: false, envelope_id: null, ledger_entry: null, reason: "the window is still open" });
+    }
+    try {
+      pending = await closeWindow(obligationDeps, pending, {
+        closure: async (operationId, discrimination, verifications) => {
+          if (!closureSocket || !approvals) throw new Error("no SEA-Forge socket is configured for authority_closure");
+          const response = await seaForgeCall(closureSocket, { verb: "authority_closure", operation_id: operationId, discrimination_observation_id: discrimination, verification_observation_ids: verifications, request_id: `horizon:closure:${operationId}`, actor: approvals.service }, 30_000);
+          if (response.ok !== true) throw new Error(`SEA-Forge refused the closure: ${String(response.error ?? response.error_class)}`);
+          return { b: Number(response.b), c: Number(response.c), committed_at: String(response.committed_at), on_time: response.on_time === true };
+        },
+      });
+    } catch (error) {
+      // Without a recorded closure SEA-Forge still settles once deadline + grace passed: unresolved, rejected.
+      await recordSettlementFor(intentId, { status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason: `closure: ${error instanceof Error ? error.message : String(error)}` });
+    }
+    const seaForge = governance.authority as Partial<SettlementAuthority> | undefined;
+    const worldRef = (await governedInvocationOf(intentId).then((inv) => (inv ? authorityOf(inv)?.worldRef : undefined))) ?? world.cognateWorldRef;
+    if (typeof seaForge?.settle !== "function") return recordSettlementFor(intentId, { status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason: "the configured authority cannot settle" });
+    const settled = await seaForge.settle(pending.operation_id!, worldRef);
+    if (!settled.ok) {
+      return recordSettlementFor(intentId, { status: settled.errorClass === "unreachable" ? "unavailable" : "refused", final: false, envelope_id: null, ledger_entry: null, reason: `SEA-Forge: ${settled.errorClass}: ${settled.error}` });
+    }
+    const ext = (settled.envelope.extensions as Record<string, Record<string, unknown>> | undefined)?.["godspeed.settlement_packet"] ?? {};
+    const epistemic = typeof ext.epistemic_status === "string" ? (ext.epistemic_status as "supported" | "contradicted" | "inconsistent" | "unresolved") : undefined;
+    const reference = { status: settled.status, final: settled.final, envelope_id: String(settled.envelope.envelope_id), ledger_entry: settled.ledgerEntry, reason: null, ...(epistemic ? { epistemic_status: epistemic } : {}) };
+    const recorded = await recordSettlementFor(intentId, reference);
+    if (settled.final) {
+      await terminate(store, caller.tenant, intentId, settled.status, epistemic ?? null, new Date());
+      await refreshBoundChoices();
+    }
+    return recorded;
+  }
+
 
   /** Start the structural observation run for one committed intent (no raw frame cast). */
   async function startObservation(commit: IntentCommit): Promise<RunView> {
@@ -583,8 +798,72 @@ export async function createApplication(
         projection: read.view,
         declared,
       },
+      {},
+      await boundCandidates(),
     ).frame;
     return { frame, projection: read.view };
+  }
+
+  /**
+   * Bound operations as T07 candidates with their real gates: payment and settlement_access from the binding
+   * and the capacity ledger, authority deferred to invocation (SEA-Forge has no evaluate-only preview), and the
+   * payment the binding declares beside what owners observed for its latest committed intent (REQ-NAV-010).
+   */
+  async function boundCandidates(): Promise<readonly CandidateOperation[]> {
+    const pendings = await listPending(runtime.runtime.store, caller.tenant);
+    const out: CandidateOperation[] = [];
+    for (const binding of loaded.config.operations) {
+      const basis = `binding:${binding.operation_ref}`;
+      const placeholder = binding.verifier
+        ? { modality: "obligation", statement: "-", refuted_by: "-", irrelevant: [], unaccounted: [], verifier: { template_ref: `${binding.verifier.template_id}@${binding.verifier.version}` }, window_s: 60 }
+        : undefined;
+      const gates = await bindingGates(obligationDeps, binding, placeholder);
+      const pass = { verdict: "pass" as const, basis_ref: basis };
+      const governed = governance.mode === "sea-forge";
+      const latest = pendings.filter((pending) => pending.operation_ref === binding.operation_ref && (pending.observed?.length ?? 0) > 0).at(-1);
+      out.push({
+        operation_ref: binding.operation_ref,
+        label: binding.label,
+        kind: "move",
+        responsibility: "commit",
+        reversibility: binding.reversibility,
+        gates: {
+          visibility: pass,
+          reach: pass,
+          payment: gates.payment,
+          authority: governed
+            ? { verdict: "pass", authority_outcome: "deferred_to_invocation", basis_ref: "sea-forge:authority_request" }
+            : binding.reversibility === "read_only"
+              ? { verdict: "pass", authority_outcome: "not_applicable", basis_ref: basis }
+              : { verdict: "unknown", authority_outcome: "unknown", reason: "no SEA-Forge authority is configured", basis_ref: basis },
+          capability: pass,
+          recovery: pass,
+          settlement_access: gates.settlement_access,
+        },
+        payment: { entries: binding.payment, ...(latest?.observed ? { observed: latest.observed } : {}) },
+        expected_evidence: binding.verifier ? [`verifier:${binding.verifier.template_id}@${binding.verifier.version}`] : [],
+        escalation: governed ? { behavior: "approval", approval_ref: "sea-forge:authority_approval", note: "SEA-Forge may escalate to an operator's approval" } : { behavior: "none" },
+      });
+    }
+    return out;
+  }
+
+  /** REQ-NAV-010: the human authority decisions SEA-Forge recorded for the approvals this intent's commit waited on. */
+  async function observedSteeringAttention(intentId: string): Promise<ObservedPayment | null> {
+    if (!closureSocket || !approvals) return null;
+    const run = (await runtime.runtime.service.listRuns(caller, { agent: NAVIGATION_COMMIT_AGENT.id })).find((r) => (r.input as { intent?: { intent_id?: unknown } } | null)?.intent?.intent_id === intentId);
+    if (!run) return null;
+    const waited = new Set(
+      (await runtime.runtime.service.listContinuations(caller, { runId: run.runId }))
+        .filter((c) => c.type === "governance-approval")
+        .map((c) => (c.condition as { approvalId?: unknown } | null)?.approvalId)
+        .filter((id): id is string => typeof id === "string"),
+    );
+    const listed = await seaForgeCall(closureSocket, { verb: "authority_approvals", actor: approvals.service }, 15_000);
+    if (listed.ok !== true || !Array.isArray(listed.approvals)) return null;
+    const decided = (listed.approvals as { approval_id?: unknown; resolved_by?: unknown }[]).filter((a) => typeof a.approval_id === "string" && waited.has(a.approval_id) && a.resolved_by !== null && a.resolved_by !== undefined);
+    const unit = bindingFor((run.input as { intent: { operation_ref: string } }).intent.operation_ref)?.payment.find((entry) => entry.currency === "steering_attention" && entry.basis === "declared_bound")?.unit ?? "decisions";
+    return { currency: "steering_attention", unit, amount: decided.length, source_ref: "sea-forge:authority_approvals" };
   }
 
   async function navigationFrame(options: NavigationOptions = {}): Promise<NavigationFrameV2> {
@@ -743,7 +1022,7 @@ export async function createApplication(
               return Response.json({ code: "invalid_argument", message: "INTENT: operation_ref is required" }, { status: 400 });
             }
             try {
-              return Response.json(await commitNavigationIntent({ operationRef: record.operation_ref }));
+              return Response.json(await commitNavigationIntent({ operationRef: record.operation_ref, ...(record.expected_outcome === undefined ? {} : { expectation: record.expected_outcome }) }));
             } catch (error) {
               if (!(error instanceof AwaitingAuthorityError)) throw error;
               // Accepted for a decision, not committed: the operator answers it at SEA-Forge.
@@ -912,6 +1191,8 @@ export async function createApplication(
       });
     },
     async close() {
+      for (const timer of windowTimers.values()) clearTimeout(timer);
+      windowTimers.clear();
       await runtime.runtime.close();
     },
   };

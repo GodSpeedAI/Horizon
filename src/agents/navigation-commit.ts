@@ -2,6 +2,18 @@ import type { AgentDefinition } from "@godspeedai/cognate-runtime-api";
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
 import type { CommitIntentInput, CommitIntentOutput } from "../domain/intent.ts";
 import { appendIntentAttempt, appendIntentRecord, NAVIGATION_INTENT_COMMIT } from "../capabilities/navigation-intent.ts";
+import { assertCurrentRunInput } from "../capabilities/contract-upgrade.ts";
+import { readPending } from "../capabilities/pending-intent.ts";
+import { windowOpen } from "../domain/expectation.ts";
+import type { OperationBindingConfig } from "../config/types.ts";
+import { type ObligationDeps, ObligationRefusal, claimsFor, discriminateRun } from "../settlement/obligation.ts";
+import { terminate } from "../capabilities/pending-intent.ts";
+
+/** What the commit run needs for a bound operation (HORIZON-001 1.1.0): its binding and the obligation flow. */
+export interface CommitObligation {
+  readonly bindingFor: (operationRef: string) => OperationBindingConfig | undefined;
+  readonly deps: ObligationDeps;
+}
 
 export const NAVIGATION_COMMIT_AGENT = {
   id: "horizon.navigation.commit",
@@ -32,20 +44,53 @@ export interface NavigationCommitOutput {
  * run resumed after a restart, or after a newer frame was issued, fails as a stale intent. An
  * approval never revives a stale frame.
  */
-export function navigationCommitAgent(store: () => DurableStore): AgentDefinition {
+export function navigationCommitAgent(store: () => DurableStore, obligation?: CommitObligation): AgentDefinition {
   return {
     id: NAVIGATION_COMMIT_AGENT.id,
     version: NAVIGATION_COMMIT_AGENT.version,
     async run(input, context) {
       const intent = readIntent(input);
-      const result = (await context.invoke(NAVIGATION_INTENT_COMMIT.id, intent as unknown as Json)) as unknown as CommitIntentOutput;
+      // A v1 run (started before the 1.1.0 upgrade) is suspended and never executes, even once approved.
+      assertCurrentRunInput(input, intent.intent_id);
+      const binding = obligation?.bindingFor(intent.operation_ref);
+      const pending = binding ? (await readPending(store(), context.tenant, intent.intent_id))?.pending : undefined;
+      if (binding && !pending) throw new Error(`INTENT: ${intent.operation_ref} is bound; its commit needs a pending intent`);
+      if (pending?.terminal) throw new ObligationRefusal(pending.terminal.reason ?? pending.terminal.outcome);
+      // Refused, terminal and consumed in a recorded step, so a replay never runs the effect it refused.
+      const refuseNow = async (refusal: string): Promise<never> => {
+        await context.step(`refuse`, async () => {
+          await terminate(store(), context.tenant, intent.intent_id, "refused", refusal, obligation!.deps.now());
+          return refusal;
+        });
+        throw new ObligationRefusal(refusal);
+      };
+      const windowExpired = () => pending?.window !== null && pending?.window !== undefined && !windowOpen(pending.window, obligation!.deps.now());
+      if (windowExpired()) await refuseNow("window expired");
+      const claims = pending && obligation ? claimsFor(pending, obligation.deps.settlement?.close_grace_s ?? 30) : undefined;
+      const result = (await context.invoke(NAVIGATION_INTENT_COMMIT.id, intent as unknown as Json, (claims ? { authorityClaims: claims } : undefined) as never)) as unknown as CommitIntentOutput;
       if (result?.intent_id !== intent.intent_id) throw new Error("INTENT: the commit answered for a different intent");
+      if (pending?.expectation && binding && obligation) {
+        // An approval that arrives after the window closed is refused before anything runs.
+        if (windowExpired()) await refuseNow("window expired");
+        const decided = await context.step("discriminate", async () => {
+          const { run, decision } = await discriminateRun(obligation.deps, binding, pending);
+          return { run, decision } as unknown as Json;
+        });
+        const decision = (decided as unknown as { decision: { proceed: boolean; refusal?: string } }).decision;
+        if (!decision.proceed) await refuseNow(decision.refusal ?? "discrimination unknown");
+      }
       const correlationRef = result.correlation_ref ?? null;
       const recorded = await context.step("record", async () => {
+        assertCurrentRunInput(input, intent.intent_id);
         const r = await appendIntentRecord(store(), {
           record: { ...intent, ...(correlationRef ? { correlation_ref: correlationRef } : {}) },
           tenant: context.tenant,
           scopeId: `horizon-${context.tenant}`,
+          contract: {
+            expectation: pending?.expectation ?? null,
+            threshold: pending?.threshold ? { id: pending.threshold.threshold_id, position: pending.threshold.position.ordinal } : null,
+            window: pending?.window ?? null,
+          },
         });
         return { event_id: r.eventId, position: r.position };
       });

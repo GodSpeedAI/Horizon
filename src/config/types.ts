@@ -1,3 +1,6 @@
+import type { VerifierTemplate } from "../domain/expectation.ts";
+import type { CapacityAllowance, PaymentEntry } from "../domain/payment.ts";
+
 export type DeploymentProfile = "local_operator" | "shared_remote";
 
 export interface IdentityConfig {
@@ -41,6 +44,32 @@ export interface HorizonConfig {
   readonly identity: IdentityConfig;
   readonly secrets: SecretsConfig;
   readonly transports: TransportConfig;
+  /** HORIZON-001 1.1.0: operator-owned capability bindings for operations beyond the structural moves. */
+  readonly operations: readonly OperationBindingConfig[];
+  /** REQ-NAV-009: allowances per (currency, unit); absent means no capacity is configured. */
+  readonly capacity: readonly CapacityAllowance[];
+  /** REQ-NAV-011/012: how verifiers are confined and how late a closure may be recorded. Absent: no settlement. */
+  readonly settlement?: SettlementConfig;
+}
+
+/** One operation's reviewed, versioned capability binding (SPEC-CR-002 §1, §4). */
+export interface OperationBindingConfig {
+  readonly operation_ref: string;
+  readonly label: string;
+  readonly reversibility: "read_only" | "reversible" | "compensable" | "irreversible" | "unknown";
+  /** `required` makes even a read_only operation require operational settlement. */
+  readonly settlement?: "required";
+  /** Declared bounds (and optional predictions); coverage is judged by the payment gate, not at load. */
+  readonly payment: readonly PaymentEntry[];
+  readonly verifier?: VerifierTemplate;
+  /** Where each pinned artifact lives on this host, by artifact name. */
+  readonly verifier_paths: Readonly<Record<string, string>>;
+}
+
+export interface SettlementConfig {
+  /** The confinement prefix every verifier runs under (e.g. an attested bubblewrap with a read-only view, no network). */
+  readonly launcher: readonly string[];
+  readonly close_grace_s: number;
 }
 
 export interface LoadedConfig {

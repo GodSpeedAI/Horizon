@@ -1,3 +1,4 @@
+import type { ObservedPayment } from "../domain/payment.ts";
 /**
  * J02 IS6: the evidence record for one committed navigation intent: `execution_record`,
  * `realitytrace_observation` and `settlement_reference` (behavioral/journeys/J02.yaml). Each
@@ -34,8 +35,10 @@ export interface SettlementReference {
    * SEA-Forge's answer (`settled` / `unsettled` / `rejected`), `refused` when SEA-Forge refused the
    * evidence or the settlement, or `unavailable` when it could not be asked.
    */
-  readonly status: "settled" | "unsettled" | "rejected" | "refused" | "unavailable";
+  readonly status: "settled" | "unsettled" | "rejected" | "refused" | "unavailable" | "not_required" | "pending";
   readonly final: boolean;
+  /** HORIZON-001 1.1.0 (REQ-NAV-012): SEA-Forge's epistemic status for an obligation; absent otherwise. */
+  readonly epistemic_status?: "supported" | "contradicted" | "inconsistent" | "unresolved";
   readonly envelope_id: string | null;
   readonly ledger_entry: string | null;
   readonly reason: string | null;
@@ -46,6 +49,8 @@ export interface NavigationSettlement {
   readonly execution_record: ExecutionRecord;
   readonly realitytrace_observation: RealityTraceObservation | null;
   readonly settlement_reference: SettlementReference;
+  /** REQ-NAV-010: the observed spend recorded with the settlement (steering_attention from SEA-Forge). */
+  readonly observed_payment?: readonly ObservedPayment[];
   readonly at: string;
 }
 

@@ -10,6 +10,7 @@
  * contributions are collected into one append-only region. An agent that claims `owner_pinned`
  * is still grouped by its actor role, so no input order can move the owner's decision.
  */
+import { formatPayment } from "../../domain/payment.ts";
 import type { NavigationChoice, NavigationFrame, ReversibilityClass } from "../../domain/navigation.ts";
 import { nextStep, plainReason } from "../sequential/controller.ts";
 import type { GuiView, ProjectedAction, ProjectedNode } from "../surface2/project.ts";
@@ -268,7 +269,7 @@ function isAgentNode(node: ProjectedNode): boolean {
 function choiceReview(choice: NavigationChoice): WorkspaceReview | null {
   if (choice.reversibility === "read_only") return null;
   const payment =
-    choice.payment === null ? "No payment is estimated." : `${choice.payment.estimate} (${choice.payment.provenance})`;
+    formatPayment(choice.payment);
   const escalation =
     choice.escalation === null
       ? "No escalation behaviour is declared."

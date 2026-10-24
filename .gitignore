@@ -27,3 +27,6 @@ tmp/
 .DS_Store
 .idea/
 .vscode/
+
+# Built verifier binaries (scripts/build-verifier.ts); bindings pin their sha256
+.horizon/

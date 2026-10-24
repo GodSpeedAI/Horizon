@@ -13,6 +13,7 @@
  *   - cancel and back change only this session, never the world;
  *   - known context is shown, not asked for again (REQ-UX-005, REQ-NAV-007).
  */
+import { formatPayment } from "../../domain/payment.ts";
 import {
   planContextSelection,
   type NavigationChoice,
@@ -302,10 +303,7 @@ function promptFor(
 }
 
 function reviewFor(frame: NavigationFrame, choice: NavigationChoice, simulate: boolean): ReviewPrompt {
-  const payment =
-    choice.payment === null
-      ? "No payment is estimated."
-      : `${choice.payment.estimate} (${choice.payment.provenance})`;
+  const payment = formatPayment(choice.payment);
   const escalation =
     choice.escalation === null
       ? "No escalation behaviour is declared."

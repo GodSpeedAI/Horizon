@@ -1,3 +1,5 @@
+import type { ExpectedOutcome, SettlementWindow } from "./expectation.ts";
+
 export type AffordanceStatus = "available" | "blocked" | "unknown" | "conflicted";
 export interface StructuralChoice {
   readonly operation_ref: string;
@@ -5,7 +7,7 @@ export interface StructuralChoice {
   readonly assessment: {
     readonly status: AffordanceStatus;
     readonly first_blocker: string | null;
-    readonly reversibility: "reversible" | "compensable" | "irreversible" | "unknown";
+    readonly reversibility: "read_only" | "reversible" | "compensable" | "irreversible" | "unknown";
   };
 }
 
@@ -40,6 +42,15 @@ export interface NavigationIntentRecord {
   readonly operation_ref: string;
   readonly authority_ref?: string;
   readonly correlation_ref?: string;
+  /** HORIZON-001 1.1.0 records carry 2; absent means 1. Readers refuse an unknown version. */
+  readonly contract_version?: number;
+  /** REQ-NAV-011: frozen with the intent; its digest is part of the duplicate check. */
+  readonly expected_outcome?: ExpectedOutcome | null;
+  readonly expectation_digest?: string | null;
+  /** RealityTrace threshold id and ledger position T, declared before authority was requested. */
+  readonly realitytrace_threshold?: { readonly id: string; readonly position: number } | null;
+  /** Window bounds, stored so they survive restarts. */
+  readonly window?: SettlementWindow | null;
 }
 
 export function buildStructuralFrame(options: {
@@ -53,6 +64,8 @@ export function buildStructuralFrame(options: {
    * never render as an affordance (REQ-NAV-001, INV-01).
    */
   readonly availability?: { readonly status: AffordanceStatus; readonly firstBlockers: Readonly<Record<string, string>> };
+  /** HORIZON-001 1.1.0: bound operations, each with the status its payment and settlement gates gave it. */
+  readonly bound?: readonly StructuralChoice[];
 }): NavigationFrameV1 {
   const availability = options.availability;
   const statusOf = (operationRef: string): { readonly status: AffordanceStatus; readonly first_blocker: string | null } => {
@@ -71,17 +84,22 @@ export function buildStructuralFrame(options: {
     focus_ref: "semantic:HorizonHost",
     case_ref: null,
     responsibility: "orient",
+    // Both structural moves only *check* things: their one effect is Horizon's own record of the intent and
+    // the observation run it starts, never a change to the world. They are read_only (owner decision
+    // 2026-10-23), so under HORIZON-001 1.1.0 they need no expected outcome and settle as not_required;
+    // a consequential operation still requires a binding, an expectation and SEA-Forge settlement.
     choices: [
       {
         operation_ref: "horizon.health",
         label: "Check the structural world and Cognate projection",
-        assessment: { ...statusOf("horizon.health"), reversibility: "reversible" },
+        assessment: { ...statusOf("horizon.health"), reversibility: "read_only" },
       },
       {
         operation_ref: "horizon.research.health",
         label: "Check the optional Python research subsystem contract",
-        assessment: { ...statusOf("horizon.research.health"), reversibility: "reversible" },
+        assessment: { ...statusOf("horizon.research.health"), reversibility: "read_only" },
       },
+      ...(options.bound ?? []),
     ],
   };
 }
