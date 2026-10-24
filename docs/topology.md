@@ -1,9 +1,16 @@
-# Horizon topology (T04 walking skeleton)
+# Horizon topology (T04 walking skeleton) — historical freeze record
 
-The spec owns what must be true and the plan owns settlement order. This record names
-only the executable substrate and its boundaries.
+> **Status: historical.** This is the topology record frozen at T04
+> (`T04-CR-001@2026-10-20`) and cited by the T04 evidence under `.agents/evidence/horizon/T04/`.
+> It is preserved as a freeze-time record, not maintained as current documentation.
+> For the current architecture (including T05–T10: the closed surface grammar, three
+> transports, operational object layer, navigation controller, and the seven-operation
+> world debugger), read **[architecture.md](architecture.md)**.
 
-## Component units
+The spec owns what must be true and the plan owns settlement order. The T04 record named
+only the executable substrate and its boundaries at that point in time.
+
+## Component units (as of the T04 freeze)
 
 | Unit | Path | Responsibility | Depends on |
 | --- | --- | --- | --- |
@@ -20,43 +27,34 @@ only the executable substrate and its boundaries.
 | Research subsystem | `research/` | Independent uv project with a lock file, typed JSON contract and pytest gate. No ML logic. | Python 3.12+ |
 | Verification | `scripts/`, `justfile` | Type/config check, boundary checks, IDM reference integrity, acceptance-claim polarity, adversarial teeth (including a memory-only runtime fake in an isolated tree), scoped gates. `just verify` is T04's complete gate. | Bun, Python, DomainForge CLI |
 
-## One-way dependencies
+## One-way dependencies (T04 rules, still enforced)
 
-`domain` ← `ui`; `domain` ← `app`. `adapters` → domain/external APIs. `capabilities` →
-adapters/domain; they write only through Cognate's own store. `agents` → runtime API and
-domain. `runtime` → capabilities/agents/projections. `app` →
-config/world/adapters/runtime. `config` does not import adapters, runtime or UI. `domain`
-does not import adapters, runtime or capabilities. `ui` does not import adapters or runtime.
+- `src/domain` imports nothing from adapters, runtime, or UI.
+- `src/ui` projects frames only; it holds no authority and no store access.
+- Adapters may depend on the domain; the domain never depends on adapters.
+- The research subsystem stays a typed subprocess contract with no ML claims.
 
-The canonical semantic authority is `.sea/interaction/`, exposed to Cognate tooling through
-the `domain` symlink. No second `.sea` tree is permitted. Cognate owns events, capability
-invocation and projection state; no second event history or product model is created.
-
-## Frozen and mutable surfaces
+## Frozen and mutable surfaces (T04 declaration, unchanged in effect)
 
 - Frozen inside a run: `.agents/specs/**`, `.agents/plans/**`, `requirements/ledger.yaml`,
   `.wayfinder/answer-key.md`, and the canonical `.sea` source after freeze.
 - Mutable: `src/**`, `scripts/**`, `test/**`, `research/**`, `config/**`, `justfile`,
   `docs/**`, and future task-specific surfaces.
 
-## Trust boundary
+## Trust boundary (T04 declaration)
 
-`local_operator` binds loopback transports only, derives the operator principal from the OS
-session, gives each agent a distinct `agent:` principal, and writes a fresh `0600` secret at
-every launch. `shared_remote` is refused unless a real identity provider is configured; the
-Product Actualizer loopback-token model is not reused as a remote trust model.
+Local operator profile: loopback binding, OS-session-derived principals, per-launch
+secret. This is a single-operator trust model, not a remote/multi-user security model.
 
-## Known release mismatch
+## Known release mismatch (at freeze)
 
-Cognate 0.6.1 `loadSemanticWorld` returns a `worldRef` derived by
-`Graph.worldRefFromIdentityJson`, while the pinned T01 identity is DomainForge's
-`semantic_closure_hash`. Both are recorded: `world_ref` is the canonical pinned reference;
-`cognate_world_ref` is the adapter's returned reference. The adapter asserts the closure
-hash, so a world change fails closed. This is recorded as debt D-011 and is not silently
-normalized.
+The pinned Cognate runtime release and the vendored 0.6.1 tarballs are the verified
+combination; later Cognate releases require re-verification rather than silent adoption.
+See [donors.md](donors.md) and `src/runtime/required-cognate.ts`.
 
-## Open behavior
+## Open behavior (at freeze; since settled by T05–T10)
 
-No navigation ranking, object query, live SEA-Forge authorization, Gauntlet execution,
-RealityTrace evidence or Product Actualizer model integration is claimed here. Their gates
-fail closed until their settlement tasks land.
+Surface semantics beyond the T04 seam, sequential rendering, the operational object
+layer, the navigation controller, the GUI workspace, and the world debugger were
+explicitly open at the freeze and are now documented in
+[subsystems/](documentation-map.md#subsystems-subsystems).

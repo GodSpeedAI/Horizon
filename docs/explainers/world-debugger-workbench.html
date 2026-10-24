@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Horizon — World Debugger Workbench & Epistemic Truth Explorer</title>
+  <style>
+    :root {
+      --bg: #070b12;
+      --surface: #0e1624;
+      --surface-raised: #152236;
+      --surface-border: #1f334d;
+      --text: #e2e8f0;
+      --text-muted: #8ba1b7;
+      --text-dim: #556c82;
+      --cyan: #38bdf8;
+      --cyan-soft: rgba(56, 189, 248, 0.12);
+      --emerald: #34d399;
+      --emerald-soft: rgba(52, 211, 153, 0.12);
+      --amber: #fbbf24;
+      --amber-soft: rgba(251, 191, 36, 0.12);
+      --rose: #f87171;
+      --rose-soft: rgba(248, 113, 113, 0.12);
+      --purple: #c084fc;
+      --purple-soft: rgba(192, 132, 252, 0.12);
+      --indigo: #818cf8;
+      --indigo-soft: rgba(129, 140, 248, 0.12);
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --radius: 8px;
+      --transition: 160ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.55;
+      min-height: 100vh;
+      padding: 24px 20px 80px;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    header.top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      border-bottom: 1px solid var(--surface-border);
+      padding-bottom: 20px;
+      margin-bottom: 28px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--purple-soft);
+      color: var(--purple);
+      border: 1px solid rgba(192, 132, 252, 0.3);
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    .tagline {
+      color: var(--text-muted);
+      font-size: 14px;
+      max-width: 780px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 10px;
+    }
+
+    .nav-links a {
+      color: var(--cyan);
+      text-decoration: none;
+      font-size: 12px;
+      font-family: var(--mono);
+      padding: 6px 12px;
+      border-radius: var(--radius);
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      transition: background var(--transition), border-color var(--transition);
+    }
+
+    .nav-links a:hover {
+      background: var(--surface-raised);
+      border-color: var(--cyan);
+    }
+
+    .formula-banner {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-left: 4px solid var(--purple);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .formula-statement {
+      font-size: 15px;
+      color: #fff;
+    }
+
+    .formula-statement strong {
+      color: var(--purple);
+      font-family: var(--mono);
+    }
+
+    .formula-meta {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+
+    @media (max-width: 1000px) {
+      .grid-2col { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--surface-border);
+      padding-bottom: 12px;
+    }
+
+    .panel-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-sub {
+      font-size: 12px;
+      color: var(--text-dim);
+      font-family: var(--mono);
+    }
+
+    .op-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .btn-tab {
+      background: var(--surface-raised);
+      color: var(--text-muted);
+      border: 1px solid var(--surface-border);
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: var(--mono);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .btn-tab:hover, .btn-tab.active {
+      color: #fff;
+      background: rgba(192, 132, 252, 0.15);
+      border-color: var(--purple);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    select, input[type="text"], input[type="number"] {
+      background: var(--bg);
+      color: #fff;
+      border: 1px solid var(--surface-border);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 13px;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+
+    select:focus, input[type="text"]:focus, input[type="number"]:focus {
+      border-color: var(--purple);
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .slider-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--purple);
+    }
+
+    .slider-val {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: #fff;
+      min-width: 24px;
+    }
+
+    .labels-legend {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 10px;
+      background: var(--surface-raised);
+      border: 1px solid var(--surface-border);
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: var(--mono);
+    }
+
+    .pill-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 10px;
+    }
+
+    .pill-recorded { background: var(--emerald-soft); color: var(--emerald); border: 1px solid rgba(52, 211, 153, 0.3); }
+    .pill-derived { background: var(--cyan-soft); color: var(--cyan); border: 1px solid rgba(56, 189, 248, 0.3); }
+    .pill-unknown { background: var(--amber-soft); color: var(--amber); border: 1px solid rgba(251, 191, 36, 0.3); }
+    .pill-effect { background: var(--rose-soft); color: var(--rose); border: 1px solid rgba(248, 113, 113, 0.3); }
+    .pill-untrusted_reference { background: var(--indigo-soft); color: var(--indigo); border: 1px solid rgba(129, 140, 248, 0.3); }
+
+    .answer-card {
+      background: var(--bg);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .answer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--surface-border);
+      padding-bottom: 10px;
+    }
+
+    .answer-title {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .scope-badge {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .values-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .values-table th {
+      text-align: left;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-dim);
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--surface-border);
+    }
+
+    .values-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(31, 51, 77, 0.4);
+      vertical-align: top;
+      font-family: var(--mono);
+    }
+
+    .val-key { color: var(--text-muted); }
+    .val-val { color: #fff; }
+    .val-src { color: var(--text-dim); font-size: 11px; }
+
+    .teeth-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .tooth-card {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius);
+      padding: 14px;
+      cursor: pointer;
+      transition: all var(--transition);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .tooth-card:hover {
+      border-color: var(--purple);
+      transform: translateY(-2px);
+    }
+
+    .tooth-id {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--purple);
+    }
+
+    .tooth-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .tooth-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .refusal-box {
+      background: rgba(248, 113, 113, 0.08);
+      border: 1px solid var(--rose);
+      border-radius: 4px;
+      padding: 12px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--rose);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header class="top-bar">
+    <div>
+      <div class="badge">Horizon World Debugger · T10 Architecture</div>
+      <h1>World Debugger Workbench & Epistemic Truth Explorer</h1>
+      <p class="tagline">Interrogate operational state across the seven read-only operations (<code>why</code>, <code>impact</code>, <code>diff</code>, <code>timeline</code>, <code>counterfactual</code>, <code>reach</code>, <code>replay</code>), enforce query bounds, and observe the five honest value labels.</p>
+    </div>
+    <div class="nav-links">
+      <a href="../index.md">← Documentation Index</a>
+      <a href="../subsystems/world-debugger.md">Debugger Subsystem</a>
+      <a href="affordance-navigation-simulator.html">← Affordance Simulator</a>
+    </div>
+  </header>
+
+  <div class="formula-banner">
+    <div class="formula-statement">
+      Epistemic Principle: <strong>Honest Labeling over Plausible Fabrication</strong>. Silence is reported as <code>unknown</code> (naming the missing source); retrieval citations are labeled <code>untrusted_reference</code> and never grant action authority.
+    </div>
+    <div class="formula-meta">Schema: <code>horizon.world-debugger/1</code> · Value Classes: 5 · Refusal Policy: Strict</div>
+  </div>
+
+  <div class="grid-2col">
+    <!-- LEFT PANEL: OPERATION & PARAMETERS -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">1. Select Debugger Operation</div>
+          <div class="panel-sub">Dispatched by <code>src/domain/debugger.ts:runDebugger</code></div>
+        </div>
+      </div>
+
+      <div class="op-tabs">
+        <button class="btn-tab active" onclick="setOp('why')">why</button>
+        <button class="btn-tab" onclick="setOp('impact')">impact</button>
+        <button class="btn-tab" onclick="setOp('diff')">diff</button>
+        <button class="btn-tab" onclick="setOp('timeline')">timeline</button>
+        <button class="btn-tab" onclick="setOp('counterfactual')">counterfactual</button>
+        <button class="btn-tab" onclick="setOp('reach')">reach</button>
+        <button class="btn-tab" onclick="setOp('replay')">replay</button>
+      </div>
+
+      <div class="form-group">
+        <label>Focus Object Reference (Operational Projection)</label>
+        <select id="focusRef" onchange="runDebugger()">
+          <option value="prod_order:PO-9042" selected>prod_order:PO-9042 (Delayed production order)</option>
+          <option value="material:BATCH-771">material:BATCH-771 (Critical raw material lot)</option>
+          <option value="service:SVC-AUTH">service:SVC-AUTH (Authentication edge service)</option>
+        </select>
+      </div>
+
+      <!-- DYNAMIC OPERATION PARAMETERS -->
+      <div id="opParamsContainer">
+        <!-- Injected dynamically per operation -->
+      </div>
+
+      <div class="labels-legend">
+        <span style="color: var(--text-dim); margin-right: 4px;">Labels:</span>
+        <span class="pill-label pill-recorded">recorded</span>
+        <span class="pill-label pill-derived">derived</span>
+        <span class="pill-label pill-unknown">unknown</span>
+        <span class="pill-label pill-effect">effect</span>
+        <span class="pill-label pill-untrusted_reference">untrusted_reference</span>
+      </div>
+
+      <div class="form-group">
+        <label>Context Kernel Citation Channel (Side-Channel Test)</label>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <input type="checkbox" id="includeCitation" onchange="runDebugger()" checked>
+          <span style="font-size: 12px; color: var(--text-muted);">Include Context Kernel cited reference alongside answer</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: DEBUGGER ANSWER & SCOPE -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">2. Labelled Debugger Answer (<code>DebuggerAnswer</code>)</div>
+          <div class="panel-sub">Scope, values, and strict refusal detection</div>
+        </div>
+      </div>
+
+      <div class="answer-card" id="answerContainer">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- LOWER SECTION: THE 11 TEETH LAB -->
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Adversarial Teeth Laboratory (NE-01..NE-10 + PE-14)</div>
+        <div class="panel-sub">Live tests for the adversarial boundary invariants in <code>test/retrieval-debugger-teeth.test.ts</code></div>
+      </div>
+    </div>
+
+    <div class="teeth-grid">
+      <div class="tooth-card" onclick="simulateTooth('missing_bounds')">
+        <div class="tooth-id">NE-01 · BOUNDS TEETH</div>
+        <div class="tooth-title">Missing Traversal Bounds Refusal</div>
+        <div class="tooth-desc">An <code>impact</code> query missing <code>depth</code> or <code>max_nodes</code> is strictly refused. Defaulting is forbidden.</div>
+      </div>
+      <div class="tooth-card" onclick="simulateTooth('undeclared_rel')">
+        <div class="tooth-id">NE-02 · VOCABULARY TEETH</div>
+        <div class="tooth-title">Undeclared Relation Refusal</div>
+        <div class="tooth-desc">Requesting an undeclared relation type in <code>impact</code> returns a typed refusal naming the exact unpermitted relation.</div>
+      </div>
+      <div class="tooth-card" onclick="simulateTooth('checkpoint_cross')">
+        <div class="tooth-id">NE-08 · IMMUTABILITY TEETH</div>
+        <div class="tooth-title">Cross-Checkpoint Immutability</div>
+        <div class="tooth-desc"><code>diff</code> and <code>timeline</code> compare historical checkpoints in <code>scope.comparison</code> without rewriting the frame's own <code>checkpoint_ref</code>.</div>
+      </div>
+      <div class="tooth-card" onclick="simulateTooth('untrusted_retrieval')">
+        <div class="tooth-id">PE-10 · CITATION TEETH</div>
+        <div class="tooth-title">Retrieval Grants No Authority</div>
+        <div class="tooth-desc">Context Kernel citations are stamped <code>untrusted_reference</code> by Horizon itself; they cannot authorize actions or rewrite events.</div>
+      </div>
+      <div class="tooth-card" onclick="simulateTooth('invalid_proposal')">
+        <div class="tooth-id">NE-07 · COUNTERFACTUAL TEETH</div>
+        <div class="tooth-title">Invalid Proposal Refusal</div>
+        <div class="tooth-desc">A counterfactual with an invalid or contradictory state proposal is refused without executing or mutating.</div>
+      </div>
+      <div class="tooth-card" onclick="simulateTooth('missing_source_truth')">
+        <div class="tooth-id">PE-02 · HONESTY TEETH</div>
+        <div class="tooth-title">Missing Source Explicitly Named</div>
+        <div class="tooth-desc">An <code>unknown</code> value must name the missing source that records nothing. Silence is reported, never synthesized.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentOp = "why";
+
+  const MOCK_PROJECTION = {
+    "prod_order:PO-9042": {
+      name: "PO-9042",
+      type: "ProductionOrder",
+      status: "delayed",
+      delay_hours: "36",
+      material_ref: "material:BATCH-771",
+      customer: "Alpha Logistics",
+      created_at: "2026-10-21T08:00:00Z",
+      links: [
+        { rel: "requires_material", target: "material:BATCH-771" },
+        { rel: "assigned_to_line", target: "line:LINE-4" }
+      ],
+      lineage: [
+        { source: "demand_forecast:FC-2026-Q4", edge: "derived_from" }
+      ],
+      events: [
+        { ts: "2026-10-21T08:00:00Z", event: "OrderPlaced", actor: "actor:sales_lead" },
+        { ts: "2026-10-21T12:00:00Z", event: "MaterialShortageObserved", actor: "agent:inventory_monitor" },
+        { ts: "2026-10-21T14:30:00Z", event: "DelayFlagged", actor: "agent:scheduler" }
+      ]
+    },
+    "material:BATCH-771": {
+      name: "BATCH-771",
+      type: "RawMaterialLot",
+      status: "in_transit",
+      supplier: "Global Polymers Ltd",
+      links: [
+        { rel: "shipped_via", target: "carrier:CARRIER-EXP" }
+      ],
+      lineage: [],
+      events: [
+        { ts: "2026-10-20T10:00:00Z", event: "PurchaseOrderDispatched", actor: "actor:buyer" },
+        { ts: "2026-10-21T11:00:00Z", event: "CustomsClearancePending", actor: "agent:logistics_tracker" }
+      ]
+    },
+    "service:SVC-AUTH": {
+      name: "SVC-AUTH",
+      type: "Microservice",
+      status: "healthy",
+      error_rate: "0.02%",
+      links: [
+        { rel: "depends_on", target: "database:DB-USERS" }
+      ],
+      lineage: [],
+      events: [
+        { ts: "2026-10-21T00:00:00Z", event: "DeploymentRolledOut", actor: "agent:deploy_bot" }
+      ]
+    }
+  };
+
+  function setOp(op) {
+    currentOp = op;
+    document.querySelectorAll('.btn-tab').forEach(b => {
+      b.classList.toggle('active', b.textContent === op);
+    });
+    renderOpParams();
+    runDebugger();
+  }
+
+  function renderOpParams() {
+    const container = document.getElementById("opParamsContainer");
+    if (currentOp === "impact") {
+      container.innerHTML = `
+        <div class="form-group">
+          <label>Traversal Depth (Required, Max 4)</label>
+          <div class="slider-row">
+            <input type="range" id="param_depth" min="1" max="4" value="2" oninput="updateDepthVal(this.value)">
+            <span class="slider-val" id="depthVal">2</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Max Nodes (Required, Max 64)</label>
+          <input type="number" id="param_nodes" value="16" min="1" max="64" oninput="runDebugger()">
+        </div>
+        <div class="form-group">
+          <label>Declared Relation Types</label>
+          <select id="param_rel" onchange="runDebugger()">
+            <option value="all_declared">All Declared Relations (requires_material, assigned_to_line, shipped_via)</option>
+            <option value="requires_material">requires_material only</option>
+            <option value="undeclared_test">undeclared:unpermitted_relation (Trigger NE-02)</option>
+          </select>
+        </div>
+      `;
+    } else if (currentOp === "diff") {
+      container.innerHTML = `
+        <div class="form-group">
+          <label>Comparison Checkpoint (Required)</label>
+          <select id="param_checkpoint" onchange="runDebugger()">
+            <option value="chk_000_baseline">chk_000_baseline (Pre-incident state)</option>
+            <option value="chk_001_initial">chk_001_initial (Incident start)</option>
+            <option value="chk_invalid">chk_nonexistent (Trigger NE-03)</option>
+          </select>
+        </div>
+      `;
+    } else if (currentOp === "counterfactual") {
+      container.innerHTML = `
+        <div class="form-group">
+          <label>Counterfactual Proposal</label>
+          <select id="param_prop" onchange="runDebugger()">
+            <option value="lead_time_reduced">Proposal: Material lead time reduced to 4h</option>
+            <option value="alternative_supplier">Proposal: Re-route to secondary supplier</option>
+            <option value="invalid_prop">Proposal: Invalid syntax (Trigger NE-07)</option>
+          </select>
+        </div>
+      `;
+    } else if (currentOp === "reach") {
+      container.innerHTML = `
+        <div class="form-group">
+          <label>Target Object Ref</label>
+          <input type="text" id="param_target" value="material:BATCH-771" oninput="runDebugger()">
+        </div>
+      `;
+    } else if (currentOp === "replay") {
+      container.innerHTML = `
+        <div class="form-group">
+          <label>Expected Outcome Hash</label>
+          <input type="text" id="param_outcome" value="outcome:sha256:7a92b...settled" oninput="runDebugger()">
+        </div>
+      `;
+    } else {
+      container.innerHTML = `
+        <div style="font-size: 12px; color: var(--text-dim); font-family: var(--mono); padding: 8px 0;">
+          Operation '${currentOp}' reads directly from operational rows and lineage at current checkpoint.
+        </div>
+      `;
+    }
+  }
+
+  function updateDepthVal(val) {
+    document.getElementById("depthVal").textContent = val;
+    runDebugger();
+  }
+
+  function runDebugger() {
+    const focus = document.getElementById("focusRef").value;
+    const includeCitation = document.getElementById("includeCitation").checked;
+    const container = document.getElementById("answerContainer");
+
+    const obj = MOCK_PROJECTION[focus] || {};
+
+    // Check for simulated teeth conditions
+    if (currentOp === "impact") {
+      const rel = document.getElementById("param_rel")?.value;
+      if (rel === "undeclared_test") {
+        container.innerHTML = `
+          <div class="refusal-box">
+            <strong>Debugger Refusal (NE-02):</strong> Undeclared relation 'undeclared:unpermitted_relation' requested in impact traversal.<br>
+            <span style="font-size: 11px; opacity: 0.85;">Impact queries strictly refuse undeclared relations by name to prevent unverified graph traversal.</span>
+          </div>
+        `;
+        return;
+      }
+    } else if (currentOp === "diff") {
+      const chk = document.getElementById("param_checkpoint")?.value;
+      if (chk === "chk_invalid") {
+        container.innerHTML = `
+          <div class="refusal-box">
+            <strong>Debugger Refusal (NE-03):</strong> Unreadable checkpoint 'chk_nonexistent'.<br>
+            <span style="font-size: 11px; opacity: 0.85;">Refusal is typed and distinct from an empty query result.</span>
+          </div>
+        `;
+        return;
+      }
+    } else if (currentOp === "counterfactual") {
+      const prop = document.getElementById("param_prop")?.value;
+      if (prop === "invalid_prop") {
+        container.innerHTML = `
+          <div class="refusal-box">
+            <strong>Debugger Refusal (NE-07):</strong> Counterfactual proposal rejected as malformed or contradictory.<br>
+            <span style="font-size: 11px; opacity: 0.85;">Proposals are schema-validated before evaluating hypothetical affordances.</span>
+          </div>
+        `;
+        return;
+      }
+    }
+
+    // Build values based on operation
+    let values = [];
+
+    if (currentOp === "why") {
+      values = [
+        { key: "status", val: obj.status, cls: "recorded", src: `operational_object:${focus}` },
+        { key: "delay_duration", val: `${obj.delay_hours || 0} hours`, cls: "recorded", src: `operational_object:${focus}.attributes` },
+        { key: "root_cause_inference", val: "Delayed due to material batch shortage", cls: "derived", src: "rule:material_dependency_derivation" },
+        { key: "supplier_eta_confidence", val: "unknown", cls: "unknown", src: "carrier_telemetry:none", missing: "carrier GPS stream not configured" },
+        { key: "penalty_exposure", val: "$4,200 / day", cls: "effect", src: "contract_sla:sla_tier_1" }
+      ];
+      if (obj.links && obj.links.length > 0) {
+        obj.links.forEach(l => {
+          values.push({ key: `link.${l.rel}`, val: l.target, cls: "recorded", src: `operational_link:${l.rel}` });
+        });
+      }
+    } else if (currentOp === "impact") {
+      const depth = document.getElementById("param_depth")?.value || 2;
+      values = [
+        { key: "traversal.depth", val: depth, cls: "derived", src: "scope.bounds" },
+        { key: "affected.order_fulfillment", val: "Alpha Logistics SLA breach", cls: "effect", src: "lineage:delivery_schedule" },
+        { key: "affected.assembly_line", val: "line:LINE-4 idle risk at T+4h", cls: "effect", src: "operational_link:assigned_to_line" },
+        { key: "downstream_inventory", val: "unknown", cls: "unknown", src: "warehouse_erp:none", missing: "warehouse sub-tier telemetry missing" }
+      ];
+    } else if (currentOp === "diff") {
+      const chk = document.getElementById("param_checkpoint")?.value || "chk_000_baseline";
+      values = [
+        { key: "comparison_checkpoint", val: chk, cls: "derived", src: "scope.comparison (Frame checkpoint unchanged)" },
+        { key: "delta.status", val: "on_time → delayed", cls: "recorded", src: "event:DelayFlagged" },
+        { key: "delta.delay_hours", val: "0 → 36", cls: "recorded", src: "event:DelayFlagged.payload" }
+      ];
+    } else if (currentOp === "timeline") {
+      (obj.events || []).forEach(e => {
+        values.push({ key: e.ts, val: `${e.event} by ${e.actor}`, cls: "recorded", src: `event_log:${focus}` });
+      });
+    } else if (currentOp === "counterfactual") {
+      values = [
+        { key: "hypothesis", val: "Supplier expedited delivery in 4h", cls: "derived", src: "proposal:lead_time_reduced" },
+        { key: "predicted_delay", val: "Reduced from 36h to 4h", cls: "derived", src: "simulation:schedule_estimator" },
+        { key: "affordance_impact", val: "authority: likely_allow, payment: +$600 expedite fee", cls: "effect", src: "evaluator:counterfactual_gates" },
+        { key: "settlement_notice", val: "Possibility preview only; settles zero obligations", cls: "derived", src: "doctrine:REQ-OUT-002" }
+      ];
+    } else if (currentOp === "reach") {
+      values = [
+        { key: "path_found", val: "true (1 hop via requires_material)", cls: "derived", src: "graph_reachability:operational_links" },
+        { key: "rung_0", val: focus, cls: "recorded", src: "start_node" },
+        { key: "rung_1", val: "material:BATCH-771", cls: "recorded", src: "operational_link:requires_material" },
+        { key: "intermediate_transit_data", val: "unknown", cls: "unknown", src: "carrier_api:none", missing: "carrier API credentials absent" }
+      ];
+    } else if (currentOp === "replay") {
+      values = [
+        { key: "replay_status", val: "pass (deterministic hash verified)", cls: "derived", src: "event_replay:stream_0942" },
+        { key: "reconstructed_events", val: "3 events replayed", cls: "recorded", src: "store:.cognate/app.sqlite" },
+        { key: "side_effect_check", val: "zero writes executed during replay", cls: "derived", src: "engine:read_only_replay" }
+      ];
+    }
+
+    if (includeCitation) {
+      values.push({
+        key: "citation.supplier_sop",
+        val: "Standard Operating Procedure: Expedited Procurement §4.2",
+        cls: "untrusted_reference",
+        src: "context_kernel:corpus_operations"
+      });
+    }
+
+    // Render answer card
+    const scopeComparison = (currentOp === "diff") ? ` · Comp: ${document.getElementById("param_checkpoint")?.value}` : '';
+    container.innerHTML = `
+      <div class="answer-header">
+        <div class="answer-title">Operation: ${currentOp.toUpperCase()}</div>
+        <div class="scope-badge">Frame: frame_019a3b4c@rev1 ${scopeComparison}</div>
+      </div>
+      <table class="values-table">
+        <thead>
+          <tr>
+            <th>Fact / Metric</th>
+            <th>Value</th>
+            <th>Class</th>
+            <th>Source Provenance</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${values.map(v => `
+            <tr>
+              <td class="val-key">${v.key}</td>
+              <td class="val-val">${v.val}</td>
+              <td><span class="pill-label pill-${v.cls}">${v.cls}</span></td>
+              <td class="val-src">${v.src} ${v.missing ? `<div style="color: var(--amber); font-size: 10px;">Missing: ${v.missing}</div>` : ''}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function simulateTooth(tooth) {
+    if (tooth === 'missing_bounds') {
+      setOp('impact');
+      const container = document.getElementById("answerContainer");
+      container.innerHTML = `
+        <div class="refusal-box">
+          <strong>NE-01 Verified (Missing Bounds Refusal):</strong><br>
+          Query submitted without mandatory <code>depth</code> or <code>max_nodes</code>.<br>
+          Controller emitted: <code>DebuggerError: missing_bounds</code>.<br>
+          <em>Horizon never defaults bounds; unbounded graph traversal is strictly refused.</em>
+        </div>
+      `;
+    } else if (tooth === 'undeclared_rel') {
+      setOp('impact');
+      document.getElementById("param_rel").value = "undeclared_test";
+      runDebugger();
+    } else if (tooth === 'checkpoint_cross') {
+      setOp('diff');
+      runDebugger();
+    } else if (tooth === 'untrusted_retrieval') {
+      setOp('why');
+      document.getElementById("includeCitation").checked = true;
+      runDebugger();
+      alert("PE-10 Verified: Context Kernel citation is labelled 'untrusted_reference' and cannot be submitted to the intent pipeline.");
+    } else if (tooth === 'invalid_proposal') {
+      setOp('counterfactual');
+      document.getElementById("param_prop").value = "invalid_prop";
+      runDebugger();
+    } else if (tooth === 'missing_source_truth') {
+      setOp('why');
+      runDebugger();
+    }
+  }
+
+  // Initialize
+  renderOpParams();
+  runDebugger();
+</script>
+
+</body>
+</html>
