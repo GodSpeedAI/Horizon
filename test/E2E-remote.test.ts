@@ -153,11 +153,17 @@ suite("phone remote control, end to end in Chromium", () => {
     await (phone.page.getByText("Remote control was turned off, or this phone was replaced")).waitFor({ state: "visible", timeout: 20_000 });
   }, 90_000);
 
-  test("a second phone pairs with the new link and replaces the first", async () => {
+  test("a second phone pairs with the new link and replaces the first; a refused passkey prompt is retried without a new scan", async () => {
     await desktopPage.goto(`${cockpitBase}/workspace/remote`);
     const second = await desktopPage.locator("#pair-link").innerText();
     secondPhone = await openPhone();
+    // The virtual authenticator first fails user verification, as a refused or gesture-less prompt does.
+    await secondPhone.cdp.send("WebAuthn.setUserVerified", { authenticatorId: secondPhone.authenticator, isUserVerified: false });
     await secondPhone.page.goto(second);
+    const retry = secondPhone.page.getByRole("button", { name: "Create passkey" });
+    await retry.waitFor({ state: "visible", timeout: 30_000 });
+    await secondPhone.cdp.send("WebAuthn.setUserVerified", { authenticatorId: secondPhone.authenticator, isUserVerified: true });
+    await retry.click();
     await (secondPhone.page.locator("#home")).waitFor({ state: "visible", timeout: 30_000 });
     const firstStatus = await phone.page.evaluate(async () => (await fetch("/m/api/state", { credentials: "same-origin" })).status);
     expect(firstStatus).toBe(401);

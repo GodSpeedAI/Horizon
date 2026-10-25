@@ -357,8 +357,14 @@ async function pair() {
   const redeemed = await post("/m/api/pair/redeem", { secret: value });
   if (redeemed.status !== 200) return say(messageFor(redeemed.data, "This link is not valid."), "error");
   say("Use your passkey to continue.");
+  await create(redeemed.data);
+}
+
+// The redeemed ticket stays valid for two minutes, so a closed or refused prompt (Safari refuses
+// one that no tap started) is retried with a button instead of a new scan.
+async function create(redeemed) {
   try {
-    const options = redeemed.data.options;
+    const options = redeemed.options;
     const credential = await navigator.credentials.create({ publicKey: {
       challenge: dec(options.challenge),
       rp: options.rp,
@@ -368,11 +374,18 @@ async function pair() {
       attestation: "none",
       timeout: options.timeout,
     } });
-    const finished = await post("/m/api/pair/finish", { ticket: redeemed.data.ticket, credential: credentialJSON(credential) });
+    const finished = await post("/m/api/pair/finish", { ticket: redeemed.ticket, credential: credentialJSON(credential) });
     if (finished.status !== 200) return say(messageFor(finished.data, "The passkey could not be registered."), "error");
     location.replace("/m");
   } catch {
-    say("The passkey prompt was closed. Scan the QR on your desktop again to retry.", "error");
+    say("The passkey prompt was closed.", "error");
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "primary";
+    retry.textContent = "Create passkey";
+    retry.addEventListener("click", () => { retry.remove(); say("Use your passkey to continue."); void create(redeemed); }, { once: true });
+    $("app").append(retry);
+    retry.focus();
   }
 }
 
