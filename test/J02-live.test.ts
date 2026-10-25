@@ -162,6 +162,12 @@ liveTest("J02 IS3-IS5: an escalated commit waits; only the operator's approval a
   expect(self.error_class).toBe("cep_approval_refused");
   expect(await records()).toEqual([]);
 
+  // The operator keeps working while the commit waits: every page render issues a new frame. The
+  // escalated intent still resumes against the frame it named, because its move is still a choice.
+  const parked = app.frames.current()!;
+  app.frames.issue({ ...parked, frame_id: "frame-j02-render-while-waiting", revision: parked.revision });
+  expect(app.frames.current()!.frame_id).not.toBe(intent.frame_id);
+
   // The operator approves through SEA-Forge; SEA-Forge revalidates and the intent is committed once.
   const committed = await app.resolveNavigationApproval({ approvalId, resolution: "approved" });
   expect(committed.intent.intent_id).toBe(intent.intent_id);

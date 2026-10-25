@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
-import { buildWorkspace, type WorkspaceSnapshot } from "../src/ui/workspace/model.ts";
+import { buildWorkspace, moveOf, onboardingOf, statusOf, type WorkspaceChrome, type WorkspaceSnapshot } from "../src/ui/workspace/model.ts";
 import { Workspace, renderWorkspacePage } from "../src/ui/workspace/render.tsx";
 import type { GuiView } from "../src/ui/surface2/project.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
@@ -72,7 +72,9 @@ function html(document: WorkspaceSnapshot): string {
 describe("T09 workspace HTML", () => {
   test("PE-08/PE-03 renders landmarks, live scope, keyboard controls and theme tokens", () => {
     const markup = html(snapshot());
-    expect(markup).toContain('<html lang="en" data-theme="dark">');
+    // Intentional (brief: light by default): no theme asked for means no data-theme, so the OS preference applies.
+    expect(markup).toContain('<html lang="en">');
+    expect(markup).not.toContain('<html lang="en" data-theme=');
     expect(markup).toContain('class="skip" href="#main"');
     expect(markup).toContain('role="status" aria-live="polite" aria-atomic="true" data-scope="current"');
     expect(markup).toContain('data-owner-pinned="true"');
@@ -199,3 +201,78 @@ describe("T09 workspace HTML", () => {
     expect(page).not.toContain("Reading the workspace.");
   });
 });
+
+/** The first-run panel, status rail, receipt and moves: the stored state each one shows. */
+describe("first-run cockpit rendering", () => {
+  const status = statusOf({ worldRef: "world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290", governed: false, realitytrace: false, approvals: false, operator: "local_operator" });
+  const chromeFor = (overrides: Partial<WorkspaceChrome> = {}): WorkspaceChrome => ({
+    status,
+    onboarding: onboardingOf({ governed: false, realitytrace: false, caseOpen: false, committed: false, skipped: false }),
+    openCase: null,
+    caseError: null,
+    receipt: null,
+    moves: [],
+    ...overrides,
+  });
+
+  test("the empty moves list says what appears there and points at step 3", () => {
+    const markup = pageWith(snapshot(), chromeFor());
+    expect(markup).toContain("Committed moves and refusals appear here");
+    expect(markup).toContain("step 3 of Getting started");
+  });
+
+  test("steps are announced as Step N of 3 with the active step marked", () => {
+    const markup = pageWith(snapshot(), chromeFor());
+    expect(markup).toContain('aria-labelledby="heading-start"');
+    expect(markup).toContain("Step 1 of 3");
+    expect(markup).toContain("Step 3 of 3");
+    expect(markup.match(/<li data-step="[a-z]+" data-done="(?:true|false)" aria-current="step">/g)?.length).toBe(1);
+    expect(markup).toContain('data-step="stack" data-done="false" aria-current="step"');
+  });
+
+  test("the status rail states every process in text, not colour alone", () => {
+    const markup = pageWith(snapshot(), chromeFor());
+    expect(markup).toContain("World: <code");
+    expect(markup).toContain("horizon@701d6211");
+    expect(markup).toContain("SEA-Forge: off");
+    expect(markup).toContain("RealityTrace: off");
+    expect(markup).toContain("Approvals: not configured");
+    expect(markup).toContain("Operator: local_operator");
+  });
+
+  test("an escalated commit without approvals says so and gives the fix instead of buttons", () => {
+    const move = moveOf(
+      { intent_id: "intent-9", operation_ref: "product.apply", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:7" }, settlement: null, at: null },
+      { governed: true, realitytrace: true },
+    );
+    const markup = pageWith(snapshot(), chromeFor({ receipt: { intent_id: "intent-9", found: true, move, approvals: false } }));
+    expect(markup).toContain("Waiting for your decision");
+    expect(markup).toContain("Approvals are not configured");
+    expect(markup).toContain("COGNATE_SEA_FORGE_OPERATOR");
+    expect(markup).not.toContain('name="decision"');
+  });
+
+  test("with approvals configured the escalation offers Approve and Reject on its own approval", () => {
+    const move = moveOf(
+      { intent_id: "intent-10", operation_ref: "product.apply", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:8" }, settlement: null, at: null },
+      { governed: true, realitytrace: true },
+    );
+    const markup = pageWith(snapshot(), chromeFor({ receipt: { intent_id: "intent-10", found: true, move, approvals: true } }));
+    expect(markup).toContain('action="/workspace/approval"');
+    expect(markup).toContain('name="approval_id" value="approval:8"');
+    expect(markup).toContain('value="approve"');
+    expect(markup).toContain('value="reject"');
+    expect(markup.match(/name="decision"/g)?.length).toBe(2);
+  });
+
+  test("an unknown receipt renders No such commit and the case error uses fixed copy", () => {
+    const markup = pageWith(snapshot(), chromeFor({ receipt: { intent_id: "<b>x</b>", found: false, move: null, approvals: false }, caseError: "empty" }));
+    expect(markup).toContain("No such commit.");
+    expect(markup).not.toContain("<b>x</b>");
+    expect(markup).toContain("The case cannot be blank.");
+  });
+});
+
+function pageWith(document: WorkspaceSnapshot, chrome: WorkspaceChrome): string {
+  return renderToStaticMarkup(<Workspace snapshot={document} chrome={chrome} />);
+}

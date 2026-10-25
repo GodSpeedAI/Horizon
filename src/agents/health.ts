@@ -2,7 +2,7 @@ import type { AgentDefinition } from "@godspeedai/cognate-runtime-api";
 import { assertSemanticOutput } from "../adapters/semantic.ts";
 import { assertCommitIntent, type CommitIntentInput } from "../domain/intent.ts";
 import type { NavigationFrameV1, NavigationIntentRecord } from "../domain/frame.ts";
-import type { FrameRegister } from "../capabilities/navigation-intent.ts";
+import { frameForIntent, type FrameRegister } from "../capabilities/navigation-intent.ts";
 
 export const HEALTH_AGENT = {
   id: "horizon.health",
@@ -25,7 +25,8 @@ export function structuralObservationAgent(register: FrameRegister): AgentDefini
     id: HEALTH_AGENT.id,
     version: HEALTH_AGENT.version,
     async run(input, context) {
-      const request = readObservationRequest(input, register.current());
+      const intentValue = input !== null && typeof input === "object" ? (input as { intent?: unknown }).intent : undefined;
+      const request = readObservationRequest(input, register.current() === null ? null : frameForIntent(register, intentValue, "HEALTH"));
       const semantic = assertSemanticOutput(await context.invoke("horizon.semantics.world", {}));
       const correlationRef = context.correlationId;
       await context.emit("horizon.health.checked", {
@@ -79,4 +80,4 @@ function readObservationRequest(input: unknown, frame: NavigationFrameV1 | null)
 }
 
 /** Historical name: the plain health agent (no intent binding). */
-export const healthAgent: AgentDefinition = structuralObservationAgent({ current: () => null, issue() {} });
+export const healthAgent: AgentDefinition = structuralObservationAgent({ current: () => null, issue() {}, retain() {}, retained: () => null });

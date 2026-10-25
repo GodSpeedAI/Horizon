@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun run src/main.ts",
+    "ignite": "bun run scripts/ignite.ts",
     "check": "bun run scripts/check.ts",
     "test": "bun test && uv run --project research pytest -q",
     "boundaries": "bun run scripts/check-boundaries.ts",

@@ -124,6 +124,7 @@ if (command === "frame") {
   const server = application.startServer();
 
   console.log(`horizon: ${application.loaded.config.deployment_profile} listening on ${server.url}`);
+  console.log(`horizon: workspace ${new URL("workspace", server.url).href}`);
   console.log(`horizon: world ${application.world.worldRef}`);
   console.log(`horizon: cognate ${application.world.cognateWorldRef}`);
   console.log(`horizon: semantics ${application.world.objectCount} objects / ${application.world.relationCount} relations`);

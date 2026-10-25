@@ -41,11 +41,23 @@ export const NAVIGATION_INTENT_COMMIT = {
 export interface FrameRegister {
   current(): NavigationFrameV1 | null;
   issue(frame: NavigationFrameV1): void;
+  /** Keep the frame an escalated intent named, so the commit can resume after the operator's approval. */
+  retain(frameId: string): void;
+  /** A retained frame, or null. */
+  retained(frameId: unknown): NavigationFrameV1 | null;
 }
 
-/** The most recently issued frame; the only frame a typed intent may act on. */
+const RECENT_FRAMES = 32;
+const RETAINED_FRAMES = 256;
+
+/**
+ * The most recently issued frame is the only frame a new intent may act on. A frame whose intent SEA-Forge
+ * escalated is retained, because every page render issues a new frame while the commit waits for approval.
+ */
 export function createFrameRegister(): FrameRegister {
   let current: NavigationFrameV1 | null = null;
+  const recent = new Map<string, NavigationFrameV1>();
+  const kept = new Map<string, NavigationFrameV1>();
   return {
     current: () => current,
     issue(frame) {
@@ -53,8 +65,34 @@ export function createFrameRegister(): FrameRegister {
         throw new Error(`INTENT: frame ${frame.frame_id} reissued at revision ${frame.revision}`);
       }
       current = frame;
+      recent.set(frame.frame_id, frame);
+      if (recent.size > RECENT_FRAMES) recent.delete(recent.keys().next().value!);
     },
+    retain(frameId) {
+      const frame = recent.get(frameId) ?? (current?.frame_id === frameId ? current : undefined);
+      if (!frame) return;
+      kept.set(frameId, frame);
+      if (kept.size > RETAINED_FRAMES) kept.delete(kept.keys().next().value!);
+    },
+    retained: (frameId) => (typeof frameId === "string" ? (kept.get(frameId) ?? null) : null),
   };
+}
+
+/**
+ * The frame an intent is validated against when its commit runs. Normally the current frame. A commit
+ * that waited on an approval was checked against the then-current frame when it was submitted, so it
+ * resumes against the frame it named, and only while its move is still a choice of the current frame.
+ */
+export function frameForIntent(register: FrameRegister, intent: unknown, prefix = "INTENT"): NavigationFrameV1 {
+  const current = register.current();
+  if (current === null) throw new Error(`${prefix}: no navigation frame has been issued`);
+  const named = intent !== null && typeof intent === "object" ? register.retained((intent as { frame_id?: unknown }).frame_id) : null;
+  if (named === null || named.frame_id === current.frame_id) return current;
+  const operation = (intent as { operation_ref?: unknown }).operation_ref;
+  if (!current.choices.some((choice) => choice.operation_ref === operation)) {
+    throw new IntentError("failed_precondition", `operation_ref ${String(operation)} is no longer a choice of the current frame ${current.frame_id}`);
+  }
+  return named;
 }
 /** Stream that holds committed `NavigationIntentRecord` events. */
 export const INTENT_STREAM = "horizon.navigation-intents";
@@ -253,6 +291,8 @@ export interface IntentAttempt {
   readonly outcome: "accepted" | "refused" | "awaiting_authority";
   readonly reason: string | null;
   readonly at: string;
+  /** The operation the intent named, when the attempt recorded it (receipts show it for refusals). */
+  readonly operation_ref?: string | null;
 }
 
 /**
@@ -296,6 +336,7 @@ export async function appendIntentAttempt(
               caller_ref: options.attempt.caller_ref,
               outcome: options.attempt.outcome,
               reason: options.attempt.reason,
+              operation_ref: options.attempt.operation_ref ?? null,
             },
           },
         ],
@@ -340,6 +381,7 @@ export async function readIntentAttempts(store: DurableStore): Promise<readonly 
             : "refused",
       reason: typeof payload.reason === "string" ? payload.reason : null,
       at: event.occurredAt,
+      operation_ref: typeof payload.operation_ref === "string" ? payload.operation_ref : null,
     };
   });
 }
@@ -360,8 +402,7 @@ export function navigationIntentComponent(register: FrameRegister = createFrameR
       // decision) for every invocation, so an attempt is observable in the audit trail
       // even when the validator refuses it — nothing extra may be written here.
       fiber.provide(NAVIGATION_INTENT_COMMIT, async (input: unknown, context): Promise<CommitIntentOutput> => {
-        const frame = register.current();
-        if (frame === null) throw new Error("INTENT: no navigation frame has been issued");
+        const frame = frameForIntent(register, input);
         const intent: CommitIntentInput = assertCommitIntent(input, frame, frame.observer_ref);
         return { intent_id: intent.intent_id, correlation_ref: context.correlationId };
       });
