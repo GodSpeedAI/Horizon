@@ -124,7 +124,6 @@ export class RemoteController {
   readonly pairing = new Pairing();
   private readonly sessions = new Sessions();
   private readonly limiter = new Limiter();
-  private readonly commandOutcomes = new Map<string, { status: number; body: unknown }>();
   private server: Server<unknown> | null = null;
   private reach: { readonly at: number; readonly ok: boolean } | null = null;
 
@@ -434,7 +433,7 @@ export class RemoteController {
     const body = await bodyOf(request);
     const commandId = typeof body?.command_id === "string" ? body.command_id : "";
     if (!COMMAND_ID.test(commandId)) return refusal(400, "invalid_argument", "REMOTE: command_id must be a UUID");
-    const seen = session.commands.get(commandId) ?? this.commandOutcomes.get(commandId);
+    const seen = session.commands.get(commandId);
     if (seen !== undefined) {
       const replay = seen as { status: number; body: unknown };
       return json(replay.status, replay.body);

@@ -260,8 +260,8 @@ async function signatureValid(keyBytes: Uint8Array, data: Uint8Array, signature:
 }
 
 /**
- * Verify an assertion against the stored credential. The sign count must rise whenever the
- * authenticator reports a non-zero count; a zero count means the authenticator keeps none.
+ * Verify an assertion against the stored credential. The sign count must rise whenever either the
+ * stored or the reported count is non-zero; zero on both sides means the authenticator keeps none.
  */
 export async function verifyAssertion(
   credential: {
@@ -273,7 +273,7 @@ export async function verifyAssertion(
   const authData = fromB64url(credential.response.authenticatorData);
   const parsed = parseAuthData(authData, expected.rpId, false);
   if ((parsed.flags & (FLAG_UP | FLAG_UV)) !== (FLAG_UP | FLAG_UV)) throw new WebAuthnError("flags", "the passkey must confirm presence and user verification");
-  if (parsed.signCount !== 0 && parsed.signCount <= expected.signCount) {
+  if ((parsed.signCount !== 0 || expected.signCount !== 0) && parsed.signCount <= expected.signCount) {
     throw new WebAuthnError("sign_count", "the sign count did not increase: this may be a cloned passkey");
   }
   const keyBytes = fromB64url(expected.publicKey);

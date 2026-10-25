@@ -148,6 +148,8 @@ describe("assertion (software authenticator)", () => {
     expect(await codeOfAsync(() => verifyAssertion(tampered, base))).toBe("signature");
     const reused = await authenticator.assert({ challenge: b64url(challenge), origin: ORIGIN, rpId: RP_ID, counter: 9 });
     expect(await codeOfAsync(() => verifyAssertion(reused, { ...base, signCount: 9 }))).toBe("sign_count");
+    const reset = await authenticator.assert({ challenge: b64url(challenge), origin: ORIGIN, rpId: RP_ID, counter: 0 });
+    expect(await codeOfAsync(() => verifyAssertion(reset, { ...base, signCount: 9 }))).toBe("sign_count");
   });
 
   test("options carry the required user verification and the challenge as base64url", () => {

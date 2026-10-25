@@ -156,6 +156,10 @@ describe("pairing: the link authorizes one passkey registration and nothing else
   test("a forged Host is refused on every route, and a cross-origin POST is refused", async () => {
     const hostless = await fetch(`${phoneBase()}/m/health`, { headers: { host: "evil.example" } });
     expect(hostless.status).toBe(403);
+    // DNS rebinding against the cockpit: the panel's GET carries the pairing link, so Host is checked on reads too.
+    const rebound = await fetch(`${cockpitBase}/workspace/remote`, { headers: { host: "evil.example:4319" } });
+    expect(rebound.status).toBe(403);
+    expect(await rebound.text()).not.toContain("/m/pair#p=");
     const cross = await postJson("/m/api/pair/redeem", { secret: "x" }, { origin: "https://evil.example" });
     expect(cross.status).toBe(403);
   });

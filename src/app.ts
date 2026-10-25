@@ -1144,11 +1144,10 @@ export async function createApplication(
         port,
         async fetch(request) {
           const url = new URL(request.url);
-          // Every state-changing route checks Host and Origin first (DNS rebinding and cross-site POSTs).
-          if (request.method === "POST") {
-            const refused = crossSiteRefusal(request, server.port ?? port);
-            if (refused !== null) return refused;
-          }
+          // Every request checks Host (DNS rebinding: the remote panel's GET carries the pairing link);
+          // state-changing routes also check Origin and Sec-Fetch-Site (cross-site POSTs).
+          const refused = crossSiteRefusal(request, server.port ?? port, request.method !== "POST");
+          if (refused !== null) return refused;
           if (url.pathname === "/health") {
             const semantic = await runtime.runtime.service.invoke(caller, {
               capability: "horizon.semantics.world",
@@ -1485,14 +1484,15 @@ function themeOf(value: FormDataEntryValue | string | null): WorkspaceTheme | un
 }
 
 /**
- * Refuse a state-changing request unless it comes from this cockpit: the Host header must name this
- * server (DNS rebinding), and any Origin or Sec-Fetch-Site must be same-origin (cross-site POSTs).
+ * Refuse a request unless it comes from this cockpit: the Host header must name this server (DNS
+ * rebinding). Unless `hostOnly`, any Origin or Sec-Fetch-Site must also be same-origin (cross-site POSTs).
  * A request with neither Origin nor Sec-Fetch-Site (a CLI or test client) is allowed on the Host check alone.
  */
-function crossSiteRefusal(request: Request, port: number): Response | null {
+function crossSiteRefusal(request: Request, port: number, hostOnly = false): Response | null {
   const hosts = [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`];
   const refuse = (message: string) => Response.json({ code: "forbidden_origin", message: `REQUEST: ${message}` }, { status: 403 });
   if (!hosts.includes(request.headers.get("host") ?? "")) return refuse("the Host header does not name this cockpit");
+  if (hostOnly) return null;
   const origin = request.headers.get("origin");
   if (origin !== null && !hosts.some((host) => origin === `http://${host}`)) return refuse("the Origin is not this cockpit");
   const site = request.headers.get("sec-fetch-site");
