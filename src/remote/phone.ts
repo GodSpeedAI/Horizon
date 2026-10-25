@@ -60,7 +60,7 @@ ${body}
 const SHARED = `
 const enc = (buffer) => { let text = ""; for (const byte of new Uint8Array(buffer)) text += String.fromCharCode(byte); return btoa(text).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/, ""); };
 const dec = (text) => { const padded = text.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((text.length + 3) % 4); const binary = atob(padded); const out = new Uint8Array(binary.length); for (let i = 0; i < binary.length; i += 1) out[i] = binary.charCodeAt(i); return out; };
-const credentialJSON = (credential) => { const response = {}; for (const [key, value] of Object.entries(credential.response)) if (value instanceof ArrayBuffer) response[key] = enc(value); return { id: credential.id, rawId: enc(credential.rawId), type: credential.type, response }; };
+const credentialJSON = (credential) => { const response = {}; for (const key of ["clientDataJSON", "attestationObject", "authenticatorData", "signature", "userHandle"]) { const value = credential.response[key]; if (value instanceof ArrayBuffer) response[key] = enc(value); } return { id: credential.id, rawId: enc(credential.rawId), type: credential.type, response }; };
 const post = async (path, body) => { const response = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), credentials: "same-origin" }); const data = await response.json().catch(() => ({})); return { status: response.status, data }; };
 const messageFor = (data, fallback) => (data && typeof data.message === "string" ? data.message : fallback);
 `;
@@ -129,7 +129,7 @@ function openStream() {
   source = new EventSource("/m/api/events");
   source.addEventListener("open", () => { retry = 1000; pill("live", "Live"); });
   source.addEventListener("state", () => void refresh());
-  source.addEventListener("revoked", () => { closeStream(); notice("Remote control was turned off, or this phone was replaced, on the desktop.", "error"); connectScreen(); });
+  source.addEventListener("revoked", () => { closeStream(); connectScreen(); notice("Remote control was turned off, or this phone was replaced, on the desktop.", "error"); });
   source.addEventListener("error", () => {
     if (source && source.readyState === EventSource.CLOSED) return;
     pill("reconnecting", "Reconnecting");
@@ -153,6 +153,9 @@ async function refresh() {
   if (previous && top !== lastTop && scrolled) $("jump").hidden = false;
   if (previous) {
     const stillThere = new Set(state.decisions.map((move) => move.approval_id));
+    for (const move of previous.decisions) {
+      if (!stillThere.has(move.approval_id) && !pending.has(move.approval_id)) notice("Already decided on the desktop.");
+    }
     for (const approval of [...pending]) if (!stillThere.has(approval)) pending.delete(approval);
   }
   lastTop = top;
