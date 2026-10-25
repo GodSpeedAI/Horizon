@@ -111,6 +111,8 @@ describe("remote control: off by default, started only from the cockpit", () => 
     expect(markup).toContain("Start remote control");
     expect(markup).not.toContain("pair#p=");
     expect(markup).toContain("Control from your phone");
+    const panelCsp = (await fetch(`${cockpitBase}/workspace/remote`)).headers.get("content-security-policy") ?? "";
+    expect(panelCsp).toContain("form-action 'self'");
   });
 
   test("the cockpit's status rail links to the panel and shows the remote state in words", async () => {
