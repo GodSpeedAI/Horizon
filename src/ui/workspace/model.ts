@@ -95,6 +95,12 @@ export interface WorkspaceOnboardingStep {
   readonly fix: string | null;
 }
 
+/** The phone remote's status-rail item: its state, and the words the rail shows. */
+export interface WorkspaceRemoteRail {
+  readonly state: string;
+  readonly label: string;
+}
+
 export interface WorkspaceChrome {
   readonly status: WorkspaceStatus;
   readonly onboarding: {
@@ -107,6 +113,8 @@ export interface WorkspaceChrome {
   readonly caseError: string | null;
   readonly receipt: WorkspaceReceipt | null;
   readonly moves: readonly WorkspaceMove[];
+  /** The phone remote's rail item; absent when the page is rendered without remote state. */
+  readonly remote?: WorkspaceRemoteRail;
 }
 
 export interface WorkspaceBlocked {
