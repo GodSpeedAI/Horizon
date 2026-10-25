@@ -198,6 +198,7 @@ You're now activated: the Getting started panel goes away, and **Your governed m
 - **Change what needs approval.** Edit `~/.local/share/horizon/cell/policy.yaml`. SEA-Forge rereads the policy on every decision, so edits apply without a restart. Add `requires_approval: true` to a rule to make its commits wait for you, or set `verdict: deny` to refuse them.
 - **Use the terminal instead.** `bun run src/main.ts frame --text` prints the same frame, and `bun run src/main.ts act --operation horizon.health` commits through the same pipeline. To keep them governed, run them with the environment `bun run ignite` sets (see `scripts/ignite.ts`).
 - **Stop.** Press Ctrl+C in the ignite terminal. That stops the cockpit and SEA-Forge together.
+- **Control from your phone.** Run `bun run ignite --remote` (or `--remote https://your-host` for a tunnel you run), then start remote control from the cockpit's panel and scan the QR. Nothing starts until you press Start. See [REMOTE](REMOTE.md).
 
 ## Where things live
 

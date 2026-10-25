@@ -17,6 +17,7 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { loadWorld } from "../src/adapters/semantic.ts";
 import { NAVIGATION_INTENT_COMMIT } from "../src/capabilities/navigation-intent.ts";
+import { REMOTE_DEFAULT_PORT, publicOriginOf } from "../src/remote/settings.ts";
 
 const args = process.argv.slice(2);
 const opt = (name: string) => {
@@ -24,10 +25,14 @@ const opt = (name: string) => {
   return i === -1 ? undefined : args[i + 1];
 };
 if (args.includes("--help")) {
-  console.log(`usage: bun run ignite [--cell DIR] [--approve-commits]
+  console.log(`usage: bun run ignite [--cell DIR] [--approve-commits] [--remote [PUBLIC_URL]] [--remote-port N]
 
   --cell DIR          cell directory (default: $XDG_DATA_HOME/horizon/cell)
   --approve-commits   on first run, write a policy where every commit needs your approval
+  --remote [URL]      make phone remote control available: a loopback listener on 127.0.0.1:4320,
+                      or, with URL (https://host), a public origin your tunnel serves. Nothing is
+                      started until you press Start in the cockpit's panel, and no tunnel is started.
+  --remote-port N     the loopback port for the phone listener (default 4320)
 
   SEA_FORGE_SERVER_BIN and REALITYTRACE_BIN override the binaries found on PATH.`);
   process.exit(0);
@@ -36,6 +41,13 @@ if (args.includes("--help")) {
 const repo = resolve(import.meta.dir, "..");
 const dataHome = process.env.XDG_DATA_HOME?.trim() || join(homedir(), ".local", "share");
 const cell = resolve(opt("cell") ?? join(dataHome, "horizon", "cell"));
+// --remote [PUBLIC_URL]: the settings the cockpit panel's Start uses. The listener itself stays off until then.
+const remoteFlag = args.indexOf("--remote");
+const remoteArg = remoteFlag === -1 ? undefined : args[remoteFlag + 1];
+const remote = remoteFlag === -1 ? null : {
+  port: opt("remote-port") ?? String(REMOTE_DEFAULT_PORT),
+  publicUrl: remoteArg !== undefined && !remoteArg.startsWith("--") ? publicOriginOf(remoteArg) : null,
+};
 
 function fail(what: string, fix: string): never {
   console.error(`ignite: ${what}\n  fix: ${fix}`);
@@ -168,6 +180,11 @@ const world = loadWorld((Bun.TOML.parse(readFileSync(configPath, "utf8")) as { w
 console.log(`ignite: cell ${cell}`);
 console.log(`ignite: SEA-Forge ${server} (log ${logPath})`);
 console.log(`ignite: RealityTrace ${rt}`);
+if (remote !== null) {
+  const cockpitPort = (Bun.TOML.parse(readFileSync(configPath, "utf8")) as { port?: number }).port ?? 4319;
+  console.log(`ignite: phone remote available: ${remote.publicUrl ?? `listener 127.0.0.1:${remote.port}, this machine only`}`);
+  console.log(`ignite: start it from http://127.0.0.1:${cockpitPort}/workspace/remote`);
+}
 const cockpit = spawn("bun", ["run", "src/main.ts"], {
   cwd: repo,
   stdio: "inherit",
@@ -182,6 +199,7 @@ const cockpit = spawn("bun", ["run", "src/main.ts"], {
     COGNATE_REALITYTRACE_BIN: rt,
     COGNATE_REALITYTRACE_DATA_HOME: rtData,
     COGNATE_REALITYTRACE_STATE_HOME: rtState,
+    ...(remote === null ? {} : { HORIZON_REMOTE_PORT: remote.port, ...(remote.publicUrl === null ? {} : { HORIZON_REMOTE_PUBLIC_URL: remote.publicUrl }) }),
   },
 });
 children.push(cockpit);

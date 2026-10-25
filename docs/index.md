@@ -127,6 +127,7 @@ flowchart TD
 | --- | --- |
 | Explore system behavior interactively | [Interactive explainers](explainers/index.md) (affordance simulator & debugger workbench) |
 | Install the whole stack on a new machine and reach the cockpit | [IGNITION](IGNITION.md) |
+| Control Horizon from a phone, passkey-paired | [phone remote control](REMOTE.md) |
 | Run Horizon, see what it does | [how-to: run and inspect](how-to.md#run-the-application) |
 | Understand the architecture | [architecture](architecture.md) |
 | Understand a subsystem in depth | [subsystems](documentation-map.md) |
