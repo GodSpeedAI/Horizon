@@ -31,7 +31,82 @@ export interface WorkspaceFrameRef {
 export interface WorkspaceContextElement {
   readonly id: "observer" | "world" | "checkpoint" | "focus" | "case" | "frame";
   readonly label: string;
+  /** The full reference, as the frame carries it. */
   readonly value: string;
+  /** The readable short form shown by default; the full value stays one disclosure away. */
+  readonly short: string;
+}
+
+/** Readable short form of a reference: the full value is kept elsewhere, never truncated silently. */
+export function shortRef(value: string): string {
+  const checkpoint = /^cognate-checkpoint\/\d+@(\d+)/.exec(value);
+  if (checkpoint) return `position ${checkpoint[1]}`;
+  const digest = /sha256:([0-9a-f]{8})[0-9a-f]*/.exec(value);
+  if (digest) return value.replace(/^world:/, "").replace(/sha256:[0-9a-f]+/, digest[1]!);
+  return value.length <= 24 ? value : `${value.slice(0, 16)}…${value.slice(-6)}`;
+}
+
+/** Process state for the status rail. Each state is text; the glyph only repeats it. */
+export interface WorkspaceStatus {
+  readonly world: string;
+  readonly world_full: string;
+  readonly governed: boolean;
+  readonly realitytrace: boolean;
+  readonly approvals: boolean;
+  readonly operator: string;
+}
+
+/** One claim about a commit. `state` is machine-readable; `text` is the sentence a reader sees. */
+export interface WorkspaceClaim {
+  readonly state: string;
+  readonly text: string;
+  /** The full recorded reason, when `text` shows only its plain part. */
+  readonly raw?: string;
+}
+
+/** The three claims about one commit (or refusal, or wait), plus its settlement. Never merged. */
+export interface WorkspaceMove {
+  readonly intent_id: string;
+  readonly operation_ref: string;
+  readonly at: string | null;
+  readonly decided: WorkspaceClaim;
+  readonly recorded: WorkspaceClaim;
+  readonly observed: WorkspaceClaim;
+  readonly settlement: WorkspaceClaim;
+  /** The escalation a human can answer, when the commit is awaiting approval. */
+  readonly approval_id: string | null;
+  /** Settlement can be requested explicitly: governed, recorded, and not yet final. */
+  readonly settleable: boolean;
+}
+
+export interface WorkspaceReceipt {
+  readonly intent_id: string;
+  readonly found: boolean;
+  readonly move: WorkspaceMove | null;
+  readonly approvals: boolean;
+}
+
+export interface WorkspaceOnboardingStep {
+  readonly id: "stack" | "case" | "move";
+  readonly label: string;
+  readonly done: boolean;
+  readonly detail: string;
+  /** The exact fix for a missing piece, or null when nothing is missing. */
+  readonly fix: string | null;
+}
+
+export interface WorkspaceChrome {
+  readonly status: WorkspaceStatus;
+  readonly onboarding: {
+    readonly visible: boolean;
+    readonly skipped: boolean;
+    readonly steps: readonly WorkspaceOnboardingStep[];
+  };
+  readonly openCase: { readonly case_ref: string; readonly purpose: string; readonly opened_at: string } | null;
+  /** A fixed, typed reason from the case form; never the submitted text. */
+  readonly caseError: string | null;
+  readonly receipt: WorkspaceReceipt | null;
+  readonly moves: readonly WorkspaceMove[];
 }
 
 export interface WorkspaceBlocked {
@@ -197,6 +272,8 @@ export interface WorkspaceSnapshot {
   readonly state: WorkspaceState;
   readonly state_message: string;
   readonly theme: WorkspaceTheme;
+  /** False when no theme was asked for, so the page follows the OS preference and sets no attribute. */
+  readonly theme_chosen: boolean;
   readonly frame: NavigationFrame;
   readonly current: WorkspaceFrameRef;
   readonly context: readonly WorkspaceContextElement[];
@@ -425,6 +502,8 @@ export function workspaceState(input: {
   readonly objects: number;
   readonly choices: number;
   readonly decision: NavigationFrame["decision"];
+  /** Surface actions this operator can submit now. */
+  readonly submittable?: number;
 }): { readonly state: WorkspaceState; readonly message: string } {
   if (input.error !== undefined && input.error !== null) {
     return { state: "error", message: `The workspace could not be read (${input.error.code}). No decision is being shown.` };
@@ -436,7 +515,10 @@ export function workspaceState(input: {
     return { state: "unknown", message: "The checkpoint is unknown. This view is not evidence of the current world." };
   }
   if (input.decision === "no_affordance") {
-    return { state: "blocked", message: "No move is available from this focus yet. The blocked reasons are shown below." };
+    const submittable = input.submittable ?? 0;
+    return submittable > 0
+      ? { state: "blocked", message: `${submittable} ${submittable === 1 ? "move is" : "moves are"} available from this focus. Blocked moves show their reasons below.` }
+      : { state: "blocked", message: "No move is available from this focus yet. The blocked reasons are shown below." };
   }
   if (input.unresolved > 0) {
     return { state: "partial", message: "Some evidence could not be resolved. Unresolved sources are shown as unknown, never invented." };
@@ -451,6 +533,18 @@ export function scopeOf(frame: NavigationFrame, current: WorkspaceFrameRef): Wor
 function bannerFor(scope: WorkspaceScope, frame: NavigationFrame, current: WorkspaceFrameRef): string {
   if (scope === "current") return `Current frame ${frame.frame_id} at revision ${frame.revision}.`;
   return `Historical frame ${frame.frame_id} revision ${frame.revision}. The current frame is ${current.frame_id} revision ${current.revision}; this view is not current world state.`;
+}
+
+function contextOf(frame: NavigationFrame): WorkspaceContextElement[] {
+  const element = (id: WorkspaceContextElement["id"], label: string, value: string): WorkspaceContextElement => ({ id, label, value, short: shortRef(value) });
+  return [
+    element("observer", "Observer", frame.observer_ref),
+    element("world", "World", frame.world_ref),
+    element("checkpoint", "Checkpoint", frame.checkpoint_ref ?? "unknown"),
+    element("focus", "Focus", frame.focus_ref),
+    element("case", "Case", frame.case_ref ?? "not derived"),
+    { id: "frame", label: "Frame", value: `${frame.frame_id} revision ${frame.revision}`, short: `revision ${frame.revision}` },
+  ];
 }
 
 /**
@@ -470,6 +564,7 @@ export function buildWorkspace(input: WorkspaceInput): WorkspaceSnapshot {
     objects: input.objects.length,
     choices: input.frame.choices.length,
     decision: input.frame.decision,
+    submittable: input.view.actions.filter((action) => action.posture === "offered" && action.affordance === "available").length,
   });
   const notices: WorkspaceNotice[] = [
     { tone: "scope", text: bannerFor(scope, input.frame, input.current) },
@@ -481,21 +576,15 @@ export function buildWorkspace(input: WorkspaceInput): WorkspaceSnapshot {
       text: `${input.view.notes.length} agent layout/provenance claim(s) were reduced; owner order is unchanged.`,
     });
   }
-  const context: WorkspaceContextElement[] = [
-    { id: "observer", label: "Observer", value: input.frame.observer_ref },
-    { id: "world", label: "World", value: input.frame.world_ref },
-    { id: "checkpoint", label: "Checkpoint", value: input.frame.checkpoint_ref ?? "unknown" },
-    { id: "focus", label: "Focus", value: input.frame.focus_ref },
-    { id: "case", label: "Case", value: input.frame.case_ref ?? "not derived" },
-    { id: "frame", label: "Frame", value: `${input.frame.frame_id} revision ${input.frame.revision}` },
-  ];
+  const context = contextOf(input.frame);
   return Object.freeze({
     schema: WORKSPACE_SCHEMA,
     scope,
     scope_banner: bannerFor(scope, input.frame, input.current),
     state: state.state,
     state_message: state.message,
-    theme: input.theme ?? "dark",
+    theme: input.theme ?? "light",
+    theme_chosen: input.theme !== undefined,
     frame: input.frame,
     current: input.current,
     context: Object.freeze(context),
@@ -520,7 +609,7 @@ export function buildWorkspace(input: WorkspaceInput): WorkspaceSnapshot {
 export function loadingWorkspace(
   frame: NavigationFrame,
   current: WorkspaceFrameRef,
-  theme: WorkspaceTheme = "dark",
+  theme: WorkspaceTheme | undefined = undefined,
 ): WorkspaceSnapshot {
   return Object.freeze({
     schema: WORKSPACE_SCHEMA,
@@ -528,17 +617,11 @@ export function loadingWorkspace(
     scope_banner: bannerFor(scopeOf(frame, current), frame, current),
     state: "loading",
     state_message: "Reading the workspace. No decision is available until the read completes.",
-    theme,
+    theme: theme ?? "light",
+    theme_chosen: theme !== undefined,
     frame,
     current,
-    context: Object.freeze([
-      { id: "observer", label: "Observer", value: frame.observer_ref } satisfies WorkspaceContextElement,
-      { id: "world", label: "World", value: frame.world_ref } satisfies WorkspaceContextElement,
-      { id: "checkpoint", label: "Checkpoint", value: frame.checkpoint_ref ?? "unknown" } satisfies WorkspaceContextElement,
-      { id: "focus", label: "Focus", value: frame.focus_ref } satisfies WorkspaceContextElement,
-      { id: "case", label: "Case", value: frame.case_ref ?? "not derived" } satisfies WorkspaceContextElement,
-      { id: "frame", label: "Frame", value: `${frame.frame_id} revision ${frame.revision}` } satisfies WorkspaceContextElement,
-    ]),
+    context: Object.freeze(contextOf(frame)),
     regions: fixedRegions(),
     choices: Object.freeze([]),
     blocked: Object.freeze([]),
@@ -554,4 +637,184 @@ export function loadingWorkspace(
     debugger: null,
     retrieval: null,
   });
+}
+
+/** The status rail: each item is read from configuration or stored records, never assumed. */
+export function statusOf(input: {
+  readonly worldRef: string;
+  readonly governed: boolean;
+  readonly realitytrace: boolean;
+  readonly approvals: boolean;
+  readonly operator: string;
+}): WorkspaceStatus {
+  return Object.freeze({
+    world: shortRef(input.worldRef),
+    world_full: input.worldRef,
+    governed: input.governed,
+    realitytrace: input.realitytrace,
+    approvals: input.approvals,
+    operator: input.operator,
+  });
+}
+
+/**
+ * The first-run path. Steps derive from stored state: the stack from configuration, the case and the
+ * first commit from records. Only the operator's skip choice is persisted, and a committed move ends
+ * the path for good.
+ */
+export function onboardingOf(input: {
+  readonly governed: boolean;
+  readonly realitytrace: boolean;
+  readonly caseOpen: boolean;
+  readonly committed: boolean;
+  readonly skipped: boolean;
+}): WorkspaceChrome["onboarding"] {
+  const missing: string[] = [];
+  if (!input.governed) missing.push("SEA-Forge governance is off");
+  if (!input.realitytrace) missing.push("RealityTrace is not configured");
+  const stackDone = missing.length === 0;
+  const steps: WorkspaceOnboardingStep[] = [
+    {
+      id: "stack",
+      label: "Connect the stack",
+      done: stackDone,
+      detail: stackDone
+        ? "SEA-Forge governs commits and RealityTrace observes them."
+        : `Missing: ${missing.join(" and ")}.`,
+      fix: stackDone ? null : "Start the cockpit with bun run ignite (see docs/IGNITION.md).",
+    },
+    {
+      id: "case",
+      label: "Open a case",
+      done: input.caseOpen,
+      detail: "Say what you are trying to move forward. The case frames this workspace and is stored.",
+      fix: null,
+    },
+    {
+      id: "move",
+      label: "Commit your first governed move",
+      done: input.committed,
+      detail: "SEA-Forge decides whether the move is committed, and RealityTrace observes what happened.",
+      fix: null,
+    },
+  ];
+  return Object.freeze({
+    visible: !input.committed && !input.skipped,
+    skipped: input.skipped,
+    steps: Object.freeze(steps),
+  });
+}
+
+/** What the store holds for one intent id, reduced to the facts the claims are judged on. */
+export interface StoredMoveFacts {
+  readonly intent_id: string;
+  readonly operation_ref: string;
+  /** The committed record, when one exists. `expected` is true when the operation names an outcome to settle. */
+  readonly committed: { readonly at: string; readonly expected: boolean } | null;
+  /** The latest audited attempt, when one exists. */
+  readonly attempt: { readonly outcome: "accepted" | "refused" | "awaiting_authority"; readonly reason: string | null } | null;
+  readonly settlement: {
+    readonly status: string;
+    readonly final: boolean;
+    readonly reason: string | null;
+    readonly observation: { readonly evidence_id?: string; readonly sxr_observation_id?: string; readonly target_ref?: string } | null;
+  } | null;
+  readonly at: string | null;
+}
+
+/** The three claims, kept apart: who decided, what recorded it, what observed it. */
+export function moveOf(facts: StoredMoveFacts, context: { readonly governed: boolean; readonly realitytrace: boolean }): WorkspaceMove {
+  const { committed, attempt, settlement } = facts;
+  const awaiting = attempt?.outcome === "awaiting_authority" && committed === null;
+  const approvalId = awaiting ? (/awaiting approval (\S+)$/.exec(attempt?.reason ?? "")?.[1] ?? null) : null;
+  let decided: WorkspaceClaim;
+  if (committed) {
+    decided = context.governed
+      ? { state: "allowed", text: "Allowed by SEA-Forge." }
+      : { state: "policy_only", text: "Horizon policy only: SEA-Forge is off." };
+  } else if (awaiting) {
+    decided = { state: "awaiting", text: "Awaiting your approval at SEA-Forge." };
+  } else {
+    const reason = attempt?.reason ?? "no reason was recorded";
+    decided = { state: "refused", text: `${refusedBy(reason, context.governed)}: ${refusalText(reason)}.`, ...(refusalText(reason) === reason ? {} : { raw: reason }) };
+  }
+  const recorded: WorkspaceClaim = committed
+    ? { state: "recorded", text: `Recorded by Horizon, ${readableTime(committed.at)}.` }
+    : { state: "not_recorded", text: "Not recorded: no intent record was written." };
+  let observed: WorkspaceClaim;
+  if (settlement?.observation) {
+    const ref = settlement.observation.evidence_id ?? settlement.observation.sxr_observation_id ?? settlement.observation.target_ref ?? "recorded";
+    observed = { state: "observed", text: `Observed by RealityTrace: ${ref}.` };
+  } else if (!committed) {
+    observed = { state: "not_applicable", text: "Not applicable: nothing was committed, so nothing was observed." };
+  } else if (settlement?.status === "not_required") {
+    observed = { state: "not_required", text: "Not required: this operation names no outcome for RealityTrace to observe." };
+  } else if (!context.realitytrace) {
+    observed = { state: "unavailable", text: "Unavailable: RealityTrace is off. Start the cockpit with bun run ignite to observe commits." };
+  } else if (settlement?.reason) {
+    observed = { state: "unavailable", text: `Unavailable: ${settlement.reason}.` };
+  } else {
+    observed = { state: "pending", text: "Not observed yet. Observe and settle below to have RealityTrace record this commit." };
+  }
+  let settlementClaim: WorkspaceClaim;
+  if (settlement) {
+    const meaning = SETTLEMENT_MEANING[settlement.status] ?? settlement.status;
+    settlementClaim = {
+      state: settlement.status,
+      text: `${meaning}${settlement.final ? " This answer is final." : ""}${settlement.reason ? ` Reason: ${settlement.reason}.` : ""}`,
+    };
+  } else if (!committed) {
+    settlementClaim = { state: "not_applicable", text: "Not applicable: nothing was committed." };
+  } else if (!committed.expected) {
+    settlementClaim = { state: "not_required", text: "No expected outcome is named, so SEA-Forge can rule on the evidence but has no outcome to settle." };
+  } else {
+    settlementClaim = { state: "pending", text: "Not settled yet." };
+  }
+  return Object.freeze({
+    intent_id: facts.intent_id,
+    operation_ref: facts.operation_ref,
+    at: committed?.at ?? facts.at,
+    decided,
+    recorded,
+    observed,
+    settlement: settlementClaim,
+    approval_id: approvalId,
+    // Offered until SEA-Forge has answered, and again while a settlement window is still open.
+    settleable:
+      context.governed && context.realitytrace && committed !== null && settlement?.final !== true &&
+      (settlement === null || settlement === undefined || settlement.status === "pending" || settlement.status === "unavailable"),
+  });
+}
+
+/** Name who refused a commit only when the recorded reason shows it; never credit SEA-Forge with Horizon's own checks. */
+export function refusedBy(reason: string, governed: boolean): string {
+  if (/IntentError|failed_precondition|invalid_argument|^(INTENT|HEALTH|SURFACE|WORKSPACE):/.test(reason)) return "Refused by Horizon's own checks";
+  if (!governed) return "Refused by Horizon policy";
+  if (/\b(deny|denied|authority refused)\b|SEA-Forge/i.test(reason)) return "Refused by SEA-Forge";
+  return "Refused";
+}
+
+/** Plain statements of SEA-Forge's settlement answers; never stronger than the status itself. */
+const SETTLEMENT_MEANING: Readonly<Record<string, string>> = {
+  settled: "Settled: SEA-Forge found the evidence proves the expected outcome.",
+  unsettled: "Unsettled: SEA-Forge recorded the evidence, and it does not prove an expected outcome.",
+  rejected: "Rejected: SEA-Forge found the evidence contradicts the expected outcome.",
+  refused: "Refused: SEA-Forge would not accept the evidence.",
+  unavailable: "Unavailable: no settlement answer could be obtained.",
+  not_required: "Not required for this operation.",
+  pending: "Pending: the settlement window is still open.",
+};
+
+/** An ISO time as `25 Oct 2026, 01:44:34 UTC`; anything unparseable is shown as stored. */
+export function readableTime(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return iso;
+  const day = at.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  return `${day}, ${at.toISOString().slice(11, 19)} UTC`;
+}
+
+/** The reason a refusal carries, without the invocation wrapper: `"reason"` or `"message"` when present. */
+export function refusalText(reason: string): string {
+  const inner = /"(?:reason|message)"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(reason);
+  return inner ? inner[1]!.replace(/\\"/g, '"') : reason;
 }

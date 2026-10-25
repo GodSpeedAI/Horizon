@@ -10,7 +10,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
-import { buildLineage, buildWorkspace, scopeOf, WORKSPACE_REGION_ORDER } from "../src/ui/workspace/model.ts";
+import { buildLineage, buildWorkspace, moveOf, onboardingOf, scopeOf, shortRef, workspaceState, WORKSPACE_REGION_ORDER } from "../src/ui/workspace/model.ts";
 import type { GuiView, ProjectedNode } from "../src/ui/surface2/project.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
@@ -197,5 +197,86 @@ describe("T09 workspace projection", () => {
     expect(scopeOf(frame, { frame_id: "frame:a", revision: 2 })).toBe("current");
     expect(scopeOf(frame, { frame_id: "frame:a", revision: 1 })).toBe("historical");
     expect(scopeOf(frame, { frame_id: "frame:b", revision: 2 })).toBe("historical");
+  });
+});
+
+/** First-run derivations are pure: the same stored facts always give the same claims. */
+describe("first-run derivations", () => {
+  const governed = { governed: true, realitytrace: true };
+  const ungoverned = { governed: false, realitytrace: false };
+
+  test("short refs keep the readable part and the digest prefix", () => {
+    expect(shortRef("world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290")).toBe("horizon@701d6211");
+    expect(shortRef("obj:strategy:alpha")).toBe("obj:strategy:alpha");
+    expect(shortRef("case:0123456789abcdef0123456789abcdef")).toBe("case:0123456789a…abcdef");
+  });
+
+  test("ungoverned onboarding names the missing pieces and the exact fix, and nothing is checked", () => {
+    const off = onboardingOf({ ...ungoverned, caseOpen: false, committed: false, skipped: false });
+    expect(off.visible).toBe(true);
+    expect(off.steps.map((step) => step.done)).toEqual([false, false, false]);
+    expect(off.steps[0]!.detail).toBe("Missing: SEA-Forge governance is off and RealityTrace is not configured.");
+    expect(off.steps[0]!.fix).toBe("Start the cockpit with bun run ignite (see docs/IGNITION.md).");
+    const on = onboardingOf({ ...governed, caseOpen: true, committed: false, skipped: false });
+    expect(on.steps[0]!.done).toBe(true);
+    expect(on.steps[0]!.fix).toBeNull();
+  });
+
+  test("skip hides the path until it is resumed, and the first commit ends it for good", () => {
+    expect(onboardingOf({ ...ungoverned, caseOpen: false, committed: false, skipped: true }).visible).toBe(false);
+    expect(onboardingOf({ ...ungoverned, caseOpen: false, committed: false, skipped: false }).visible).toBe(true);
+    expect(onboardingOf({ ...governed, caseOpen: true, committed: true, skipped: false }).visible).toBe(false);
+  });
+
+  test("a governed refusal is attributed to SEA-Forge and states that nothing was recorded", () => {
+    const move = moveOf(
+      { intent_id: "intent-1", operation_ref: "horizon.health", committed: null, attempt: { outcome: "refused", reason: "policy denied" }, settlement: null, at: "2026-10-24T00:00:00.000Z" },
+      governed,
+    );
+    expect(move.decided).toEqual({ state: "refused", text: "Refused by SEA-Forge: policy denied." });
+    expect(move.recorded.state).toBe("not_recorded");
+    expect(move.observed.state).toBe("not_applicable");
+    expect(move.settleable).toBe(false);
+  });
+
+  test("an escalated commit waits on the approval named in its stored attempt", () => {
+    const move = moveOf(
+      { intent_id: "intent-2", operation_ref: "horizon.health", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:42" }, settlement: null, at: null },
+      governed,
+    );
+    expect(move.decided.state).toBe("awaiting");
+    expect(move.approval_id).toBe("approval:42");
+  });
+
+  test("an ungoverned commit is policy only, never SEA-Forge's decision, and is not observed", () => {
+    const move = moveOf(
+      { intent_id: "intent-3", operation_ref: "horizon.health", committed: { at: "2026-10-24T00:00:00.000Z", expected: false }, attempt: null, settlement: null, at: null },
+      ungoverned,
+    );
+    expect(move.decided.text).toBe("Horizon policy only: SEA-Forge is off.");
+    expect(move.settlement.state).toBe("not_required");
+    expect(move.observed.state).toBe("unavailable");
+    expect(move.settleable).toBe(false);
+  });
+
+  test("a governed commit with an observation names the evidence and can be settled until it is final", () => {
+    const facts = {
+      intent_id: "intent-4",
+      operation_ref: "product.apply",
+      committed: { at: "2026-10-24T00:00:00.000Z", expected: true },
+      attempt: null,
+      settlement: { status: "pending", final: false, reason: null, observation: { evidence_id: "ev-1", sxr_observation_id: "sxr-1" } },
+      at: null,
+    };
+    const move = moveOf(facts, governed);
+    expect(move.observed).toEqual({ state: "observed", text: "Observed by RealityTrace: ev-1." });
+    expect(move.settleable).toBe(true);
+    expect(moveOf({ ...facts, settlement: { ...facts.settlement, final: true } }, governed).settleable).toBe(false);
+  });
+
+  test("the no-affordance message names the moves that can still be committed", () => {
+    const base = { unresolved: 0, checkpointKnown: true, objects: 1, choices: 1, decision: "no_affordance" as const };
+    expect(workspaceState({ ...base, submittable: 2 }).message).toBe("2 moves are available from this focus. Blocked moves show their reasons below.");
+    expect(workspaceState({ ...base, submittable: 0 }).message).toBe("No move is available from this focus yet. The blocked reasons are shown below.");
   });
 });

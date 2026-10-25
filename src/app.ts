@@ -7,7 +7,8 @@ import { observeResearch, requireResearch, type ResearchStatus } from "./adapter
 import { loadConfig } from "./config/load.ts";
 import type { LoadedConfig } from "./config/types.ts";
 import { createHorizonRuntime, type HorizonRuntime } from "./runtime/create.ts";
-import { appendIntentAttempt, appendIntentRecord, createFrameRegister, NAVIGATION_INTENT_COMMIT, navigationIntentComponent, readIntentRecords, type FrameRegister, type IntentAttempt } from "./capabilities/navigation-intent.ts";
+import { appendIntentAttempt, appendIntentRecord, createFrameRegister, NAVIGATION_INTENT_COMMIT, navigationIntentComponent, readIntentAttempts, readIntentRecords, type FrameRegister, type IntentAttempt } from "./capabilities/navigation-intent.ts";
+import { checkPurpose, latestCase, onboardingSkipped, openCase, setOnboardingSkipped } from "./capabilities/workspace-records.ts";
 import { CONTRACT_VERSION, contractVersionOf } from "./capabilities/capacity-ledger.ts";
 import { activateContract } from "./capabilities/contract-upgrade.ts";
 import { RealityTraceObligation } from "./adapters/realitytrace-obligation.ts";
@@ -45,7 +46,21 @@ import {
 } from "./ui/surface.ts";
 import { publishSurfaceSchema, SURFACE_SCHEMA, type SurfaceRole } from "./ui/surface2/grammar.ts";
 import { renderHtml, renderText } from "./ui/surface2/render.ts";
-import { buildWorkspace, type WorkspaceDebugger, type WorkspaceFrameRef, type WorkspaceRetrieval, type WorkspaceSnapshot, type WorkspaceTheme } from "./ui/workspace/model.ts";
+import {
+  buildWorkspace,
+  moveOf,
+  onboardingOf,
+  statusOf,
+  type StoredMoveFacts,
+  type WorkspaceChrome,
+  type WorkspaceDebugger,
+  type WorkspaceFrameRef,
+  type WorkspaceMove,
+  type WorkspaceReceipt,
+  type WorkspaceRetrieval,
+  type WorkspaceSnapshot,
+  type WorkspaceTheme,
+} from "./ui/workspace/model.ts";
 import { debuggerView, inspect, missingRetrieval } from "./ui/workspace/inspect.ts";
 import type { ContextKernelAdapter, ContextReferenceAnswer } from "./adapters/context-kernel.ts";
 import { CONTEXT_REFERENCE } from "./capabilities/context.ts";
@@ -68,6 +83,8 @@ export interface SurfaceIntentRequestBody {
   /** CLI/MCP: the operation the caller named. */
   readonly operation?: unknown;
   readonly frame_id?: unknown;
+  /** GUI: the intent id the receipt will name, so a refused or awaiting commit is addressable. */
+  readonly intent_id?: unknown;
 }
 
 export interface NavigationOptions {
@@ -316,7 +333,7 @@ export async function createApplication(
   }
 
   function audit(intent: CommitIntentInput, outcome: IntentAttempt["outcome"], reason: string | null) {
-    const attempt: IntentAttempt = { intent_id: intent.intent_id, actor_ref: intent.actor_ref, caller_ref: caller.actor.id, outcome, reason, at: new Date().toISOString() };
+    const attempt: IntentAttempt = { intent_id: intent.intent_id, actor_ref: intent.actor_ref, caller_ref: caller.actor.id, outcome, reason, at: new Date().toISOString(), operation_ref: intent.operation_ref };
     return appendIntentAttempt(runtime.runtime.store, { attempt, tenant: caller.tenant, scopeId: `horizon-${caller.tenant}` });
   }
 
@@ -373,6 +390,7 @@ export async function createApplication(
       const wait = (await runtime.runtime.service.listContinuations(caller, { runId: view.runId, status: "OPEN" })).find((c) => c.type === "governance-approval");
       const approvalId = (wait?.condition as { approvalId?: unknown } | undefined)?.approvalId;
       if (typeof approvalId !== "string") throw new Error(`INTENT: governed commit run ${view.runId} waits on something other than SEA-Forge`);
+      frames.retain(intent.frame_id);
       await audit(intent, "awaiting_authority", `SEA-Forge escalated; awaiting approval ${approvalId}`);
       throw new AwaitingAuthorityError(intent, view.runId, approvalId);
     }
@@ -754,7 +772,8 @@ export async function createApplication(
       return { ok: false, code: "not_affordable", message: `SURFACE: ${bound.intent.operation} is ${match.affordance}` };
     }
     try {
-      return { ok: true, result: await commitNavigationIntent({ operationRef: bound.intent.operation }), bound };
+      const intentId = typeof submission.intent_id === "string" && submission.intent_id !== "" ? submission.intent_id : undefined;
+      return { ok: true, result: await commitNavigationIntent({ operationRef: bound.intent.operation, ...(intentId === undefined ? {} : { intentId }) }), bound };
     } catch (error) {
       if (error instanceof AwaitingAuthorityError) return { ok: false, code: error.code, message: error.message };
       throw error;
@@ -789,6 +808,8 @@ export async function createApplication(
     if (!read.ok) throw new Error(`NAVIGATION: operational projection is unavailable: ${read.reason}`);
     const objects = [...read.view.objects].sort((left, right) => (left.object_ref < right.object_ref ? -1 : left.object_ref > right.object_ref ? 1 : 0));
     const focus = options.focusRef ?? objects[0]?.object_ref ?? `focus:${world.worldRef}`;
+    // The operator's latest open case frames the workspace unless a caller names its own case or purpose.
+    const activeCase = options.caseRef === undefined && options.purpose === undefined ? await latestCase(runtime.runtime.store, caller.tenant) : null;
     const frame = buildOperationalFrame(
       {
         observer_ref: caller.actor.id,
@@ -796,8 +817,8 @@ export async function createApplication(
         world_ref: world.worldRef,
         checkpoint_ref: checkpointOf(read.view),
         focus_ref: focus,
-        case_ref: options.caseRef ?? `case:${focus}`,
-        purpose: options.purpose ?? "keep the focused object inside its declared direction",
+        case_ref: options.caseRef ?? activeCase?.case_ref ?? `case:${focus}`,
+        purpose: options.purpose ?? activeCase?.purpose ?? "keep the focused object inside its declared direction",
         direction_ref: options.directionRef ?? `direction:${focus}`,
         direction_statement: options.directionStatement ?? "navigate the focused object without changing the world",
         projection: read.view,
@@ -972,6 +993,91 @@ export async function createApplication(
     }
   }
 
+  /** Authority and observation are on only when configured; nothing here assumes them. */
+  function cockpitStatus(): { readonly governed: boolean; readonly realitytrace: boolean; readonly approvals: boolean } {
+    return { governed: governance.mode === "sea-forge", realitytrace: realityTrace !== undefined, approvals: approvals !== undefined };
+  }
+
+  /** The stored facts about one intent: its committed record, its latest audited attempt and its settlement. */
+  async function storedMove(intentId: string): Promise<StoredMoveFacts | null> {
+    const store = runtime.runtime.store;
+    const row = (await readIntentRecords(store)).find((entry) => entry.record.intent_id === intentId && entry.event.tenant === caller.tenant);
+    const attempt = (await readIntentAttempts(store)).filter((entry) => entry.intent_id === intentId).at(-1) ?? null;
+    if (!row && !attempt) return null;
+    const settled = await latestSettlement(store, caller.tenant, intentId);
+    return {
+      intent_id: intentId,
+      operation_ref: row?.record.operation_ref ?? attempt?.operation_ref ?? "operation not recorded",
+      committed: row ? { at: row.event.occurredAt, expected: (row.record.expected_outcome ?? null) !== null } : null,
+      attempt: attempt === null ? null : { outcome: attempt.outcome, reason: attempt.reason },
+      settlement: settled
+        ? {
+            status: settled.settlement_reference.status,
+            final: settled.settlement_reference.final,
+            reason: settled.settlement_reference.reason ?? null,
+            observation: settled.realitytrace_observation ?? null,
+          }
+        : null,
+      at: attempt?.at ?? null,
+    };
+  }
+
+  /** The decision receipt for one intent id, read from stored records and never from the query text. */
+  async function receiptFor(intentId: string): Promise<WorkspaceReceipt> {
+    const facts = await storedMove(intentId);
+    return {
+      intent_id: intentId,
+      found: facts !== null,
+      move: facts === null ? null : moveOf(facts, cockpitStatus()),
+      approvals: approvals !== undefined,
+    };
+  }
+
+  /** The approval an escalated commit waits on, and the intent it belongs to; null when nothing waits on it. */
+  async function intentIdForApproval(approvalId: string): Promise<string | null> {
+    const waiting = (await readIntentAttempts(runtime.runtime.store)).filter((entry) => entry.outcome === "awaiting_authority" && entry.reason?.endsWith(` ${approvalId}`));
+    return waiting.at(-1)?.intent_id ?? null;
+  }
+
+  /** Governed moves, newest first: committed intents and refusals or waits, capped at twenty. */
+  async function recentMoves(limit = 20): Promise<WorkspaceMove[]> {
+    const store = runtime.runtime.store;
+    const latest = new Map<string, string>();
+    const note = (intentId: string, at: string) => {
+      if ((latest.get(intentId) ?? "") < at) latest.set(intentId, at);
+    };
+    for (const entry of await readIntentRecords(store)) {
+      if (entry.event.tenant === caller.tenant) note(entry.record.intent_id, entry.event.occurredAt);
+    }
+    for (const attempt of await readIntentAttempts(store)) {
+      if (attempt.intent_id !== null && attempt.outcome !== "accepted") note(attempt.intent_id, attempt.at);
+    }
+    const ids = [...latest.entries()].sort((left, right) => (left[1] < right[1] ? 1 : left[1] > right[1] ? -1 : 0)).slice(0, limit).map(([id]) => id);
+    const moves: WorkspaceMove[] = [];
+    for (const id of ids) {
+      const facts = await storedMove(id);
+      if (facts !== null) moves.push(moveOf(facts, cockpitStatus()));
+    }
+    return moves;
+  }
+
+  /** The first-run path, status rail, case, receipt and moves, all read from configuration and stored records. */
+  async function cockpitChrome(options: { readonly caseError?: string | null; readonly receipt?: string | null } = {}): Promise<WorkspaceChrome> {
+    const store = runtime.runtime.store;
+    const status = cockpitStatus();
+    const committed = (await readIntentRecords(store)).some((entry) => entry.event.tenant === caller.tenant);
+    const current = await latestCase(store, caller.tenant);
+    const skipped = await onboardingSkipped(store, caller.tenant, caller.actor.id);
+    return {
+      status: statusOf({ worldRef: world.worldRef, governed: status.governed, realitytrace: status.realitytrace, approvals: status.approvals, operator: caller.actor.id }),
+      onboarding: onboardingOf({ governed: status.governed, realitytrace: status.realitytrace, caseOpen: current !== null, committed, skipped }),
+      openCase: current === null ? null : { case_ref: current.case_ref, purpose: current.purpose, opened_at: current.opened_at },
+      caseError: options.caseError ?? null,
+      receipt: options.receipt ? await receiptFor(options.receipt) : null,
+      moves: await recentMoves(),
+    };
+  }
+
   return {
     loaded,
     world,
@@ -993,11 +1099,16 @@ export async function createApplication(
     commitSurfaceIntent,
     researchContract: () => requireResearch(research),
     startServer(port = loaded.config.port): HttpServer {
-      return Bun.serve({
+      const server: HttpServer = Bun.serve({
         hostname: loaded.config.bind_host,
         port,
         async fetch(request) {
           const url = new URL(request.url);
+          // Every state-changing route checks Host and Origin first (DNS rebinding and cross-site POSTs).
+          if (request.method === "POST") {
+            const refused = crossSiteRefusal(request, server.port ?? port);
+            if (refused !== null) return refused;
+          }
           if (url.pathname === "/health") {
             const semantic = await runtime.runtime.service.invoke(caller, {
               capability: "horizon.semantics.world",
@@ -1078,12 +1189,17 @@ export async function createApplication(
               : Response.json({ ok: false, code: outcome.code, message: outcome.message }, { status: 409 });
           }
           if (url.pathname === "/workspace" && request.method === "GET") {
-            const theme = url.searchParams.get("theme") === "light" ? "light" as const : "dark" as const;
+            const theme = themeOf(url.searchParams.get("theme"));
             const evidenceRef = url.searchParams.get("evidence");
             const data = await workspace({
               ...(url.searchParams.get("focus") === null ? {} : { focusRef: url.searchParams.get("focus") as string }),
               ...(evidenceRef === null ? {} : { evidenceRef }),
-              theme,
+              ...(theme === undefined ? {} : { theme }),
+            });
+            const caseParam = url.searchParams.get("case_error");
+            const chrome = await cockpitChrome({
+              caseError: caseParam === "empty" || caseParam === "too_long" ? caseParam : null,
+              receipt: url.searchParams.get("receipt"),
             });
             // An `operation=` on the page is answered server-side and rendered with the frame it
             // was answered about, so the surface never shows an answer next to a different focus.
@@ -1102,20 +1218,21 @@ export async function createApplication(
               view: data.view,
               current: data.current,
               evidenceRef,
-              theme,
+              ...(theme === undefined ? {} : { theme }),
               expectedObjects: data.objects.length,
               debuggerAnswer: inspected?.debugger ?? null,
               retrievalAnswer: inspected?.retrieval ?? null,
+              chrome,
             });
             return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
           }
           if (url.pathname === "/workspace.json" && request.method === "GET") {
-            const theme = url.searchParams.get("theme") === "light" ? "light" as const : "dark" as const;
+            const theme = themeOf(url.searchParams.get("theme"));
             const evidenceRef = url.searchParams.get("evidence");
             const data = await workspace({
               ...(url.searchParams.get("focus") === null ? {} : { focusRef: url.searchParams.get("focus") as string }),
               ...(evidenceRef === null ? {} : { evidenceRef }),
-              theme,
+              ...(theme === undefined ? {} : { theme }),
             });
             return Response.json(data.snapshot, { headers: { "cache-control": "no-store" } });
           }
@@ -1163,8 +1280,8 @@ export async function createApplication(
             const submittedRevision = form.get("frame_revision");
             const focus = typeof form.get("focus") === "string" ? (form.get("focus") as string) : undefined;
             const evidence = typeof form.get("evidence") === "string" && (form.get("evidence") as string) !== "" ? (form.get("evidence") as string) : undefined;
-            const theme = form.get("theme") === "light" ? "light" as const : "dark" as const;
-            const data = await workspace({ ...(focus === undefined ? {} : { focusRef: focus }), ...(evidence === undefined ? {} : { evidenceRef: evidence }), theme });
+            const theme = themeOf(form.get("theme"));
+            const data = await workspace({ ...(focus === undefined ? {} : { focusRef: focus }), ...(evidence === undefined ? {} : { evidenceRef: evidence }), ...(theme === undefined ? {} : { theme }) });
             if (
               typeof submittedFrame !== "string" || submittedFrame === "" ||
               (submittedRevision !== null && String(data.frame.revision) !== String(submittedRevision))
@@ -1178,22 +1295,81 @@ export async function createApplication(
             if (action === undefined || action.posture !== "offered" || action.affordance !== "available") {
               return Response.json({ code: "not_available", message: `WORKSPACE: ${actionId} is not an available action in the current view` }, { status: 409 });
             }
-            const outcome = await commitSurfaceIntent({ transport: "gui", role: "human", node_id: actionId });
-            if (!outcome.ok) return Response.json({ code: outcome.code, message: outcome.message }, { status: 409 });
-            const query = new URLSearchParams({ result: `intent:${actionId}` });
+            // The intent id is chosen here, so every outcome that reached the store (committed, awaiting, refused) has a receipt.
+            const intentId = randomUUID();
+            let outcome: Awaited<ReturnType<typeof commitSurfaceIntent>> | null = null;
+            let failure: unknown = null;
+            try {
+              outcome = await commitSurfaceIntent({ transport: "gui", role: "human", node_id: actionId, intent_id: intentId });
+            } catch (error) {
+              failure = error;
+            }
+            const audited = (await readIntentAttempts(runtime.runtime.store)).some((entry) => entry.intent_id === intentId);
+            if (outcome !== null && !outcome.ok && outcome.code !== "awaiting_authority") {
+              return Response.json({ code: outcome.code, message: outcome.message }, { status: 409 });
+            }
+            if (failure !== null && !audited) throw failure;
+            const query = new URLSearchParams({ receipt: intentId });
             if (focus !== undefined) query.set("focus", focus);
             if (evidence !== undefined) query.set("evidence", evidence);
-            query.set("theme", theme);
-            return Response.redirect(`/workspace?${query.toString()}`, 303);
+            if (theme !== undefined) query.set("theme", theme);
+            return Response.redirect(`/workspace?${query.toString()}#receipt`, 303);
+          }
+          if (url.pathname === "/workspace/case" && request.method === "POST") {
+            const form = await request.formData().catch(() => null);
+            if (form === null) return Response.json({ code: "invalid_argument", message: "CASE: body is not a form" }, { status: 400 });
+            const check = checkPurpose(form.get("purpose"));
+            if (!check.ok) return Response.redirect(`/workspace?case_error=${check.code}#getting-started`, 303);
+            await openCase(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, purpose: check.purpose, now: new Date() });
+            return Response.redirect("/workspace#getting-started", 303);
+          }
+          if (url.pathname === "/workspace/onboarding/skip" && request.method === "POST") {
+            await setOnboardingSkipped(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, skipped: true, now: new Date() });
+            return Response.redirect("/workspace", 303);
+          }
+          if (url.pathname === "/workspace/onboarding/resume" && request.method === "POST") {
+            await setOnboardingSkipped(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, skipped: false, now: new Date() });
+            return Response.redirect("/workspace#getting-started", 303);
+          }
+          if (url.pathname === "/workspace/approval" && request.method === "POST") {
+            const form = await request.formData().catch(() => null);
+            const approvalId = form?.get("approval_id");
+            const decision = form?.get("decision");
+            if (typeof approvalId !== "string" || approvalId === "" || (decision !== "approve" && decision !== "reject")) {
+              return Response.json({ code: "invalid_argument", message: "APPROVAL: approval_id and decision (approve or reject) are required" }, { status: 400 });
+            }
+            const intentId = await intentIdForApproval(approvalId);
+            if (intentId === null) return Response.json({ code: "not_found", message: "APPROVAL: no escalated commit waits on this approval" }, { status: 404 });
+            try {
+              await resolveNavigationApproval({ approvalId, resolution: decision === "approve" ? "approved" : "rejected" });
+            } catch (error) {
+              // A rejected commit fails by design and is audited; its receipt says so. Anything else is refused here.
+              if (!(error instanceof Error && error.message.startsWith("INTENT: governed commit refused"))) {
+                return Response.json({ code: "approval_refused", message: error instanceof Error ? error.message : String(error) }, { status: 409 });
+              }
+            }
+            return Response.redirect(`/workspace?receipt=${encodeURIComponent(intentId)}#receipt`, 303);
+          }
+          if (url.pathname === "/workspace/settle" && request.method === "POST") {
+            const form = await request.formData().catch(() => null);
+            const intentId = form?.get("intent_id");
+            if (typeof intentId !== "string" || intentId === "") {
+              return Response.json({ code: "invalid_argument", message: "SETTLEMENT: intent_id is required" }, { status: 400 });
+            }
+            try {
+              await settleNavigationIntent(intentId);
+            } catch (error) {
+              return Response.json({ code: "settlement_refused", message: error instanceof Error ? error.message : String(error) }, { status: 409 });
+            }
+            return Response.redirect(`/workspace?receipt=${encodeURIComponent(intentId)}#receipt`, 303);
           }
           if (url.pathname === "/") {
-            return new Response("Horizon structural skeleton\n", {
-              headers: { "content-type": "text/plain; charset=utf-8" },
-            });
+            return Response.redirect("/workspace", 303);
           }
           return new Response("not found\n", { status: 404 });
         },
       });
+      return server;
     },
     async close() {
       for (const timer of windowTimers.values()) clearTimeout(timer);
@@ -1201,6 +1377,27 @@ export async function createApplication(
       await runtime.runtime.close();
     },
   };
+}
+
+/** A theme is set only when the caller asked for one; otherwise the page follows the OS preference. */
+function themeOf(value: FormDataEntryValue | string | null): WorkspaceTheme | undefined {
+  return value === "light" || value === "dark" ? value : undefined;
+}
+
+/**
+ * Refuse a state-changing request unless it comes from this cockpit: the Host header must name this
+ * server (DNS rebinding), and any Origin or Sec-Fetch-Site must be same-origin (cross-site POSTs).
+ * A request with neither Origin nor Sec-Fetch-Site (a CLI or test client) is allowed on the Host check alone.
+ */
+function crossSiteRefusal(request: Request, port: number): Response | null {
+  const hosts = [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`];
+  const refuse = (message: string) => Response.json({ code: "forbidden_origin", message: `REQUEST: ${message}` }, { status: 403 });
+  if (!hosts.includes(request.headers.get("host") ?? "")) return refuse("the Host header does not name this cockpit");
+  const origin = request.headers.get("origin");
+  if (origin !== null && !hosts.some((host) => origin === `http://${host}`)) return refuse("the Origin is not this cockpit");
+  const site = request.headers.get("sec-fetch-site");
+  if (site !== null && site !== "same-origin" && site !== "none") return refuse("the request is cross-site");
+  return null;
 }
 
 /** `cognate:store@<bytes>`: the durable store's size — observed, never fabricated. */

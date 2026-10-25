@@ -126,6 +126,7 @@ flowchart TD
 | I want to… | Read |
 | --- | --- |
 | Explore system behavior interactively | [Interactive explainers](explainers/index.md) (affordance simulator & debugger workbench) |
+| Install the whole stack on a new machine and reach the cockpit | [IGNITION](IGNITION.md) |
 | Run Horizon, see what it does | [how-to: run and inspect](how-to.md#run-the-application) |
 | Understand the architecture | [architecture](architecture.md) |
 | Understand a subsystem in depth | [subsystems](documentation-map.md) |
