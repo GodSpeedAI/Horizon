@@ -7,9 +7,9 @@ import { qrcodegen } from "./vendor/qrcodegen.ts";
 import type { RemoteStatus } from "./server.ts";
 
 const STYLE = `
-:root { --bg:#f6f6f3; --fg:#1b1d20; --muted:#4f545b; --line:#d6d8dc; --card:#ffffff; --accent:#1f5fa8; --warn:#7a4300; --focus:#1f5fa8; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#15171a; --fg:#eceef1; --muted:#b9bec6; --line:#363b42; --card:#1d2024; --accent:#8fb8ea; --warn:#f0c27b; --focus:#8fb8ea; } }
-:root[data-theme="dark"] { --bg:#15171a; --fg:#eceef1; --muted:#b9bec6; --line:#363b42; --card:#1d2024; --accent:#8fb8ea; --warn:#f0c27b; --focus:#8fb8ea; }
+:root { --bg:#f6f6f3; --fg:#1b1d20; --muted:#4f545b; --line:#d6d8dc; --card:#ffffff; --accent:#1f5fa8; --on-accent:#ffffff; --warn:#7a4300; --focus:#1f5fa8; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#15171a; --fg:#eceef1; --muted:#b9bec6; --line:#363b42; --card:#1d2024; --accent:#8fb8ea; --on-accent:#0d1b2a; --warn:#f0c27b; --focus:#8fb8ea; } }
+:root[data-theme="dark"] { --bg:#15171a; --fg:#eceef1; --muted:#b9bec6; --line:#363b42; --card:#1d2024; --accent:#8fb8ea; --on-accent:#0d1b2a; --warn:#f0c27b; --focus:#8fb8ea; }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
 main { max-width: 640px; margin: 0 auto; padding: 24px 16px; }
@@ -22,7 +22,7 @@ p { margin: 0 0 12px; }
 .warn { color: var(--warn); }
 .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 button { min-height: 44px; min-width: 44px; padding: 10px 16px; font: inherit; color: var(--fg); background: var(--card); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
-button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .qr { width: 240px; height: 240px; background: #fff; padding: 0; border-radius: 4px; }
 .qr svg { display: block; width: 240px; height: 240px; }
@@ -152,8 +152,8 @@ if (countdown) {
   const tick = () => {
     const left = Math.max(0, Math.ceil((expires - Date.now()) / 1000));
     countdown.textContent = Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0");
-    const minute = Math.floor(left / 60);
-    if (minute !== lastMinute && left > 0) { lastMinute = minute; announce.textContent = "About " + (minute + 1) + " minute" + (minute === 0 ? "" : "s") + " left on the link."; }
+    const minutes = Math.ceil(left / 60);
+    if (minutes !== lastMinute && left > 0) { lastMinute = minutes; announce.textContent = (minutes === 1 ? "Less than a minute" : "About " + minutes + " minutes") + " left on the link."; }
     if (left === 0) { clearInterval(timer); }
   };
   const timer = setInterval(tick, 1000);

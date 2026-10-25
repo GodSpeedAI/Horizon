@@ -389,11 +389,15 @@ export class RemoteController {
     };
   }
 
-  /** Server-sent events: `id` is the store position; a revoked session is told so and the stream closes. */
+  /**
+   * Server-sent events. A record write (a case, a skip) does not move the event store, so the change
+   * signal is the store position plus a digest of the cockpit state the phone shows; `id` carries both,
+   * and a reconnect with the same `Last-Event-ID` is not told again. A revoked session is told so and
+   * the stream closes. A heartbeat every 5s keeps a quiet stream under Bun's 10s idle timeout.
+   */
   private events(request: Request, session: Session): Response {
     const encoder = new TextEncoder();
-    const lastEventId = Number(request.headers.get("last-event-id") ?? "0");
-    let sent = Number.isFinite(lastEventId) ? lastEventId : 0;
+    let sent = request.headers.get("last-event-id") ?? "";
     let timer: ReturnType<typeof setInterval> | null = null;
     let beat = 0;
     const stream = new ReadableStream<Uint8Array>({
@@ -409,10 +413,12 @@ export class RemoteController {
           }
           beat += 1;
           const position = await this.deps.position();
-          if (position > sent) {
-            sent = position;
-            write(`id: ${position}\nevent: state\ndata: ${JSON.stringify({ position })}\n\n`);
-          } else if (beat % 15 === 0) {
+          const digest = createHash("sha256").update(JSON.stringify(await this.deps.chrome())).digest("hex").slice(0, 16);
+          const marker = `${position}-${digest}`;
+          if (marker !== sent) {
+            sent = marker;
+            write(`id: ${marker}\nevent: state\ndata: ${JSON.stringify({ position })}\n\n`);
+          } else if (beat % 5 === 0) {
             write(": heartbeat\n\n");
           }
         };

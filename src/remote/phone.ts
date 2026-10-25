@@ -5,9 +5,9 @@
  */
 
 const STYLE = `
-:root { --bg:#f7f7f5; --fg:#1d1f22; --muted:#55595f; --line:#d9dbdf; --card:#ffffff; --accent:#1f5fa8; --warn:#8a4b00; --focus:#1f5fa8; --ok:#1d6b3a; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#15171a; --fg:#eceef1; --muted:#b3b8c0; --line:#343940; --card:#1d2024; --accent:#8fb8ea; --warn:#f0c27b; --focus:#8fb8ea; --ok:#8fd3a4; } }
-:root[data-theme="dark"] { --bg:#15171a; --fg:#eceef1; --muted:#b3b8c0; --line:#343940; --card:#1d2024; --accent:#8fb8ea; --warn:#f0c27b; --focus:#8fb8ea; --ok:#8fd3a4; }
+:root { --bg:#f7f7f5; --fg:#1d1f22; --muted:#55595f; --line:#d9dbdf; --card:#ffffff; --accent:#1f5fa8; --on-accent:#ffffff; --warn:#8a4b00; --focus:#1f5fa8; --ok:#1d6b3a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#15171a; --fg:#eceef1; --muted:#b3b8c0; --line:#343940; --card:#1d2024; --accent:#8fb8ea; --on-accent:#0d1b2a; --warn:#f0c27b; --focus:#8fb8ea; --ok:#8fd3a4; } }
+:root[data-theme="dark"] { --bg:#15171a; --fg:#eceef1; --muted:#b3b8c0; --line:#343940; --card:#1d2024; --accent:#8fb8ea; --on-accent:#0d1b2a; --warn:#f0c27b; --focus:#8fb8ea; --ok:#8fd3a4; }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; overflow-x: hidden; }
 body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
@@ -24,7 +24,7 @@ p { margin: 0 0 10px; }
 .notice { min-height: 1.4em; margin: 10px 0; color: var(--muted); }
 .notice[data-kind="error"] { color: var(--warn); }
 button, .button { min-height: 44px; min-width: 44px; padding: 10px 14px; font: inherit; color: var(--fg); background: var(--card); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
-button.primary { background: var(--accent); color: #ffffff; border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 button.danger { color: var(--warn); }
 button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 input[type="text"] { width: 100%; min-height: 44px; padding: 10px; font: inherit; color: var(--fg); background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
@@ -161,13 +161,20 @@ async function refresh() {
   lastTop = top;
 }
 
+const DONE = {
+  Case: "Case opened.",
+  Commit: "Committed. SEA-Forge's ruling is in the receipt below.",
+  Approved: "Approved. SEA-Forge's ruling is in the receipt below.",
+  Rejected: "Rejected. The receipt below records it.",
+};
+
 async function command(body, label) {
   const sent = await post("/m/api/command", { command_id: uuid(), ...body });
   if (sent.status === 401) return connectScreen();
   const outcome = sent.data.outcome || {};
   if (outcome.state === "refused") notice(outcome.message || "Refused.", "error");
   else if (outcome.state === "waiting") notice("SEA-Forge is holding this for your approval on the desktop.");
-  else notice(label + ": done. The outcome is below.");
+  else notice(DONE[label] || label + ". The receipt is below.");
   await refresh();
   return sent.data;
 }
