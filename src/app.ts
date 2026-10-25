@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { statSync } from "node:fs";
 import type { Caller } from "@godspeedai/cognate-runtime-api";
 import { governanceFromEnv, type GovernanceOptions } from "@godspeedai/cognate-runtime-bun";
@@ -67,6 +67,9 @@ import { CONTEXT_REFERENCE } from "./capabilities/context.ts";
 import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type DebuggerOperation, type DebuggerSources } from "./domain/debugger.ts";
 import { renderWorkspacePage } from "./ui/workspace/render.tsx";
 import type { Server } from "bun";
+import { RemoteController, type RemoteStatus } from "./remote/server.ts";
+import { remoteSettings } from "./remote/settings.ts";
+import { remotePanelPage } from "./remote/panel.ts";
 
 type HttpServer = Server<unknown>;
 
@@ -133,6 +136,8 @@ export interface HorizonApplication {
   readonly world: LoadedWorld;
   readonly runtime: HorizonRuntime;
   readonly caller: Caller;
+  /** The phone remote (passkey-paired, loopback listener). Off until started from the cockpit panel. */
+  readonly remote: RemoteController;
   /** Healthy, or a typed degraded observation; never a startup prerequisite. */
   readonly research: ResearchStatus;
   readonly frames: FrameRegister;
@@ -1075,14 +1080,49 @@ export async function createApplication(
       caseError: options.caseError ?? null,
       receipt: options.receipt ? await receiptFor(options.receipt) : null,
       moves: await recentMoves(),
+      remote: remoteRailOf(await remote.status()),
     };
   }
+
+  const remote = new RemoteController(remoteSettings(), {
+    store: runtime.runtime.store,
+    tenant: caller.tenant,
+    operator: caller.actor.id,
+    workspace: () => workspace(),
+    chrome: (receipt) => cockpitChrome({ receipt: receipt ?? null }),
+    position: () => lastPosition(runtime),
+    approvalIntent: (approvalId) => intentIdForApproval(approvalId),
+    resolveApproval: async (approvalId, resolution) => {
+      await resolveNavigationApproval({ approvalId, resolution });
+    },
+    commitAction: async (actionId, intentId) => {
+      // The same commit the desktop's /workspace/intent makes, under the same identity.
+      let outcome: Awaited<ReturnType<typeof commitSurfaceIntent>> | null = null;
+      let failure: unknown = null;
+      try {
+        outcome = await commitSurfaceIntent({ transport: "gui", role: "human", node_id: actionId, intent_id: intentId });
+      } catch (error) {
+        failure = error;
+      }
+      const audited = (await readIntentAttempts(runtime.runtime.store)).some((entry) => entry.intent_id === intentId);
+      if (outcome !== null && !outcome.ok) return { ok: false as const, code: outcome.code, message: outcome.message };
+      if (failure !== null && !audited) throw failure;
+      return { ok: true as const };
+    },
+    settle: async (intentId) => {
+      await settleNavigationIntent(intentId);
+    },
+    openCase: async (purpose) => {
+      await openCase(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, purpose, now: new Date() });
+    },
+  });
 
   return {
     loaded,
     world,
     runtime,
     caller,
+    remote,
     research,
     frames,
     frame: () => issued,
@@ -1104,11 +1144,10 @@ export async function createApplication(
         port,
         async fetch(request) {
           const url = new URL(request.url);
-          // Every state-changing route checks Host and Origin first (DNS rebinding and cross-site POSTs).
-          if (request.method === "POST") {
-            const refused = crossSiteRefusal(request, server.port ?? port);
-            if (refused !== null) return refused;
-          }
+          // Every request checks Host (DNS rebinding: the remote panel's GET carries the pairing link);
+          // state-changing routes also check Origin and Sec-Fetch-Site (cross-site POSTs).
+          const refused = crossSiteRefusal(request, server.port ?? port, request.method !== "POST");
+          if (refused !== null) return refused;
           if (url.pathname === "/health") {
             const semantic = await runtime.runtime.service.invoke(caller, {
               capability: "horizon.semantics.world",
@@ -1363,6 +1402,59 @@ export async function createApplication(
             }
             return Response.redirect(`/workspace?receipt=${encodeURIComponent(intentId)}#receipt`, 303);
           }
+          if (url.pathname === "/workspace/remote" && request.method === "GET") {
+            await remote.checkReachable();
+            const nonce = randomBytes(16).toString("base64");
+            const html = remotePanelPage({ status: await remote.status(), link: remote.pairingLink(), nonce, now: Date.now() });
+            return new Response(html, {
+              headers: {
+                "content-type": "text/html; charset=utf-8",
+                "cache-control": "no-store",
+                "content-security-policy": `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`,
+              },
+            });
+          }
+          if (url.pathname === "/workspace/remote/status" && request.method === "GET") {
+            return Response.json(await remote.status(), { headers: { "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/workspace/remote/events" && request.method === "GET") {
+            // The panel's status stream: one event when the state changes, a heartbeat otherwise.
+            const encoder = new TextEncoder();
+            let timer: ReturnType<typeof setInterval> | null = null;
+            let last = "";
+            const stream = new ReadableStream<Uint8Array>({
+              start: (controller) => {
+                const tick = async () => {
+                  const next = await remote.status();
+                  const text = JSON.stringify(next);
+                  if (text !== last) {
+                    last = text;
+                    controller.enqueue(encoder.encode(`event: status\ndata: ${text}\n\n`));
+                  } else {
+                    controller.enqueue(encoder.encode(": heartbeat\n\n"));
+                  }
+                };
+                void tick();
+                timer = setInterval(() => void tick().catch(() => undefined), 2000);
+              },
+              cancel: () => {
+                if (timer !== null) clearInterval(timer);
+              },
+            });
+            return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/workspace/remote/start" && request.method === "POST") {
+            await remote.start();
+            return Response.redirect("/workspace/remote", 303);
+          }
+          if (url.pathname === "/workspace/remote/refresh" && request.method === "POST") {
+            await remote.refresh();
+            return Response.redirect("/workspace/remote", 303);
+          }
+          if (url.pathname === "/workspace/remote/stop" && request.method === "POST") {
+            await remote.stop();
+            return Response.redirect("/workspace/remote", 303);
+          }
           if (url.pathname === "/") {
             return Response.redirect("/workspace", 303);
           }
@@ -1372,11 +1464,18 @@ export async function createApplication(
       return server;
     },
     async close() {
+      if (remote.listening) await remote.stop();
       for (const timer of windowTimers.values()) clearTimeout(timer);
       windowTimers.clear();
       await runtime.runtime.close();
     },
   };
+}
+
+/** The status-rail item for the phone remote: its state in words, and where to act on it. */
+function remoteRailOf(status: RemoteStatus): { readonly state: string; readonly label: string } {
+  const label = status.state === "off" ? "off" : status.state === "connected" ? "phone connected" : status.state === "restoring" ? "restoring" : "waiting";
+  return { state: status.state, label: `Remote: ${label}` };
 }
 
 /** A theme is set only when the caller asked for one; otherwise the page follows the OS preference. */
@@ -1385,14 +1484,15 @@ function themeOf(value: FormDataEntryValue | string | null): WorkspaceTheme | un
 }
 
 /**
- * Refuse a state-changing request unless it comes from this cockpit: the Host header must name this
- * server (DNS rebinding), and any Origin or Sec-Fetch-Site must be same-origin (cross-site POSTs).
+ * Refuse a request unless it comes from this cockpit: the Host header must name this server (DNS
+ * rebinding). Unless `hostOnly`, any Origin or Sec-Fetch-Site must also be same-origin (cross-site POSTs).
  * A request with neither Origin nor Sec-Fetch-Site (a CLI or test client) is allowed on the Host check alone.
  */
-function crossSiteRefusal(request: Request, port: number): Response | null {
+function crossSiteRefusal(request: Request, port: number, hostOnly = false): Response | null {
   const hosts = [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`];
   const refuse = (message: string) => Response.json({ code: "forbidden_origin", message: `REQUEST: ${message}` }, { status: 403 });
   if (!hosts.includes(request.headers.get("host") ?? "")) return refuse("the Host header does not name this cockpit");
+  if (hostOnly) return null;
   const origin = request.headers.get("origin");
   if (origin !== null && !hosts.some((host) => origin === `http://${host}`)) return refuse("the Origin is not this cockpit");
   const site = request.headers.get("sec-fetch-site");

@@ -512,6 +512,14 @@ export function Workspace({ snapshot, chrome, basePath = "/workspace", intentPat
                 <span aria-hidden="true">{status.approvals ? "◆" : "◇"}</span> Approvals: {status.approvals ? "you can approve" : "not configured"}
               </li>
               <li data-rail="operator"><span aria-hidden="true">●</span> Operator: {status.operator}</li>
+              {chrome?.remote ? (
+                <li data-rail="remote" data-state={chrome.remote.state}>
+                  <a href="/workspace/remote" aria-label={`Mobile remote control: ${chrome.remote.label.replace("Remote: ", "")}`}>
+                    <svg aria-hidden="true" width="12" height="16" viewBox="0 0 12 16" focusable="false"><rect x="1" y="1" width="10" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" /><line x1="4" y1="12" x2="8" y2="12" stroke="currentColor" strokeWidth="1.6" /></svg>
+                    {" "}{chrome.remote.label}
+                  </a>
+                </li>
+              ) : null}
             </ul>
           )}
           <p className="scope" role="status" aria-live="polite" aria-atomic="true" data-scope={snapshot.scope}>
