@@ -5,8 +5,8 @@ type Result = { ok: true; status: "settled" } | { ok: false; errorClass: string;
 
 const PENDING: Result = {
   ok: false,
-  errorClass: "cep_evidence_refused",
-  error: "evidence or settlement refused: the closure has not been recorded yet; settlement is pending",
+  errorClass: "cep_settlement_pending",
+  error: "settlement pending: the closure has not been recorded yet",
 };
 
 function harness(script: Result[], deadlineMs = 10_000) {
@@ -63,6 +63,13 @@ describe("settleAwaitingClosure: a late closure is pending, not a refusal", () =
     expect(await h.run()).toEqual(refused);
     expect(h.calls).toHaveLength(1);
     expect(h.sleeps).toHaveLength(0);
+  });
+
+  test("an evidence refusal is final even if its message mentions a pending settlement", async () => {
+    const refused: Result = { ok: false, errorClass: "cep_evidence_refused", error: "evidence or settlement refused: settlement is pending" };
+    const h = harness([refused]);
+    expect(await h.run()).toEqual(refused);
+    expect(h.calls).toHaveLength(1);
   });
 
   test("a pending message under a different error class is not treated as pending", async () => {
