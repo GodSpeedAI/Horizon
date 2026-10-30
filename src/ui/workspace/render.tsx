@@ -512,6 +512,9 @@ export function Workspace({ snapshot, chrome, basePath = "/workspace", intentPat
                 <span aria-hidden="true">{status.approvals ? "◆" : "◇"}</span> Approvals: {status.approvals ? "you can approve" : "not configured"}
               </li>
               <li data-rail="operator"><span aria-hidden="true">●</span> Operator: {status.operator}</li>
+              <li data-rail="economics">
+                <a href="/workspace/economics">Case economics</a>
+              </li>
               {chrome?.remote ? (
                 <li data-rail="remote" data-state={chrome.remote.state}>
                   <a href="/workspace/remote" aria-label={`Mobile remote control: ${chrome.remote.label.replace("Remote: ", "")}`}>
@@ -717,7 +720,7 @@ export function Workspace({ snapshot, chrome, basePath = "/workspace", intentPat
   );
 }
 
-const STYLE = `
+export const STYLE = `
 :root { --bg:oklch(98.6% 0.005 250); --panel:oklch(99.6% 0.003 250); --fg:oklch(25% 0.02 250); --muted:oklch(40% 0.02 250); --line:oklch(82% 0.014 250); --edge:oklch(52% 0.03 250); --accent:oklch(44% 0.15 255); --on-accent:oklch(99% 0.004 250); --tint:oklch(94% 0.03 255); --danger:oklch(45% 0.17 27); --ok:oklch(42% 0.12 155); --focus:oklch(48% 0.16 60); color-scheme:light; }
 :root[data-theme="light"] { --bg:oklch(98.6% 0.005 250); --panel:oklch(99.6% 0.003 250); --fg:oklch(25% 0.02 250); --muted:oklch(40% 0.02 250); --line:oklch(82% 0.014 250); --edge:oklch(52% 0.03 250); --accent:oklch(44% 0.15 255); --on-accent:oklch(99% 0.004 250); --tint:oklch(94% 0.03 255); --danger:oklch(45% 0.17 27); --ok:oklch(42% 0.12 155); --focus:oklch(48% 0.16 60); color-scheme:light; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:oklch(20% 0.012 250); --panel:oklch(25% 0.014 250); --fg:oklch(94% 0.01 250); --muted:oklch(80% 0.015 250); --line:oklch(40% 0.02 250); --edge:oklch(62% 0.03 250); --accent:oklch(80% 0.1 255); --on-accent:oklch(20% 0.02 250); --tint:oklch(30% 0.04 255); --danger:oklch(80% 0.13 27); --ok:oklch(82% 0.13 155); --focus:oklch(84% 0.14 80); color-scheme:dark; } }

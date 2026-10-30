@@ -28,6 +28,18 @@ export interface ContextKernelConfig {
   readonly corpus_id: string;
 }
 
+/**
+ * Case economics (HC-06): an optional, read-only binding to a RealityTrace store that holds agent events.
+ * It is NOT the obligation store: that one has its own data home. Absent means the view says how to enable it.
+ */
+export interface EconomicsConfig {
+  /** The `realitytrace` binary. Only `repo list`, `ledger export` and `projections export` are ever run. */
+  readonly realitytrace_bin: string;
+  /** XDG_DATA_HOME of the store to read (the agent tap's). Absent: RealityTrace's own default location. */
+  readonly data_home?: string;
+  readonly state_home?: string;
+}
+
 export interface HorizonConfig {
   readonly deployment_profile: DeploymentProfile;
   readonly bind_host: string;
@@ -50,6 +62,8 @@ export interface HorizonConfig {
   readonly capacity: readonly CapacityAllowance[];
   /** REQ-NAV-011/012: how verifiers are confined and how late a closure may be recorded. Absent: no settlement. */
   readonly settlement?: SettlementConfig;
+  /** HC-06: where case economics are read from. Absent: the economics view shows an honest "not configured". */
+  readonly economics?: EconomicsConfig;
 }
 
 /** One operation's reviewed, versioned capability binding (SPEC-CR-002 §1, §4). */
