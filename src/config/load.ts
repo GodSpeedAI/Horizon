@@ -8,6 +8,7 @@ import { REVERSIBILITY_CLASSES } from "../domain/navigation.ts";
 import type {
   ContextKernelConfig,
   DeploymentProfile,
+  EconomicsConfig,
   HorizonConfig,
   IdentityConfig,
   LoadedConfig,
@@ -138,6 +139,25 @@ function asSettlement(value: unknown): SettlementConfig | undefined {
   return { launcher: asStringList(doc.launcher, "settlement.launcher"), close_grace_s: grace };
 }
 
+function asEconomics(value: unknown): EconomicsConfig | undefined {
+  if (value === undefined) return undefined;
+  const doc = asRecord(value, "economics");
+  return {
+    realitytrace_bin: asString(doc.realitytrace_bin, "economics.realitytrace_bin"),
+    ...(doc.data_home === undefined ? {} : { data_home: asString(doc.data_home, "economics.data_home") }),
+    ...(doc.state_home === undefined ? {} : { state_home: asString(doc.state_home, "economics.state_home") }),
+  };
+}
+
+/** Environment override of `[economics]` (HORIZON_ECONOMICS_REALITYTRACE_BIN / _DATA_HOME / _STATE_HOME). */
+export function economicsFromEnv(env: Record<string, string | undefined>, fromFile?: EconomicsConfig): EconomicsConfig | undefined {
+  const bin = env.HORIZON_ECONOMICS_REALITYTRACE_BIN?.trim();
+  if (!bin) return fromFile;
+  const data = env.HORIZON_ECONOMICS_DATA_HOME?.trim();
+  const state = env.HORIZON_ECONOMICS_STATE_HOME?.trim();
+  return { realitytrace_bin: bin, ...(data ? { data_home: data } : fromFile?.data_home ? { data_home: fromFile.data_home } : {}), ...(state ? { state_home: state } : fromFile?.state_home ? { state_home: fromFile.state_home } : {}) };
+}
+
 export function configFromDocument(document: unknown): HorizonConfig {
   const doc = asRecord(document, "config");
   const profile = asString(doc.deployment_profile, "deployment_profile") as DeploymentProfile;
@@ -204,6 +224,7 @@ export function configFromDocument(document: unknown): HorizonConfig {
     operations: asOperations(doc.operations),
     capacity: asList(doc.capacity, "capacity").map((entry, index) => validated(`capacity[${index}]`, () => assertAllowance(entry))),
     ...(doc.settlement === undefined ? {} : { settlement: asSettlement(doc.settlement)! }),
+    ...(doc.economics === undefined ? {} : { economics: asEconomics(doc.economics)! }),
   };
 }
 

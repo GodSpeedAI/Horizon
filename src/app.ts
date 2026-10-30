@@ -4,7 +4,8 @@ import type { Caller } from "@godspeedai/cognate-runtime-api";
 import { governanceFromEnv, type GovernanceOptions } from "@godspeedai/cognate-runtime-bun";
 import { loadWorld, type LoadedWorld } from "./adapters/semantic.ts";
 import { observeResearch, requireResearch, type ResearchStatus } from "./adapters/research.ts";
-import { loadConfig } from "./config/load.ts";
+import { economicsFromEnv, loadConfig } from "./config/load.ts";
+import { ECONOMICS_SCHEMA } from "./economics/model.ts";
 import type { LoadedConfig } from "./config/types.ts";
 import { createHorizonRuntime, type HorizonRuntime } from "./runtime/create.ts";
 import { appendIntentAttempt, appendIntentRecord, createFrameRegister, NAVIGATION_INTENT_COMMIT, navigationIntentComponent, readIntentAttempts, readIntentRecords, type FrameRegister, type IntentAttempt } from "./capabilities/navigation-intent.ts";
@@ -12,6 +13,7 @@ import { checkPurpose, latestCase, onboardingSkipped, openCase, setOnboardingSki
 import { CONTRACT_VERSION, contractVersionOf } from "./capabilities/capacity-ledger.ts";
 import { activateContract } from "./capabilities/contract-upgrade.ts";
 import { RealityTraceObligation } from "./adapters/realitytrace-obligation.ts";
+import { realityTraceEconomics, type EconomicsSource } from "./adapters/realitytrace-economics.ts";
 import { listPending, readPending, terminate, updatePending, type PendingIntent } from "./capabilities/pending-intent.ts";
 import { type ObligationDeps, ObligationRefusal, bindingGates, close as closeWindow, prepare as prepareObligation, verifyRun } from "./settlement/obligation.ts";
 import { isClosurePending, settleAwaitingClosure } from "./settlement/settle-awaiting-closure.ts";
@@ -66,6 +68,7 @@ import type { ContextKernelAdapter, ContextReferenceAnswer } from "./adapters/co
 import { CONTEXT_REFERENCE } from "./capabilities/context.ts";
 import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type DebuggerOperation, type DebuggerSources } from "./domain/debugger.ts";
 import { renderWorkspacePage } from "./ui/workspace/render.tsx";
+import { renderEconomicsPage } from "./ui/workspace/economics.tsx";
 import type { Server } from "bun";
 import { RemoteController, type RemoteStatus } from "./remote/server.ts";
 import { remoteSettings } from "./remote/settings.ts";
@@ -236,11 +239,17 @@ export async function createApplication(
      * settlement references say RealityTrace is unavailable.
      */
     readonly realityTrace?: RealityTraceConfig | null;
+    /**
+     * Where case economics are read from (HC-06): a read-only RealityTrace reader. Defaults to the
+     * `[economics]` config table / `HORIZON_ECONOMICS_REALITYTRACE_BIN`; unset, the view says it is not configured.
+     */
+    readonly economics?: EconomicsSource;
     /** The SEA-Forge socket for `authority_closure`. Defaults to the approvals socket or `COGNATE_SEA_FORGE_SOCKET`. */
     readonly seaForgeSocket?: string;
   } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath);
+  const economics = options.economics ?? realityTraceEconomics(economicsFromEnv(process.env, loaded.config.economics));
   const world = loadWorld(loaded.config.world_ref);
   const research = await observeResearch(loaded.config.research_command);
   const caller: Caller = { actor: loaded.operator.principal, tenant: loaded.operator.tenant };
@@ -1274,6 +1283,14 @@ export async function createApplication(
               ...(theme === undefined ? {} : { theme }),
             });
             return Response.json(data.snapshot, { headers: { "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/workspace/economics" && request.method === "GET") {
+            // Read-only: RealityTrace is read through its CLI on every request; nothing is stored or written.
+            const readout = economics.read();
+            if ((request.headers.get("accept") ?? "").includes("application/json")) {
+              return Response.json({ schema: ECONOMICS_SCHEMA, ...readout }, { headers: { "cache-control": "no-store" } });
+            }
+            return new Response(renderEconomicsPage(readout, themeOf(url.searchParams.get("theme"))), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
           }
           if (url.pathname === "/workspace/inspect" && request.method === "GET") {
             // Read-only, deliberately: GET, no form, no commit. The operation is one of the seven
