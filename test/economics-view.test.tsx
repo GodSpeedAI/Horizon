@@ -15,7 +15,7 @@ import { residual, sampleLedger } from "./support/economics-fixture.ts";
 
 const projection = [residual("r1", "observed_undeclared"), residual("r2", "declared_unobserved"), residual("r3", "declared_unobserved")];
 const model = economicsModel(sampleLedger(), projection);
-const ok: EconomicsReadout = { state: "ok", repos: [{ repo_id: "repo-1", path: "/work/alpha", model, error: null }] };
+const ok: EconomicsReadout = { state: "ok", repos: [{ repo_id: "repo-1", path: "/work/alpha", model, error: null }], skipped: { without_agent_activity: 0, missing_folder: 0 } };
 const fmt = (n: number) => n.toLocaleString("en-US");
 
 describe("economics page", () => {
@@ -48,7 +48,7 @@ describe("economics page", () => {
     expect(html).toContain('<span class="badge estimate">estimate</span>');
     expect(html).toContain("no estimate recorded");
     expect(html).toContain("Unbound");
-    const noArm = renderEconomicsPage({ state: "ok", repos: [{ repo_id: "r", path: null, model: economicsModel(sampleLedger().filter((r: any) => r.append_ordinal !== 20), []), error: null }] });
+    const noArm = renderEconomicsPage({ state: "ok", repos: [{ repo_id: "r", path: null, model: economicsModel(sampleLedger().filter((r: any) => r.append_ordinal !== 20), []), error: null }], skipped: { without_agent_activity: 0, missing_folder: 0 } });
     expect(noArm).toContain("not run");
     expect(html).toContain("Arms recorded on events");
     // the estimate badge never sits on the observed total header
@@ -64,7 +64,7 @@ describe("economics page", () => {
     const down = renderEconomicsPage({ state: "unavailable", message: "realitytrace repo list failed (exit 2): boom" });
     expect(down).toContain("could not be read");
     expect(down).toContain("boom");
-    expect(renderEconomicsPage({ state: "empty", repos: [] })).toContain("No agent events recorded yet");
+    expect(renderEconomicsPage({ state: "empty", repos: [], skipped: { without_agent_activity: 0, missing_folder: 0 } })).toContain("No agent events recorded yet");
   });
 });
 
@@ -81,7 +81,7 @@ describe("realityTraceEconomics adapter", () => {
       if (args[0] === "ledger") return { status: 0, stdout: JSON.stringify(sampleLedger()), stderr: "" };
       return { status: 0, stdout: JSON.stringify(projection), stderr: "" };
     };
-    const out = realityTraceEconomics({ realitytrace_bin: "rt", data_home: "/d", state_home: "/s" }, run).read();
+    const out = realityTraceEconomics({ realitytrace_bin: "rt", data_home: "/d", state_home: "/s" }, run, () => true).read();
     expect(out.state).toBe("ok");
     expect(calls.map((c) => c.args.slice(0, 2).join(" "))).toEqual(["repo list", "ledger export", "projections export"]);
     for (const call of calls) {
@@ -108,6 +108,31 @@ describe("realityTraceEconomics adapter", () => {
   test("an enrolled store with no agent events is empty", () => {
     const run: Runner = (_b, args) => ({ status: 0, stdout: JSON.stringify(args[0] === "repo" ? { repos: [{ repo_id: "R1" }] } : []), stderr: "" });
     expect(realityTraceEconomics({ realitytrace_bin: "rt" }, run).read().state).toBe("empty");
+  });
+
+  test("skips vanished folders and repos without agent events, and counts both", () => {
+    const calls: string[] = [];
+    const repos = [
+      { repo_id: "LIVE", filesystem_path: "/live", state: "enrolled" },
+      { repo_id: "QUIET", filesystem_path: "/quiet", state: "enrolled" },
+      { repo_id: "GONE", filesystem_path: "/tmp/gone", state: "enrolled" },
+    ];
+    const run: Runner = (_b, args) => {
+      calls.push(args.slice(0, 4).join(" "));
+      if (args[0] === "repo") return { status: 0, stdout: JSON.stringify({ repos }), stderr: "" };
+      if (args[0] === "ledger") return { status: 0, stdout: JSON.stringify(args[3] === "LIVE" ? sampleLedger() : []), stderr: "" };
+      return { status: 0, stdout: "[]", stderr: "" };
+    };
+    const out = realityTraceEconomics({ realitytrace_bin: "rt" }, run, (p) => p !== "/tmp/gone").read();
+    expect(out.state).toBe("ok");
+    if (out.state !== "ok") return;
+    expect(out.repos.map((r) => r.repo_id)).toEqual(["LIVE"]);
+    expect(out.skipped).toEqual({ without_agent_activity: 1, missing_folder: 1 });
+    // no CLI call for the vanished folder, and no projection export for the quiet repo
+    expect(calls.some((c) => c.includes("GONE"))).toBe(false);
+    expect(calls.filter((c) => c.startsWith("projections"))).toEqual(["projections export --repo LIVE"]);
+    const html = renderEconomicsPage(out);
+    expect(html).toContain("Not shown: 1 enrolled repository has no agent events; 1 is enrolled at a folder that no longer exists.");
   });
 
   test("config binding: absent by default, env overrides the file", () => {

@@ -6,7 +6,7 @@
  */
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { EconomicsReadout, EconomicsRepo } from "../../adapters/realitytrace-economics.ts";
+import type { EconomicsReadout, EconomicsRepo, EconomicsSkipped } from "../../adapters/realitytrace-economics.ts";
 import { RESIDUAL_KINDS, type CaseModel, type EconomicsModel, type JourneyCounts, type SessionModel, type Totals } from "../../economics/model.ts";
 import type { WorkspaceTheme } from "./model.ts";
 import { STYLE } from "./render.tsx";
@@ -250,6 +250,15 @@ function Notice({ title, children }: { readonly title: string; readonly children
   );
 }
 
+/** Says how many enrolled repositories are not shown, so none disappears silently. */
+function SkippedNote({ skipped }: { readonly skipped: EconomicsSkipped }): ReactNode {
+  const parts: string[] = [];
+  if (skipped.without_agent_activity > 0) parts.push(`${fmt(skipped.without_agent_activity)} enrolled ${skipped.without_agent_activity === 1 ? "repository has" : "repositories have"} no agent events`);
+  if (skipped.missing_folder > 0) parts.push(`${fmt(skipped.missing_folder)} ${skipped.missing_folder === 1 ? "is" : "are"} enrolled at a folder that no longer exists`);
+  if (parts.length === 0) return null;
+  return <p className="muted" data-skipped="true">Not shown: {parts.join("; ")}.</p>;
+}
+
 function Body({ readout }: { readonly readout: EconomicsReadout }): ReactNode {
   switch (readout.state) {
     case "not_configured":
@@ -275,13 +284,19 @@ function Body({ readout }: { readonly readout: EconomicsReadout }): ReactNode {
       return (
         <>
           <Notice title="No agent events recorded yet">
-            <p>RealityTrace is reachable{readout.repos.length === 0 ? ", but no repository is enrolled" : ", but the store holds no agent events"}. Enroll a repository with <code>te-agents rt enroll &lt;repo&gt;</code>, work in it with the tap installed, and the tap&apos;s drain will record sessions here.</p>
+            <p>RealityTrace is reachable, but no enrolled repository holds agent events yet. Enroll a repository with <code>te-agents rt enroll &lt;repo&gt;</code>, work in it with the tap installed, and the tap&apos;s drain will record sessions here.</p>
           </Notice>
           {readout.repos.map((repo) => <RepoView key={repo.repo_id} repo={repo} />)}
+          <SkippedNote skipped={readout.skipped} />
         </>
       );
     case "ok":
-      return <>{readout.repos.map((repo) => <RepoView key={repo.repo_id} repo={repo} />)}</>;
+      return (
+        <>
+          {readout.repos.map((repo) => <RepoView key={repo.repo_id} repo={repo} />)}
+          <SkippedNote skipped={readout.skipped} />
+        </>
+      );
   }
 }
 

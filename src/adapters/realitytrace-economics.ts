@@ -9,6 +9,7 @@
  * Nothing it returns is stored; the pure model arranges it for display.
  */
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import type { EconomicsConfig } from "../config/types.ts";
 import { economicsModel, type EconomicsModel } from "../economics/model.ts";
 
@@ -23,8 +24,18 @@ export interface EconomicsRepo {
 export type EconomicsReadout =
   | { readonly state: "not_configured" }
   | { readonly state: "unavailable"; readonly message: string }
-  | { readonly state: "empty"; readonly repos: readonly EconomicsRepo[] }
-  | { readonly state: "ok"; readonly repos: readonly EconomicsRepo[] };
+  | { readonly state: "empty"; readonly repos: readonly EconomicsRepo[]; readonly skipped: EconomicsSkipped }
+  | { readonly state: "ok"; readonly repos: readonly EconomicsRepo[]; readonly skipped: EconomicsSkipped };
+
+/** Enrolled repositories left out of the view, counted so nothing disappears silently. */
+export interface EconomicsSkipped {
+  /** Enrolled, but the ledger holds no agent events (e.g. repos enrolled by other tools). */
+  readonly without_agent_activity: number;
+  /** Enrolled, but the folder no longer exists (e.g. temporary test repositories). */
+  readonly missing_folder: number;
+}
+
+export type PathExists = (path: string) => boolean;
 
 export interface EconomicsSource {
   read(): EconomicsReadout;
@@ -48,7 +59,7 @@ const spawnRunner: Runner = (bin, args, env) => {
 
 const brief = (text: string): string => text.trim().replace(/\s+/g, " ").slice(0, 240);
 
-export function realityTraceEconomics(config: EconomicsConfig | undefined, run: Runner = spawnRunner): EconomicsSource {
+export function realityTraceEconomics(config: EconomicsConfig | undefined, run: Runner = spawnRunner, pathExists: PathExists = existsSync): EconomicsSource {
   return {
     read(): EconomicsReadout {
       if (!config) return { state: "not_configured" };
@@ -72,20 +83,29 @@ export function realityTraceEconomics(config: EconomicsConfig | undefined, run: 
       if (!listed.ok) return { state: "unavailable", message: listed.message };
       const all = isObject(listed.json) && Array.isArray(listed.json.repos) ? listed.json.repos : [];
       const enrolled = all.filter(isObject).filter((repo) => typeof repo.repo_id === "string" && (repo.state === undefined || repo.state === "enrolled"));
-      if (enrolled.length === 0) return { state: "empty", repos: [] };
+      const present = enrolled.filter((repo) => typeof repo.filesystem_path !== "string" || pathExists(repo.filesystem_path));
+      const skipped = { without_agent_activity: 0, missing_folder: enrolled.length - present.length };
 
-      const repos: EconomicsRepo[] = enrolled.map((repo) => {
+      const repos: EconomicsRepo[] = [];
+      for (const repo of present) {
         const repo_id = repo.repo_id as string;
         const path = typeof repo.filesystem_path === "string" ? repo.filesystem_path : null;
         const ledger = call(["ledger", "export", "--repo", repo_id, "--json"]);
-        if (!ledger.ok) return { repo_id, path, model: null, error: ledger.message };
+        if (!ledger.ok) {
+          repos.push({ repo_id, path, model: null, error: ledger.message });
+          continue;
+        }
         const rows = rowsOf(ledger.json);
+        if (economicsModel(rows, []).audit.agent_events === 0) {
+          skipped.without_agent_activity += 1;
+          continue;
+        }
         // Residuals are a bonus: a failed projection export leaves them empty and says so, it never hides the ledger.
         const projection = call(["projections", "export", "--repo", repo_id, "--canonical-json"]);
         const model = economicsModel(rows, projection.ok ? rowsOf(projection.json) : []);
-        return { repo_id, path, model, error: projection.ok ? null : `${projection.message} (residuals unavailable)` };
-      });
-      return { state: repos.some((repo) => repo.model && repo.model.audit.agent_events > 0) ? "ok" : "empty", repos };
+        repos.push({ repo_id, path, model, error: projection.ok ? null : `${projection.message} (residuals unavailable)` });
+      }
+      return { state: repos.some((repo) => repo.model !== null) ? "ok" : "empty", repos, skipped };
     },
   };
 }
