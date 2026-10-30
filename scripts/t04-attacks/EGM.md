@@ -10,8 +10,8 @@ production dependency of the repository.
 The only consumer found in source is `scripts/teeth.ts`, which copies
 `scripts/t04-attacks/fake-runtime` over
 `node_modules/@godspeedai/cognate-runtime-bun` inside a temporary copy of the tree and
-requires `test/app.test.ts` to fail. `[teeth.ts:isolatedTree]`
-`[teeth.ts:fake-runtime-substitution]`
+requires `test/app.test.ts` to fail. `[../teeth.ts:isolatedTree]`
+`[../teeth.ts:fake-runtime-substitution]`
 
 ## Subdirectories & Boundaries
 

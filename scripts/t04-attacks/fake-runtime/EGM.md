@@ -12,7 +12,7 @@ loads wherever the real runtime does.
 Its only consumer in source is `scripts/teeth.ts`, which copies this directory into an
 isolated dependency tree as `node_modules/@godspeedai/cognate-runtime-bun` and requires
 `test/app.test.ts` to fail — a control run with the real runtime must pass first.
-`[teeth.ts:fake-runtime-substitution]` `[teeth.ts:checkControl]`
+`[../../teeth.ts:fake-runtime-substitution]` `[../../teeth.ts:checkControl]`
 
 The surface below is documented factually from `index.js`; it is deliberately
 *sufficient* for the real code to boot, so a failure is attributable to behaviour rather
@@ -69,7 +69,7 @@ than to a missing export.
 - No network access, no child processes.
 - Filesystem writes occur in an isolated temporary tree because `teeth.ts` copies this
   directory there; running it against the real repository would still write
-  `/tmp/fake.sqlite` by default. `[teeth.ts:isolatedTree]`
+  `/tmp/fake.sqlite` by default. `[../../teeth.ts:isolatedTree]`
 
 ## Verification
 
