@@ -75,8 +75,8 @@ describe("install-sea-forge-gateway.sh", () => {
       });
       const out = r.stdout.toString();
       expect(r.exitCode).toBe(0);
-      expect(out).toContain("privileged plan:");
-      expect(out).toContain("useradd --system");
+      // The plan is generated from a staged bundle (just gateway-stage); without one, dry-run says so and changes nothing.
+      expect(out).toContain("no staged bundle");
       expect(out).toContain("no changes made");
       expect(readdirSync(root)).toEqual([]);
     } finally {

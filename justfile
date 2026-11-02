@@ -246,20 +246,22 @@ gate-t22:
     @echo "gate-t22: not implemented; fails closed until T22 settles"
     @exit 1
 
-# SEA-Forge gateway service account (Linux/WSL). Nothing here runs privileged commands on its own.
-# gateway-plan: read-only, prints the privileged plan the installer would apply.
-gateway-plan:
+# SEA-Forge gateway and Horizon runtime, two service accounts (Linux/WSL). Nothing here runs privileged
+# commands on its own; the only privileged step is the sudo command gateway-install prints.
+# gateway-stage [--development]: unprivileged. Writes the staging bundle (plan, runtime tree, manifest, units, status).
+gateway-stage *args:
+    bun run scripts/gateway-setup.ts stage {{args}}
+
+# gateway-plan [--development]: stages, then prints the full privileged plan as a dry run. Changes nothing.
+gateway-plan *args:
+    bun run scripts/gateway-setup.ts stage {{args}}
     scripts/install-sea-forge-gateway.sh --dry-run
 
-# gateway-install: applies the plan. Run this yourself in a terminal (sudo asks for your password).
-gateway-install:
-    scripts/install-sea-forge-gateway.sh --dry-run
-    @echo "Apply the plan above with: sudo scripts/install-sea-forge-gateway.sh --authorize-privileged"
+# gateway-install BINARY SHA256: dry run with the server binary verified, then prints the exact sudo command.
+gateway-install binary="" sha256="":
+    scripts/install-sea-forge-gateway.sh --dry-run --binary "{{binary}}" --sha256 "{{sha256}}"
+    @echo "Then start the services (as you): sudo systemctl daemon-reload && sudo systemctl enable --now godspeed-sea-forge.service godspeed-horizon.service"
 
-# gateway-check: read-only ownership and mode check of the gateway directories.
+# gateway-check: read-only ownership, mode, membership and socket-access check. Expects the agent to be denied the socket.
 gateway-check:
-    #!/usr/bin/env bash
-    set -u
-    for d in "${HORIZON_GATEWAY_SOCKET_DIR:-/run/godspeed-sea-forge}" "${HORIZON_GATEWAY_CONFIG_DIR:-/etc/godspeed-sea-forge}" "${HORIZON_GATEWAY_STATE_DIR:-/var/lib/godspeed-sea-forge}"; do
-      if [ -e "$d" ]; then stat -c '%U:%G %a %n' "$d"; else echo "missing: $d"; fi
-    done
+    scripts/install-sea-forge-gateway.sh --check
