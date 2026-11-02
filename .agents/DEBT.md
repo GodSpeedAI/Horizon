@@ -283,3 +283,28 @@
 - Confidence: high (the capability refuses the other two by construction)
 - Closure: add per-tool request/answer shapes under the same closed outcome set and scope checks, extend the capability and its policy, then add positive and refusal teeth for each. Files likely touched: `src/adapters/context-kernel.ts`, `src/capabilities/context.ts`, `src/ui/workspace/inspect.ts`, `test/retrieval-debugger.test.ts`, `test/retrieval-debugger-teeth.test.ts`. Size M.
 
+### Cline CLI concurrent clients silently lose one client's turn log
+- Date: 2026-11-01
+- Location: Cline CLI 3.0.68 session storage, `~/.cline/data/sessions/1793537682482_b9mx4/` (not Horizon code)
+- Debt: Two Cline clients attached to the same session id can run concurrently; each rewrites the shared `messages.json` wholesale, so the surviving transcript silently loses the other client's turns even though separate agent transcript files and file edits survive. A session's `messages.json` is therefore not a complete record of what a session executed, which misleads any later audit or continuation that trusts it.
+- Evidence: During EGM mission work (`.tmp/egm-integration/`), `concepts_brief.md` was edited at 08:35:51 and two second-round agent transcripts (`agent_9765d03c-1c90-4916-9d79-669ae0bf7468`, `agent_fcaeda6f-5216-4317-a2b2-2e8756ce059c`, mtime 08:34) were produced, with no corresponding spawn/editor entries in that session's `messages.json`; the file was subsequently rewritten by the other client (mtime 08:41+). Only one CLI process remained at audit time.
+- Confidence: medium (effect directly observed; the two-client mechanism is inferred from mtimes and the transcript mismatch)
+- Closure: upstream Cline CLI fix — serialize session writes per session id or refuse a second concurrent client. Not Horizon's to fix; recorded so session records are not treated as complete execution logs. Size S (upstream).
+
+### EGM design basis and cited evidence are retained only in gitignored scratch
+- Date: 2026-11-01
+- Location: `.gitignore` (`.tmp/`), `.tmp/egm-integration/` (`concepts_brief.md`, `discovery.md`, `design_draft.md`, `evidence/`)
+- Debt: The control-plane design's requirement register (R2-1…R2-14) and the host measurements it treats as verified (Docker 29.7.1, cgroup v2, mise Node 25.9.0) exist only under `.tmp/`, which git ignores. A committed design therefore cites identifiers and measurements that a fresh reader or later auditor cannot resolve or reproduce, and the acceptance thresholds derived from those numbers cannot be re-derived from the repository.
+- Evidence: `docs/designs/godspeed-egm-jetson-control-plane.md` cites `R2-3`…`R2-14` with no in-document definition; the definitions appear only in `.tmp/egm-integration/concepts_brief.md:64-86`, and `.gitignore` ignores `.tmp/`. `.tmp/egm-integration/evidence/` holds the only copies of the cited discovery logs.
+- Confidence: high (paths and the ignore rule read directly)
+- Closure: move the requirement register and the retained measurements to a committed path (for example `docs/designs/` or `.agents/evidence/`) and cite that path from the design. Files likely touched: the design document, a new committed evidence directory. Size S.
+
+### RealityTrace ledger export reported to fail integrity verification
+- Date: 2026-11-01
+- Location: RealityTrace (`sxr`) ledger, consumed by `src/adapters/realitytrace-economics.ts` (not Horizon code)
+- Debt: A review reviewer reported that `realitytrace ledger export --repo … --json` exits 2 with "ledger integrity: startup tail-chain verification failed at …:704". If accurate, any consumer needing a full ledger copy — including the proposed ID-replay test — cannot obtain one, and the ~1,703-record premise is currently unverifiable.
+- Evidence: reviewer transcript during the EGM review of `docs/designs/godspeed-egm-jetson-control-plane.md`; not reproduced by the orchestrating agent, and no command was run. The committed report `.agents/reports/2026-10-30-agent-economics-realitytrace.md` records "first real drain: 1 449 ledger records", which also disagrees with the 1,703 figure.
+- Confidence: low (reported, not observed directly)
+- Closure: reproduce the export; if the integrity failure is real, land or document the referenced upstream fix, and state the export precondition before any design depends on copying the ledger. Files likely touched: the RealityTrace ledger read path; Horizon design text. Size S–M.
+
+
