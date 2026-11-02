@@ -88,7 +88,7 @@ RealityTrace is not installed by this setup. The runtime unit points at
    root is closed to other accounts, so your login cannot see inside it. Confirm those paths as root:
 
    ```bash
-   sudo scripts/install-sea-forge-gateway.sh --check
+   sudo scripts/install-sea-forge-gateway.sh --check --stage /home/sprime01/.cache/godspeed/gateway-stage
    ```
 
 5. Reload systemd and start both services:
