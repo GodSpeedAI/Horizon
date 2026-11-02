@@ -287,6 +287,8 @@ export function unitFiles(l: GatewayLayout): Record<string, string> {
 
 /** Stands in for the runtime account's uid in the staged template; the installer substitutes `id -u <account>`. */
 export const UID_PLACEHOLDER = "__RUNTIME_UID__";
+/** Stands in for the socket group's gid in the staged template; the installer substitutes `getent group`. */
+export const SOCKET_GID_PLACEHOLDER = "__SOCKET_GID__";
 export const SERVICE_ACTOR = "cognate-service";
 /** The operator actor id used when no config value is given. Production reads identity.operator_ref instead. */
 export const DEFAULT_OPERATOR_ACTOR = "operator";
@@ -302,6 +304,8 @@ export interface ServerBinding {
 /** The keys scripts/ignite.ts writes for a cell (identity, gateway, cep_authority), with the gateway's identities. */
 export interface ServerConfig {
   socket_path: string;
+  /** Group allowed to connect to the socket (a numeric gid, rendered at install). Absent means owner-only. */
+  socket_gid?: number | string;
   root: string;
   identity: { bindings: ServerBinding[] };
   gateway: { uid: number | string; actor: string; delegable_actors: string[] };
@@ -329,6 +333,8 @@ export function worldFiles(dir: string, rel = ""): string[] {
 export function serverConfig(l: GatewayLayout, files: string[], runtimeUid: number | typeof UID_PLACEHOLDER): ServerConfig {
   return {
     socket_path: l.socketPath,
+    // Rendered at install from the socket group's gid (install-sea-forge-gateway.sh). The runtime account reaches the socket through this group.
+    socket_gid: SOCKET_GID_PLACEHOLDER,
     root: l.gatewayStateDir,
     identity: {
       bindings: [
@@ -359,6 +365,9 @@ export function renderServerYaml(c: ServerConfig): string {
 /** Binding rules from sea-rs config.rs and identity.rs, plus the gateway's own delegation rules. Empty means valid. */
 export function validateServerConfig(c: ServerConfig): string[] {
   const errors: string[] = [];
+  if (c.socket_gid !== undefined && c.socket_gid !== SOCKET_GID_PLACEHOLDER && (typeof c.socket_gid !== "number" || c.socket_gid === 0 || !Number.isInteger(c.socket_gid))) {
+    errors.push("socket_gid must be the socket group's numeric gid, not root");
+  }
   const uids = new Set<number>();
   const actors = new Map<string, ServerBinding>();
   for (const b of c.identity.bindings) {

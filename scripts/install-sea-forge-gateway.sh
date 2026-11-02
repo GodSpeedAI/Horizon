@@ -252,15 +252,22 @@ row_deploy_tree() {
 # The runtime account's name comes from the plan, never from a constant.
 runtime_account_name() { awk -F'\t' '$1=="account" && $3=="runtime" {print $2; exit}' "$STAGE/plan.tsv"; }
 
-# Render a staged template into $3. The only substitution is the runtime uid, read with `id -u` at install.
+# Render a staged template into $3. Two substitutions, read at install: the runtime uid (`id -u`) and the
+# socket group's gid (`getent group`, the group named in the staged plan). Root and non-numeric values are refused.
 render_config() {
-  local tmpl="$1" rt="$2" out="$3" uid
+  local tmpl="$1" rt="$2" out="$3" uid="" gid="" sock=""
+  cp "$STAGE/$tmpl" "$out"
   if grep -q '"__RUNTIME_UID__"' "$STAGE/$tmpl"; then
     uid="$(id -u "$rt")" || refuse "runtime account '$rt' does not exist; the account step must run first"
     [[ "$uid" =~ ^[1-9][0-9]{0,9}$ ]] || refuse "runtime account '$rt' has no usable uid (root and non-numeric are refused)"
-    sed "s/\"__RUNTIME_UID__\"/$uid/g" "$STAGE/$tmpl" > "$out"
-  else
-    cp "$STAGE/$tmpl" "$out"
+    sed -i "s/\"__RUNTIME_UID__\"/$uid/g" "$out"
+  fi
+  if grep -q '"__SOCKET_GID__"' "$STAGE/$tmpl"; then
+    sock="$(awk -F'\t' '$1=="group"{print $2; exit}' "$STAGE/plan.tsv")"
+    [ -n "$sock" ] || refuse "the staged plan names no socket group"
+    gid="$(getent group "$sock" | cut -d: -f3)"
+    [[ "$gid" =~ ^[1-9][0-9]{0,9}$ ]] || refuse "socket group '$sock' has no usable gid (root and non-numeric are refused)"
+    sed -i "s/\"__SOCKET_GID__\"/$gid/g" "$out"
   fi
 }
 

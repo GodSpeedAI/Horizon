@@ -16,6 +16,7 @@ import {
   navigationCommitId,
   operatorRefFromConfig,
   renderPolicyYaml,
+  SOCKET_GID_PLACEHOLDER,
   renderServerYaml,
   serverConfig,
   validateServerConfig,
@@ -84,6 +85,23 @@ describe("operator identity: one value from config, shared by the unit and serve
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("socket group: the gateway's server.yaml names the runtime's group by gid, rendered at install", () => {
+  test("the staged server.yaml carries the placeholder, and the validator accepts it", () => {
+    const l = layoutFor("/tmp/sock-root");
+    const files = worldFiles(join(repoRoot, "domain"));
+    const cfg = serverConfig(l, files, 4242);
+    expect(cfg.socket_gid).toBe(SOCKET_GID_PLACEHOLDER);
+    expect(renderServerYaml(cfg)).toContain(`"socket_gid": "${SOCKET_GID_PLACEHOLDER}"`);
+    expect(validateServerConfig(cfg)).toEqual([]);
+  });
+  test("a root gid is refused, and a numeric non-root gid is accepted", () => {
+    const l = layoutFor("/tmp/sock-root");
+    const files = worldFiles(join(repoRoot, "domain"));
+    expect(validateServerConfig({ ...serverConfig(l, files, 4242), socket_gid: 0 }).join("|")).toMatch(/not root/);
+    expect(validateServerConfig({ ...serverConfig(l, files, 4242), socket_gid: 1002 })).toEqual([]);
   });
 });
 
@@ -499,6 +517,8 @@ describe("server.yaml and policy.yaml (rendered from the runtime account's uid, 
       else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) { keys.add(k); walk(x); }
     };
     walk(JSON.parse(render(4242)));
+    // socket_gid is a gateway-only key (the runtime group's gid, rendered at install). The cell generator never writes it.
+    keys.delete("socket_gid");
     for (const k of keys) expect(ignite.includes(`${k}:`) || ignite.includes(`${k},`) || ignite.includes(`${k} `)).toBe(true);
   });
 
