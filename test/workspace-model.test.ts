@@ -10,7 +10,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
-import { buildLineage, buildWorkspace, moveOf, onboardingOf, scopeOf, shortRef, workspaceState, WORKSPACE_REGION_ORDER } from "../src/ui/workspace/model.ts";
+import { approvalAssuranceOf, buildLineage, buildWorkspace, moveOf, onboardingOf, scopeOf, shortRef, workspaceState, WORKSPACE_REGION_ORDER } from "../src/ui/workspace/model.ts";
 import type { GuiView, ProjectedNode } from "../src/ui/surface2/project.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
@@ -351,5 +351,19 @@ describe("typed approval id on stored attempts", () => {
     const attempts = await readIntentAttempts(store);
     expect(attempts.find((a) => a.intent_id === "typed-1")?.approvalId).toBe("ap-typed");
     expect(attempts.find((a) => a.intent_id === "legacy-1")?.approvalId).toBeNull();
+  });
+});
+
+describe("approval assurance", () => {
+  test("known values map to themselves", () => {
+    expect(approvalAssuranceOf("governed")).toBe("governed");
+    expect(approvalAssuranceOf("unisolated-development")).toBe("unisolated-development");
+  });
+  test("missing or unrecognised values are unknown, never governed", () => {
+    expect(approvalAssuranceOf(undefined)).toBe("unknown");
+    expect(approvalAssuranceOf(null)).toBe("unknown");
+    expect(approvalAssuranceOf("")).toBe("unknown");
+    expect(approvalAssuranceOf("Governed!")).toBe("unknown");
+    expect(approvalAssuranceOf("production")).toBe("unknown");
   });
 });

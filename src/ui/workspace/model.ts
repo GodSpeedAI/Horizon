@@ -105,7 +105,18 @@ export interface WorkspaceRemoteRail {
   readonly label: string;
 }
 
+/** Whether governed approvals run behind OS-isolated gateway protection. Anything unproven is "unknown", never "governed". */
+export type ApprovalAssurance = "governed" | "unisolated-development" | "unknown";
+
+/** Map the startup value (HORIZON_APPROVAL_ASSURANCE) to a typed assurance; missing or unrecognised input is "unknown". */
+export function approvalAssuranceOf(raw: string | null | undefined): ApprovalAssurance {
+  const value = raw?.trim();
+  return value === "governed" || value === "unisolated-development" ? value : "unknown";
+}
+
 export interface WorkspaceChrome {
+  /** Absent is treated as "unknown" by the renderer. */
+  readonly approvalAssurance?: ApprovalAssurance;
   readonly status: WorkspaceStatus;
   readonly onboarding: {
     readonly visible: boolean;

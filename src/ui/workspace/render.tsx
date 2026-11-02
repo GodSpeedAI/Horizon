@@ -23,6 +23,7 @@ import {
   WORKSPACE_SCHEMA,
   type PrimaryAction,
   primaryActionOf,
+  type ApprovalAssurance,
   type WorkspaceChrome,
   type WorkspaceDebugger,
   type WorkspaceFrameRef,
@@ -502,6 +503,22 @@ function Moves({ moves, basePath, visible }: { readonly moves: readonly Workspac
   );
 }
 
+function AssuranceBanner({ assurance }: { readonly assurance: ApprovalAssurance }): ReactNode {
+  if (assurance === "governed") return null;
+  if (assurance === "unisolated-development") {
+    return (
+      <div id="approval-assurance" role="alert" data-assurance={assurance} className="assurance insecure">
+        <strong>INSECURE (development only):</strong> governed approvals run without OS-isolated gateway protection and must not be treated as production-safe.
+      </div>
+    );
+  }
+  return (
+    <p id="approval-assurance" role="status" data-assurance={assurance} className="assurance unknown">
+      Approval isolation: not verified.
+    </p>
+  );
+}
+
 export function Workspace({ snapshot, chrome, basePath = "/workspace", intentPath = "/workspace/intent" }: WorkspaceProps): ReactNode {
   const nextTheme = snapshot.theme === "dark" ? "light" : "dark";
   const themeHref = `${basePath}${queryOf(snapshot, { theme: nextTheme })}`;
@@ -566,6 +583,7 @@ export function Workspace({ snapshot, chrome, basePath = "/workspace", intentPat
           </ul>
         </nav>
         <main id="main" tabIndex={-1}>
+          {chrome ? <AssuranceBanner assurance={chrome.approvalAssurance ?? "unknown"} /> : null}
           {chrome ? (
             <PrimaryActionPanel
               action={primaryActionOf({ receipt: chrome.receipt, onboarding: chrome.onboarding, choices: snapshot.choices, current })}
@@ -800,6 +818,9 @@ dd { margin:0; overflow-wrap:anywhere; }
 .claims .claim { border:1px solid var(--line); border-radius:.35rem; padding:.45rem .6rem; background:var(--bg); }
 .claims dt { margin-bottom:.1rem; }
 .claims dd { color:var(--fg); }
+.assurance { border:1px solid var(--danger); padding:.5rem 1rem; margin:0 0 1rem; color:var(--fg); background:var(--panel); }
+.assurance.insecure { border-width:1px; border-style:dashed; font-weight:600; }
+.assurance.unknown { border-color:var(--line); color:var(--muted); font-size:.9rem; }
 .primary-action { border:1px solid currentColor; padding:0.5rem 1rem; margin:0 0 1rem; }
 .primary-action h2 { font-size:0.95rem; margin:0 0 0.25rem; text-transform:uppercase; letter-spacing:0.04em; }
 .claim[data-state="allowed"] dd, .claim[data-state="observed"] dd { font-weight:600; color:var(--ok); }

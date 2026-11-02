@@ -215,6 +215,19 @@ describe("first-run cockpit rendering", () => {
     ...overrides,
   });
 
+  test("approval assurance banner: insecure for unisolated-development, quiet for unknown, absent for governed", () => {
+    const insecure = pageWith(snapshot(), chromeFor({ approvalAssurance: "unisolated-development" }));
+    expect(insecure).toContain("without OS-isolated gateway protection and must not be treated as production-safe");
+    expect(insecure).toContain("INSECURE");
+    const unknown = pageWith(snapshot(), chromeFor({ approvalAssurance: "unknown" }));
+    expect(unknown).toContain("Approval isolation: not verified.");
+    expect(unknown).not.toContain("INSECURE");
+    const governed = pageWith(snapshot(), chromeFor({ approvalAssurance: "governed" }));
+    expect(governed).not.toContain("approval-assurance");
+    expect(governed).not.toContain("not verified");
+    expect(insecure).not.toMatch(/border-(left|right):\s*[2-9]\d*px/);
+  });
+
   test("the empty moves list says what appears there and points at step 3", () => {
     const markup = pageWith(snapshot(), chromeFor());
     expect(markup).toContain("Committed moves and refusals appear here");

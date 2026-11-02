@@ -57,6 +57,7 @@ import {
 import { publishSurfaceSchema, SURFACE_SCHEMA, type SurfaceRole } from "./ui/surface2/grammar.ts";
 import { renderHtml, renderText } from "./ui/surface2/render.ts";
 import {
+  approvalAssuranceOf,
   buildWorkspace,
   moveOf,
   onboardingOf,
@@ -1176,6 +1177,7 @@ export async function createApplication(
     const current = await latestCase(store, caller.tenant);
     const skipped = await onboardingSkipped(store, caller.tenant, caller.actor.id);
     return {
+      approvalAssurance: approvalAssuranceOf(process.env.HORIZON_APPROVAL_ASSURANCE),
       status: statusOf({ worldRef: world.worldRef, governed: status.governed, realitytrace: status.realitytrace, approvals: status.approvals, operator: caller.actor.id }),
       onboarding: onboardingOf({ governed: status.governed, realitytrace: status.realitytrace, caseOpen: current !== null, committed, skipped }),
       openCase: current === null ? null : { case_ref: current.case_ref, purpose: current.purpose, opened_at: current.opened_at },
