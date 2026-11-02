@@ -379,6 +379,7 @@ run_check() {
         else fails=$((fails+1)); echo "  BAD     runtime tree ${F[3]} missing or not matching its manifest"; fi ;;
       socket)
         if [ "$(id -u)" = 0 ]; then echo "  note    agent socket open: not tested as root (root connects to any socket); run --check as the operator login to test it";
+        elif ! [ -e "${F[1]}" ] && [[ "$(stat "${F[1]}" 2>&1 || true)" == *"Permission denied"* ]]; then echo "  ok      agent cannot reach the socket path (permission denied, expected)";
         elif [ -S "${F[1]}" ] && command -v python3 >/dev/null 2>&1; then
           result="$(python3 -c 'import socket,sys
 s=socket.socket(socket.AF_UNIX)

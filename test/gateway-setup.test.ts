@@ -295,6 +295,7 @@ describe("unit files", () => {
     expect(gw).toContain("PrivateTmp=yes");
     expect(gw).toContain(`ExecStart=${layout.binPath}`);
     expect(gw).toContain(`ReadWritePaths=${layout.gatewayStateDir} ${layout.socketDir}`);
+    expect(gw).toContain(`ReadOnlyPaths=${layout.gatewayStateDir}/server.yaml ${layout.gatewayStateDir}/policy.yaml`);
   });
 
   test("the runtime unit runs as the runtime account, requires the gateway, and is governed", () => {
