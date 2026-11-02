@@ -24,6 +24,7 @@ import { AwaitingAuthorityError, createApplication, type HorizonApplication } fr
 import { loadWorld } from "../src/adapters/semantic.ts";
 import { approvalAuthority, seaForgeCall } from "../src/adapters/sea-forge-approvals.ts";
 import { NAVIGATION_INTENT_COMMIT, readIntentAttempts, readIntentRecords } from "../src/capabilities/navigation-intent.ts";
+import { latestSettlement } from "../src/capabilities/navigation-settlement.ts";
 import { PINNED_WORLD_REF, horizonDocument, writeConfig } from "./support/config.ts";
 
 const BIN = process.env.SEA_FORGE_SERVER_BIN;
@@ -258,10 +259,9 @@ settlementTest("observation and the SEA-Forge ruling are separate steps: observe
   const { app } = await seaForge("allow", true);
   const committed = await app.commitNavigationIntent({ operationRef: "horizon.health" });
 
-  // Ruling before observing refuses to rule and says why; nothing is ruled.
-  const early = await app.settleNavigationIntent(committed.intent.intent_id, "rule");
-  expect(early.settlement_reference).toMatchObject({ status: "unavailable", final: false });
-  expect(early.settlement_reference.reason).toContain("observe the commit first");
+  // Ruling before observing refuses with a reason and writes no settlement record.
+  await expect(app.settleNavigationIntent(committed.intent.intent_id, "rule")).rejects.toThrow("observe the commit first");
+  expect(await latestSettlement(app.runtime.runtime.store, app.caller.tenant, committed.intent.intent_id)).toBeNull();
 
   // Observing records the observation and stops: SEA-Forge has not ruled, so the status is pending.
   const observed = await app.settleNavigationIntent(committed.intent.intent_id, "observe");

@@ -520,7 +520,8 @@ export async function createApplication(
     if (typeof seaForge?.submitEvidence !== "function" || typeof seaForge.settle !== "function") return unavailable("the configured authority cannot settle");
     if (!evidence) return unavailable("RealityTrace is not configured (COGNATE_REALITYTRACE_BIN)");
 
-    if (phase === "rule" && !observation) return unavailable("no RealityTrace observation to rule on: observe the commit first");
+    // Ruling before observation is refused without writing a record: nothing was observed, so nothing is settled.
+    if (phase === "rule" && !observation) throw new Error("SETTLEMENT: no RealityTrace observation to rule on: observe the commit first");
     if (!observation) {
       try {
         const targetRef = await evidence.observe(invocation);

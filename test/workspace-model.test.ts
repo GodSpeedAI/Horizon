@@ -206,7 +206,7 @@ describe("first-run derivations", () => {
   const ungoverned = { governed: false, realitytrace: false };
 
   test("short refs keep the readable part and the digest prefix", () => {
-    expect(shortRef("world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290")).toBe("horizon@701d6211");
+    expect(shortRef("world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b")).toBe("horizon@0a10c20d");
     expect(shortRef("obj:strategy:alpha")).toBe("obj:strategy:alpha");
     expect(shortRef("case:0123456789abcdef0123456789abcdef")).toBe("case:0123456789a…abcdef");
   });

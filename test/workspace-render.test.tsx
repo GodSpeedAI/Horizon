@@ -204,7 +204,7 @@ describe("T09 workspace HTML", () => {
 
 /** The first-run panel, status rail, receipt and moves: the stored state each one shows. */
 describe("first-run cockpit rendering", () => {
-  const status = statusOf({ worldRef: "world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290", governed: false, realitytrace: false, approvals: false, operator: "local_operator" });
+  const status = statusOf({ worldRef: "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b", governed: false, realitytrace: false, approvals: false, operator: "local_operator" });
   const chromeFor = (overrides: Partial<WorkspaceChrome> = {}): WorkspaceChrome => ({
     status,
     onboarding: onboardingOf({ governed: false, realitytrace: false, caseOpen: false, committed: false, skipped: false }),
@@ -233,7 +233,7 @@ describe("first-run cockpit rendering", () => {
   test("the status rail states every process in text, not colour alone", () => {
     const markup = pageWith(snapshot(), chromeFor());
     expect(markup).toContain("World: <code");
-    expect(markup).toContain("horizon@701d6211");
+    expect(markup).toContain("horizon@0a10c20d");
     expect(markup).toContain("SEA-Forge: off");
     expect(markup).toContain("RealityTrace: off");
     expect(markup).toContain("Approvals: not configured");

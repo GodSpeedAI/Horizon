@@ -5,7 +5,7 @@ import { GUI_VIEW_SCHEMA } from "../src/ui/surface2/project.ts";
 import type { LoadedWorld } from "../src/adapters/semantic.ts";
 
 const world = {
-  worldRef: "world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290",
+  worldRef: "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
   cognateWorldRef: "world:horizon@sha256:aa459cf9c096b8102824d5d0a0d7a3b29bbf3f2537013800c88d7e7690300a9b",
   projection: { objects: [], relations: [] },
   objectCount: 0,
