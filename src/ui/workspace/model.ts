@@ -807,6 +807,51 @@ export function moveOf(facts: StoredMoveFacts, context: { readonly governed: boo
   });
 }
 
+/** The one next step shown at the top of the workspace. It names where to act; it never acts itself. */
+export interface PrimaryAction {
+  readonly kind: "answer_escalation" | "observe" | "rule" | "finish_setup" | "choose_move" | "none";
+  readonly title: string;
+  readonly reason: string;
+  /** The region on this page where the operator takes the step. */
+  readonly href: string;
+}
+
+/**
+ * The fixed precedence for the primary action: a waiting human decision, then the observation and ruling of the
+ * latest commit, then unfinished setup, then the first available move. Nothing here decides or submits.
+ */
+export function primaryActionOf(input: {
+  readonly receipt: WorkspaceReceipt | null;
+  readonly onboarding: WorkspaceChrome["onboarding"];
+  readonly choices: readonly { readonly label: string; readonly available: boolean; readonly action_id: string | null }[];
+  readonly current: boolean;
+}): PrimaryAction {
+  const move = input.receipt?.move ?? null;
+  if (move?.approval_id) {
+    return { kind: "answer_escalation", title: "Answer the approval waiting for you", reason: "SEA-Forge is waiting for your decision on the latest move.", href: "#receipt" };
+  }
+  if (move?.observable) {
+    return { kind: "observe", title: "Observe the commit with RealityTrace", reason: "The latest move is committed but nothing has observed its effect yet.", href: "#receipt" };
+  }
+  if (move?.settleable) {
+    return { kind: "rule", title: "Ask SEA-Forge to rule on the observed evidence", reason: "RealityTrace has observed the latest move. SEA-Forge has not ruled yet.", href: "#receipt" };
+  }
+  if (input.onboarding.visible) {
+    const missing = input.onboarding.steps.find((step) => !step.done);
+    return {
+      kind: "finish_setup",
+      title: missing === undefined ? "Finish setup" : `Finish setup: ${missing.label}`,
+      reason: missing?.fix ?? missing?.detail ?? "Complete the remaining setup steps.",
+      href: "#getting-started",
+    };
+  }
+  const first = input.choices.find((choice) => choice.available && choice.action_id !== null);
+  if (input.current && first !== undefined) {
+    return { kind: "choose_move", title: `Choose the next move: ${first.label}`, reason: "This move is available at the current checkpoint.", href: "#region-decision" };
+  }
+  return { kind: "none", title: "No move is available here yet", reason: "Nothing can be committed at this checkpoint. The reasons are listed below.", href: "#region-decision" };
+}
+
 /** Name who refused a commit only when the recorded reason shows it; never credit SEA-Forge with Horizon's own checks. */
 export function refusedBy(reason: string, governed: boolean): string {
   if (/IntentError|failed_precondition|invalid_argument|^(INTENT|HEALTH|SURFACE|WORKSPACE):/.test(reason)) return "Refused by Horizon's own checks";

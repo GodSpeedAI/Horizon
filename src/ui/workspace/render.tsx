@@ -21,6 +21,8 @@ import {
   loadingWorkspace,
   buildWorkspace,
   WORKSPACE_SCHEMA,
+  type PrimaryAction,
+  primaryActionOf,
   type WorkspaceChrome,
   type WorkspaceDebugger,
   type WorkspaceFrameRef,
@@ -327,7 +329,18 @@ function ClaimRows({ move, prefix }: { readonly move: WorkspaceMove; readonly pr
 }
 
 /** The decision receipt after a commit: stored facts only, addressed by intent id. */
-function Receipt({ receipt, basePath }: { readonly receipt: WorkspaceReceipt; readonly basePath: string }): ReactNode {
+/** The one next step, named first. A link to where the operator acts; this panel submits nothing. */
+function PrimaryActionPanel({ action }: { readonly action: PrimaryAction }): ReactNode {
+  return (
+    <section id="primary-action" aria-labelledby="heading-primary-action" data-kind={action.kind} className="primary-action">
+      <h2 id="heading-primary-action">What to do now</h2>
+      <p><a href={action.href}><strong>{action.title}</strong></a></p>
+      <p>{action.reason}</p>
+    </section>
+  );
+}
+
+function Receipt({ receipt, basePath }:{ readonly receipt: WorkspaceReceipt; readonly basePath: string }): ReactNode {
   if (!receipt.found || receipt.move === null) {
     return (
       <section id="receipt" tabIndex={-1} aria-labelledby="heading-receipt" data-receipt="missing">
@@ -547,6 +560,11 @@ export function Workspace({ snapshot, chrome, basePath = "/workspace", intentPat
           </ul>
         </nav>
         <main id="main" tabIndex={-1}>
+          {chrome ? (
+            <PrimaryActionPanel
+              action={primaryActionOf({ receipt: chrome.receipt, onboarding: chrome.onboarding, choices: snapshot.choices, current })}
+            />
+          ) : null}
           {chrome?.receipt ? <Receipt receipt={chrome.receipt} basePath={basePath} /> : null}
 
           {chrome?.onboarding.visible ? <GettingStarted chrome={chrome} snapshot={snapshot} basePath={basePath} intentPath={intentPath} /> : null}
@@ -776,7 +794,9 @@ dd { margin:0; overflow-wrap:anywhere; }
 .claims .claim { border:1px solid var(--line); border-radius:.35rem; padding:.45rem .6rem; background:var(--bg); }
 .claims dt { margin-bottom:.1rem; }
 .claims dd { color:var(--fg); }
-.claim[data-state="allowed"] dd, .claim[data-state="observed"] dd, .claim[data-state="recorded"] dd { font-weight:600; color:var(--ok); }
+.primary-action { border:1px solid currentColor; padding:0.5rem 1rem; margin:0 0 1rem; }
+.primary-action h2 { font-size:0.95rem; margin:0 0 0.25rem; text-transform:uppercase; letter-spacing:0.04em; }
+.claim[data-state="allowed"] dd,.claim[data-state="observed"] dd, .claim[data-state="recorded"] dd { font-weight:600; color:var(--ok); }
 .claim[data-state="refused"] dd, .claim[data-state="unavailable"] dd { font-weight:600; color:var(--danger); }
 .moves { padding-left:1.2rem; }
 .moves li { margin:.6rem 0; }

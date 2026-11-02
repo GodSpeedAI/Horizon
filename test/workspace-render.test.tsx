@@ -230,6 +230,17 @@ describe("first-run cockpit rendering", () => {
     expect(markup).toContain('data-step="stack" data-done="false" aria-current="step"');
   });
 
+  test("the page opens with one primary action, before the context and the decision", () => {
+    const markup = pageWith(snapshot(), chromeFor());
+    const primary = markup.indexOf('id="primary-action"');
+    expect(primary).toBeGreaterThan(-1);
+    expect(markup.slice(primary)).toContain("What to do now");
+    expect(primary).toBeLessThan(markup.indexOf('id="region-context"'));
+    expect(primary).toBeLessThan(markup.indexOf('id="region-decision"'));
+    // The panel links to the place the operator acts; it does not submit anything itself.
+    expect(markup.slice(primary, markup.indexOf("</section>", primary))).not.toContain("<form");
+  });
+
   test("the status rail states every process in text, not colour alone", () => {
     const markup = pageWith(snapshot(), chromeFor());
     expect(markup).toContain("World: <code");
