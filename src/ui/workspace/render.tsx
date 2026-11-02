@@ -796,7 +796,8 @@ dd { margin:0; overflow-wrap:anywhere; }
 .claims dd { color:var(--fg); }
 .primary-action { border:1px solid currentColor; padding:0.5rem 1rem; margin:0 0 1rem; }
 .primary-action h2 { font-size:0.95rem; margin:0 0 0.25rem; text-transform:uppercase; letter-spacing:0.04em; }
-.claim[data-state="allowed"] dd,.claim[data-state="observed"] dd, .claim[data-state="recorded"] dd { font-weight:600; color:var(--ok); }
+.claim[data-state="allowed"] dd, .claim[data-state="observed"] dd { font-weight:600; color:var(--ok); }
+.claim[data-state="recorded"] dd { font-weight:600; }
 .claim[data-state="refused"] dd, .claim[data-state="unavailable"] dd { font-weight:600; color:var(--danger); }
 .moves { padding-left:1.2rem; }
 .moves li { margin:.6rem 0; }
