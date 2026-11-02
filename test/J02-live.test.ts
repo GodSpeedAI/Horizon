@@ -253,3 +253,24 @@ settlementTest("J02 IS6/IS7: RealityTrace records the commit's trace; SEA-Forge 
   expect(again.realitytrace_observation).toEqual(observation);
   expect(again.settlement_reference.status).toBe("unsettled");
 }, 240_000);
+
+settlementTest("observation and the SEA-Forge ruling are separate steps: observe records evidence without a ruling, rule needs the observation", async () => {
+  const { app } = await seaForge("allow", true);
+  const committed = await app.commitNavigationIntent({ operationRef: "horizon.health" });
+
+  // Ruling before observing refuses to rule and says why; nothing is ruled.
+  const early = await app.settleNavigationIntent(committed.intent.intent_id, "rule");
+  expect(early.settlement_reference).toMatchObject({ status: "unavailable", final: false });
+  expect(early.settlement_reference.reason).toContain("observe the commit first");
+
+  // Observing records the observation and stops: SEA-Forge has not ruled, so the status is pending.
+  const observed = await app.settleNavigationIntent(committed.intent.intent_id, "observe");
+  expect(observed.settlement_reference).toMatchObject({ status: "pending", final: false });
+  expect(observed.realitytrace_observation).not.toBeNull();
+
+  // Observing again keeps the same observation; the ruling then uses it.
+  expect(await app.settleNavigationIntent(committed.intent.intent_id, "observe")).toEqual(observed);
+  const ruled = await app.settleNavigationIntent(committed.intent.intent_id, "rule");
+  expect(ruled.realitytrace_observation).toEqual(observed.realitytrace_observation);
+  expect(ruled.settlement_reference.status).toBe("unsettled");
+}, 240_000);

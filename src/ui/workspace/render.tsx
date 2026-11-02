@@ -348,11 +348,20 @@ function Receipt({ receipt, basePath }: { readonly receipt: WorkspaceReceipt; re
       <div className="settlement" data-settlement={move.settlement.state}>
         <h3>Settlement</h3>
         <p>{move.settlement.text}</p>
+        {move.observable ? (
+          <form method="post" action={`${basePath}/settle`}>
+            <input type="hidden" name="intent_id" value={move.intent_id} />
+            <input type="hidden" name="phase" value="observe" />
+            <p>RealityTrace observes the committed trace and sends the evidence to SEA-Forge. SEA-Forge has not ruled yet.</p>
+            <button type="submit">Observe with RealityTrace</button>
+          </form>
+        ) : null}
         {move.settleable ? (
           <form method="post" action={`${basePath}/settle`}>
             <input type="hidden" name="intent_id" value={move.intent_id} />
-            <p>RealityTrace observes the committed trace, SEA-Forge rules on that evidence, and Horizon records both answers.</p>
-            <button type="submit">Observe and settle</button>
+            <input type="hidden" name="phase" value="rule" />
+            <p>SEA-Forge rules on the observed evidence. This answer is recorded and is final once SEA-Forge settles it.</p>
+            <button type="submit">Ask SEA-Forge to rule</button>
           </form>
         ) : null}
       </div>

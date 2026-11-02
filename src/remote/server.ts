@@ -37,7 +37,7 @@ export interface RemoteDeps {
   readonly resolveApproval: (approvalId: string, resolution: "approved" | "rejected") => Promise<void>;
   /** The cockpit's commit of one offered action, under the operator's identity. */
   readonly commitAction: (actionId: string, intentId: string) => Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }>;
-  readonly settle: (intentId: string) => Promise<void>;
+  readonly settle: (intentId: string, phase: "observe" | "rule") => Promise<void>;
   readonly openCase: (purpose: string) => Promise<void>;
 }
 
@@ -491,8 +491,11 @@ export class RemoteController {
     if (kind === "settle") {
       const intentId = typeof body?.intent_id === "string" ? body.intent_id : "";
       if (intentId === "") return reply(400, false, { state: "refused", code: "invalid_argument", message: "intent_id is required" });
+      // Observation and the SEA-Forge ruling are separate requests, as on the desktop: a combined settle is not offered.
+      const phase = body?.phase;
+      if (phase !== "observe" && phase !== "rule") return reply(400, false, { state: "refused", code: "invalid_argument", message: "phase must be observe or rule" });
       try {
-        await this.deps.settle(intentId);
+        await this.deps.settle(intentId, phase);
       } catch {
         return reply(409, false, { state: "refused", code: "settlement_refused", message: "Settlement was refused. The receipt on the desktop says why." });
       }

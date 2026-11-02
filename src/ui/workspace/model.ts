@@ -75,7 +75,9 @@ export interface WorkspaceMove {
   readonly settlement: WorkspaceClaim;
   /** The escalation a human can answer, when the commit is awaiting approval. */
   readonly approval_id: string | null;
-  /** Settlement can be requested explicitly: governed, recorded, and not yet final. */
+  /** RealityTrace can observe the commit now: governed, decided, recorded, and no observation yet. */
+  readonly observable: boolean;
+  /** SEA-Forge can rule on the observed evidence now: as observable, but an observation already exists and nothing is final. */
   readonly settleable: boolean;
 }
 
@@ -786,6 +788,10 @@ export function moveOf(facts: StoredMoveFacts, context: { readonly governed: boo
   } else {
     settlementClaim = { state: "pending", text: "Not settled yet." };
   }
+  const governedDecided = context.governed && context.realitytrace && committed !== null && decisionRef !== null;
+  const open = settlement?.final !== true && (settlement === null || settlement === undefined || settlement.status === "pending" || settlement.status === "unavailable");
+  const canObserve = governedDecided && open && !settlement?.observation;
+  const canRule = governedDecided && open && Boolean(settlement?.observation);
   return Object.freeze({
     intent_id: facts.intent_id,
     operation_ref: facts.operation_ref,
@@ -795,10 +801,9 @@ export function moveOf(facts: StoredMoveFacts, context: { readonly governed: boo
     observed,
     settlement: settlementClaim,
     approval_id: approvalId,
-    // Offered until SEA-Forge has answered, and again while a settlement window is still open.
-    settleable:
-      context.governed && context.realitytrace && committed !== null && decisionRef !== null && settlement?.final !== true &&
-      (settlement === null || settlement === undefined || settlement.status === "pending" || settlement.status === "unavailable"),
+    // Both steps are offered only while nothing is final; the ruling needs the observation first.
+    observable: canObserve,
+    settleable: canRule,
   });
 }
 

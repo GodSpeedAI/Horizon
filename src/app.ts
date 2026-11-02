@@ -134,6 +134,9 @@ export class AwaitingAuthorityError extends Error {
   }
 }
 
+/** Settlement in steps: `observe` records RealityTrace's observation, `rule` asks SEA-Forge to rule on it, `both` does both (the default). */
+export type SettlementPhase = "observe" | "rule" | "both";
+
 export interface HorizonApplication {
   readonly loaded: LoadedConfig;
   readonly world: LoadedWorld;
@@ -189,7 +192,7 @@ export interface HorizonApplication {
    * settlement reference. A completion trace alone is `unsettled`; what cannot be obtained is marked
    * `unavailable` with the reason, never invented. A final settlement is returned as recorded.
    */
-  settleNavigationIntent(intentId: string): Promise<NavigationSettlement>;
+  settleNavigationIntent(intentId: string, phase?: SettlementPhase): Promise<NavigationSettlement>;
   surface(role?: SurfaceRole): ReturnType<typeof projectForRole>;
   /** The published `horizon.surface/2` vocabulary, for discovery (PE-01). */
   surfaceSchema(): ReturnType<typeof publishSurfaceSchema>;
@@ -476,13 +479,16 @@ export async function createApplication(
     );
   }
 
-  async function settleNavigationIntent(intentId: string): Promise<NavigationSettlement> {
+  async function settleNavigationIntent(intentId: string, phase: SettlementPhase = "both"): Promise<NavigationSettlement> {
     const store = runtime.runtime.store;
     const prior = await latestSettlement(store, caller.tenant, intentId);
     if (prior?.settlement_reference.final) return prior;
+    // Observing again is a no-op: the observation is kept and reused, never re-recorded.
+    if (phase === "observe" && prior?.realitytrace_observation) return prior;
     // A bound operation settles through its obligation flow (or as not_required), never the evidence-item rule.
     const obligationPending = await readPending(store, caller.tenant, intentId);
     if (obligationPending) {
+      if (phase !== "both") throw new Error("SETTLEMENT: this operation settles through its obligation window in one step; it cannot be observed and ruled on separately");
       const settled = await closeAndSettle(intentId);
       const latest = settled ?? (await latestSettlement(store, caller.tenant, intentId));
       if (latest) return latest;
@@ -514,6 +520,7 @@ export async function createApplication(
     if (typeof seaForge?.submitEvidence !== "function" || typeof seaForge.settle !== "function") return unavailable("the configured authority cannot settle");
     if (!evidence) return unavailable("RealityTrace is not configured (COGNATE_REALITYTRACE_BIN)");
 
+    if (phase === "rule" && !observation) return unavailable("no RealityTrace observation to rule on: observe the commit first");
     if (!observation) {
       try {
         const targetRef = await evidence.observe(invocation);
@@ -526,6 +533,8 @@ export async function createApplication(
         return unavailable(`RealityTrace: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
+    // The observation step stops here: SEA-Forge has the evidence but has not ruled on it yet.
+    if (phase === "observe") return record({ status: "pending", final: false, envelope_id: null, ledger_entry: null, reason: "RealityTrace observed the commit; SEA-Forge has not ruled yet" });
     const settled = await seaForge.settle(authority.operationId, authority.worldRef);
     if (!settled.ok) {
       return settled.errorClass === "unreachable" ? unavailable(`SEA-Forge: ${settled.error}`) : refused(`SEA-Forge refused the settlement: ${settled.errorClass}: ${settled.error}`);
@@ -1122,8 +1131,8 @@ export async function createApplication(
       if (failure !== null && !audited) throw failure;
       return { ok: true as const };
     },
-    settle: async (intentId) => {
-      await settleNavigationIntent(intentId);
+    settle: async (intentId, phase) => {
+      await settleNavigationIntent(intentId, phase);
     },
     openCase: async (purpose) => {
       await openCase(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, purpose, now: new Date() });
@@ -1416,8 +1425,12 @@ export async function createApplication(
             if (typeof intentId !== "string" || intentId === "") {
               return Response.json({ code: "invalid_argument", message: "SETTLEMENT: intent_id is required" }, { status: 400 });
             }
+            const phase = form?.get("phase");
+            if (phase !== "observe" && phase !== "rule") {
+              return Response.json({ code: "invalid_argument", message: "SETTLEMENT: phase must be observe or rule" }, { status: 400 });
+            }
             try {
-              await settleNavigationIntent(intentId);
+              await settleNavigationIntent(intentId, phase);
             } catch (error) {
               return Response.json({ code: "settlement_refused", message: error instanceof Error ? error.message : String(error) }, { status: 409 });
             }

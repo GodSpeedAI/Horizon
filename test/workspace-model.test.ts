@@ -295,6 +295,27 @@ describe("first-run derivations", () => {
     expect(recorded.decided.text).toBe("Allowed by SEA-Forge: decision inv-7.");
   });
 
+  test("observation and the SEA-Forge ruling are separate steps: observing never offers or performs the ruling", () => {
+    const base = {
+      intent_id: "intent-6",
+      operation_ref: "product.apply",
+      committed: { at: "2026-10-24T00:00:00.000Z", expected: true },
+      decision: { ref: "inv-6" },
+      attempt: null,
+      at: null,
+    };
+    const unobserved = moveOf({ ...base, settlement: null }, governed);
+    expect(unobserved.observable).toBe(true);
+    expect(unobserved.settleable).toBe(false);
+
+    const observed = moveOf(
+      { ...base, settlement: { status: "pending", final: false, reason: null, observation: { evidence_id: "ev-6" } } },
+      governed,
+    );
+    expect(observed.observable).toBe(false);
+    expect(observed.settleable).toBe(true);
+  });
+
   test("the no-affordance message names the moves that can still be committed", () => {
     const base = { unresolved: 0, checkpointKnown: true, objects: 1, choices: 1, decision: "no_affordance" as const };
     expect(workspaceState({ ...base, submittable: 2 }).message).toBe("2 moves are available from this focus. Blocked moves show their reasons below.");
