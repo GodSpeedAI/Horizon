@@ -105,7 +105,7 @@ async function rig(name: string): Promise<Rig> {
   const app = await createApplication({
     configPath,
     governance: { mode: "sea-forge", authority: wire.inner, worldRef: world },
-    approvals: approvalAuthority({ socketPath: join(root, "none.sock"), operatorId: "operator" }),
+    approvals: approvalAuthority({ socketPath: join(root, "none.sock"), operatorId: "actor:operator" }),
     realityTrace: null,
     operators: { desktop_operator: "operator", delegable_actors: [MAPPED, "operator"], actors: { operator: MAPPED } },
     delegationSend: wire.send,

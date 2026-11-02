@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
+import { seaForgeActorOf } from "../src/adapters/sea-forge-approvals.ts";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { userInfo, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -13,6 +14,7 @@ import {
   buildPlan,
   decideBinaryPlacement,
   navigationCommitId,
+  operatorRefFromConfig,
   renderPolicyYaml,
   renderServerYaml,
   serverConfig,
@@ -44,6 +46,8 @@ afterAll(() => {
 
 // The pinned world identity, read the way ignite reads it, and the cognate ref the runtime is given.
 const WORLD: WorldIdentity = await worldIdentity(repoRoot);
+// The operator actor the gateway is generated for: read from config/horizon.toml, never a constant here.
+const OPERATOR = operatorRefFromConfig(repoRoot);
 
 // Fake account names: nothing here is a real user, and none is derived from the process.
 const FAKE = {
@@ -53,11 +57,39 @@ const FAKE = {
   HORIZON_OPERATOR_ACCOUNT: "op-fake",
 };
 const layoutFor = (root: string, extra: Record<string, string> = {}, development = false): GatewayLayout =>
-  resolveLayout({ ...FAKE, HORIZON_GATEWAY_ROOT: root, ...extra }, { development, world: WORLD });
+  resolveLayout({ ...FAKE, HORIZON_GATEWAY_ROOT: root, ...extra }, { development, world: WORLD, operatorRef: OPERATOR });
+
+describe("operator identity: one value from config, shared by the unit and server.yaml", () => {
+  test("the runtime unit and the gateway's delegable actor carry the configured ref", () => {
+    const l = layoutFor("/tmp/op-root");
+    expect(unitFiles(l)[UNIT_RUNTIME]).toContain(`Environment=COGNATE_SEA_FORGE_OPERATOR=${OPERATOR}\n`);
+    const bound = seaForgeActorOf(OPERATOR);
+    expect(serverConfig(l, [], 4242).gateway.delegable_actors).toEqual([bound]);
+    expect(serverConfig(l, [], 4242).identity.bindings.find((b) => b.actor_id === bound)?.uid).toBeUndefined();
+  });
+  test("the principal is actor:<id>, and the gateway binds the bare id", () => {
+    expect(OPERATOR).toBe("actor:operator");
+    expect(seaForgeActorOf(OPERATOR)).toBe("operator");
+  });
+  test("a ref the gateway cannot accept is refused when staging, not in SEA-Forge", () => {
+    const dir = mkdtempSync(join(tmpdir(), "op-ref-"));
+    try {
+      mkdirSync(join(dir, "config"));
+      writeFileSync(join(dir, "config", "horizon.toml"), '[identity]\noperator_ref = "operator"\n');
+      expect(() => operatorRefFromConfig(dir)).toThrow(/must be actor:<id>/);
+      writeFileSync(join(dir, "config", "horizon.toml"), '[identity]\noperator_ref = "actor:has space"\n');
+      expect(() => operatorRefFromConfig(dir)).toThrow(/gateway's rule/);
+      writeFileSync(join(dir, "config", "horizon.toml"), "[identity]\nsource = \"os_session\"\n");
+      expect(() => operatorRefFromConfig(dir)).toThrow(/no identity.operator_ref/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("resolveLayout defaults", () => {
   test("product-name defaults, and no default contains the launching login", () => {
-    const l = resolveLayout({}, { world: WORLD });
+    const l = resolveLayout({}, { world: WORLD, operatorRef: OPERATOR });
     expect(l.gatewayAccount).toBe(DEFAULT_GATEWAY_ACCOUNT);
     expect(l.runtimeAccount).toBe(DEFAULT_RUNTIME_ACCOUNT);
     expect(l.socketGroup).toBe(DEFAULT_SOCKET_GROUP);

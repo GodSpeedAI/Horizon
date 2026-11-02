@@ -19,6 +19,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSy
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { seaForgeActorOf } from "../src/adapters/sea-forge-approvals.ts";
 
 export const PRODUCT = "godspeed";
 export const DEFAULT_GATEWAY_ACCOUNT = `${PRODUCT}-sea-forge`;
@@ -46,6 +47,8 @@ export interface GatewayLayout {
   runtimeAccount: string;
   socketGroup: string;
   operatorAccount: string | null;
+  /** The operator principal ref (`actor:<id>`), from config. server.yaml uses its SEA-Forge actor id. */
+  operatorRef: string;
   socketDir: string;
   socketPath: string;
   /** Gateway root: SEA_FORGE_ROOT, holds server.yaml and policy.yaml (root-owned) and the gateway's own state. */
@@ -66,7 +69,7 @@ export type PlanRow = string[];
 /** Explicit configuration: env overrides, product-name defaults. Nothing is derived from the launching user. */
 export function resolveLayout(
   env: Record<string, string | undefined>,
-  options: { development?: boolean; world: WorldIdentity },
+  options: { development?: boolean; world: WorldIdentity; operatorRef: string },
 ): GatewayLayout {
   const pick = (v: string | undefined) => (v?.trim() ? v.trim() : undefined);
   const socketDir = pick(env.HORIZON_GATEWAY_SOCKET_DIR) ?? `/run/${DEFAULT_GATEWAY_ACCOUNT}`;
@@ -90,6 +93,7 @@ export function resolveLayout(
     bunPath: pick(env.HORIZON_BUN_PATH) ?? `${runtimeBinDir}/bun`,
     realityTraceBin: pick(env.HORIZON_REALITYTRACE_BIN) ?? `${runtimeBinDir}/realitytrace`,
     world: options.world,
+    operatorRef: options.operatorRef,
   };
 }
 
@@ -100,6 +104,19 @@ export async function worldIdentity(repo: string): Promise<WorldIdentity> {
   const { loadWorld } = await import("../src/adapters/semantic.ts");
   const loaded = loadWorld(config.world_ref, join(repo, "domain"));
   return { pinned: config.world_ref, cognate: loaded.cognateWorldRef };
+}
+
+/**
+ * The operator's principal ref, from `identity.operator_ref` in config/horizon.toml. It goes to the runtime
+ * unit (COGNATE_SEA_FORGE_OPERATOR, which must equal the runtime's operator ref) and, mapped through
+ * seaForgeActorOf, to server.yaml (the operator binding and delegable actor). One source, one mapping.
+ */
+export function operatorRefFromConfig(repo: string): string {
+  const config = Bun.TOML.parse(readFileSync(join(repo, "config", "horizon.toml"), "utf8")) as { identity?: { operator_ref?: unknown } };
+  const ref = config.identity?.operator_ref;
+  if (typeof ref !== "string" || ref === "") throw new Error("config/horizon.toml has no identity.operator_ref");
+  seaForgeActorOf(ref); // throws if the gateway could not bind it
+  return ref;
 }
 
 const ACCOUNT_RE = /^[a-z_][a-z0-9_-]{0,31}$/;
@@ -246,7 +263,7 @@ export function unitFiles(l: GatewayLayout): Record<string, string> {
     `Environment=HORIZON_SECRET_FILE=${l.runtimeStateDir}/local-operator.secret`,
     "Environment=COGNATE_GOVERNANCE=sea-forge",
     `Environment=COGNATE_SEA_FORGE_SOCKET=${l.socketPath}`,
-    "Environment=COGNATE_SEA_FORGE_OPERATOR=operator",
+    `Environment=COGNATE_SEA_FORGE_OPERATOR=${l.operatorRef}`,
     `Environment=COGNATE_WORLD_REF=${l.world.cognate}`,
     `Environment=COGNATE_REALITYTRACE_BIN=${l.realityTraceBin}`,
     `Environment=COGNATE_REALITYTRACE_DATA_HOME=${l.runtimeStateDir}/realitytrace/data`,
@@ -271,7 +288,8 @@ export function unitFiles(l: GatewayLayout): Record<string, string> {
 /** Stands in for the runtime account's uid in the staged template; the installer substitutes `id -u <account>`. */
 export const UID_PLACEHOLDER = "__RUNTIME_UID__";
 export const SERVICE_ACTOR = "cognate-service";
-export const OPERATOR_ACTOR = "operator";
+/** The operator actor id used when no config value is given. Production reads identity.operator_ref instead. */
+export const DEFAULT_OPERATOR_ACTOR = "operator";
 const ACTOR_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const MAX_UID = 4_294_967_294; // 4294967295 is the "unset" sentinel in several tools; no wildcard is expressible
 
@@ -316,10 +334,10 @@ export function serverConfig(l: GatewayLayout, files: string[], runtimeUid: numb
       bindings: [
         { uid: runtimeUid, actor_id: SERVICE_ACTOR, roles: ["service"] },
         // The operator has no uid: it acts only through the gateway (on_behalf_of).
-        { actor_id: OPERATOR_ACTOR, roles: ["operator"] },
+        { actor_id: seaForgeActorOf(l.operatorRef), roles: ["operator"] },
       ],
     },
-    gateway: { uid: runtimeUid, actor: SERVICE_ACTOR, delegable_actors: [OPERATOR_ACTOR] },
+    gateway: { uid: runtimeUid, actor: SERVICE_ACTOR, delegable_actors: [seaForgeActorOf(l.operatorRef)] },
     cep_authority: {
       enabled: true,
       policy: "policy.yaml",
@@ -356,9 +374,12 @@ export function validateServerConfig(c: ServerConfig): string[] {
     }
     if (b.roles.length === 0) errors.push(`actor '${b.actor_id}' has no roles`);
   }
-  const op = actors.get(OPERATOR_ACTOR);
-  if (!op || op.uid !== undefined) errors.push("the operator actor must be bound with no uid");
   const gw = c.gateway;
+  if (gw.delegable_actors.length === 0) errors.push("no operator actor is delegable");
+  for (const a of gw.delegable_actors) {
+    const op = actors.get(a);
+    if (!op || op.uid !== undefined) errors.push(`operator actor must be bound with no uid (actor '${a}')`);
+  }
   const gwBinding = actors.get(gw.actor);
   if (!gwBinding || gwBinding.uid === undefined || gwBinding.uid !== gw.uid) errors.push("gateway uid must be bound to the gateway actor in identity.bindings");
   if (new Set(gw.delegable_actors).size !== gw.delegable_actors.length) errors.push("gateway.delegable_actors has a duplicate");
@@ -528,13 +549,15 @@ async function stage(args: string[]): Promise<number> {
   const repo = resolve(flag("--repo") ?? join(dirname(fileURLToPath(import.meta.url)), ".."));
   const development = args.includes("--development");
   let world: WorldIdentity;
+  let operatorRef: string;
   try {
     world = await worldIdentity(repo);
+    operatorRef = operatorRefFromConfig(repo);
   } catch (error) {
-    console.error(`gateway-stage: cannot establish the world identity: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`gateway-stage: cannot establish the world or operator identity: ${error instanceof Error ? error.message : String(error)}`);
     return 1;
   }
-  const layout = resolveLayout(process.env, { development, world });
+  const layout = resolveLayout(process.env, { development, world, operatorRef });
   const errors = validateLayout(layout);
   if (errors.length > 0) {
     for (const e of errors) console.error(`gateway-stage: ${e}`);

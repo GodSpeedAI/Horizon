@@ -102,7 +102,7 @@ async function seaForge(commit: Commit, withRealityTrace = false) {
   const governance = governanceFromEnv({ COGNATE_GOVERNANCE: "sea-forge", COGNATE_SEA_FORGE_SOCKET: socket, COGNATE_WORLD_REF: loadWorld(PINNED_WORLD_REF).cognateWorldRef });
   expect(governance.mode).toBe("sea-forge");
   const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "app.sqlite"), secretPath: join(root, "launch.secret") }));
-  const app: HorizonApplication = await createApplication({ configPath, governance, approvals: approvalAuthority({ socketPath: socket, operatorId: "operator" }), realityTrace: rt ?? null });
+  const app: HorizonApplication = await createApplication({ configPath, governance, approvals: approvalAuthority({ socketPath: socket, operatorId: "actor:operator" }), realityTrace: rt ?? null });
   cleanups.push(() => void app.close?.());
   const records = async () => (await readIntentRecords(app.runtime.runtime.store)).map((r) => r.record.intent_id);
   const attempts = async () => readIntentAttempts(app.runtime.runtime.store);
