@@ -499,7 +499,8 @@ export async function createApplication(
     };
     // A v1 intent stays readable and is never backfilled: it carries no expected outcome to settle against.
     if (contractVersionOf(committed.record) === 1) {
-      return record({ status: "unsettled", final: true, envelope_id: null, ledger_entry: null, reason: "contract_version 1: no expected outcome" });
+      // Horizon does not rule on evidence: a v1 intent gets no SEA-Forge settlement, so it stays non-final and can be settled later.
+      return record({ status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason: "contract_version 1: no expected outcome to settle against" });
     }
     const unavailable = (reason: string) => record({ status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason });
     const refused = (reason: string) => record({ status: "refused", final: false, envelope_id: null, ledger_entry: null, reason });
@@ -1019,10 +1020,13 @@ export async function createApplication(
     const attempt = (await readIntentAttempts(store)).filter((entry) => entry.intent_id === intentId).at(-1) ?? null;
     if (!row && !attempt) return null;
     const settled = await latestSettlement(store, caller.tenant, intentId);
+    const invocation = row ? await governedInvocationOf(intentId) : undefined;
+    const authorized = invocation && authorityOf(invocation) ? { ref: invocation.eventId } : null;
     return {
       intent_id: intentId,
       operation_ref: row?.record.operation_ref ?? attempt?.operation_ref ?? "operation not recorded",
       committed: row ? { at: row.event.occurredAt, expected: (row.record.expected_outcome ?? null) !== null } : null,
+      decision: authorized,
       attempt: attempt === null ? null : { outcome: attempt.outcome, reason: attempt.reason },
       settlement: settled
         ? {

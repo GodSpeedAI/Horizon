@@ -264,6 +264,7 @@ describe("first-run derivations", () => {
       intent_id: "intent-4",
       operation_ref: "product.apply",
       committed: { at: "2026-10-24T00:00:00.000Z", expected: true },
+      decision: { ref: "inv-4" },
       attempt: null,
       settlement: { status: "pending", final: false, reason: null, observation: { evidence_id: "ev-1", sxr_observation_id: "sxr-1" } },
       at: null,
@@ -272,6 +273,26 @@ describe("first-run derivations", () => {
     expect(move.observed).toEqual({ state: "observed", text: "Observed by RealityTrace: ev-1." });
     expect(move.settleable).toBe(true);
     expect(moveOf({ ...facts, settlement: { ...facts.settlement, final: true } }, governed).settleable).toBe(false);
+  });
+
+  test("a governed commit with no recorded SEA-Forge decision is never presented as allowed by SEA-Forge", () => {
+    const base = {
+      intent_id: "intent-5",
+      operation_ref: "product.apply",
+      committed: { at: "2026-10-24T00:00:00.000Z", expected: true },
+      attempt: null,
+      settlement: null,
+      at: null,
+    };
+    const unrecorded = moveOf(base, governed);
+    expect(unrecorded.decided.state).not.toBe("allowed");
+    expect(unrecorded.decided.text).not.toContain("Allowed by SEA-Forge");
+    expect(unrecorded.decided.text).toContain("no SEA-Forge decision is recorded");
+    expect(unrecorded.settleable).toBe(false);
+
+    const recorded = moveOf({ ...base, decision: { ref: "inv-7" } }, governed);
+    expect(recorded.decided.state).toBe("allowed");
+    expect(recorded.decided.text).toBe("Allowed by SEA-Forge: decision inv-7.");
   });
 
   test("the no-affordance message names the moves that can still be committed", () => {

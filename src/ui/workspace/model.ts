@@ -719,6 +719,8 @@ export interface StoredMoveFacts {
   readonly operation_ref: string;
   /** The committed record, when one exists. `expected` is true when the operation names an outcome to settle. */
   readonly committed: { readonly at: string; readonly expected: boolean } | null;
+  /** The SEA-Forge decision that authorized the commit, when one is recorded. Absent or null means none was recorded. */
+  readonly decision?: { readonly ref: string } | null;
   /** The latest audited attempt, when one exists. */
   readonly attempt: { readonly outcome: "accepted" | "refused" | "awaiting_authority"; readonly reason: string | null } | null;
   readonly settlement: {
@@ -736,10 +738,16 @@ export function moveOf(facts: StoredMoveFacts, context: { readonly governed: boo
   const awaiting = attempt?.outcome === "awaiting_authority" && committed === null;
   const approvalId = awaiting ? (/awaiting approval (\S+)$/.exec(attempt?.reason ?? "")?.[1] ?? null) : null;
   let decided: WorkspaceClaim;
+  const decisionRef = facts.decision?.ref ?? null;
   if (committed) {
-    decided = context.governed
-      ? { state: "allowed", text: "Allowed by SEA-Forge." }
-      : { state: "policy_only", text: "Horizon policy only: SEA-Forge is off." };
+    if (!context.governed) {
+      decided = { state: "policy_only", text: "Horizon policy only: SEA-Forge is off." };
+    } else if (decisionRef !== null) {
+      decided = { state: "allowed", text: `Allowed by SEA-Forge: decision ${decisionRef}.` };
+    } else {
+      // Committed without a recorded SEA-Forge decision: never credit SEA-Forge with it.
+      decided = { state: "unverified", text: "Committed by Horizon, but no SEA-Forge decision is recorded for this commit." };
+    }
   } else if (awaiting) {
     decided = { state: "awaiting", text: "Awaiting your approval at SEA-Forge." };
   } else {
@@ -789,7 +797,7 @@ export function moveOf(facts: StoredMoveFacts, context: { readonly governed: boo
     approval_id: approvalId,
     // Offered until SEA-Forge has answered, and again while a settlement window is still open.
     settleable:
-      context.governed && context.realitytrace && committed !== null && settlement?.final !== true &&
+      context.governed && context.realitytrace && committed !== null && decisionRef !== null && settlement?.final !== true &&
       (settlement === null || settlement === undefined || settlement.status === "pending" || settlement.status === "unavailable"),
   });
 }
