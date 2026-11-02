@@ -560,6 +560,9 @@ export function Workspace({ snapshot, chrome, basePath = "/workspace", intentPat
               <li data-rail="economics">
                 <a href="/workspace/economics">Case economics</a>
               </li>
+              <li data-rail="approval-inbox">
+                <a href="/workspace/approvals">Approval inbox</a>
+              </li>
               {chrome?.remote ? (
                 <li data-rail="remote" data-state={chrome.remote.state}>
                   <a href="/workspace/remote" aria-label={`Mobile remote control: ${chrome.remote.label.replace("Remote: ", "")}`}>

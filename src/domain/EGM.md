@@ -16,6 +16,8 @@ The module set keeps the architecture's distinctions separate rather than mergin
 - **intent** — `intent.ts` (typed `CommitIntentInput`, stale-frame and duplicate guard).
 - **expectation / settlement** — `expectation.ts` (frozen expected outcome, verifier templates,
   window, discrimination, three-valued evidence classification, epistemic status).
+- **approval inbox** — `approval-inbox.ts` (validates SEA-Forge's `authority_approvals` rows, groups
+  them, and says which decision buttons may be offered; it never decides).
 - **payment** — `payment.ts` (currency vector, declared bounds, capacity ledger, the payment gate).
 - **debugger** — `debugger.ts` (seven read-only questions, each value labelled with its class).
 

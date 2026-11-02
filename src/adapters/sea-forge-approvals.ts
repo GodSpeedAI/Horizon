@@ -78,6 +78,18 @@ export async function resolveApproval(
   }
 }
 
+/**
+ * The approvals SEA-Forge lists (`authority_approvals`, read-only). Returns the rows as SEA-Forge sent
+ * them; the domain validates each row before it is shown (`src/domain/approval-inbox.ts`).
+ */
+export async function listApprovals(authority: ApprovalAuthority): Promise<unknown[]> {
+  const response = await seaForgeCall(authority.socketPath, { verb: "authority_approvals", actor: authority.service }, authority.timeoutMs ?? 15_000);
+  if (response.ok !== true || !Array.isArray(response.approvals)) {
+    throw new Error(`APPROVAL: SEA-Forge did not list approvals: ${String(response.error ?? response.error_class ?? "no approvals array")}`);
+  }
+  return response.approvals;
+}
+
 /** One NDJSON request/response over the SEA-Forge Unix socket. The socket is closed however it ends. */
 export async function seaForgeCall(socketPath: string, request: Record<string, unknown>, timeoutMs = 5_000): Promise<Record<string, unknown>> {
   let buffered = "";

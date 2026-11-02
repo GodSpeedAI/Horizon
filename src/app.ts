@@ -31,7 +31,8 @@ import type { CandidateOperation } from "./domain/navigation.ts";
 import type { ObservedPayment } from "./domain/payment.ts";
 import { structuralObservationAgent, healthAgent, HEALTH_AGENT, type StructuralObservationRequest } from "./agents/health.ts";
 import { navigationCommitAgent, NAVIGATION_COMMIT_AGENT, type NavigationCommitOutput } from "./agents/navigation-commit.ts";
-import { approvalAuthorityFromEnv, resolveApproval, seaForgeCall, type ApprovalAuthority } from "./adapters/sea-forge-approvals.ts";
+import { approvalAuthorityFromEnv, listApprovals, resolveApproval, seaForgeCall, type ApprovalAuthority } from "./adapters/sea-forge-approvals.ts";
+import { buildInbox, type InboxReadout } from "./domain/approval-inbox.ts";
 import { authorityOf, defaultRealityTraceRepo, observationOutbox, realityTraceFromEnv, RealityTraceEvidence, type GovernedInvocation, type RealityTraceConfig, type SettlementAuthority } from "./adapters/settlement.ts";
 import { appendSettlement, latestSettlement, type ExecutionRecord, type NavigationSettlement, type RealityTraceObservation, type SettlementReference } from "./capabilities/navigation-settlement.ts";
 import type { Json } from "@godspeedai/cognate-events";
@@ -78,6 +79,7 @@ import { CONTEXT_REFERENCE } from "./capabilities/context.ts";
 import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type DebuggerOperation, type DebuggerSources } from "./domain/debugger.ts";
 import { renderWorkspacePage } from "./ui/workspace/render.tsx";
 import { renderEconomicsPage } from "./ui/workspace/economics.tsx";
+import { renderApprovalInboxPage } from "./ui/workspace/approval-inbox.tsx";
 import type { Server } from "bun";
 import { RemoteController, type RemoteStatus } from "./remote/server.ts";
 import { remoteSettings } from "./remote/settings.ts";
@@ -1141,6 +1143,21 @@ export async function createApplication(
     };
   }
 
+  /**
+   * The approval inbox (P2.1): SEA-Forge's listing, validated, with the approvals a Horizon commit waits on
+   * marked. Read-only. A decision still goes through `/workspace/approval`, which SEA-Forge decides.
+   */
+  async function approvalInbox(now: Date = new Date()): Promise<InboxReadout> {
+    if (!approvals) return { state: "not_configured" };
+    try {
+      const rows = await listApprovals(approvals);
+      const waiting = new Set((await readIntentAttempts(runtime.runtime.store)).flatMap((entry) => (entry.outcome === "awaiting_authority" && entry.approvalId ? [entry.approvalId] : [])));
+      return { state: "listed", inbox: buildInbox(rows, { now, waitingApprovalIds: waiting, operatorRef: caller.actor.id }) };
+    } catch (error) {
+      return { state: "unreachable", message: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
   /** The approval an escalated commit waits on, and the intent it belongs to; null when nothing waits on it. */
   async function intentIdForApproval(approvalId: string): Promise<string | null> {
     const waiting = (await readIntentAttempts(runtime.runtime.store)).filter((entry) => entry.outcome === "awaiting_authority" && entry.approvalId === approvalId);
@@ -1396,6 +1413,10 @@ export async function createApplication(
               return Response.json({ schema: ECONOMICS_SCHEMA, ...readout }, { headers: { "cache-control": "no-store" } });
             }
             return new Response(renderEconomicsPage(readout, themeOf(url.searchParams.get("theme"))), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/workspace/approvals" && request.method === "GET") {
+            // Read-only listing. Decisions are POSTed to /workspace/approval, which SEA-Forge decides.
+            return new Response(renderApprovalInboxPage(await approvalInbox(), themeOf(url.searchParams.get("theme"))), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
           }
           if (url.pathname === "/workspace/inspect" && request.method === "GET") {
             // Read-only, deliberately: GET, no form, no commit. The operation is one of the seven

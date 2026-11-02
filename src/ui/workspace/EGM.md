@@ -4,7 +4,8 @@
 
 The human GUI surface (T09/T10). `model.ts` maps one navigation frame plus one closed `GuiView`
 into a fixed six-region document; `render.tsx` server-renders that document as semantic HTML with
-no client bundle; `economics.tsx` renders a read-only case-economics page; `inspect.ts` attaches two
+no client bundle; `economics.tsx` renders a read-only case-economics page; `approval-inbox.tsx`
+renders the SEA-Forge approval listing with the existing decision form on decidable items only; `inspect.ts` attaches two
 read-only observations (a world-debugger answer and cited Context Kernel retrieval) to the same
 frame the terminal and GUI already render.
 

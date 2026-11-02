@@ -62,7 +62,8 @@ Two shapes are used consistently. Read adapters return a closed, typed observati
 - `sea-forge-approvals.ts`: `approvalAuthorityFromEnv(env)` / `approvalAuthority(options)` building
   `ApprovalAuthority { socketPath, service, operator }` `[sea-forge-approvals.ts:approvalAuthority]`;
   `resolveApproval(authority, { approvalId, resolution })` where resolution is `"approved"` or
-  `"rejected"` `[sea-forge-approvals.ts:resolveApproval]`; `seaForgeCall(socketPath, request,
+  `"rejected"` `[sea-forge-approvals.ts:resolveApproval]`; `listApprovals(authority)` for the read-only
+  `authority_approvals` listing `[sea-forge-approvals.ts:listApprovals]`; `seaForgeCall(socketPath, request,
   timeoutMs = 5_000)` for one NDJSON request over the Unix socket `[sea-forge-approvals.ts:seaForgeCall]`;
   env var name `COGNATE_SEA_FORGE_OPERATOR` `[sea-forge-approvals.ts:ENV_OPERATOR]`.
 - `settlement.ts`: `realityTraceFromEnv(env, repoDir)`, `defaultRealityTraceRepo(storePath)`,
