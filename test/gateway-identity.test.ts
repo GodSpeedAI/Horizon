@@ -69,9 +69,11 @@ describe("gateway identity", () => {
 describe("install-sea-forge-gateway.sh", () => {
   test("dry-run prints a plan and changes nothing", () => {
     const root = mkdtempSync(join(tmpdir(), "gw-plan-"));
+    const emptyStage = mkdtempSync(join(tmpdir(), "gw-stage-"));
     try {
+      // Point the stage at an empty directory so a developer's real staged bundle cannot change the result.
       const r = Bun.spawnSync(["bash", join(import.meta.dir, "..", "scripts", "install-sea-forge-gateway.sh"), "--dry-run"], {
-        env: { ...process.env, HORIZON_GATEWAY_ROOT: root, HORIZON_GATEWAY_ACCOUNT: "horizon-test-absent-account" },
+        env: { ...process.env, HORIZON_GATEWAY_ROOT: root, HORIZON_GATEWAY_STAGE: emptyStage, HORIZON_GATEWAY_ACCOUNT: "horizon-test-absent-account" },
       });
       const out = r.stdout.toString();
       expect(r.exitCode).toBe(0);
@@ -81,6 +83,7 @@ describe("install-sea-forge-gateway.sh", () => {
       expect(readdirSync(root)).toEqual([]);
     } finally {
       rmSync(root, { recursive: true, force: true });
+      rmSync(emptyStage, { recursive: true, force: true });
     }
   });
 });
