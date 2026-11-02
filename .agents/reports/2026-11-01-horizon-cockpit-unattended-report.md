@@ -122,3 +122,54 @@ open. The primary action is the smallest change that addresses the stated proble
 - Settlement split: revert `5ee9cca` and `fe55bd4`.
 - Primary action: revert `53703ce`. The panel is removed and nothing else depends on it.
 - Colour: revert `fb66aeb`.
+
+## Live verification (SEA-Forge and RealityTrace installed)
+
+Run with `SEA_FORGE_SERVER_BIN=/home/sprime01/.local/bin/sea-forge-server` and
+`REALITYTRACE_BIN=/home/sprime01/.cargo/bin/realitytrace` (RealityTrace reports 0.3.0).
+
+- **J02 live (4 tests): all pass.** This covers the SEA-Forge commit decision, escalation and operator approval
+  (IS3 to IS5), RealityTrace trace and SEA-Forge settlement (IS6 and IS7), and the new observe-then-rule split.
+  This is the first observed pass of the settlement path in this session.
+- **Full suite with live binaries: 353 pass, 12 skip, 3 fail.** Remaining failures are listed below.
+
+### Fixed during live verification
+
+- `test/economics-live.test.ts` passed `--require-declared` to `realitytrace run begin`. That flag exists nowhere
+  (not in the installed binary, the `sxr` source or history, Cognate, or the Horizon dependencies). The test was
+  never green; it had only skipped. I removed the flag and declared the question and threshold, as the test already
+  does.
+- Probe result that matters for the design: the installed RealityTrace **accepts `run begin` for an undeclared
+  question** (exit 0) and accepts a threshold declared against a question that does not exist. The "require
+  declared" guarantee is therefore not enforced by this RealityTrace. This belongs to the RealityTrace owners.
+
+### Failures that remain
+
+1. **Phone remote, Chromium (2 to 3 tests, varies by run). Pre-existing.** Reproduced on `main` at `4ab84e9` with the
+   same failures, so it is not caused by this branch. Error: `goto: net::ERR_INSUFFICIENT_RESOURCES`. Shared memory
+   is not the cause (`/dev/shm` is 1% used). Host memory is tight (about 1.7 GB available of 7.9 GB). The cause is
+   not confirmed. I left these failing rather than skipping them, since they are real end-to-end checks.
+2. **Economics live (now an explicit skip, not a pass).** RealityTrace 0.3.0's ledger export keeps only
+   `observation_id` and `scope` for each observation. Agent-event token figures never reach the reader, so the
+   figures cannot be derived from this RealityTrace. Enable with `HORIZON_ECONOMICS_RT_EXPORTS_EVENTS=1` once the
+   export carries them.
+
+## Upstream gaps (for the owners, not fixed here)
+
+- **RealityTrace (sxr):** `run begin` does not refuse undeclared questions; `ledger export` drops agent-event
+  payloads (only `observation_id` and `scope` survive). Both are needed for the economics view and for the
+  declared-question guarantee.
+- **SEA-Forge and Cognate:** the approval client in `src/adapters/sea-forge-approvals.ts` is a raw socket client.
+  Cognate should export the approval call (`authority_approval`, and `authority_approvals` for an inbox).
+- **Gauntlet and SWE_SEED:** no projection contract exists in Horizon.
+
+## Architecture check against the target invariants
+
+Invariant 2 says Horizon reaches external stack services through Cognate capabilities or Cognate-owned adapters, and
+must not build separate authority, execution or evidence clients. Current violations, stated plainly:
+
+- `src/adapters/sea-forge-approvals.ts`: Horizon writes to SEA-Forge's socket itself (authority client).
+- `src/adapters/realitytrace-economics.ts`: Horizon spawns the RealityTrace CLI itself (evidence client).
+
+Both exist because Cognate does not export the calls. Each file's header says so. They are recorded as readiness debt
+and should move behind Cognate once Cognate exports them. They are not replaced by new substitutes in this branch.
