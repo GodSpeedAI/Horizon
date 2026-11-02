@@ -11,6 +11,7 @@ import type { WorkspaceTheme } from "./model.ts";
 import { STYLE } from "./render.tsx";
 
 const EXTRA_STYLE = `
+.inbox-list { list-style:none; margin:0; padding:0; }
 .inbox-item { border:1px solid var(--edge); border-radius:.5rem; padding:.75rem 1rem; margin:.6rem 0; }
 .inbox-item dl { display:grid; grid-template-columns:max-content 1fr; gap:.2rem .8rem; margin:.4rem 0; }
 .inbox-item dt { color:var(--muted); }
@@ -78,11 +79,11 @@ function Body({ readout }: { readonly readout: InboxReadout }): ReactNode {
     <>
       <section aria-labelledby="waiting-heading">
         <h2 id="waiting-heading">Waiting for a decision ({inbox.waiting.length})</h2>
-        {inbox.waiting.length === 0 ? <p className="inbox-note">Nothing is waiting at SEA-Forge.</p> : <ul>{inbox.waiting.map((item) => <Item key={item.approval_id} item={item} />)}</ul>}
+        {inbox.waiting.length === 0 ? <p className="inbox-note">Nothing is waiting at SEA-Forge.</p> : <ul className="inbox-list">{inbox.waiting.map((item) => <Item key={item.approval_id} item={item} />)}</ul>}
       </section>
       <section aria-labelledby="decided-heading">
         <h2 id="decided-heading">Decided ({inbox.decided.length})</h2>
-        {inbox.decided.length === 0 ? <p className="inbox-note">No decided approvals are listed.</p> : <ul>{inbox.decided.map((item) => <Item key={item.approval_id} item={item} />)}</ul>}
+        {inbox.decided.length === 0 ? <p className="inbox-note">No decided approvals are listed.</p> : <ul className="inbox-list">{inbox.decided.map((item) => <Item key={item.approval_id} item={item} />)}</ul>}
       </section>
       {inbox.malformed > 0 ? (
         <p className="inbox-warn">{inbox.malformed} record(s) from SEA-Forge did not match the expected shape and are not shown.</p>
