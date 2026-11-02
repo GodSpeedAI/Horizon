@@ -13,6 +13,7 @@ import type {
   IdentityConfig,
   LoadedConfig,
   OperationBindingConfig,
+  OperatorsConfig,
   SecretsConfig,
   SettlementConfig,
   TransportConfig,
@@ -139,6 +140,19 @@ function asSettlement(value: unknown): SettlementConfig | undefined {
   return { launcher: asStringList(doc.launcher, "settlement.launcher"), close_grace_s: grace };
 }
 
+function asOperators(value: unknown): OperatorsConfig {
+  const doc = asRecord(value, "operators");
+  const actorsDoc = asRecord(doc.actors, "operators.actors");
+  const actors: Record<string, string> = {};
+  for (const [operator, actor] of Object.entries(actorsDoc)) actors[operator] = asString(actor, `operators.actors.${operator}`);
+  if (Object.keys(actors).length === 0) bounded("operators.actors must map at least one operator to an actor");
+  return {
+    actors,
+    ...(doc.desktop_operator === undefined ? {} : { desktop_operator: asString(doc.desktop_operator, "operators.desktop_operator") }),
+    ...(doc.delegable_actors === undefined ? {} : { delegable_actors: asStringList(doc.delegable_actors, "operators.delegable_actors") }),
+  };
+}
+
 function asEconomics(value: unknown): EconomicsConfig | undefined {
   if (value === undefined) return undefined;
   const doc = asRecord(value, "economics");
@@ -225,6 +239,7 @@ export function configFromDocument(document: unknown): HorizonConfig {
     capacity: asList(doc.capacity, "capacity").map((entry, index) => validated(`capacity[${index}]`, () => assertAllowance(entry))),
     ...(doc.settlement === undefined ? {} : { settlement: asSettlement(doc.settlement)! }),
     ...(doc.economics === undefined ? {} : { economics: asEconomics(doc.economics)! }),
+    ...(doc.operators === undefined ? {} : { operators: asOperators(doc.operators) }),
   };
 }
 

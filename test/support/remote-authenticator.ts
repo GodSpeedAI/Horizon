@@ -91,7 +91,8 @@ export interface Ceremony {
 
 export class SoftwareAuthenticator {
   private keys: CryptoKeyPair | null = null;
-  readonly credentialId = new Uint8Array(32).map((_, index) => (index * 7 + 3) & 0xff);
+  /** Random per authenticator: a credential id belongs to one device for good, and a revoked one is never re-enrolled. */
+  readonly credentialId = crypto.getRandomValues(new Uint8Array(32));
   private counter = 0;
 
   async generate(): Promise<this> {

@@ -1,5 +1,10 @@
 import { reconcilePending } from "./capabilities/pending-reconcile.ts";
 import { randomBytes, randomUUID } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createIdentityService, type IdentityService } from "@godspeed/identity";
+import { delegatingAuthority, delegationSender } from "./adapters/delegating-authority.ts";
+import { identityStoreOf } from "./remote/identity-store.ts";
+import { OperatorActors, resolveOperatorsConfig, validateOperatorActors } from "./remote/operators.ts";
 import { statSync } from "node:fs";
 import type { Caller } from "@godspeedai/cognate-runtime-api";
 import { governanceFromEnv, type GovernanceOptions } from "@godspeedai/cognate-runtime-bun";
@@ -7,7 +12,7 @@ import { loadWorld, type LoadedWorld } from "./adapters/semantic.ts";
 import { observeResearch, requireResearch, type ResearchStatus } from "./adapters/research.ts";
 import { economicsFromEnv, loadConfig } from "./config/load.ts";
 import { ECONOMICS_SCHEMA } from "./economics/model.ts";
-import type { LoadedConfig } from "./config/types.ts";
+import type { LoadedConfig, OperatorsConfig } from "./config/types.ts";
 import { createHorizonRuntime, type HorizonRuntime } from "./runtime/create.ts";
 import { appendIntentAttempt, appendIntentRecord, createFrameRegister, NAVIGATION_INTENT_COMMIT, navigationIntentComponent, readIntentAttempts, readIntentRecords, type FrameRegister, type IntentAttempt } from "./capabilities/navigation-intent.ts";
 import { checkPurpose, latestCase, onboardingSkipped, openCase, setOnboardingSkipped } from "./capabilities/workspace-records.ts";
@@ -145,6 +150,12 @@ export interface HorizonApplication {
   readonly caller: Caller;
   /** The phone remote (passkey-paired, loopback listener). Off until started from the cockpit panel. */
   readonly remote: RemoteController;
+  /** The shared identity service over the application's own store: durable operators, devices and sessions. */
+  readonly identity: IdentityService;
+  /** The validated operator-to-SEA-Forge-actor mapping. */
+  readonly operatorActors: OperatorActors;
+  /** The commit the phone makes, run as a session's Caller with its mapped SEA-Forge actor. Refuses any Caller that is not a mapped operator session. */
+  commitForSession(actionId: string, intentId: string, who: Caller): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }>;
   /** Healthy, or a typed degraded observation; never a startup prerequisite. */
   readonly research: ResearchStatus;
   readonly frames: FrameRegister;
@@ -250,6 +261,13 @@ export async function createApplication(
     readonly economics?: EconomicsSource;
     /** The SEA-Forge socket for `authority_closure`. Defaults to the approvals socket or `COGNATE_SEA_FORGE_SOCKET`. */
     readonly seaForgeSocket?: string;
+    /**
+     * Operator-to-SEA-Forge-actor mapping, replacing the `[operators]` config table. The only source of a
+     * session's SEA-Forge actor. Absent in both: the single-operator development default.
+     */
+    readonly operators?: OperatorsConfig;
+    /** The wire to SEA-Forge for delegated (`on_behalf_of`) commits. Injected by tests; defaults to the Unix socket. */
+    readonly delegationSend?: (request: Record<string, unknown>) => Promise<Record<string, unknown>>;
   } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath);
@@ -261,9 +279,32 @@ export async function createApplication(
   const configured = options.governance ?? governanceFromEnv(process.env);
   // Poll SEA-Forge for decided escalations, so a commit approved or rejected at SEA-Forge directly
   // (not through resolveNavigationApproval) still resumes or fails on its own.
-  const governance: GovernanceOptions =
-    configured.mode === "sea-forge" ? { ...configured, approvalPollMs: configured.approvalPollMs ?? 2_000 } : configured;
   const approvals = options.approvals ?? approvalAuthorityFromEnv(process.env);
+  // A signed-in operator's commits go to SEA-Forge as the gateway acting on behalf of the operator's mapped actor.
+  // The mapping is validated after the identity store opens; until then every session operator is refused.
+  let operatorActors: OperatorActors | null = null;
+  const serviceActor = approvals?.service ?? { actor_id: process.env.COGNATE_SEA_FORGE_ACTOR?.trim() || "cognate-service", role: "service" };
+  const delegationSocket = options.seaForgeSocket ?? approvals?.socketPath ?? process.env.COGNATE_SEA_FORGE_SOCKET?.trim() ?? "";
+  const governance: GovernanceOptions =
+    configured.mode === "sea-forge"
+      ? {
+          ...configured,
+          approvalPollMs: configured.approvalPollMs ?? 2_000,
+          ...(configured.authority === undefined
+            ? {}
+            : {
+                authority: delegatingAuthority(configured.authority, {
+                  service: serviceActor,
+                  actors: () => operatorActors,
+                  serverPrincipalId: caller.actor.id,
+                  send: options.delegationSend ?? delegationSender(delegationSocket),
+                }),
+              }),
+        }
+      : configured;
+  /** Whom a commit runs as: the session's Caller inside `commitAs`, otherwise the cockpit's own operator. */
+  const acting = new AsyncLocalStorage<Caller>();
+  const actor = (): Caller => acting.getStore() ?? caller;
   const realityTrace =
     governance.mode !== "sea-forge"
       ? undefined
@@ -294,6 +335,21 @@ export async function createApplication(
   });
   // HORIZON-001 1.1.0: suspend pending v1 commit runs and mark the store before anything is served.
   await activateContract(runtime.runtime.store, new Date());
+  // Durable operators, sessions and devices live in the same store. Operators named in configuration are
+  // provisioned here (the host's administrative act); the mapping is then validated, never trusted blindly.
+  const identity = createIdentityService(identityStoreOf(runtime.runtime.store));
+  const identityTenant = identityTenantOf(caller.tenant);
+  const operatorsConfig = resolveOperatorsConfig(options.operators ?? loaded.config.operators);
+  for (const operatorId of Object.keys(operatorsConfig.actors)) await identity.registerOperator({ tenant: identityTenant, operatorId, label: "configured operator" });
+  operatorActors = await validateOperatorActors(operatorsConfig, { identity, tenant: identityTenant, serviceActorId: serviceActor.actor_id });
+  const mappedActors: OperatorActors = operatorActors;
+  /** Why a session Caller may not commit, or null when it may. */
+  function sessionRefusal(who: Caller): string | null {
+    if (who.tenant !== caller.tenant || who.actor.kind !== "user" || who.actor.id === caller.actor.id) return "SESSION: not a signed-in operator session";
+    if (who.actor.id === serviceActor.actor_id) return "SESSION: the gateway service identity cannot be used as the operator";
+    if (mappedActors.actorFor(who.actor.id) === undefined) return `SESSION: no SEA-Forge actor is configured for operator ${who.actor.id}`;
+    return null;
+  }
   // Complete accounting for terminal intents that still hold; awaiting-authority holds are only reported.
   const stranded = await reconcilePending(runtime.runtime.store, caller.tenant);
   if (stranded.blockers.length > 0) console.error(`horizon: ${stranded.blockers.length} intent(s) hold capacity awaiting authority`);
@@ -354,7 +410,7 @@ export async function createApplication(
   }
 
   function audit(intent: CommitIntentInput, outcome: IntentAttempt["outcome"], reason: string | null, approvalId: string | null = null) {
-    const attempt: IntentAttempt = { intent_id: intent.intent_id, actor_ref: intent.actor_ref, caller_ref: caller.actor.id, outcome, reason, at: new Date().toISOString(), operation_ref: intent.operation_ref, approvalId };
+    const attempt: IntentAttempt = { intent_id: intent.intent_id, actor_ref: intent.actor_ref, caller_ref: actor().actor.id, outcome, reason, at: new Date().toISOString(), operation_ref: intent.operation_ref, approvalId };
     return appendIntentAttempt(runtime.runtime.store, { attempt, tenant: caller.tenant, scopeId: `horizon-${caller.tenant}` });
   }
 
@@ -366,7 +422,7 @@ export async function createApplication(
   async function governedSubmit(intent: CommitIntentInput): Promise<IntentCommit> {
     let run: RunView;
     try {
-      run = await runtime.runtime.service.startRun(caller, {
+      run = await runtime.runtime.service.startRun(actor(), {
         agent: NAVIGATION_COMMIT_AGENT.id,
         input: { intent, contract_version: CONTRACT_VERSION } as unknown as Json,
         idempotencyKey: `commit:${intent.intent_id}`,
@@ -420,10 +476,20 @@ export async function createApplication(
     throw new Error(`INTENT: governed commit refused: ${reason}`);
   }
 
-  async function resolveNavigationApproval(request: { readonly approvalId: string; readonly resolution: "approved" | "rejected" }): Promise<IntentCommit> {
+  async function resolveNavigationApproval(request: { readonly approvalId: string; readonly resolution: "approved" | "rejected" }, who?: Caller): Promise<IntentCommit> {
     if (!approvals) throw new Error("APPROVAL: no operator is configured to answer escalations (COGNATE_SEA_FORGE_OPERATOR)");
     // An agent must never answer its own escalation: only the human operator's session may.
     if (caller.actor.kind !== "user") throw new Error("APPROVAL: only a human operator may answer an escalation");
+    // A session answers as its own mapped actor, never as the configured approver, and never to its own request.
+    let authority = approvals;
+    if (who !== undefined) {
+      const refusal = sessionRefusal(who);
+      if (refusal !== null) throw new Error(`APPROVAL: ${refusal}`);
+      const approver = mappedActors.actorFor(who.actor.id)!;
+      const asked = (await readIntentAttempts(runtime.runtime.store)).filter((entry) => entry.outcome === "awaiting_authority" && entry.approvalId === request.approvalId).at(-1);
+      if (asked !== undefined && mappedActors.actorFor(asked.caller_ref ?? "") === approver) throw new Error("APPROVAL: the requester cannot approve its own escalation");
+      authority = { ...approvals, operator: { actor_id: approver, role: "operator" } };
+    }
     // Pick up a decision already made at SEA-Forge directly before answering again.
     await runtime.runtime.pollApprovals();
     const wait = (await runtime.runtime.service.listContinuations(caller, {})).find(
@@ -439,7 +505,7 @@ export async function createApplication(
       if (terminal(run.status) && run.status !== "completed") return settleCommitRun(intent, run);
       throw new Error(`APPROVAL: ${request.approvalId} was already decided (run ${run.status})`);
     }
-    await resolveApproval(approvals, request);
+    await resolveApproval(authority, request);
     await runtime.runtime.pollApprovals();
     return settleCommitRun(intent, await runOutcome(run.runId, terminal));
   }
@@ -563,7 +629,7 @@ export async function createApplication(
     if (governance.mode === "sea-forge") return governedSubmit(intent);
     let result: CommitIntentOutput;
     try {
-      result = (await runtime.runtime.service.invoke(caller, {
+      result = (await runtime.runtime.service.invoke(actor(), {
         capability: NAVIGATION_INTENT_COMMIT.id,
         input: intent as unknown as Json,
       })) as unknown as CommitIntentOutput;
@@ -1113,36 +1179,43 @@ export async function createApplication(
     };
   }
 
+  /** The cockpit's commit of one offered action, run as a session's Caller; refused when that Caller is not a mapped operator session. */
+  async function commitForSession(actionId: string, intentId: string, who: Caller): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }> {
+    const refusal = sessionRefusal(who);
+    if (refusal !== null) return { ok: false, code: "no_actor_mapping", message: refusal };
+    // The same commit the desktop's /workspace/intent makes, run as the session's Caller.
+    let outcome: Awaited<ReturnType<typeof commitSurfaceIntent>> | null = null;
+    let failure: unknown = null;
+    try {
+      outcome = await acting.run(who, () => commitSurfaceIntent({ transport: "gui", role: "human", node_id: actionId, intent_id: intentId }));
+    } catch (error) {
+      failure = error;
+    }
+    const audited = (await readIntentAttempts(runtime.runtime.store)).some((entry) => entry.intent_id === intentId);
+    if (outcome !== null && !outcome.ok) return { ok: false, code: outcome.code, message: outcome.message };
+    if (failure !== null && !audited) throw failure;
+    return { ok: true };
+  }
+
   const remote = new RemoteController(remoteSettings(), {
     store: runtime.runtime.store,
     tenant: caller.tenant,
-    operator: caller.actor.id,
+    identity,
+    identityTenant,
+    operator: mappedActors.desktopOperator,
     workspace: () => workspace(),
     chrome: (receipt) => cockpitChrome({ receipt: receipt ?? null }),
     position: () => lastPosition(runtime),
     approvalIntent: (approvalId) => intentIdForApproval(approvalId),
-    resolveApproval: async (approvalId, resolution) => {
-      await resolveNavigationApproval({ approvalId, resolution });
+    resolveApproval: async (approvalId, resolution, who) => {
+      await resolveNavigationApproval({ approvalId, resolution }, who);
     },
-    commitAction: async (actionId, intentId) => {
-      // The same commit the desktop's /workspace/intent makes, under the same identity.
-      let outcome: Awaited<ReturnType<typeof commitSurfaceIntent>> | null = null;
-      let failure: unknown = null;
-      try {
-        outcome = await commitSurfaceIntent({ transport: "gui", role: "human", node_id: actionId, intent_id: intentId });
-      } catch (error) {
-        failure = error;
-      }
-      const audited = (await readIntentAttempts(runtime.runtime.store)).some((entry) => entry.intent_id === intentId);
-      if (outcome !== null && !outcome.ok) return { ok: false as const, code: outcome.code, message: outcome.message };
-      if (failure !== null && !audited) throw failure;
-      return { ok: true as const };
-    },
+    commitAction: (actionId, intentId, who) => commitForSession(actionId, intentId, who),
     settle: async (intentId, phase) => {
       await settleNavigationIntent(intentId, phase);
     },
-    openCase: async (purpose) => {
-      await openCase(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, purpose, now: new Date() });
+    openCase: async (purpose, who) => {
+      await openCase(runtime.runtime.store, { tenant: caller.tenant, operator: who.actor.id, purpose, now: new Date() });
     },
   });
 
@@ -1152,6 +1225,9 @@ export async function createApplication(
     runtime,
     caller,
     remote,
+    identity,
+    operatorActors: mappedActors,
+    commitForSession,
     research,
     frames,
     frame: () => issued,
@@ -1556,4 +1632,10 @@ async function lastPosition(runtime: HorizonRuntime): Promise<number> {
     if (event.position > max) max = event.position;
   }
   return max;
+}
+
+/** The identity store's tenant is a lowercase slug; the runtime tenant (`local:<host>`) is mapped to one, deterministically. */
+function identityTenantOf(tenant: string): string {
+  const slug = tenant.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[^a-z0-9]+/, "").slice(0, 64);
+  return slug === "" ? "local" : slug;
 }
