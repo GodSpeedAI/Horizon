@@ -1,3 +1,4 @@
+import { reconcilePending } from "./capabilities/pending-reconcile.ts";
 import { randomBytes, randomUUID } from "node:crypto";
 import { statSync } from "node:fs";
 import type { Caller } from "@godspeedai/cognate-runtime-api";
@@ -293,6 +294,9 @@ export async function createApplication(
   });
   // HORIZON-001 1.1.0: suspend pending v1 commit runs and mark the store before anything is served.
   await activateContract(runtime.runtime.store, new Date());
+  // Complete accounting for terminal intents that still hold; awaiting-authority holds are only reported.
+  const stranded = await reconcilePending(runtime.runtime.store, caller.tenant);
+  if (stranded.blockers.length > 0) console.error(`horizon: ${stranded.blockers.length} intent(s) hold capacity awaiting authority`);
   const evidence = realityTrace ? new RealityTraceEvidence(runtime.runtime.store, realityTrace) : undefined;
   let issued: FrameView | null = null;
   let boundChoices: readonly StructuralChoice[] = [];

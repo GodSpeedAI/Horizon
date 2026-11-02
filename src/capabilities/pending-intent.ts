@@ -12,7 +12,7 @@
 import { ConcurrencyError, RecordConflictError, type DurableStore, type Json } from "@godspeedai/cognate-events";
 import { type ExpectedOutcome, type SettlementWindow, expectationDigest } from "../domain/expectation.ts";
 import type { CommitIntentInput } from "../domain/intent.ts";
-import { type CapacityAllowance, type ObservedPayment, type PaymentEntry, reserve } from "../domain/payment.ts";
+import { type CapacityAllowance, type ObservedPayment, type PaymentEntry, consume, reserve } from "../domain/payment.ts";
 import { CONTRACT_VERSION, consumeReservation, contractVersionOf, ledgerWrite, readLedger } from "./capacity-ledger.ts";
 import type { DeclaredThreshold, VerifierRun } from "../adapters/realitytrace-obligation.ts";
 import { IntentError } from "../domain/intent.ts";
@@ -120,9 +120,34 @@ export async function updatePending(store: DurableStore, tenant: string, intentI
   throw new Error(`PENDING: could not update intent ${intentId}`);
 }
 
-/** The intent is terminal: record why, and its reservation becomes consumption (idempotent). */
+/**
+ * The intent is terminal: record why, and its reservation becomes consumption, in ONE commit (pending record
+ * and ledger, each with an expected version). A crash can never leave a terminal record that still holds.
+ * Idempotent: an already-terminal record is returned unchanged (and any leftover hold is consumed).
+ */
 export async function terminate(store: DurableStore, tenant: string, intentId: string, outcome: string, reason: string | null, at: Date): Promise<PendingIntent> {
-  const done = await updatePending(store, tenant, intentId, (current) => (current.terminal ? {} : { stage: "terminal", terminal: { outcome, reason, at: at.toISOString() } }));
-  if (done.reserved) await consumeReservation(store, { tenant, intentId, at });
-  return done;
+  for (let attempt = 0; attempt < 16; attempt++) {
+    const current = await readPending(store, tenant, intentId);
+    if (!current) throw new Error(`PENDING: intent ${intentId} has no pending record`);
+    if (current.pending.terminal) {
+      if (current.pending.reserved) await consumeReservation(store, { tenant, intentId, at });
+      return current.pending;
+    }
+    const next: PendingIntent = { ...current.pending, stage: "terminal", terminal: { outcome, reason, at: at.toISOString() } };
+    const records: { collection: string; id: string; expectedVersion: number; value: { readonly [key: string]: Json } }[] = [
+      { collection: PENDING_COLLECTION, id: key(tenant, intentId), expectedVersion: current.version, value: next as unknown as { readonly [key: string]: Json } },
+    ];
+    if (current.pending.reserved) {
+      const { ledger, version } = await readLedger(store, tenant, []);
+      const consumed = consume(ledger, intentId, at);
+      if (consumed !== ledger) records.push(ledgerWrite(tenant, consumed, version));
+    }
+    try {
+      await store.commit({ appends: [], records });
+      return next;
+    } catch (error) {
+      if (!(error instanceof RecordConflictError || error instanceof ConcurrencyError)) throw error;
+    }
+  }
+  throw new Error(`PENDING: could not terminate intent ${intentId}`);
 }
