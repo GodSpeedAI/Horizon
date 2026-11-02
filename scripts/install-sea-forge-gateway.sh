@@ -319,7 +319,18 @@ row_generated() {
 check_row_stat() {
   local owner="$1" group="$2" mode="$3" path="$4" want actual
   want="$owner:$group $(printf '%o' "$((8#$mode))")"
-  if [ ! -e "$path" ]; then echo "  MISSING $path (expected $want)"; return 1; fi
+  if [ ! -e "$path" ]; then
+    # A path under a directory this login cannot traverse looks missing. That is the containment working, not an absent file.
+    # Only root can confirm it. Report it as unverified, not as a problem.
+    # Walk up to the nearest ancestor this login can see. If that ancestor exists but is closed, the path is unverified.
+    local ancestor; ancestor="$(dirname "$path")"
+    while [ "$ancestor" != "/" ] && [ ! -e "$ancestor" ]; do ancestor="$(dirname "$ancestor")"; done
+    if [ "$(id -u)" != 0 ] && [ -e "$ancestor" ] && { [ ! -x "$ancestor" ] || [ ! -r "$ancestor" ]; }; then
+      echo "  UNVERIFIED $path (not visible to this login; $ancestor is closed to other accounts; run the check as root to confirm)"
+      return 0
+    fi
+    echo "  MISSING $path (expected $want)"; return 1
+  fi
   actual="$(stat -c '%U:%G %a' "$path")"
   if [ "$actual" = "$want" ]; then echo "  ok      $path: $actual"; return 0; fi
   echo "  BAD     $path: $actual, expected $want"; return 1

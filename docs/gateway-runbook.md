@@ -83,7 +83,13 @@ RealityTrace is not installed by this setup. The runtime unit points at
    just gateway-check
    ```
 
-   Every line should read `ok`. `note` lines are informational. `MISSING` means the apply did not reach that step.
+   Every line should read `ok` or `UNVERIFIED`. `note` lines are informational. `MISSING` means the apply did not reach
+   that step. `UNVERIFIED` means the path sits under a directory your login cannot enter. That is expected: the gateway
+   root is closed to other accounts, so your login cannot see inside it. Confirm those paths as root:
+
+   ```bash
+   sudo scripts/install-sea-forge-gateway.sh --check
+   ```
 
 5. Reload systemd and start both services:
 
