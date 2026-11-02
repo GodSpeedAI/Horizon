@@ -245,3 +245,21 @@ gate-t21:
 gate-t22:
     @echo "gate-t22: not implemented; fails closed until T22 settles"
     @exit 1
+
+# SEA-Forge gateway service account (Linux/WSL). Nothing here runs privileged commands on its own.
+# gateway-plan: read-only, prints the privileged plan the installer would apply.
+gateway-plan:
+    scripts/install-sea-forge-gateway.sh --dry-run
+
+# gateway-install: applies the plan. Run this yourself in a terminal (sudo asks for your password).
+gateway-install:
+    scripts/install-sea-forge-gateway.sh --dry-run
+    @echo "Apply the plan above with: sudo scripts/install-sea-forge-gateway.sh --authorize-privileged"
+
+# gateway-check: read-only ownership and mode check of the gateway directories.
+gateway-check:
+    #!/usr/bin/env bash
+    set -u
+    for d in "${HORIZON_GATEWAY_SOCKET_DIR:-/run/godspeed-sea-forge}" "${HORIZON_GATEWAY_CONFIG_DIR:-/etc/godspeed-sea-forge}" "${HORIZON_GATEWAY_STATE_DIR:-/var/lib/godspeed-sea-forge}"; do
+      if [ -e "$d" ]; then stat -c '%U:%G %a %n' "$d"; else echo "missing: $d"; fi
+    done
