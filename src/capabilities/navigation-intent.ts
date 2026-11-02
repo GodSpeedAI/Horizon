@@ -293,6 +293,11 @@ export interface IntentAttempt {
   readonly at: string;
   /** The operation the intent named, when the attempt recorded it (receipts show it for refusals). */
   readonly operation_ref?: string | null;
+  /**
+   * The SEA-Forge approval id an `awaiting_authority` attempt waits on, taken from the escalation
+   * response. Absent on records written before this field existed; those are never backfilled.
+   */
+  readonly approvalId?: string | null;
 }
 
 /**
@@ -337,6 +342,7 @@ export async function appendIntentAttempt(
               outcome: options.attempt.outcome,
               reason: options.attempt.reason,
               operation_ref: options.attempt.operation_ref ?? null,
+              approvalId: options.attempt.approvalId ?? null,
             },
           },
         ],
@@ -382,6 +388,7 @@ export async function readIntentAttempts(store: DurableStore): Promise<readonly 
       reason: typeof payload.reason === "string" ? payload.reason : null,
       at: event.occurredAt,
       operation_ref: typeof payload.operation_ref === "string" ? payload.operation_ref : null,
+      approvalId: typeof payload.approvalId === "string" ? payload.approvalId : null,
     };
   });
 }

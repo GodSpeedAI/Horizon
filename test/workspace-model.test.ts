@@ -241,11 +241,29 @@ describe("first-run derivations", () => {
 
   test("an escalated commit waits on the approval named in its stored attempt", () => {
     const move = moveOf(
-      { intent_id: "intent-2", operation_ref: "horizon.health", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:42" }, settlement: null, at: null },
+      { intent_id: "intent-2", operation_ref: "horizon.health", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:42", approvalId: "approval:42" }, settlement: null, at: null },
       governed,
     );
     expect(move.decided.state).toBe("awaiting");
     expect(move.approval_id).toBe("approval:42");
+  });
+
+  test("a legacy attempt whose text names an approval but has no typed id is unverified and offers no approve control", () => {
+    const move = moveOf(
+      { intent_id: "intent-3", operation_ref: "horizon.health", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:99" }, settlement: null, at: null },
+      governed,
+    );
+    expect(move.approval_identity).toEqual({ state: "unverified" });
+    expect(move.approval_id).toBeNull();
+  });
+
+  test("a new attempt record carries its typed approval id and the model reads it without parsing text", () => {
+    const move = moveOf(
+      { intent_id: "intent-4", operation_ref: "horizon.health", committed: null, attempt: { outcome: "awaiting_authority", reason: "unrelated wording", approvalId: "approval:typed" }, settlement: null, at: null },
+      governed,
+    );
+    expect(move.approval_identity).toEqual({ state: "verified", approvalId: "approval:typed" });
+    expect(move.approval_id).toBe("approval:typed");
   });
 
   test("an ungoverned commit is policy only, never SEA-Forge's decision, and is not observed", () => {
@@ -320,5 +338,18 @@ describe("first-run derivations", () => {
     const base = { unresolved: 0, checkpointKnown: true, objects: 1, choices: 1, decision: "no_affordance" as const };
     expect(workspaceState({ ...base, submittable: 2 }).message).toBe("2 moves are available from this focus. Blocked moves show their reasons below.");
     expect(workspaceState({ ...base, submittable: 0 }).message).toBe("No move is available from this focus yet. The blocked reasons are shown below.");
+  });
+});
+
+describe("typed approval id on stored attempts", () => {
+  test("appendIntentAttempt persists approvalId and readIntentAttempts returns it; an attempt without one reads as null", async () => {
+    const { appendIntentAttempt, readIntentAttempts } = await import("../src/capabilities/navigation-intent.ts");
+    const store = application.runtime.runtime.store;
+    const base = { actor_ref: null, caller_ref: null, outcome: "awaiting_authority" as const, reason: "SEA-Forge escalated; awaiting approval ap-typed", at: new Date().toISOString() };
+    await appendIntentAttempt(store, { attempt: { ...base, intent_id: "typed-1", approvalId: "ap-typed" }, tenant: "t", scopeId: "s" });
+    await appendIntentAttempt(store, { attempt: { ...base, intent_id: "legacy-1" }, tenant: "t", scopeId: "s" });
+    const attempts = await readIntentAttempts(store);
+    expect(attempts.find((a) => a.intent_id === "typed-1")?.approvalId).toBe("ap-typed");
+    expect(attempts.find((a) => a.intent_id === "legacy-1")?.approvalId).toBeNull();
   });
 });

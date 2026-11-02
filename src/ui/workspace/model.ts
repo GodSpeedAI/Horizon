@@ -75,6 +75,8 @@ export interface WorkspaceMove {
   readonly settlement: WorkspaceClaim;
   /** The escalation a human can answer, when the commit is awaiting approval. */
   readonly approval_id: string | null;
+  /** Verified only when the stored attempt carries the typed approval id; older records are unverified. */
+  readonly approval_identity: ApprovalIdentity | null;
   /** RealityTrace can observe the commit now: governed, decided, recorded, and no observation yet. */
   readonly observable: boolean;
   /** SEA-Forge can rule on the observed evidence now: as observable, but an observation already exists and nothing is final. */
@@ -724,7 +726,7 @@ export interface StoredMoveFacts {
   /** The SEA-Forge decision that authorized the commit, when one is recorded. Absent or null means none was recorded. */
   readonly decision?: { readonly ref: string } | null;
   /** The latest audited attempt, when one exists. */
-  readonly attempt: { readonly outcome: "accepted" | "refused" | "awaiting_authority"; readonly reason: string | null } | null;
+  readonly attempt: { readonly outcome: "accepted" | "refused" | "awaiting_authority"; readonly reason: string | null; readonly approvalId?: string | null } | null;
   readonly settlement: {
     readonly status: string;
     readonly final: boolean;
@@ -734,11 +736,15 @@ export interface StoredMoveFacts {
   readonly at: string | null;
 }
 
+export type ApprovalIdentity = { readonly state: "verified"; readonly approvalId: string } | { readonly state: "unverified" };
+
 /** The three claims, kept apart: who decided, what recorded it, what observed it. */
 export function moveOf(facts: StoredMoveFacts, context: { readonly governed: boolean; readonly realitytrace: boolean }): WorkspaceMove {
   const { committed, attempt, settlement } = facts;
   const awaiting = attempt?.outcome === "awaiting_authority" && committed === null;
-  const approvalId = awaiting ? (/awaiting approval (\S+)$/.exec(attempt?.reason ?? "")?.[1] ?? null) : null;
+  const typedId = attempt?.approvalId;
+  const approvalIdentity: ApprovalIdentity | null = !awaiting ? null : typeof typedId === "string" && typedId !== "" ? { state: "verified", approvalId: typedId } : { state: "unverified" };
+  const approvalId = approvalIdentity?.state === "verified" ? approvalIdentity.approvalId : null;
   let decided: WorkspaceClaim;
   const decisionRef = facts.decision?.ref ?? null;
   if (committed) {
@@ -801,6 +807,7 @@ export function moveOf(facts: StoredMoveFacts, context: { readonly governed: boo
     observed,
     settlement: settlementClaim,
     approval_id: approvalId,
+    approval_identity: approvalIdentity,
     // Both steps are offered only while nothing is final; the ruling needs the observation first.
     observable: canObserve,
     settleable: canRule,

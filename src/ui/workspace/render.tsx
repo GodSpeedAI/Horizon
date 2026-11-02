@@ -378,6 +378,12 @@ function Receipt({ receipt, basePath }:{ readonly receipt: WorkspaceReceipt; rea
           </form>
         ) : null}
       </div>
+      {move.approval_identity?.state === "unverified" ? (
+        <div className="approval" data-approval-identity="unverified">
+          <h3>Waiting for a decision</h3>
+          <p>This older record does not carry a verified approval id, so it cannot be approved from here.</p>
+        </div>
+      ) : null}
       {move.approval_id === null ? null : (
         <div className="approval" data-approval={move.approval_id}>
           <h3>Waiting for your decision</h3>

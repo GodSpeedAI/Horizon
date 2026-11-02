@@ -353,8 +353,8 @@ export async function createApplication(
     return issued;
   }
 
-  function audit(intent: CommitIntentInput, outcome: IntentAttempt["outcome"], reason: string | null) {
-    const attempt: IntentAttempt = { intent_id: intent.intent_id, actor_ref: intent.actor_ref, caller_ref: caller.actor.id, outcome, reason, at: new Date().toISOString(), operation_ref: intent.operation_ref };
+  function audit(intent: CommitIntentInput, outcome: IntentAttempt["outcome"], reason: string | null, approvalId: string | null = null) {
+    const attempt: IntentAttempt = { intent_id: intent.intent_id, actor_ref: intent.actor_ref, caller_ref: caller.actor.id, outcome, reason, at: new Date().toISOString(), operation_ref: intent.operation_ref, approvalId };
     return appendIntentAttempt(runtime.runtime.store, { attempt, tenant: caller.tenant, scopeId: `horizon-${caller.tenant}` });
   }
 
@@ -412,7 +412,7 @@ export async function createApplication(
       const approvalId = (wait?.condition as { approvalId?: unknown } | undefined)?.approvalId;
       if (typeof approvalId !== "string") throw new Error(`INTENT: governed commit run ${view.runId} waits on something other than SEA-Forge`);
       frames.retain(intent.frame_id);
-      await audit(intent, "awaiting_authority", `SEA-Forge escalated; awaiting approval ${approvalId}`);
+      await audit(intent, "awaiting_authority", `SEA-Forge escalated; awaiting approval ${approvalId}`, approvalId);
       throw new AwaitingAuthorityError(intent, view.runId, approvalId);
     }
     const reason = view.error ?? `run ${view.status}`;
@@ -1043,7 +1043,7 @@ export async function createApplication(
       operation_ref: row?.record.operation_ref ?? attempt?.operation_ref ?? "operation not recorded",
       committed: row ? { at: row.event.occurredAt, expected: (row.record.expected_outcome ?? null) !== null } : null,
       decision: authorized,
-      attempt: attempt === null ? null : { outcome: attempt.outcome, reason: attempt.reason },
+      attempt: attempt === null ? null : { outcome: attempt.outcome, reason: attempt.reason, approvalId: attempt.approvalId ?? null },
       settlement: settled
         ? {
             status: settled.settlement_reference.status,
@@ -1069,7 +1069,7 @@ export async function createApplication(
 
   /** The approval an escalated commit waits on, and the intent it belongs to; null when nothing waits on it. */
   async function intentIdForApproval(approvalId: string): Promise<string | null> {
-    const waiting = (await readIntentAttempts(runtime.runtime.store)).filter((entry) => entry.outcome === "awaiting_authority" && entry.reason?.endsWith(` ${approvalId}`));
+    const waiting = (await readIntentAttempts(runtime.runtime.store)).filter((entry) => entry.outcome === "awaiting_authority" && entry.approvalId === approvalId);
     return waiting.at(-1)?.intent_id ?? null;
   }
 

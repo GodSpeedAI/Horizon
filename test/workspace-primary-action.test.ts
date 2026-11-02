@@ -26,7 +26,7 @@ describe("primary action", () => {
       intent_id: "i-1",
       operation_ref: "product.apply",
       committed: null,
-      attempt: { outcome: "awaiting_authority", reason: "awaiting approval appr-1" },
+      attempt: { outcome: "awaiting_authority", reason: "awaiting approval appr-1", approvalId: "appr-1" },
       settlement: null,
       at: null,
     });

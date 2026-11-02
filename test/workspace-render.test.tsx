@@ -253,7 +253,7 @@ describe("first-run cockpit rendering", () => {
 
   test("an escalated commit without approvals says so and gives the fix instead of buttons", () => {
     const move = moveOf(
-      { intent_id: "intent-9", operation_ref: "product.apply", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:7" }, settlement: null, at: null },
+      { intent_id: "intent-9", operation_ref: "product.apply", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:7", approvalId: "approval:7" }, settlement: null, at: null },
       { governed: true, realitytrace: true },
     );
     const markup = pageWith(snapshot(), chromeFor({ receipt: { intent_id: "intent-9", found: true, move, approvals: false } }));
@@ -263,9 +263,20 @@ describe("first-run cockpit rendering", () => {
     expect(markup).not.toContain('name="decision"');
   });
 
+  test("a legacy escalation with approval text but no typed id is shown unverified with no approve control", () => {
+    const move = moveOf(
+      { intent_id: "intent-11", operation_ref: "product.apply", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:99" }, settlement: null, at: null },
+      { governed: true, realitytrace: true },
+    );
+    const markup = pageWith(snapshot(), chromeFor({ receipt: { intent_id: "intent-11", found: true, move, approvals: true } }));
+    expect(markup).toContain("cannot be approved from here");
+    expect(markup).not.toContain('value="approve"');
+    expect(markup).not.toContain('name="approval_id"');
+  });
+
   test("with approvals configured the escalation offers Approve and Reject on its own approval", () => {
     const move = moveOf(
-      { intent_id: "intent-10", operation_ref: "product.apply", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:8" }, settlement: null, at: null },
+      { intent_id: "intent-10", operation_ref: "product.apply", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:8", approvalId: "approval:8" }, settlement: null, at: null },
       { governed: true, realitytrace: true },
     );
     const markup = pageWith(snapshot(), chromeFor({ receipt: { intent_id: "intent-10", found: true, move, approvals: true } }));
