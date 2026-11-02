@@ -1,10 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { hostname, userInfo } from "node:os";
+import { hostname } from "node:os";
 import { dirname, resolve } from "node:path";
 import { assertVerifierTemplate } from "../domain/expectation.ts";
 import { assertAllowance, assertPaymentEntry } from "../domain/payment.ts";
 import { REVERSIBILITY_CLASSES } from "../domain/navigation.ts";
+import { OBSERVER_ACTOR_REF } from "../ui/surface2/grammar.ts";
 import type {
   ContextKernelConfig,
   DeploymentProfile,
@@ -193,6 +194,7 @@ export function configFromDocument(document: unknown): HorizonConfig {
     source: identitySource,
     operator_prefix: asString(identityDoc.operator_prefix, "identity.operator_prefix"),
     agent_prefix: asString(identityDoc.agent_prefix, "identity.agent_prefix"),
+    operator_ref: identityDoc.operator_ref === undefined ? DEFAULT_OPERATOR_REF : asString(identityDoc.operator_ref, "identity.operator_ref"),
     ...(identityDoc.identity_provider === undefined
       ? {}
       : { identity_provider: asString(identityDoc.identity_provider, "identity.identity_provider") }),
@@ -255,12 +257,30 @@ function writeLaunchSecret(path: string): string {
   return secret;
 }
 
+/** The single-operator development default for the local operator's ref. */
+export const DEFAULT_OPERATOR_REF = "actor:operator";
+
+/**
+ * A human operator ref must be a Cognate `actor:` principal. The OS account is never a valid
+ * source: an `os:` ref would name the service account that runs the runtime, not the person.
+ */
+export function assertOperatorRef(value: string, source: string): string {
+  if (value.length === 0) bounded(`${source} must not be empty`);
+  if (!value.startsWith("actor:") || !OBSERVER_ACTOR_REF.test(value)) {
+    bounded(`${source} must be an actor:<id> ref (got ${JSON.stringify(value)}); the OS account is never the operator`);
+  }
+  return value;
+}
+
+/**
+ * The local operator's principal. Its id is the configured ref (HORIZON_OPERATOR_REF, else
+ * `identity.operator_ref`), validated at startup. The OS account is not read here.
+ */
 export function operatorPrincipal(config: HorizonConfig): { readonly id: string; readonly kind: "user" } {
   if (config.identity.source !== "os_session") {
     bounded("operator identity is not available from an OS session");
   }
-  const info = userInfo();
-  return { id: `${config.identity.operator_prefix}${info.username}:${info.uid}`, kind: "user" };
+  return { id: assertOperatorRef(config.identity.operator_ref, "operator identity"), kind: "user" };
 }
 
 export function agentPrincipal(config: HorizonConfig, agentId: string): { readonly id: string; readonly kind: "agent" } {
@@ -286,7 +306,11 @@ export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.
   }
   const config = configFromDocument(document);
   const store = process.env.HORIZON_STORE;
-  const withStore = store ? { ...config, runtime_store: store } : config;
+  const operatorEnv = process.env.HORIZON_OPERATOR_REF;
+  const identityWithOperator = operatorEnv === undefined
+    ? config.identity
+    : { ...config.identity, operator_ref: assertOperatorRef(operatorEnv, "HORIZON_OPERATOR_REF") };
+  const withStore = { ...(store ? { ...config, runtime_store: store } : config), identity: identityWithOperator };
   const secretPath = process.env.HORIZON_SECRET_FILE ?? withStore.secrets.path;
   const launchSecret = writeLaunchSecret(secretPath);
   return {

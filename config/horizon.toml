@@ -9,6 +9,7 @@ research_command = ["uv", "run", "--project", "research", "python", "-m", "horiz
 [identity]
 source = "os_session"
 operator_prefix = "os:"
+operator_ref = "actor:operator"
 agent_prefix = "agent:"
 
 [secrets]

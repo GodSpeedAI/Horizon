@@ -1,7 +1,8 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, statSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
+import { horizonDocument, writeConfig } from "./support/config.ts";
 import {
   agentPrincipal,
   assertAgentPrincipal,
@@ -89,3 +90,59 @@ function toToml(document: Record<string, unknown>): string {
   }
   return lines.join("\n");
 }
+
+/** The local operator's identity is configured; the OS account (the runtime's service user) never is. */
+describe("local operator identity is configured, not the OS account", () => {
+  const withOperatorEnv = (value: string | undefined, run: () => void) => {
+    const before = process.env.HORIZON_OPERATOR_REF;
+    if (value === undefined) delete process.env.HORIZON_OPERATOR_REF;
+    else process.env.HORIZON_OPERATOR_REF = value;
+    try {
+      run();
+    } finally {
+      if (before === undefined) delete process.env.HORIZON_OPERATOR_REF;
+      else process.env.HORIZON_OPERATOR_REF = before;
+    }
+  };
+  let configPath = "";
+  beforeAll(async () => {
+    const root = mkdtempSync(join(tmpdir(), "horizon-operator-"));
+    configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "app.sqlite"), secretPath: join(root, "launch.secret") }));
+  });
+  const load = () => loadConfig(configPath);
+  const osRef = () => {
+    const info = userInfo();
+    return `os:${info.username}:${info.uid}`;
+  };
+
+  test("defaults to the configured actor ref when the environment is unset", () => {
+    withOperatorEnv(undefined, () => {
+      const loaded = load();
+      expect(loaded.operator.principal.id).toBe("actor:operator");
+      expect(loaded.operator.principal.id).not.toBe(osRef());
+    });
+  });
+
+  test("HORIZON_OPERATOR_REF overrides the configured default", () => {
+    withOperatorEnv("actor:cockpit-owner", () => {
+      expect(load().operator.principal.id).toBe("actor:cockpit-owner");
+    });
+  });
+
+  test("startup refuses an empty, OS-shaped, or malformed HORIZON_OPERATOR_REF", () => {
+    for (const bad of ["", "   ", "operator", "actor:", "actor:has space", osRef(), `os:${userInfo().username}`]) {
+      withOperatorEnv(bad, () => {
+        expect(() => load()).toThrow(/HORIZON_OPERATOR_REF/);
+      });
+    }
+  });
+
+  test("the OS account name and UID never appear in the operator principal", () => {
+    withOperatorEnv(undefined, () => {
+      const id = load().operator.principal.id;
+      expect(id).not.toContain(`:${userInfo().uid}`);
+      expect(id.startsWith("os:")).toBe(false);
+    });
+  });
+});
+

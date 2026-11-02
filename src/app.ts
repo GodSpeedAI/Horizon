@@ -282,7 +282,7 @@ export async function createApplication(
   const configured = options.governance ?? governanceFromEnv(process.env);
   // Poll SEA-Forge for decided escalations, so a commit approved or rejected at SEA-Forge directly
   // (not through resolveNavigationApproval) still resumes or fails on its own.
-  const approvals = options.approvals ?? approvalAuthorityFromEnv(process.env);
+  const approvals = options.approvals ?? approvalAuthorityFromEnv(process.env, caller.actor.id);
   // A signed-in operator's commits go to SEA-Forge as the gateway acting on behalf of the operator's mapped actor.
   // The mapping is validated after the identity store opens; until then every session operator is refused.
   let operatorActors: OperatorActors | null = null;

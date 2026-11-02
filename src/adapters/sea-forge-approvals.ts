@@ -27,16 +27,19 @@ export interface ApprovalAuthority {
 }
 
 /**
- * `COGNATE_SEA_FORGE_OPERATOR` names the operator actor bound in SEA-Forge. Unset: no one can answer
- * an escalation from Horizon (allow/deny still work). Set without `COGNATE_GOVERNANCE=sea-forge`, or
- * equal to the service actor, it is a startup error, never a guess.
+ * `COGNATE_SEA_FORGE_OPERATOR` enables answering escalations from Horizon. Unset: no one can answer
+ * (allow/deny still work). The approver is the configured operator ref (`operatorRef`, from
+ * HORIZON_OPERATOR_REF / `identity.operator_ref`): one value for the cockpit's principal and the
+ * SEA-Forge actor. If the variable is set to anything else, or without `COGNATE_GOVERNANCE=sea-forge`,
+ * it is a startup error, never a guess.
  */
-export function approvalAuthorityFromEnv(env: Readonly<Record<string, string | undefined>>): ApprovalAuthority | undefined {
-  const operatorId = env[ENV_OPERATOR]?.trim();
+export function approvalAuthorityFromEnv(env: Readonly<Record<string, string | undefined>>, operatorRef: string): ApprovalAuthority | undefined {
+  const named = env[ENV_OPERATOR]?.trim();
   const governed = env.COGNATE_GOVERNANCE?.trim() === "sea-forge";
-  if (!operatorId) return undefined;
+  if (!named) return undefined;
   if (!governed) throw new Error(`${ENV_OPERATOR} is set but COGNATE_GOVERNANCE is not 'sea-forge'; refusing to guess`);
-  return approvalAuthority({ socketPath: env.COGNATE_SEA_FORGE_SOCKET?.trim() ?? "", operatorId, serviceId: env.COGNATE_SEA_FORGE_ACTOR?.trim() || undefined });
+  if (named !== operatorRef) throw new Error(`${ENV_OPERATOR} (${named}) must equal the configured operator ref (${operatorRef}); one identity, not two`);
+  return approvalAuthority({ socketPath: env.COGNATE_SEA_FORGE_SOCKET?.trim() ?? "", operatorId: operatorRef, serviceId: env.COGNATE_SEA_FORGE_ACTOR?.trim() || undefined });
 }
 
 export function approvalAuthority(options: { readonly socketPath: string; readonly operatorId: string; readonly serviceId?: string }): ApprovalAuthority {

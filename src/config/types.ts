@@ -7,6 +7,12 @@ export interface IdentityConfig {
   readonly source: "os_session" | "identity_provider";
   readonly operator_prefix: string;
   readonly agent_prefix: string;
+  /**
+   * The local human operator's durable ref (`actor:<id>`), the principal every local session and
+   * approval is attributed to. Configured here, overridable at startup by HORIZON_OPERATOR_REF.
+   * Never derived from the OS account, so it survives a change of service account or UID.
+   */
+  readonly operator_ref: string;
   readonly identity_provider?: string;
 }
 
