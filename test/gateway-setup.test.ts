@@ -417,7 +417,7 @@ describe("installer (shell) against a temporary root", () => {
     const r = await run(["--dry-run", "--stage", copy, "--binary", bin, "--sha256", sha]);
     expect(r.code).toBe(1);
     expect(r.err).toContain("does not match its manifest");
-  });
+  }, 120_000); // copies the staged runtime tree, which carries node_modules (hundreds of MB)
 });
 
 describe("server.yaml and policy.yaml (rendered from the runtime account's uid, never a constant)", () => {
