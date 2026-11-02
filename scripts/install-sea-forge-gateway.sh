@@ -378,7 +378,8 @@ run_check() {
           echo "  ok      runtime tree ${F[3]} matches its manifest"
         else fails=$((fails+1)); echo "  BAD     runtime tree ${F[3]} missing or not matching its manifest"; fi ;;
       socket)
-        if [ -S "${F[1]}" ] && command -v python3 >/dev/null 2>&1; then
+        if [ "$(id -u)" = 0 ]; then echo "  note    agent socket open: not tested as root (root connects to any socket); run --check as the operator login to test it";
+        elif [ -S "${F[1]}" ] && command -v python3 >/dev/null 2>&1; then
           result="$(python3 -c 'import socket,sys
 s=socket.socket(socket.AF_UNIX)
 try:
