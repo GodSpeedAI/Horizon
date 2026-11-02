@@ -86,7 +86,7 @@
 
     "@formatjs/icu-skeleton-parser": ["@formatjs/icu-skeleton-parser@2.1.11", "", {}, "sha512-j8cUmOJzVgkHuS0QiQ6ga76UIoLOFSAMWhs7aZJztH3aAdCOAE6vpC8KVvFB4cU10ON0y2/5oOVmPJ43s2lTwA=="],
 
-    "@godspeed/identity": ["@godspeed/identity@./.cognate/vendor/godspeed-identity-0.1.0.tgz", { "dependencies": { "@godspeedai/cognate-events": "^0.8.0", "@godspeedai/cognate-runtime-api": "^0.8.0" } }, "sha512-/sVspqodeo5yuqGYOqVUcqSmi5rij/s5lzOBijhs+QrHawNvU8WAutfZmHi6qPGs7tBKcFKZqIho4mkmlbzzxg=="],
+    "@godspeed/identity": ["@godspeed/identity@./.cognate/vendor/godspeed-identity-0.1.0.tgz", { "dependencies": { "@godspeedai/cognate-events": "^0.8.0", "@godspeedai/cognate-runtime-api": "^0.8.0" } }, "sha512-2NIemS0QEEn4Bhl3Fp3AVx9r1prb+kIj7ewmHh+hRK456/FGyYqBZ+YAwymXS+pl7COenPBFy0wj2gIH6Zx4qA=="],
 
     "@godspeedai/cognate-ag-ui": ["@godspeedai/cognate-ag-ui@./.cognate/vendor/godspeedai-cognate-ag-ui-0.8.0.tgz", { "dependencies": { "@ag-ui/core": "1.0.0", "@ag-ui/encoder": "1.0.0", "@godspeedai/cognate-client": "^0.8.0", "@godspeedai/cognate-events": "^0.8.0", "@godspeedai/cognate-runtime-api": "^0.8.0" } }, "sha512-LLohvI5zXKZHG0pC+vEOqIh9LsmoL5xQ1wh4c6LxrTmOPxc4dyaqE0AIe9Sdrdc79vRWAayaWjOKZ9LlRtNlFg=="],
 

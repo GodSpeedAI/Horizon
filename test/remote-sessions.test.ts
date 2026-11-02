@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
 import { buildAuthorityRequest, interpretDecision, type GovernanceAuthority } from "@godspeedai/cognate-runtime-bun";
-import { createIdentityService, SESSIONS } from "@godspeed/identity";
+import { createIdentityService, DEVICES, OPERATORS, SESSIONS } from "@godspeed/identity";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
 import { approvalAuthority } from "../src/adapters/sea-forge-approvals.ts";
 import { delegatingAuthority } from "../src/adapters/delegating-authority.ts";
@@ -200,9 +200,9 @@ describe("an unpaired phone, forged actors, and the mapped actor", () => {
   test("a pairing link enrols a passkey for the existing operator only: it creates no operator and grants no role", async () => {
     const response = await phone.pair(device);
     expect(response.status).toBe(200);
-    const operators = (await identityStoreOf(r.app.runtime.runtime.store).listRecords("identity.operators", {})).map((row) => (row.value as { operatorId: string }).operatorId);
+    const operators = (await identityStoreOf(r.app.runtime.runtime.store).listRecords(OPERATORS, {})).map((row) => (row.value as { operatorId: string }).operatorId);
     expect(operators).toEqual(["operator"]);
-    const devices = await r.app.identity.listDevices((await identityStoreOf(r.app.runtime.runtime.store).listRecords("identity.operators", {}))[0]!.value.tenant as string, "operator");
+    const devices = await r.app.identity.listDevices((await identityStoreOf(r.app.runtime.runtime.store).listRecords(OPERATORS, {}))[0]!.value.tenant as string, "operator");
     expect(devices.length).toBe(1);
     expect(devices[0]!.operatorId).toBe("operator");
   });
@@ -253,7 +253,7 @@ describe("an unpaired phone, forged actors, and the mapped actor", () => {
   });
 
   test("a revoked device cannot authenticate", async () => {
-    const tenant = (await identityStoreOf(r.app.runtime.runtime.store).listRecords("identity.operators", {}))[0]!.value.tenant as string;
+    const tenant = (await identityStoreOf(r.app.runtime.runtime.store).listRecords(OPERATORS, {}))[0]!.value.tenant as string;
     const [active] = (await r.app.identity.listDevices(tenant, "operator")).filter((candidate) => candidate.revokedAt === null);
     await r.app.identity.revokeDevice(active!.id, "lost phone");
     const response = await phone.signIn(device);
@@ -269,7 +269,7 @@ describe("an unpaired phone, forged actors, and the mapped actor", () => {
     expect((await phone.pair(second)).status).toBe(200);
     const replacement = phone.cookie;
     expect(replacement).not.toBe(oldCookie);
-    const tenant = (await identityStoreOf(r.app.runtime.runtime.store).listRecords("identity.operators", {}))[0]!.value.tenant as string;
+    const tenant = (await identityStoreOf(r.app.runtime.runtime.store).listRecords(OPERATORS, {}))[0]!.value.tenant as string;
     const devices = await r.app.identity.listDevices(tenant, "operator");
     expect(devices.filter((candidate) => candidate.revokedAt === null).length).toBe(1);
     expect(devices.length).toBeGreaterThanOrEqual(2);
@@ -400,6 +400,35 @@ describe("an operator with no mapping, and the gateway identity", () => {
     const context = { identity, tenant: "t1", serviceActorId: SERVICE };
     await expect(validateOperatorActors(resolveOperatorsConfig({ desktop_operator: SERVICE, delegable_actors: [SERVICE], actors: { [SERVICE]: SERVICE } }), context)).rejects.toThrow(OperatorMappingError);
     await expect(validateOperatorActors(resolveOperatorsConfig({ desktop_operator: "operator", delegable_actors: [SERVICE], actors: { operator: SERVICE } }), context)).rejects.toThrow("gateway service identity");
+  });
+
+  test("the identity store receives the three hyphenated collection names", async () => {
+    const seen = new Set<string>();
+    const memory = createMemoryStore();
+    const spy = new Proxy(memory, {
+      get(target, property) {
+        if (property === "commit") {
+          return (input: Parameters<typeof memory.commit>[0]) => {
+            for (const record of input.records ?? []) seen.add(record.collection);
+            return target.commit(input);
+          };
+        }
+        if (property === "getRecord" || property === "listRecords") {
+          return (collection: string, ...rest: unknown[]) => {
+            seen.add(collection);
+            return (target[property] as (...args: unknown[]) => unknown)(collection, ...rest);
+          };
+        }
+        return Reflect.get(target, property, target) as unknown;
+      },
+    });
+    expect([OPERATORS, SESSIONS, DEVICES]).toEqual(["identity-operators", "identity-sessions", "identity-devices"]);
+    const store = identityStoreOf(spy);
+    await createIdentityService(store).registerOperator({ tenant: "t1", operatorId: "operator" });
+    await store.listRecords(SESSIONS, {});
+    await store.listRecords(DEVICES, {});
+    expect([...seen].sort()).toEqual(["identity-devices", "identity-operators", "identity-sessions"]);
+    expect([...seen].some((name) => name.includes("."))).toBe(false);
   });
 
   test("startup validation: the operator must exist and be active, and the actor must be a delegation target", async () => {
