@@ -82,6 +82,14 @@ enum EpistemicStatus {
     inconsistent = "inconsistent",
 }
 
+// Settlement advances in order. `observed` is evidence held by RealityTrace and sent to SEA-Forge;
+// it is not a ruling. Only `ruled` carries an operational settlement reference.
+enum SettlementStage {
+    unobserved = "unobserved",
+    observed = "observed",
+    ruled = "ruled",
+}
+
 enum ReviewDisposition {
     close = "close",
     continue = "continue",
@@ -322,6 +330,7 @@ entity "SettlementReviewRecord" {
     intent_ref: string
     epistemic_status: EpistemicStatus
     disposition: ReviewDisposition
+    settlement_stage: SettlementStage
     operational_settlement_ref: string optional
     developmental_assessment_ref: string optional
 }
@@ -782,6 +791,14 @@ instance inv_domainforge_owns_identity of "InteractionInvariant" {
     invariant_id: "INV-06",
     statement: "DomainForge alone owns canonical semantic compilation and world_ref identity.",
     requirement_ref: "REQ-STACK-001",
+    evidence_class: "declared",
+    status: "active"
+}
+
+instance inv_settlement_stage_ordered of "InteractionInvariant" {
+    invariant_id: "INV-12",
+    statement: "A settlement advances unobserved, then observed, then ruled, and never skips a stage. SEA-Forge rules only on evidence that RealityTrace has observed, and an observed stage is not a ruling.",
+    requirement_ref: "REQ-DEV-001",
     evidence_class: "declared",
     status: "active"
 }
