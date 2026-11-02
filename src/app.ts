@@ -1029,8 +1029,10 @@ export async function createApplication(
     const attempt = (await readIntentAttempts(store)).filter((entry) => entry.intent_id === intentId).at(-1) ?? null;
     if (!row && !attempt) return null;
     const settled = await latestSettlement(store, caller.tenant, intentId);
+    // The decision reference is SEA-Forge's own decision envelope, not the Cognate invocation event that carried it.
     const invocation = row ? await governedInvocationOf(intentId) : undefined;
-    const authorized = invocation && authorityOf(invocation) ? { ref: invocation.eventId } : null;
+    const authority = invocation ? authorityOf(invocation) : undefined;
+    const authorized = authority ? { ref: authority.decisionEnvelopeId } : null;
     return {
       intent_id: intentId,
       operation_ref: row?.record.operation_ref ?? attempt?.operation_ref ?? "operation not recorded",
