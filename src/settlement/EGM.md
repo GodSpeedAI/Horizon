@@ -78,7 +78,10 @@ returns the pending result.
   `[obligation.ts:close]`; `terminate(..., "refused", refusal, deps.now())` in `refuse`
   `[obligation.ts:refuse]`.
 - Process spawns by proxy: `deps.realityTrace.run(threshold, argv, launcher, timeoutS)` runs the pinned
-  verifier under the configured launcher `[obligation.ts:runVerifier]`.
+  verifier under the configured launcher `[obligation.ts:runVerifier]`. Before each run `takeSnapshot` (`snapshot.ts`)
+  copies the live WAL store (`VACUUM INTO`, renamed atomically) to `<settings.snapshot_dir>/app.sqlite`; the verifier's
+  `--store` literal names that path and the launcher must `--ro-bind` the snapshot directory, not the live store's.
+  A failed snapshot refuses the run (`discrimination unknown: <reason>`).
 - Network: `seaForge.closure(...)` calls SEA-Forge to record the closure
   `[obligation.ts:close]`.
 - Filesystem reads: `existsSync` + `readFileSync` + `createHash("sha256")` per artifact, returning `null`

@@ -137,7 +137,9 @@ function asSettlement(value: unknown): SettlementConfig | undefined {
   const doc = asRecord(value, "settlement");
   const grace = doc.close_grace_s ?? 30;
   if (typeof grace !== "number" || !Number.isInteger(grace) || grace < 0 || grace > 3600) bounded("settlement.close_grace_s must be an integer from 0 to 3600");
-  return { launcher: asStringList(doc.launcher, "settlement.launcher"), close_grace_s: grace };
+  const snapshot = doc.snapshot_dir;
+  if (snapshot !== undefined && (typeof snapshot !== "string" || snapshot.trim() === "")) bounded("settlement.snapshot_dir must be a non-empty string");
+  return { launcher: asStringList(doc.launcher, "settlement.launcher"), close_grace_s: grace, ...(snapshot === undefined ? {} : { snapshot_dir: snapshot as string }) };
 }
 
 function asOperators(value: unknown): OperatorsConfig {

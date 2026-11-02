@@ -6,6 +6,7 @@ import { delegatingAuthority, delegationSender } from "./adapters/delegating-aut
 import { identityStoreOf } from "./remote/identity-store.ts";
 import { OperatorActors, resolveOperatorsConfig, validateOperatorActors } from "./remote/operators.ts";
 import { statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import type { Caller } from "@godspeedai/cognate-runtime-api";
 import { governanceFromEnv, type GovernanceOptions } from "@godspeedai/cognate-runtime-bun";
 import { loadWorld, type LoadedWorld } from "./adapters/semantic.ts";
@@ -22,6 +23,7 @@ import { RealityTraceObligation } from "./adapters/realitytrace-obligation.ts";
 import { realityTraceEconomics, type EconomicsSource } from "./adapters/realitytrace-economics.ts";
 import { listPending, readPending, terminate, updatePending, type PendingIntent } from "./capabilities/pending-intent.ts";
 import { type ObligationDeps, ObligationRefusal, bindingGates, close as closeWindow, prepare as prepareObligation, verifyRun } from "./settlement/obligation.ts";
+import { assertSnapshotDir } from "./settlement/snapshot.ts";
 import { isClosurePending, settleAwaitingClosure } from "./settlement/settle-awaiting-closure.ts";
 import { windowOpen } from "./domain/expectation.ts";
 import type { StructuralChoice } from "./domain/frame.ts";
@@ -319,6 +321,10 @@ export async function createApplication(
     // Its own repository in the same RealityTrace home, so SEA-Forge reads both through one data home.
     realityTrace: realityTrace ? new RealityTraceObligation({ bin: realityTrace.bin, dataHome: realityTrace.dataHome, stateHome: realityTrace.stateHome, repoDir: `${realityTrace.repoDir}-obligations` }) : null,
     settlement: loaded.config.settlement ?? null,
+    // The verifier reads a read-only snapshot of the store, never the live WAL database (see settlement/snapshot.ts).
+    get snapshot() {
+      return loaded.config.settlement ? { liveStore: runtime.storePath, dir: snapshotDirOf(loaded.config.settlement, runtime.storePath) } : undefined;
+    },
     allowances: loaded.config.capacity,
     settlementConfigured: governance.mode === "sea-forge" && realityTrace !== undefined,
     now: () => new Date(),
@@ -333,6 +339,7 @@ export async function createApplication(
     // The observation commits with the governed invocation itself (the outbox), so it cannot be lost.
     ...(realityTrace ? { outboxFor: observationOutbox(NAVIGATION_INTENT_COMMIT.id) } : {}),
   });
+  if (loaded.config.settlement) assertSnapshotDir(snapshotDirOf(loaded.config.settlement, runtime.storePath), runtime.storePath);
   // HORIZON-001 1.1.0: suspend pending v1 commit runs and mark the store before anything is served.
   await activateContract(runtime.runtime.store, new Date());
   // Durable operators, sessions and devices live in the same store. Operators named in configuration are
@@ -1618,6 +1625,11 @@ function crossSiteRefusal(request: Request, port: number, hostOnly = false): Res
 }
 
 /** `cognate:store@<bytes>`: the durable store's size — observed, never fabricated. */
+/** The configured snapshot directory, else `verifier-snapshot` beside the live store's directory. */
+function snapshotDirOf(settlement: { readonly snapshot_dir?: string }, storePath: string): string {
+  return resolve(settlement.snapshot_dir ?? join(dirname(resolve(storePath)), "verifier-snapshot"));
+}
+
 function checkpointRefOf(storePath: string): string {
   try {
     return `cognate:store@${statSync(storePath).size}`;

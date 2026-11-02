@@ -11,7 +11,7 @@ check" is never reported as a pass. `intent-recorded.ts` is compiled to one self
 
 - `intent-recorded.ts` — `horizon-verify-intent`, the verifier for REQ-NAV-011
   `[intent-recorded.ts:1]`.
-- CLI: `horizon-verify-intent --store <horizon store.sqlite> --tenant <tenant> --intent <intent_id>`
+- CLI: `horizon-verify-intent --store <snapshot of the horizon store.sqlite> --tenant <tenant> --intent <intent_id>`
   `[intent-recorded.ts:arg]`; arguments are read positionally from `process.argv`
   `[intent-recorded.ts:arg]`.
 - Exit codes: `0` the store records the committed `NavigationIntentRecord` for exactly this intent;

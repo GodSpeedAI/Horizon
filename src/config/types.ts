@@ -99,6 +99,11 @@ export interface SettlementConfig {
   /** The confinement prefix every verifier runs under (e.g. an attested bubblewrap with a read-only view, no network). */
   readonly launcher: readonly string[];
   readonly close_grace_s: number;
+  /**
+   * Directory holding the verifier's read-only snapshot of the store (`app.sqlite` inside it). The launcher mounts
+   * this, not the live store's directory. Absent: `verifier-snapshot` beside the live store's directory.
+   */
+  readonly snapshot_dir?: string;
 }
 
 export interface LoadedConfig {
