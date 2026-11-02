@@ -1,10 +1,10 @@
 # Horizon requirement ledger (generated) — see scripts/gen-requirement-ledger.py
 ledger_version: 1
 project: Horizon
-freeze_hash: sha256:a66376de71b77386a493db686a82d8830b17d2819d00313dc3739b134a244348
+freeze_hash: sha256:114c118afee0f88708977c6065186f5ae3c99bfb0f43596e507a9cbfbc636e18
 generated_from:
   spec: .agents/specs/horizon.agent.spec.yaml
-  spec_sha256: d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+  spec_sha256: 7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   plan: .agents/plans/horizon.plan.yaml
   plan_sha256: 62e85f4cddc5144a7939cd4515627fe6d307a3976b286e40ff8263e193a4cce3
   semantic_sources:
@@ -23,7 +23,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.case_and_development[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CaseRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -79,7 +79,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.case_and_development[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CaseRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -121,7 +121,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.case_and_development[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CaseRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -176,7 +176,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[6]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CandidateRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -218,7 +218,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.resolution_rules[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -244,7 +244,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.resolution_rules[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -270,7 +270,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.resolution_rules[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -296,7 +296,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.resolution_rules[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -322,7 +322,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.startup_preflight.requirements[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -348,7 +348,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.startup_preflight.requirements[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -394,7 +394,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.configuration_and_input_contract.startup_preflight.requirements[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -440,7 +440,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.case_and_development[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -490,7 +490,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.case_and_development[4]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -540,7 +540,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.case_and_development[5]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -590,7 +590,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.requirements.goals[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -645,7 +645,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.requirements.goals[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -671,7 +671,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.requirements.goals[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -715,7 +715,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.requirements.goals[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -793,7 +793,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.requirements.goals[4]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationContext
     entity_source: .sea/interaction/interaction-model.sea
@@ -846,7 +846,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.interactions[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -872,7 +872,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.interactions[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -916,7 +916,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.interactions[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -981,7 +981,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.interactions[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -1027,7 +1027,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1069,7 +1069,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1111,7 +1111,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1153,7 +1153,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1202,7 +1202,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[4]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1244,7 +1244,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[5]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1296,7 +1296,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[7]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1340,7 +1340,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[8]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1382,7 +1382,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[9]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1424,7 +1424,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[10]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1480,7 +1480,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[11]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1533,7 +1533,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[12]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1569,7 +1569,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.navigation_and_affordances[13]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: AffordanceAssessment
     entity_source: .sea/interaction/interaction-model.sea
@@ -1624,7 +1624,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.output_produced.requirements[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: OperationRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -1666,7 +1666,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.output_produced.requirements[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: OperationRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -1708,7 +1708,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.output_produced.requirements[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: OperationRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -1763,7 +1763,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.output_produced.requirements[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: OperationRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -1823,7 +1823,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -1883,7 +1883,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -1943,7 +1943,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -2003,7 +2003,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -2063,7 +2063,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[4]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -2135,7 +2135,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[5]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -2195,7 +2195,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.research_and_learning[6]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ExperimentRun
     entity_source: .sea/interaction/research-artifacts.sea
@@ -2255,7 +2255,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.failure_model_and_recovery.safe_failure_requirements[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -2316,7 +2316,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.failure_model_and_recovery.safe_failure_requirements[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -2352,7 +2352,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.failure_model_and_recovery.safe_failure_requirements[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -2386,7 +2386,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.failure_model_and_recovery.safe_failure_requirements[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -2475,7 +2475,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.failure_model_and_recovery.safe_failure_requirements[4]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationIntentRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -2528,7 +2528,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.security_safety_trust_boundaries.mandatory_requirements[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ObserverActor
     entity_source: .sea/interaction/interaction-model.sea
@@ -2574,7 +2574,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.security_safety_trust_boundaries.mandatory_requirements[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ObserverActor
     entity_source: .sea/interaction/interaction-model.sea
@@ -2605,7 +2605,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.security_safety_trust_boundaries.mandatory_requirements[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ObserverActor
     entity_source: .sea/interaction/interaction-model.sea
@@ -2636,7 +2636,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.security_safety_trust_boundaries.mandatory_requirements[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ObserverActor
     entity_source: .sea/interaction/interaction-model.sea
@@ -2713,7 +2713,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.security_safety_trust_boundaries.mandatory_requirements[4]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ObserverActor
     entity_source: .sea/interaction/interaction-model.sea
@@ -2755,11 +2755,11 @@ requirements:
   status: candidate
 - id: REQ-SEC-006
   title: REQ-SEC-006
-  statement: 'Initial conformance targets the local_operator profile: loopback-bound, per-launch secrets, operator identity from the OS session, and agent principals distinct from the human. shared_remote MUST NOT be enabled without a real identity provider at Cognate''s authenticate boundary; conformance claims MUST name their profile.'
+  statement: 'Initial conformance targets the local_operator profile: loopback-bound, per-launch secrets, operator identity from a configured, durable operator actor bound to a registered WebAuthn credential and mapped to a SEA-Forge actor (the OS account is diagnostic only), and agent principals distinct from the human. shared_remote MUST NOT be enabled without a real identity provider at Cognate''s authenticate boundary; conformance claims MUST name their profile.'
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.security_safety_trust_boundaries.mandatory_requirements[5]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: ObserverActor
     entity_source: .sea/interaction/interaction-model.sea
@@ -2833,7 +2833,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2888,7 +2888,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2914,7 +2914,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2960,7 +2960,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -2997,7 +2997,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[4]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -3044,7 +3044,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[5]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -3080,7 +3080,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[6]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -3136,7 +3136,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[7]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -3206,7 +3206,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[8]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -3252,7 +3252,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[9]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -3338,7 +3338,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[10]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -3396,7 +3396,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[11]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -3454,7 +3454,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[13]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -3512,7 +3512,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.integration[12]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: CognateHost
     entity_source: .sea/interaction/interaction-model.sea
@@ -3606,7 +3606,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3637,7 +3637,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3668,7 +3668,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3699,7 +3699,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3762,7 +3762,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[4]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3805,7 +3805,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[5]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3856,7 +3856,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[6]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3913,7 +3913,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.presentation_and_atomic_ui[7]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: SurfaceSpecRecord
     entity_source: .sea/interaction/interaction-model.sea
@@ -3944,7 +3944,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4011,7 +4011,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4078,7 +4078,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4145,7 +4145,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4212,7 +4212,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[4]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4253,7 +4253,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[5]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4304,7 +4304,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[6]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4368,7 +4368,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[7]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4409,7 +4409,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[8]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4502,7 +4502,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[9]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4569,7 +4569,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[10]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4610,7 +4610,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.operator_experience[11]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: NavigationFrame
     entity_source: .sea/interaction/interaction-model.sea
@@ -4684,7 +4684,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.outcome_verified.signals[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: InteractionInvariant
     entity_source: .sea/interaction/interaction-model.sea
@@ -4735,7 +4735,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.outcome_verified.signals[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: InteractionInvariant
     entity_source: .sea/interaction/interaction-model.sea
@@ -4821,7 +4821,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.outcome_verified.signals[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: InteractionInvariant
     entity_source: .sea/interaction/interaction-model.sea
@@ -4872,7 +4872,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.outcome_verified.signals[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: InteractionInvariant
     entity_source: .sea/interaction/interaction-model.sea
@@ -4928,7 +4928,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.outcome_contract.outcome_verified.signals[4]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: InteractionInvariant
     entity_source: .sea/interaction/interaction-model.sea
@@ -4998,7 +4998,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[0]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -5032,7 +5032,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[1]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -5066,7 +5066,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[2]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -5100,7 +5100,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[3]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -5155,7 +5155,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[4]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -5189,7 +5189,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[5]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -5223,7 +5223,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[6]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -5288,7 +5288,7 @@ requirements:
   source:
     file: .agents/specs/horizon.agent.spec.yaml
     section: $.core_behavior_requirements.world_navigation[7]
-    digest: sha256:d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907
+    digest: sha256:7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   semantic_binding:
     entity: WorldRevision
     entity_source: .sea/interaction/interaction-model.sea
@@ -5625,7 +5625,7 @@ acceptance_contracts:
   status: candidate
 - id: AC-SEC-006-01
   requirement: REQ-SEC-006
-  expected: 'Initial conformance targets the local_operator profile: loopback-bound, per-launch secrets, operator identity from the OS session, and agent principals distinct from the human. shared_remote is never observed to be enabled without a real identity provider at Cognate''s authenticate boundary. Conformance claims are observed to name their profile.'
+  expected: 'Initial conformance targets the local_operator profile: loopback-bound, per-launch secrets, operator identity from a configured, durable operator actor bound to a registered WebAuthn credential and mapped to a SEA-Forge actor (the OS account is diagnostic only), and agent principals distinct from the human. shared_remote is never observed to be enabled without a real identity provider at Cognate''s authenticate boundary. Conformance claims are observed to name their profile.'
   gate_command: *id060
   status: candidate
 - id: AC-STACK-001-01

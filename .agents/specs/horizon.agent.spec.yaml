@@ -7,7 +7,7 @@ metadata:
   id: HORIZON-001
   title: Horizon — observer-relative operational navigation environment
   status: frozen
-  version: "1.1.0"
+  version: "1.2.0"
   approval:
     approved_by: owner (GodSpeed AI)
     approved_on: "2026-10-19"
@@ -15,6 +15,7 @@ metadata:
     amendments:
       - { version: "1.0.1", approved_by: owner, approved_on: "2026-10-20", change: "adds REQ-CMP-001" }
       - { version: "1.1.0", approved_by: "owner (DEC-OWNER-2026-10-23-01) on an independent ACCEPT verdict (.agents/candidates/horizon/SPEC-CR-002/REVIEW.md)", approved_on: "2026-10-23", change: "SPEC-CR-002: payment entries and capacity (REQ-NAV-008..010), expected outcome and IS7 settlement of committed intents (REQ-NAV-011..013); resolves OQ-IDM-02" }
+      - { version: "1.2.0", approved_by: "owner (approved in session 2026-11-02: spec is stale, operator identity is configured, not the OS session)", approved_on: "2026-11-02", change: "REQ-SEC-006: operator identity is a configured durable actor bound to a WebAuthn credential and mapped to a SEA-Forge actor; the OS account is diagnostic only. Supersedes the local_operator OS-session wording." }
     freeze_rule: >-
       This file is immutable while frozen. Any change in meaning or acceptance requires a
       new version, explicit owner approval, a new SHA-256 and a plan rebind. The binding
@@ -1279,7 +1280,7 @@ security_safety_trust_boundaries:
     - { id: "REQ-SEC-003", text: "All untrusted source and UI strings MUST be schema-validated, scoped, and escaped; no arbitrary executable markup may be submitted." }
     - { id: "REQ-SEC-004", text: "Multi-user or remote deployments MUST NOT reuse Product Actualizer loopback-token trust assumptions unchanged." }
     - { id: "REQ-SEC-005", text: "Credential and private reference material MUST never be exposed through shared UI context, logs or evidence." }
-    - { id: "REQ-SEC-006", text: "Initial conformance targets the local_operator profile: loopback-bound, per-launch secrets, operator identity from the OS session, and agent principals distinct from the human. shared_remote MUST NOT be enabled without a real identity provider at Cognate's authenticate boundary; conformance claims MUST name their profile." }
+    - { id: "REQ-SEC-006", text: "Initial conformance targets the local_operator profile: loopback-bound, per-launch secrets, operator identity from a configured, durable operator actor bound to a registered WebAuthn credential and mapped to a SEA-Forge actor (the OS account is diagnostic only), and agent principals distinct from the human. shared_remote MUST NOT be enabled without a real identity provider at Cognate's authenticate boundary; conformance claims MUST name their profile." }
   deployment_profiles:
     local_operator: One owner on one machine; loopback transports; satisfies initial conformance.
     shared_remote: Multiple users or remote access; roadmap until a production identity provider is bound; Cognate's dev token authenticator is never acceptable.

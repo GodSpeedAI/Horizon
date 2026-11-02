@@ -15,7 +15,7 @@ semantic world → research probe → runtime → HTTP server.
 1. `createApplication()` (`src/app.ts:144`) loads `config/horizon.toml` via `loadConfig`
    (`src/config/load.ts`): strict field validation, profile allow-list (`local_operator`),
    loopback bind check, port bounds, per-launch secret written to `.cognate/`
-   (`writeLaunchSecret`), principals derived from the OS session (`operatorPrincipal`,
+   (`writeLaunchSecret`), principals derived from the configured operator actor (`operatorPrincipal`,
    `agentPrincipal`).
 2. The semantic adapter loads the canonical `.sea` world and asserts the pinned
    `world_ref` (`src/adapters/semantic.ts`) — a mismatch throws; startup aborts.
