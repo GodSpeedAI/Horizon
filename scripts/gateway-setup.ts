@@ -10,8 +10,10 @@
  *
  * Config: sea-forge-server reads `<SEA_FORGE_ROOT>/server.yaml`, so the gateway root IS the gateway state
  * directory. Its config files (server.yaml, policy.yaml) are root-owned 0640 inside it; the directory is
- * owned by the gateway with the sticky bit (1700), so the gateway can create its own state there but cannot
- * write, rename or delete a root-owned file. Runtime world identity and RealityTrace settings are the ones
+ * owned by the gateway at 0711 (the mode the gateway's own hardening enforces: traverse-only for others).
+ * The gateway can write its own state there, and it cannot write a root-owned file. It CAN replace one by
+ * rename or unlink, because a directory's owner may remove any entry in it, sticky or not. Config integrity
+ * against the gateway therefore rests on the file ownership and mode, not on the directory. Runtime world identity and RealityTrace settings are the ones
  * scripts/ignite.ts passes to the cockpit, read from config/horizon.toml and the semantic loader.
  */
 import { createHash } from "node:crypto";
@@ -188,8 +190,9 @@ export function buildPlan(l: GatewayLayout): PlanRow[] {
     ["dir", "root", "root", "0755", phys(l, l.binDir)],
     ...runtimeBinDirs.map((d) => ["dir", "root", "root", "0755", phys(l, d)]),
     ["dir", gw, sock, "0750", phys(l, l.socketDir)],
-    // Gateway root: owner gateway, sticky. Config files below are root-owned, so the gateway cannot unlink or rename them.
-    ["dir", gw, gw, "1700", phys(l, l.gatewayStateDir)],
+    // Gateway root: owner gateway, 0711 as the gateway's own hardening enforces. Config files below are root-owned 0640;
+    // the gateway can still replace them by rename (directory owner), which the sticky bit would not prevent.
+    ["dir", gw, gw, "711", phys(l, l.gatewayStateDir)],
     ["dir", gw, gw, "0700", phys(l, `${l.gatewayStateDir}/realitytrace/data`)],
     ["dir", gw, gw, "0700", phys(l, `${l.gatewayStateDir}/realitytrace/state`)],
     // Root-owned copy of the pinned world, read by the gateway through the socket group (cep_authority base).

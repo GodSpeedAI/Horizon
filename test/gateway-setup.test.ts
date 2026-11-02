@@ -182,9 +182,9 @@ describe("config lives under the gateway root (SEA_FORGE_ROOT)", () => {
   const gwDir = rows.find((r) => r[0] === "dir" && r[4] === `${root}${layout.gatewayStateDir}`);
   const configRows = rows.filter((r) => r[0] === "config-file");
 
-  test("the gateway root is the gateway state directory, owned by the gateway, sticky so root-owned files in it cannot be removed or renamed by the gateway", () => {
-    expect(gwDir?.slice(1, 4)).toEqual([FAKE.HORIZON_GATEWAY_ACCOUNT, FAKE.HORIZON_GATEWAY_ACCOUNT, "1700"]);
-    expect(Number.parseInt(gwDir![3]!, 8) & 0o1000).not.toBe(0);
+  test("the gateway root is the gateway state directory, owned by the gateway, at the 0711 the gateway's own hardening enforces", () => {
+    expect(gwDir?.slice(1, 4)).toEqual([FAKE.HORIZON_GATEWAY_ACCOUNT, FAKE.HORIZON_GATEWAY_ACCOUNT, "711"]);
+    expect(Number.parseInt(gwDir![3]!, 8)).toBe(0o711);
   });
 
   test("server.yaml and policy.yaml are root-owned, group socket, 0640, directly inside SEA_FORGE_ROOT", () => {

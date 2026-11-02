@@ -25,7 +25,7 @@
 #   account   gateway and runtime service accounts (system, nologin, no home), created if missing
 #   group     socket group; both service accounts are members; the operator is not
 #   dir       bin dirs root:root 0755; socket dir GATEWAY:socket 0750;
-#             gateway root (= SEA_FORGE_ROOT, holds server.yaml) GATEWAY:GATEWAY 1700 (sticky);
+#             gateway root (= SEA_FORGE_ROOT, holds server.yaml) GATEWAY:GATEWAY 711;
 #             runtime state RUNTIME:RUNTIME 0700
 #   bun       the owner runs this step: a Bun you already trust is copied to root:root 0755 at the runtime
 #             bun path after sha256 verification (--bun PATH --bun-sha256 HEX); nothing is downloaded
@@ -41,9 +41,11 @@
 #   generated status.json, and the two systemd units into the unit directory; a differing old file is kept as a sidecar
 #   socket    checked only; the server creates the socket
 #
-# Why the sticky gateway root: the gateway owns the directory, so it can create its own state, but with the
-# sticky bit it cannot unlink or rename a file it does not own. The config files are root-owned and 0640 (group
-# socket, read-only), so the gateway can read them and cannot change them.
+# The gateway root is 0711 (gateway-owned). The gateway's own hardening enforces this mode on every start, so the
+# installer expects it. The config files are root-owned and 0640 (group socket, read-only), so the gateway can read
+# them and cannot write them. It can still replace one by rename or unlink, because a directory's owner may remove
+# any entry in it; a sticky bit would not prevent that. Config integrity against the gateway rests on the file
+# ownership and mode.
 #
 # Installing the units does not start them. Start order and checks are printed by `just gateway-install`.
 #

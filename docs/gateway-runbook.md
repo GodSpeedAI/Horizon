@@ -104,7 +104,7 @@ RealityTrace is not installed by this setup. The runtime unit points at
 ## Expected check results after a complete apply
 
 - All accounts, group memberships, and root-owned directories are `ok`.
-- `/var/lib/godspeed-sea-forge` is `godspeed-sea-forge:godspeed-sea-forge 1700`.
+- `/var/lib/godspeed-sea-forge` is `godspeed-sea-forge:godspeed-sea-forge 711`. The gateway enforces this on every start. Its config files are root-owned, but the gateway can replace them by rename, since a directory owner may remove any entry in it.
 - `server.yaml`, `policy.yaml`, and `status.json` exist in `/var/lib/godspeed-sea-forge`, root:godspeed-sock, 0640.
 - `realitytrace/data` and `realitytrace/state` exist, gateway-owned, 0700.
 - The socket is reported once the gateway is running.
