@@ -7,6 +7,12 @@
  * The operator must be in neither group and must have no path to the socket or the deployed tree.
  * Every name and path comes from configuration (env), with product-name defaults; nothing is derived
  * from the launching user. `HORIZON_GATEWAY_ROOT` prefixes filesystem operations only, for tests.
+ *
+ * Config: sea-forge-server reads `<SEA_FORGE_ROOT>/server.yaml`, so the gateway root IS the gateway state
+ * directory. Its config files (server.yaml, policy.yaml) are root-owned 0640 inside it; the directory is
+ * owned by the gateway with the sticky bit (1700), so the gateway can create its own state there but cannot
+ * write, rename or delete a root-owned file. Runtime world identity and RealityTrace settings are the ones
+ * scripts/ignite.ts passes to the cockpit, read from config/horizon.toml and the semantic loader.
  */
 import { createHash } from "node:crypto";
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
@@ -22,8 +28,15 @@ export const UNIT_GATEWAY = `${PRODUCT}-sea-forge.service`;
 export const UNIT_RUNTIME = `${PRODUCT}-horizon.service`;
 /** Top-level entries of the repository that the deployed runtime tree needs. */
 export const RUNTIME_ENTRIES = ["src", "domain", "config", "package.json", "bun.lock", "tsconfig.json", "node_modules"];
+const WORLD_REF_RE = /^world:[a-z0-9-]+@sha256:[0-9a-f]{64}$/;
 
 export type Environment = "production" | "development";
+
+/** The pinned world (config/horizon.toml) and the cognate ref the runtime is given (as ignite.ts computes it). */
+export interface WorldIdentity {
+  pinned: string;
+  cognate: string;
+}
 
 /** Logical paths are as the system sees them; `root` is prepended only for filesystem operations. */
 export interface GatewayLayout {
@@ -35,7 +48,7 @@ export interface GatewayLayout {
   operatorAccount: string | null;
   socketDir: string;
   socketPath: string;
-  configDir: string;
+  /** Gateway root: SEA_FORGE_ROOT, holds server.yaml and policy.yaml (root-owned) and the gateway's own state. */
   gatewayStateDir: string;
   runtimeStateDir: string;
   binDir: string;
@@ -43,16 +56,22 @@ export interface GatewayLayout {
   runtimeTree: string;
   unitDir: string;
   bunPath: string;
+  realityTraceBin: string;
+  world: WorldIdentity;
 }
 
 /** One privileged step. Fields are tab-separated in plan.tsv; paths are physical (root applied). */
 export type PlanRow = string[];
 
 /** Explicit configuration: env overrides, product-name defaults. Nothing is derived from the launching user. */
-export function resolveLayout(env: Record<string, string | undefined>, options: { development?: boolean } = {}): GatewayLayout {
+export function resolveLayout(
+  env: Record<string, string | undefined>,
+  options: { development?: boolean; world: WorldIdentity },
+): GatewayLayout {
   const pick = (v: string | undefined) => (v?.trim() ? v.trim() : undefined);
   const socketDir = pick(env.HORIZON_GATEWAY_SOCKET_DIR) ?? `/run/${DEFAULT_GATEWAY_ACCOUNT}`;
   const binDir = pick(env.HORIZON_GATEWAY_BIN_DIR) ?? `/usr/local/lib/${DEFAULT_GATEWAY_ACCOUNT}/bin`;
+  const runtimeBinDir = `/usr/local/lib/${DEFAULT_RUNTIME_ACCOUNT}/bin`;
   return {
     root: (pick(env.HORIZON_GATEWAY_ROOT) ?? "").replace(/\/+$/, ""),
     environment: options.development ? "development" : "production",
@@ -62,15 +81,25 @@ export function resolveLayout(env: Record<string, string | undefined>, options: 
     operatorAccount: pick(env.HORIZON_OPERATOR_ACCOUNT) ?? null,
     socketDir,
     socketPath: pick(env.HORIZON_GATEWAY_SOCKET) ?? `${socketDir}/sea-forge.sock`,
-    configDir: pick(env.HORIZON_GATEWAY_CONFIG_DIR) ?? `/etc/${DEFAULT_GATEWAY_ACCOUNT}`,
     gatewayStateDir: pick(env.HORIZON_GATEWAY_STATE_DIR) ?? `/var/lib/${DEFAULT_GATEWAY_ACCOUNT}`,
     runtimeStateDir: pick(env.HORIZON_RUNTIME_STATE_DIR) ?? `/var/lib/${DEFAULT_RUNTIME_ACCOUNT}`,
     binDir,
     binPath: `${binDir}/sea-forge-server`,
     runtimeTree: pick(env.HORIZON_RUNTIME_TREE) ?? `/opt/${DEFAULT_RUNTIME_ACCOUNT}`,
     unitDir: pick(env.HORIZON_UNIT_DIR) ?? "/etc/systemd/system",
-    bunPath: pick(env.HORIZON_BUN_PATH) ?? "/usr/local/bin/bun",
+    bunPath: pick(env.HORIZON_BUN_PATH) ?? `${runtimeBinDir}/bun`,
+    realityTraceBin: pick(env.HORIZON_REALITYTRACE_BIN) ?? `${runtimeBinDir}/realitytrace`,
+    world: options.world,
   };
+}
+
+/** Read the pinned world_ref from config/horizon.toml, then ask the semantic loader for the cognate ref ignite passes. */
+export async function worldIdentity(repo: string): Promise<WorldIdentity> {
+  const config = Bun.TOML.parse(readFileSync(join(repo, "config", "horizon.toml"), "utf8")) as { world_ref?: unknown };
+  if (typeof config.world_ref !== "string") throw new Error("config/horizon.toml has no world_ref");
+  const { loadWorld } = await import("../src/adapters/semantic.ts");
+  const loaded = loadWorld(config.world_ref, join(repo, "domain"));
+  return { pinned: config.world_ref, cognate: loaded.cognateWorldRef };
 }
 
 const ACCOUNT_RE = /^[a-z_][a-z0-9_-]{0,31}$/;
@@ -92,16 +121,18 @@ export function validateLayout(l: GatewayLayout): string[] {
     errors.push(`operator account '${l.operatorAccount}' must not be the gateway, the runtime, or in the socket group`);
   }
   if (l.root !== "" && (!isAbsolute(l.root) || BAD_PATH_CHARS.test(l.root))) errors.push(`HORIZON_GATEWAY_ROOT '${l.root}' must be an absolute path without spaces`);
+  if (!WORLD_REF_RE.test(l.world.pinned)) errors.push(`pinned world_ref '${l.world.pinned}' must be world:<name>@sha256:<64 hex>`);
+  if (!WORLD_REF_RE.test(l.world.cognate)) errors.push(`cognate world ref '${l.world.cognate}' must be world:<name>@sha256:<64 hex>`);
   const paths: [string, string][] = [
     ["socket directory", l.socketDir],
     ["socket path", l.socketPath],
-    ["config directory", l.configDir],
     ["gateway state directory", l.gatewayStateDir],
     ["runtime state directory", l.runtimeStateDir],
     ["binary directory", l.binDir],
     ["runtime tree", l.runtimeTree],
     ["unit directory", l.unitDir],
     ["bun", l.bunPath],
+    ["RealityTrace binary", l.realityTraceBin],
   ];
   for (const [label, p] of paths) {
     if (!isAbsolute(p)) errors.push(`${label} '${p}' must be absolute`);
@@ -110,10 +141,15 @@ export function validateLayout(l: GatewayLayout): string[] {
   }
   if (!l.socketPath.startsWith(`${l.socketDir}/`)) errors.push("the socket path must be inside the socket directory");
   if (inside(l.runtimeTree, l.runtimeStateDir) || inside(l.runtimeStateDir, l.runtimeTree)) errors.push("the runtime tree and its state directory must not overlap");
-  if (inside(l.runtimeTree, l.configDir) || inside(l.runtimeTree, l.socketDir)) errors.push("the runtime tree must not sit inside the socket or config directory");
-  if (/^\/(home|root)(\/|$)/.test(l.bunPath)) errors.push(`bun '${l.bunPath}' is under /home or /root; the runtime unit uses ProtectHome=yes, so install bun outside them`);
-  const stateDirs = [l.socketDir, l.configDir, l.gatewayStateDir, l.runtimeStateDir, l.binDir];
-  if (new Set(stateDirs).size !== stateDirs.length) errors.push("socket, config, state and binary directories must be distinct");
+  if (inside(l.runtimeTree, l.gatewayStateDir) || inside(l.runtimeTree, l.socketDir)) errors.push("the runtime tree must not sit inside the socket or gateway state directory");
+  for (const [label, p] of [
+    ["bun", l.bunPath],
+    ["RealityTrace binary", l.realityTraceBin],
+  ] as const) {
+    if (/^\/(home|root)(\/|$)/.test(p)) errors.push(`${label} '${p}' is under /home or /root; the runtime unit uses ProtectHome=yes, so install it outside them`);
+  }
+  const stateDirs = [l.socketDir, l.gatewayStateDir, l.runtimeStateDir, l.binDir];
+  if (new Set(stateDirs).size !== stateDirs.length) errors.push("socket, gateway state and binary directories must be distinct");
   return errors;
 }
 
@@ -124,6 +160,7 @@ export function buildPlan(l: GatewayLayout): PlanRow[] {
   const sock = l.socketGroup;
   const gw = l.gatewayAccount;
   const rt = l.runtimeAccount;
+  const runtimeBinDirs = [...new Set([dirname(l.bunPath), dirname(l.realityTraceBin)])];
   const rows: PlanRow[] = [
     ["account", gw, "gateway"],
     ["account", rt, "runtime"],
@@ -132,16 +169,18 @@ export function buildPlan(l: GatewayLayout): PlanRow[] {
     ["member", rt, sock],
     ["dir", "root", "root", "0755", phys(l, dirname(l.binDir))],
     ["dir", "root", "root", "0755", phys(l, l.binDir)],
+    ...runtimeBinDirs.map((d) => ["dir", "root", "root", "0755", phys(l, d)]),
     ["dir", gw, sock, "0750", phys(l, l.socketDir)],
-    ["dir", "root", sock, "0750", phys(l, l.configDir)],
-    ["dir", gw, gw, "0700", phys(l, l.gatewayStateDir)],
+    // Gateway root: owner gateway, sticky. Config files below are root-owned, so the gateway cannot unlink or rename them.
+    ["dir", gw, gw, "1700", phys(l, l.gatewayStateDir)],
     ["dir", rt, rt, "0700", phys(l, l.runtimeStateDir)],
-    ["require-exec", phys(l, l.bunPath)],
+    ["place-bun", "root", "root", "0755", phys(l, l.bunPath)],
+    ["optional-exec", phys(l, l.realityTraceBin)],
     ["place-binary", "root", "root", "0755", phys(l, l.binPath)],
     ["deploy-tree", "root", "root", phys(l, l.runtimeTree)],
-    ["fixmode", "root", sock, "0640", phys(l, `${l.configDir}/server.yaml`)],
-    ["fixmode", "root", sock, "0640", phys(l, `${l.configDir}/policy.yaml`)],
-    ["generated", "root", sock, "0640", "status.json", phys(l, `${l.configDir}/status.json`)],
+    ["config-file", "root", sock, "0640", phys(l, `${l.gatewayStateDir}/server.yaml`)],
+    ["config-file", "root", sock, "0640", phys(l, `${l.gatewayStateDir}/policy.yaml`)],
+    ["generated", "root", sock, "0640", "status.json", phys(l, `${l.gatewayStateDir}/status.json`)],
     ["generated", "root", "root", "0644", `units/${UNIT_GATEWAY}`, phys(l, `${l.unitDir}/${UNIT_GATEWAY}`)],
     ["generated", "root", "root", "0644", `units/${UNIT_RUNTIME}`, phys(l, `${l.unitDir}/${UNIT_RUNTIME}`)],
     ["socket", phys(l, l.socketPath)],
@@ -153,7 +192,7 @@ export function renderPlanTsv(rows: PlanRow[]): string {
   return `${rows.map((r) => r.join("\t")).join("\n")}\n`;
 }
 
-/** Systemd units. Accounts, paths and the bun binary come from the layout; nothing is hardcoded. */
+/** Systemd units. Accounts, paths, the bun copy and the world identity come from the layout; nothing is hardcoded. */
 export function unitFiles(l: GatewayLayout): Record<string, string> {
   const sock = l.socketGroup;
   const gateway = [
@@ -171,7 +210,6 @@ export function unitFiles(l: GatewayLayout): Record<string, string> {
     `WorkingDirectory=${l.gatewayStateDir}`,
     `Environment=SEA_FORGE_ROOT=${l.gatewayStateDir}`,
     `Environment=SEA_FORGE_SOCKET=${l.socketPath}`,
-    `Environment=SEA_FORGE_CONFIG_DIR=${l.configDir}`,
     "UMask=0007",
     "Restart=on-failure",
     "NoNewPrivileges=yes",
@@ -204,6 +242,10 @@ export function unitFiles(l: GatewayLayout): Record<string, string> {
     "Environment=COGNATE_GOVERNANCE=sea-forge",
     `Environment=COGNATE_SEA_FORGE_SOCKET=${l.socketPath}`,
     "Environment=COGNATE_SEA_FORGE_OPERATOR=operator",
+    `Environment=COGNATE_WORLD_REF=${l.world.cognate}`,
+    `Environment=COGNATE_REALITYTRACE_BIN=${l.realityTraceBin}`,
+    `Environment=COGNATE_REALITYTRACE_DATA_HOME=${l.runtimeStateDir}/realitytrace/data`,
+    `Environment=COGNATE_REALITYTRACE_STATE_HOME=${l.runtimeStateDir}/realitytrace/state`,
     "UMask=0027",
     "Restart=on-failure",
     "NoNewPrivileges=yes",
@@ -338,7 +380,7 @@ export function defaultStageDir(env: Record<string, string | undefined> = proces
   return env.HORIZON_GATEWAY_STAGE?.trim() || join(env.XDG_CACHE_HOME?.trim() || join(homedir(), ".cache"), PRODUCT, "gateway-stage");
 }
 
-function stage(args: string[]): number {
+async function stage(args: string[]): Promise<number> {
   const flag = (name: string) => {
     const i = args.indexOf(name);
     return i >= 0 ? args[i + 1] : undefined;
@@ -346,7 +388,14 @@ function stage(args: string[]): number {
   const stageDir = resolve(flag("--stage") ?? defaultStageDir());
   const repo = resolve(flag("--repo") ?? join(dirname(fileURLToPath(import.meta.url)), ".."));
   const development = args.includes("--development");
-  const layout = resolveLayout(process.env, { development });
+  let world: WorldIdentity;
+  try {
+    world = await worldIdentity(repo);
+  } catch (error) {
+    console.error(`gateway-stage: cannot establish the world identity: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
+  const layout = resolveLayout(process.env, { development, world });
   const errors = validateLayout(layout);
   if (errors.length > 0) {
     for (const e of errors) console.error(`gateway-stage: ${e}`);
@@ -363,14 +412,18 @@ function stage(args: string[]): number {
   console.log(`gateway-stage: ${layout.environment} bundle in ${stageDir}`);
   console.log(`  runtime tree: ${result.files.length} files hashed, ${result.symlinks} symlinks copied, ${result.excluded.length} excluded`);
   for (const e of result.excluded.slice(0, 20)) console.log(`    excluded ${e}`);
+  console.log(`  world: pinned ${world.pinned.slice(0, 22)}..., cognate ref carried by the runtime unit`);
   console.log(`  bundle digest: ${stageDigest(stageDir)}`);
-  console.log("next (privileged, you run it): see `just gateway-install <sea-forge-server path> <sha256>`");
+  console.log("next (privileged, you run it): see `just gateway-install <sea-forge-server> <sha256> <bun> <bun-sha256>`");
   return 0;
 }
 
 if (import.meta.main) {
   const [cmd, ...rest] = process.argv.slice(2);
-  if (cmd === "stage") process.exit(stage(rest));
-  console.error("usage: bun run scripts/gateway-setup.ts stage [--stage DIR] [--repo DIR] [--development]");
-  process.exit(2);
+  if (cmd === "stage") {
+    stage(rest).then((code) => process.exit(code));
+  } else {
+    console.error("usage: bun run scripts/gateway-setup.ts stage [--stage DIR] [--repo DIR] [--development]");
+    process.exit(2);
+  }
 }

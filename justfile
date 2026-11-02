@@ -257,9 +257,10 @@ gateway-plan *args:
     bun run scripts/gateway-setup.ts stage {{args}}
     scripts/install-sea-forge-gateway.sh --dry-run
 
-# gateway-install BINARY SHA256: dry run with the server binary verified, then prints the exact sudo command.
-gateway-install binary="" sha256="":
-    scripts/install-sea-forge-gateway.sh --dry-run --binary "{{binary}}" --sha256 "{{sha256}}"
+# gateway-install BINARY SHA256 BUN BUN_SHA256: dry run with the server binary and the runtime's bun verified (bun is
+# copied to a root-owned path by the owner's sudo step; nothing is downloaded), then prints the exact sudo command.
+gateway-install binary="" sha256="" bun="" bun_sha256="":
+    scripts/install-sea-forge-gateway.sh --dry-run --binary "{{binary}}" --sha256 "{{sha256}}" --bun "{{bun}}" --bun-sha256 "{{bun_sha256}}"
     @echo "Then start the services (as you): sudo systemctl daemon-reload && sudo systemctl enable --now godspeed-sea-forge.service godspeed-horizon.service"
 
 # gateway-check: read-only ownership, mode, membership and socket-access check. Expects the agent to be denied the socket.

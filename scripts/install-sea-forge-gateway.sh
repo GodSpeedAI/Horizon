@@ -13,7 +13,8 @@
 #
 # Usage:
 #   install-sea-forge-gateway.sh [--dry-run] [--check] [--stage DIR]
-#       [--authorize-privileged --binary PATH --sha256 HEX --expect-stage-sha256 HEX [--replace-binary]]
+#       [--authorize-privileged --binary PATH --sha256 HEX --bun PATH --bun-sha256 HEX
+#        --expect-stage-sha256 HEX [--replace-binary]]
 #
 # Environment (defaults are product names; nothing is derived from the current user):
 #   HORIZON_GATEWAY_STAGE   staging bundle directory (~/.cache/godspeed/gateway-stage); --stage overrides
@@ -23,14 +24,23 @@
 # Privileged plan (what --authorize-privileged does, in order):
 #   account   gateway and runtime service accounts (system, nologin, no home), created if missing
 #   group     socket group; both service accounts are members; the operator is not
-#   dir       bin dir root:root 0755; socket dir GATEWAY:socket 0750; config dir root:socket 0750;
-#             gateway state GATEWAY:GATEWAY 0700; runtime state RUNTIME:RUNTIME 0700
+#   dir       bin dirs root:root 0755; socket dir GATEWAY:socket 0750;
+#             gateway root (= SEA_FORGE_ROOT, holds server.yaml) GATEWAY:GATEWAY 1700 (sticky);
+#             runtime state RUNTIME:RUNTIME 0700
+#   bun       the owner runs this step: a Bun you already trust is copied to root:root 0755 at the runtime
+#             bun path after sha256 verification (--bun PATH --bun-sha256 HEX); nothing is downloaded
 #   place     sea-forge-server copied root:root 0755 after sha256 verification (refused on mismatch;
 #             an existing different binary is refused unless --replace-binary, which keeps it as a sidecar)
+#   realitytrace  reported only: the runtime unit points at this binary; place a root-owned copy there yourself
 #   deploy    runtime tree copied root:root (dirs 0755, files 0644), manifest verified, previous tree kept as a sidecar
-#   fixmode   server.yaml and policy.yaml root:socket 0640 when present (never created or rewritten here)
+#   config    server.yaml and policy.yaml must be placed by the owner as root:socket 0640 inside the gateway root.
+#             The installer never creates or rewrites them; a missing file makes the apply exit 1 (not ready).
 #   generated status.json, and the two systemd units into the unit directory; a differing old file is kept as a sidecar
 #   socket    checked only; the server creates the socket
+#
+# Why the sticky gateway root: the gateway owns the directory, so it can create its own state, but with the
+# sticky bit it cannot unlink or rename a file it does not own. The config files are root-owned and 0640 (group
+# socket, read-only), so the gateway can read them and cannot change them.
 #
 # Installing the units does not start them. Start order and checks are printed by `just gateway-install`.
 #
@@ -51,8 +61,11 @@ CHECK=0
 STAGE="${HORIZON_GATEWAY_STAGE:-${XDG_CACHE_HOME:-$HOME/.cache}/$PRODUCT/gateway-stage}"
 BINARY=""
 SHA256=""
+BUN_BINARY=""
+BUN_SHA256=""
 EXPECT_STAGE=""
 REPLACE_BINARY=0
+NOT_READY=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -62,6 +75,8 @@ while [ $# -gt 0 ]; do
     --stage) STAGE="${2:?--stage needs a directory}"; shift ;;
     --binary) BINARY="${2:?--binary needs a path}"; shift ;;
     --sha256) SHA256="${2:?--sha256 needs a hex digest}"; shift ;;
+    --bun) BUN_BINARY="${2:?--bun needs a path}"; shift ;;
+    --bun-sha256) BUN_SHA256="${2:?--bun-sha256 needs a hex digest}"; shift ;;
     --expect-stage-sha256) EXPECT_STAGE="${2:?--expect-stage-sha256 needs a hex digest}"; shift ;;
     --replace-binary) REPLACE_BINARY=1 ;;
     -h|--help) sed -n '2,/^set -euo/p' "$0" | sed '$d'; exit 0 ;;
@@ -111,15 +126,48 @@ if [ -n "$BINARY" ]; then
   BINARY_NOTE="$BINARY verified sha256 $ACTUAL"
 fi
 
+# The runtime's bun: a copy the owner supplies and verifies; never downloaded here.
+BUN_NOTE="not given (pass --bun PATH --bun-sha256 HEX; the owner runs this step)"
+if [ -n "$BUN_BINARY" ]; then
+  [ -f "$BUN_BINARY" ] || refuse "bun $BUN_BINARY does not exist"
+  [ -n "$BUN_SHA256" ] || refuse "--bun-sha256 is required with --bun"
+  BUN_SHA256="$(printf '%s' "$BUN_SHA256" | tr 'A-F' 'a-f')"
+  BUN_ACTUAL="$(sha256sum "$BUN_BINARY" | cut -d' ' -f1)"
+  if [ "$BUN_ACTUAL" != "$BUN_SHA256" ]; then
+    refuse "sha256 of bun $BUN_BINARY is $BUN_ACTUAL, expected $BUN_SHA256; not copied"
+  fi
+  BUN_NOTE="$BUN_BINARY verified sha256 $BUN_ACTUAL"
+fi
+
 # ---- execution helpers ------------------------------------------------------------------------------
-# Decide binary placement; mirrors decideBinaryPlacement() in scripts/gateway-setup.ts.
-decide_binary() {
-  local dest="$1" existing=""
+# Decide file placement; mirrors decideBinaryPlacement() in scripts/gateway-setup.ts.
+decide_file() {
+  local dest="$1" want="$2" existing=""
   [ -e "$dest" ] && existing="$(sha256sum "$dest" | cut -d' ' -f1)"
   if [ -z "$existing" ]; then echo install
-  elif [ "$existing" = "$SHA256" ]; then echo keep
+  elif [ "$existing" = "$want" ]; then echo keep
   elif [ "$REPLACE_BINARY" = 1 ]; then echo replace
   else echo refuse
+  fi
+}
+
+# place_file LABEL SRC SHA OWNER GROUP MODE DEST: copy SRC to DEST only when SHA matches its content.
+place_file() {
+  local label="$1" src="$2" want="$3" owner="$4" group="$5" mode="$6" dest="$7" action
+  action="$(decide_file "$dest" "$want")"
+  case "$action" in
+    install) say "$label $dest: install $owner:$group $mode after sha256 check" ;;
+    keep) say "$label $dest: identical, kept (mode and owner corrected)" ;;
+    replace) say "$label $dest: different; old copy kept as $dest.replaced-$TS (requires --replace-binary)" ;;
+    refuse) say "$label $dest: differs from $want; refusing (pass --replace-binary to replace, old kept as a sidecar)" ;;
+  esac
+  if [ "$APPLY" = 1 ]; then
+    case "$action" in
+      install) install -o "$owner" -g "$group" -m "$mode" "$src" "$dest" ;;
+      keep) chown "$owner:$group" "$dest"; chmod "$mode" "$dest" ;;
+      replace) mv "$dest" "$dest.replaced-$TS"; install -o "$owner" -g "$group" -m "$mode" "$src" "$dest" ;;
+      refuse) refuse "$label $dest differs; pass --replace-binary" ;;
+    esac
   fi
 }
 
@@ -151,31 +199,31 @@ row_dir() {
   if [ "$APPLY" = 1 ]; then install -d -o "$owner" -g "$group" -m "$mode" "$path"; fi
 }
 
-row_require_exec() {
+row_place_bun() {
+  local owner="$1" group="$2" mode="$3" dest="$4"
+  if [ -z "$BUN_BINARY" ]; then
+    say "bun $dest: copy a Bun you already trust to root:root 0755 here (owner runs this step; no network install); pass --bun PATH --bun-sha256 HEX"
+    if [ "$APPLY" = 1 ]; then refuse "no bun given: pass --bun PATH --bun-sha256 HEX"; fi
+    return
+  fi
+  say "bun: owner runs this step; the copy is verified, never downloaded"
+  place_file bun "$BUN_BINARY" "$BUN_SHA256" "$owner" "$group" "$mode" "$dest"
+}
+
+row_optional_exec() {
   local path="$1"
-  if [ -x "$path" ]; then say "bun $path: present"; return; fi
-  say "bun $path: MISSING (the runtime unit cannot start without it)"
-  if [ "$APPLY" = 1 ]; then refuse "bun is not executable at $path"; fi
+  if [ -x "$path" ]; then say "realitytrace $path: present (the runtime unit points at it)"; return; fi
+  say "realitytrace $path: absent; the runtime unit points at it. Place a root-owned copy there yourself if you use RealityTrace (not installed here)"
 }
 
 row_place_binary() {
-  local owner="$1" group="$2" mode="$3" dest="$4" action
-  action="$(decide_binary "$dest")"
-  case "$action" in
-    install) say "binary $dest: install $owner:$group $mode after sha256 check" ;;
-    keep) say "binary $dest: identical, kept (mode and owner corrected)" ;;
-    replace) say "binary $dest: different; old copy kept as $dest.replaced-$TS (requires --replace-binary)" ;;
-    refuse) say "binary $dest: differs from $SHA256; refusing (pass --replace-binary to replace, old kept as a sidecar)" ;;
-  esac
-  if [ "$APPLY" = 1 ]; then
-    [ -n "$BINARY" ] || refuse "no binary given: pass --binary PATH --sha256 HEX"
-    case "$action" in
-      install) install -o "$owner" -g "$group" -m "$mode" "$BINARY" "$dest" ;;
-      keep) chown "$owner:$group" "$dest"; chmod "$mode" "$dest" ;;
-      replace) mv "$dest" "$dest.replaced-$TS"; install -o "$owner" -g "$group" -m "$mode" "$BINARY" "$dest" ;;
-      refuse) refuse "binary $dest differs; pass --replace-binary" ;;
-    esac
+  local owner="$1" group="$2" mode="$3" dest="$4"
+  if [ -z "$BINARY" ]; then
+    say "binary $dest: no binary given (pass --binary PATH --sha256 HEX)"
+    if [ "$APPLY" = 1 ]; then refuse "no binary given: pass --binary PATH --sha256 HEX"; fi
+    return
   fi
+  place_file binary "$BINARY" "$SHA256" "$owner" "$group" "$mode" "$dest"
 }
 
 row_deploy_tree() {
@@ -198,10 +246,14 @@ row_deploy_tree() {
   fi
 }
 
-row_fixmode() {
+row_config_file() {
   local owner="$1" group="$2" mode="$3" path="$4"
-  if [ ! -e "$path" ]; then say "file $path: absent, not created by this installer"; return; fi
-  say "file $path: $owner:$group $mode"
+  if [ ! -e "$path" ]; then
+    say "config $path: MISSING; the owner places this root-owned file here, then reruns --authorize-privileged"
+    NOT_READY=$((NOT_READY+1))
+    return
+  fi
+  say "config $path: $owner:$group $mode"
   if [ "$APPLY" = 1 ]; then chown "$owner:$group" "$path"; chmod "$mode" "$path"; fi
 }
 
@@ -248,13 +300,14 @@ run_check() {
     case "${F[0]}" in
       account) id -u "${F[1]}" >/dev/null 2>&1 && echo "  ok      account ${F[1]} exists" || { fails=$((fails+1)); echo "  MISSING account ${F[1]}"; } ;;
       member) id -nG "${F[1]}" 2>/dev/null | tr ' ' '\n' | grep -qx "${F[2]}" && echo "  ok      ${F[1]} in ${F[2]}" || { fails=$((fails+1)); echo "  MISSING ${F[1]} not in ${F[2]}"; } ;;
-      dir|fixmode|generated|place-binary)
+      dir|config-file|generated|place-binary|place-bun)
         case "${F[0]}" in
           dir) check_row_stat "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" || fails=$((fails+1)) ;;
-          fixmode) [ -e "${F[4]}" ] && { check_row_stat "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" || fails=$((fails+1)); } ;;
+          config-file) check_row_stat "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" || fails=$((fails+1)) ;;
           generated) check_row_stat "${F[1]}" "${F[2]}" "${F[3]}" "${F[5]}" || fails=$((fails+1)) ;;
-          place-binary) check_row_stat "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" || fails=$((fails+1)) ;;
+          place-binary|place-bun) check_row_stat "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" || fails=$((fails+1)) ;;
         esac ;;
+      optional-exec) [ -x "${F[1]}" ] && echo "  ok      ${F[1]} present" || echo "  note    ${F[1]} absent (RealityTrace not installed by this installer)" ;;
       deploy-tree)
         if (cd "${F[3]}" 2>/dev/null && sha256sum -c --quiet "${F[3]}.manifest.sha256" 2>/dev/null); then
           echo "  ok      runtime tree ${F[3]} matches its manifest"
@@ -284,10 +337,11 @@ run_plan() {
       group) row_group "${F[1]}" ;;
       member) row_member "${F[1]}" "${F[2]}" ;;
       dir) row_dir "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" ;;
-      require-exec) row_require_exec "${F[1]}" ;;
+      place-bun) row_place_bun "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" ;;
+      optional-exec) row_optional_exec "${F[1]}" ;;
       place-binary) row_place_binary "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" ;;
       deploy-tree) row_deploy_tree "${F[1]}" "${F[2]}" "${F[3]}" ;;
-      fixmode) row_fixmode "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" ;;
+      config-file) row_config_file "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" ;;
       generated) row_generated "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" "${F[5]}" ;;
       socket) say "socket ${F[1]}: created by the gateway service, checked by --check" ;;
       *) refuse "unknown plan step '${F[0]}'" ;;
@@ -305,12 +359,14 @@ echo "SEA-Forge gateway setup (mode: $MODE)"
 echo "stage: $STAGE"
 echo "stage digest: $STAGE_DIGEST"
 echo "binary: $BINARY_NOTE"
+echo "bun: $BUN_NOTE"
 echo "privileged plan:"
 
 if [ "$APPLY" = 1 ]; then
   [ "$(id -u)" = 0 ] || refuse "--authorize-privileged must run as root (sudo)"
   [ "$EXPECT_STAGE" = "$STAGE_DIGEST" ] || refuse "--expect-stage-sha256 does not match the staged bundle digest $STAGE_DIGEST; review the plan and pass that digest"
   [ -n "$BINARY" ] || refuse "--binary and --sha256 are required with --authorize-privileged"
+  [ -n "$BUN_BINARY" ] || refuse "--bun and --bun-sha256 are required with --authorize-privileged"
   # The operator who ran sudo must not become a gateway, runtime or socket-group member.
   invoker="${SUDO_USER:-root}"
   if [ "$invoker" != root ] && id -u "$invoker" >/dev/null 2>&1; then
@@ -324,10 +380,16 @@ fi
 run_plan
 
 if [ "$APPLY" = 1 ]; then
+  if [ "$NOT_READY" -gt 0 ]; then
+    echo "installed, NOT READY: $NOT_READY config file(s) missing in the gateway root (server.yaml, policy.yaml)."
+    echo "place them as root, group = the socket group in plan.tsv, mode 0640, inside the gateway root; then rerun the same --authorize-privileged command."
+    exit 1
+  fi
   echo "done. Units are installed, not started. Next: sudo systemctl daemon-reload, then start the gateway, then the runtime."
   exit 0
 fi
 
 echo "no changes made."
-echo "to apply, as root (sudo asks for your password):"
-echo "  sudo $0 --authorize-privileged --stage $STAGE --binary ${BINARY:-<path to sea-forge-server>} --sha256 ${SHA256:-<sha256>} --expect-stage-sha256 $STAGE_DIGEST"
+echo "to apply, as root (sudo asks for your password; the owner runs this, including the bun step):"
+echo "  sudo $0 --authorize-privileged --stage $STAGE --binary ${BINARY:-<path to sea-forge-server>} --sha256 ${SHA256:-<sha256>} --bun ${BUN_BINARY:-<path to a trusted bun>} --bun-sha256 ${BUN_SHA256:-<sha256 of bun>} --expect-stage-sha256 $STAGE_DIGEST"
+echo "the gateway also needs root-owned server.yaml and policy.yaml in its root before it starts (checked by --check)."
