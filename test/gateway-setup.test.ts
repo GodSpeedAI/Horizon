@@ -9,8 +9,15 @@ import {
   DEFAULT_SOCKET_GROUP,
   UNIT_GATEWAY,
   UNIT_RUNTIME,
+  UID_PLACEHOLDER,
   buildPlan,
   decideBinaryPlacement,
+  navigationCommitId,
+  renderPolicyYaml,
+  renderServerYaml,
+  serverConfig,
+  validateServerConfig,
+  worldFiles,
   excludeReason,
   renderPlanTsv,
   resolveLayout,
@@ -22,7 +29,7 @@ import {
   type GatewayLayout,
   type WorldIdentity,
 } from "../scripts/gateway-setup.ts";
-import { sidecarName } from "../scripts/gateway-identity.ts";
+import { planConfigWrite, sidecarName } from "../scripts/gateway-identity.ts";
 
 const repoRoot = resolve(import.meta.dir, "..");
 const scratch: string[] = [];
@@ -402,11 +409,127 @@ describe("installer (shell) against a temporary root", () => {
     for (const f of ["plan.tsv", "runtime-manifest.sha256", "status.json"]) writeFileSync(join(copy, f), readFileSync(join(stage, f)));
     mkdirSync(join(copy, "units"));
     for (const f of readdirSync(join(stage, "units"))) writeFileSync(join(copy, "units", f), readFileSync(join(stage, "units", f)));
+    mkdirSync(join(copy, "config"));
+    for (const f of ["server.yaml.in", "policy.yaml"]) writeFileSync(join(copy, "config", f), readFileSync(join(stage, "config", f)));
     const { cpSync } = await import("node:fs");
     cpSync(join(stage, "runtime"), join(copy, "runtime"), { recursive: true });
     writeFileSync(join(copy, "runtime", "package.json"), "{\"evil\":true}\n");
     const r = await run(["--dry-run", "--stage", copy, "--binary", bin, "--sha256", sha]);
     expect(r.code).toBe(1);
     expect(r.err).toContain("does not match its manifest");
+  });
+});
+
+describe("server.yaml and policy.yaml (rendered from the runtime account's uid, never a constant)", () => {
+  const root = "/tmp/gateway-server-fixture";
+  const layout = layoutFor(root);
+  const files = worldFiles(join(repoRoot, "domain"));
+  const render = (uid: number | typeof UID_PLACEHOLDER) => renderServerYaml(serverConfig(layout, files, uid));
+
+  test("the rendered file carries the uid given as input, in both the binding and the gateway", () => {
+    for (const uid of [4242, 5151]) {
+      const cfg = JSON.parse(render(uid));
+      expect(cfg.identity.bindings[0]).toEqual({ uid, actor_id: "cognate-service", roles: ["service"] });
+      expect(cfg.gateway.uid).toBe(uid);
+      expect(render(uid)).not.toContain(`"uid": ${uid === 4242 ? 5151 : 4242}`);
+    }
+  });
+
+  test("the staged template, with the placeholder replaced the way the installer's sed does, equals the TypeScript render", () => {
+    const template = render(UID_PLACEHOLDER);
+    expect(template).toContain(`"${UID_PLACEHOLDER}"`);
+    const sed = Bun.spawnSync(["sed", `s/"${UID_PLACEHOLDER}"/4242/g`], { stdin: Buffer.from(template) });
+    expect(sed.stdout.toString()).toBe(render(4242));
+  });
+
+  test("the operator is bound with its role and no uid; only the operator is delegable", () => {
+    const cfg = JSON.parse(render(4242));
+    expect(cfg.identity.bindings[1]).toEqual({ actor_id: "operator", roles: ["operator"] });
+    expect("uid" in cfg.identity.bindings[1]).toBe(false);
+    expect(cfg.gateway.delegable_actors).toEqual(["operator"]);
+    expect(cfg.gateway.actor).toBe("cognate-service");
+    expect(validateServerConfig(serverConfig(layout, files, 4242))).toEqual([]);
+  });
+
+  test("the file never contains the test runner's own uid, the username, or ignite's unbound sentinel", () => {
+    const text = render(4242);
+    const own = process.getuid?.();
+    if (own !== undefined && own !== 4242) expect(text).not.toContain(`"uid": ${own}`);
+    expect(text).not.toContain(userInfo().username);
+    expect(text).not.toContain("4294967000");
+  });
+
+  test("keys match the ones scripts/ignite.ts writes for a cell", () => {
+    const ignite = readFileSync(join(repoRoot, "scripts", "ignite.ts"), "utf8");
+    const keys = new Set<string>();
+    const walk = (v: unknown) => {
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) { keys.add(k); walk(x); }
+    };
+    walk(JSON.parse(render(4242)));
+    for (const k of keys) expect(ignite.includes(`${k}:`) || ignite.includes(`${k},`) || ignite.includes(`${k} `)).toBe(true);
+  });
+
+  test("validation refuses a duplicate uid, a uid on the operator, an unbound or duplicate delegable actor, the gateway as delegable, and root", () => {
+    const base = () => JSON.parse(render(4242)) as ReturnType<typeof serverConfig>;
+    const dupUid = base();
+    dupUid.identity.bindings[1]!.uid = 4242;
+    expect(validateServerConfig(dupUid).join("|")).toMatch(/more than one actor/);
+    const opUid = base();
+    opUid.identity.bindings[1]!.uid = 5151;
+    expect(validateServerConfig(opUid).join("|")).toMatch(/operator actor must be bound with no uid/);
+    const selfDelegable = base();
+    selfDelegable.gateway.delegable_actors = ["cognate-service"];
+    expect(validateServerConfig(selfDelegable).join("|")).toMatch(/must not be delegable/);
+    const dupDelegable = base();
+    dupDelegable.gateway.delegable_actors = ["operator", "operator"];
+    expect(validateServerConfig(dupDelegable).join("|")).toMatch(/duplicate/);
+    const unbound = base();
+    unbound.gateway.delegable_actors = ["operator", "ghost"];
+    expect(validateServerConfig(unbound).join("|")).toMatch(/no binding/);
+    const rootUid = base();
+    rootUid.identity.bindings[0]!.uid = 0;
+    rootUid.gateway.uid = 0;
+    expect(validateServerConfig(rootUid).join("|")).toMatch(/not root/);
+    expect(validateServerConfig(JSON.parse(render(UID_PLACEHOLDER))).join("|")).toMatch(/not root/);
+  });
+
+  test("the world entry is among its files, and the policy names the commit resource", async () => {
+    expect(files).toContain("interaction-model.sea");
+    const policy = renderPolicyYaml(await navigationCommitId());
+    expect(policy).toContain("actor_role: operator");
+    expect(policy).toContain(await navigationCommitId());
+    expect(() => renderPolicyYaml('bad"id')).toThrow();
+  });
+
+  test("the plan renders server.yaml and policy.yaml from templates and copies the worlds, with gateway-owned realitytrace homes", () => {
+    const rows = buildPlan(layout);
+    const cfg = rows.filter((r) => r[0] === "config-file");
+    expect(cfg.map((r) => r[5])).toEqual(["config/server.yaml.in", "config/policy.yaml"]);
+    expect(rows.some((r) => r[0] === "worlds" && r[4] === "runtime/domain")).toBe(true);
+    expect(rows.filter((r) => r[0] === "dir" && (r[4] ?? "").includes("/realitytrace/")).length).toBe(2);
+  });
+
+  test("an existing authoritative file is never overwritten: identical is kept, differing gets a timestamped sidecar", () => {
+    const dir = tempDir("authoritative");
+    const path = join(dir, "server.yaml");
+    const rendered = render(4242);
+    expect(planConfigWrite(null, rendered).action).toBe("write");
+    writeFileSync(path, rendered);
+    expect(planConfigWrite(readFileSync(path, "utf8"), rendered).action).toBe("keep");
+    const hand = rendered.replace("4242", "7777");
+    writeFileSync(path, hand);
+    const plan = planConfigWrite(readFileSync(path, "utf8"), rendered);
+    expect(plan.action).toBe("sidecar");
+    const side = sidecarName(path, new Date("2026-11-02T10:00:00Z"));
+    writeFileSync(side, rendered);
+    expect(side).toMatch(/server\.yaml\.generated-20261102T100000Z$/);
+    expect(readFileSync(path, "utf8")).toBe(hand);
+  });
+
+  test("the development flag changes the status marker only, not the rendered identity", () => {
+    const dev = layoutFor(root, {}, true);
+    expect(renderServerYaml(serverConfig(dev, files, 4242))).toBe(render(4242));
+    expect(statusRecord(dev).environment).toBe("development");
   });
 });

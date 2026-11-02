@@ -33,8 +33,11 @@
 #             an existing different binary is refused unless --replace-binary, which keeps it as a sidecar)
 #   realitytrace  reported only: the runtime unit points at this binary; place a root-owned copy there yourself
 #   deploy    runtime tree copied root:root (dirs 0755, files 0644), manifest verified, previous tree kept as a sidecar
-#   config    server.yaml and policy.yaml must be placed by the owner as root:socket 0640 inside the gateway root.
-#             The installer never creates or rewrites them; a missing file makes the apply exit 1 (not ready).
+#   realitytrace homes  gateway-owned data and state directories for the gateway's RealityTrace settings
+#   worlds    the pinned world's .sea files copied root:socket 0644 into the gateway root (cep_authority base)
+#   config    server.yaml and policy.yaml are rendered once, root:socket 0640, inside the gateway root. server.yaml
+#             takes the runtime account's uid from `id -u` (the runtime account is created earlier in the plan).
+#             An existing file is never overwritten: a differing render is written beside it as *.generated-<UTC>.
 #   generated status.json, and the two systemd units into the unit directory; a differing old file is kept as a sidecar
 #   socket    checked only; the server creates the socket
 #
@@ -65,7 +68,7 @@ BUN_BINARY=""
 BUN_SHA256=""
 EXPECT_STAGE=""
 REPLACE_BINARY=0
-NOT_READY=0
+SIDECARS=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -108,7 +111,7 @@ if [ "$STAGED" = 0 ]; then
   echo "no changes made."
   exit 0
 fi
-STAGE_DIGEST="$(cat "$STAGE/plan.tsv" "$STAGE/runtime-manifest.sha256" "$STAGE/units/godspeed-sea-forge.service" "$STAGE/units/godspeed-horizon.service" "$STAGE/status.json" | sha256sum | cut -d' ' -f1)"
+STAGE_DIGEST="$(cat "$STAGE/plan.tsv" "$STAGE/runtime-manifest.sha256" "$STAGE/units/godspeed-sea-forge.service" "$STAGE/units/godspeed-horizon.service" "$STAGE/status.json" "$STAGE/config/server.yaml.in" "$STAGE/config/policy.yaml" | sha256sum | cut -d' ' -f1)"
 
 # The staged runtime tree must match its manifest before anything is installed from it.
 (cd "$STAGE/runtime" && sha256sum -c --quiet "$STAGE/runtime-manifest.sha256") || refuse "staged runtime tree does not match its manifest; run: just gateway-stage"
@@ -246,15 +249,57 @@ row_deploy_tree() {
   fi
 }
 
+# The runtime account's name comes from the plan, never from a constant.
+runtime_account_name() { awk -F'\t' '$1=="account" && $3=="runtime" {print $2; exit}' "$STAGE/plan.tsv"; }
+
+# Render a staged template into $3. The only substitution is the runtime uid, read with `id -u` at install.
+render_config() {
+  local tmpl="$1" rt="$2" out="$3" uid
+  if grep -q '"__RUNTIME_UID__"' "$STAGE/$tmpl"; then
+    uid="$(id -u "$rt")" || refuse "runtime account '$rt' does not exist; the account step must run first"
+    [[ "$uid" =~ ^[1-9][0-9]{0,9}$ ]] || refuse "runtime account '$rt' has no usable uid (root and non-numeric are refused)"
+    sed "s/\"__RUNTIME_UID__\"/$uid/g" "$STAGE/$tmpl" > "$out"
+  else
+    cp "$STAGE/$tmpl" "$out"
+  fi
+}
+
 row_config_file() {
-  local owner="$1" group="$2" mode="$3" path="$4"
-  if [ ! -e "$path" ]; then
-    say "config $path: MISSING; the owner places this root-owned file here, then reruns --authorize-privileged"
-    NOT_READY=$((NOT_READY+1))
+  local owner="$1" group="$2" mode="$3" path="$4" tmpl="$5" rt new
+  rt="$(runtime_account_name)"
+  if [ "$APPLY" != 1 ]; then
+    if [ -e "$path" ]; then say "config $path: exists, kept as authoritative (a differing render becomes a sidecar)"
+    elif grep -q '"__RUNTIME_UID__"' "$STAGE/$tmpl"; then say "config $path: rendered from $tmpl with the uid of $rt (id -u) at install, $owner:$group $mode"
+    else say "config $path: placed from $tmpl, $owner:$group $mode"; fi
     return
   fi
-  say "config $path: $owner:$group $mode"
-  if [ "$APPLY" = 1 ]; then chown "$owner:$group" "$path"; chmod "$mode" "$path"; fi
+  new="$(mktemp)"
+  render_config "$tmpl" "$rt" "$new"
+  if [ ! -e "$path" ]; then
+    install -o "$owner" -g "$group" -m "$mode" "$new" "$path"
+    say "config $path: rendered, $owner:$group $mode"
+  elif cmp -s "$new" "$path"; then
+    chown "$owner:$group" "$path"; chmod "$mode" "$path"
+    say "config $path: identical, kept (mode and owner corrected)"
+  else
+    install -o "$owner" -g "$group" -m "$mode" "$new" "$path.generated-$TS"
+    SIDECARS=$((SIDECARS+1))
+    say "config $path: authoritative and differs from this checkout; kept it, wrote $path.generated-$TS"
+  fi
+  rm -f "$new"
+}
+
+row_worlds() {
+  local owner="$1" group="$2" dest="$3" src="$STAGE/$4" list
+  list="$(cd "$src" && find . -name '*.sea' -not -path '*/validation/*' -not -path '*/__pycache__/*' | sed 's|^\./||' | sort)"
+  say "worlds $dest: $(printf '%s\n' "$list" | grep -c .) .sea file(s) copied from the verified runtime domain, $owner:$group 0644"
+  if [ "$APPLY" = 1 ]; then
+    rm -rf "$dest"
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      install -D -o "$owner" -g "$group" -m 0644 "$src/$f" "$dest/$f"
+    done <<< "$list"
+  fi
 }
 
 row_generated() {
@@ -341,7 +386,8 @@ run_plan() {
       optional-exec) row_optional_exec "${F[1]}" ;;
       place-binary) row_place_binary "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" ;;
       deploy-tree) row_deploy_tree "${F[1]}" "${F[2]}" "${F[3]}" ;;
-      config-file) row_config_file "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" ;;
+      config-file) row_config_file "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" "${F[5]}" ;;
+      worlds) row_worlds "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" ;;
       generated) row_generated "${F[1]}" "${F[2]}" "${F[3]}" "${F[4]}" "${F[5]}" ;;
       socket) say "socket ${F[1]}: created by the gateway service, checked by --check" ;;
       *) refuse "unknown plan step '${F[0]}'" ;;
@@ -380,10 +426,8 @@ fi
 run_plan
 
 if [ "$APPLY" = 1 ]; then
-  if [ "$NOT_READY" -gt 0 ]; then
-    echo "installed, NOT READY: $NOT_READY config file(s) missing in the gateway root (server.yaml, policy.yaml)."
-    echo "place them as root, group = the socket group in plan.tsv, mode 0640, inside the gateway root; then rerun the same --authorize-privileged command."
-    exit 1
+  if [ "$SIDECARS" -gt 0 ]; then
+    echo "note: $SIDECARS authoritative config file(s) differ from this checkout; the generated versions sit beside them (*.generated-<UTC>). Compare and merge by hand."
   fi
   echo "done. Units are installed, not started. Next: sudo systemctl daemon-reload, then start the gateway, then the runtime."
   exit 0
@@ -392,4 +436,4 @@ fi
 echo "no changes made."
 echo "to apply, as root (sudo asks for your password; the owner runs this, including the bun step):"
 echo "  sudo $0 --authorize-privileged --stage $STAGE --binary ${BINARY:-<path to sea-forge-server>} --sha256 ${SHA256:-<sha256>} --bun ${BUN_BINARY:-<path to a trusted bun>} --bun-sha256 ${BUN_SHA256:-<sha256 of bun>} --expect-stage-sha256 $STAGE_DIGEST"
-echo "the gateway also needs root-owned server.yaml and policy.yaml in its root before it starts (checked by --check)."
+echo "the installer renders server.yaml (runtime uid from id -u) and places policy.yaml in the gateway root; --check verifies them."

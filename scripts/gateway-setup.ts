@@ -173,13 +173,18 @@ export function buildPlan(l: GatewayLayout): PlanRow[] {
     ["dir", gw, sock, "0750", phys(l, l.socketDir)],
     // Gateway root: owner gateway, sticky. Config files below are root-owned, so the gateway cannot unlink or rename them.
     ["dir", gw, gw, "1700", phys(l, l.gatewayStateDir)],
+    ["dir", gw, gw, "0700", phys(l, `${l.gatewayStateDir}/realitytrace/data`)],
+    ["dir", gw, gw, "0700", phys(l, `${l.gatewayStateDir}/realitytrace/state`)],
+    // Root-owned copy of the pinned world, read by the gateway through the socket group (cep_authority base).
+    ["worlds", "root", sock, phys(l, `${l.gatewayStateDir}/worlds`), "runtime/domain"],
     ["dir", rt, rt, "0700", phys(l, l.runtimeStateDir)],
     ["place-bun", "root", "root", "0755", phys(l, l.bunPath)],
     ["optional-exec", phys(l, l.realityTraceBin)],
     ["place-binary", "root", "root", "0755", phys(l, l.binPath)],
     ["deploy-tree", "root", "root", phys(l, l.runtimeTree)],
-    ["config-file", "root", sock, "0640", phys(l, `${l.gatewayStateDir}/server.yaml`)],
-    ["config-file", "root", sock, "0640", phys(l, `${l.gatewayStateDir}/policy.yaml`)],
+    // Rendered by the installer after the runtime account exists (server.yaml takes its uid from `id -u`).
+    ["config-file", "root", sock, "0640", phys(l, `${l.gatewayStateDir}/server.yaml`), "config/server.yaml.in"],
+    ["config-file", "root", sock, "0640", phys(l, `${l.gatewayStateDir}/policy.yaml`), "config/policy.yaml"],
     ["generated", "root", sock, "0640", "status.json", phys(l, `${l.gatewayStateDir}/status.json`)],
     ["generated", "root", "root", "0644", `units/${UNIT_GATEWAY}`, phys(l, `${l.unitDir}/${UNIT_GATEWAY}`)],
     ["generated", "root", "root", "0644", `units/${UNIT_RUNTIME}`, phys(l, `${l.unitDir}/${UNIT_RUNTIME}`)],
@@ -259,6 +264,138 @@ export function unitFiles(l: GatewayLayout): Record<string, string> {
     "",
   ].join("\n");
   return { [UNIT_GATEWAY]: gateway, [UNIT_RUNTIME]: runtime };
+}
+
+// ---- server.yaml and policy.yaml: the gateway root's config, authoritative once placed ---------------
+
+/** Stands in for the runtime account's uid in the staged template; the installer substitutes `id -u <account>`. */
+export const UID_PLACEHOLDER = "__RUNTIME_UID__";
+export const SERVICE_ACTOR = "cognate-service";
+export const OPERATOR_ACTOR = "operator";
+const ACTOR_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const MAX_UID = 4_294_967_294; // 4294967295 is the "unset" sentinel in several tools; no wildcard is expressible
+
+export interface ServerBinding {
+  uid?: number | string;
+  actor_id: string;
+  roles: string[];
+}
+
+/** The keys scripts/ignite.ts writes for a cell (identity, gateway, cep_authority), with the gateway's identities. */
+export interface ServerConfig {
+  socket_path: string;
+  root: string;
+  identity: { bindings: ServerBinding[] };
+  gateway: { uid: number | string; actor: string; delegable_actors: string[] };
+  cep_authority: {
+    enabled: boolean;
+    policy: string;
+    worlds: { name: string; base: string; entry: string; files: string[] }[];
+    realitytrace: { bin: string; data_home: string; state_home: string; require_corroboration: boolean };
+  };
+}
+
+/** Repository .sea files under `dir`, as ignite lists them (validation and __pycache__ skipped). */
+export function worldFiles(dir: string, rel = ""): string[] {
+  const out: string[] = [];
+  for (const e of readdirSync(join(dir, rel), { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
+    if (e.name === "validation" || e.name === "__pycache__") continue;
+    const r = rel === "" ? e.name : `${rel}/${e.name}`;
+    if (e.isDirectory()) out.push(...worldFiles(dir, r));
+    else if (e.isFile() && e.name.endsWith(".sea")) out.push(r);
+  }
+  return out;
+}
+
+/** Same keys and nesting as ignite's cell server.yaml. The runtime uid is a value from the caller, never a constant. */
+export function serverConfig(l: GatewayLayout, files: string[], runtimeUid: number | typeof UID_PLACEHOLDER): ServerConfig {
+  return {
+    socket_path: l.socketPath,
+    root: l.gatewayStateDir,
+    identity: {
+      bindings: [
+        { uid: runtimeUid, actor_id: SERVICE_ACTOR, roles: ["service"] },
+        // The operator has no uid: it acts only through the gateway (on_behalf_of).
+        { actor_id: OPERATOR_ACTOR, roles: ["operator"] },
+      ],
+    },
+    gateway: { uid: runtimeUid, actor: SERVICE_ACTOR, delegable_actors: [OPERATOR_ACTOR] },
+    cep_authority: {
+      enabled: true,
+      policy: "policy.yaml",
+      worlds: [{ name: "horizon", base: "worlds", entry: "interaction-model.sea", files }],
+      realitytrace: {
+        bin: l.realityTraceBin,
+        data_home: `${l.gatewayStateDir}/realitytrace/data`,
+        state_home: `${l.gatewayStateDir}/realitytrace/state`,
+        require_corroboration: true,
+      },
+    },
+  };
+}
+
+export function renderServerYaml(c: ServerConfig): string {
+  return `${JSON.stringify(c, null, 2)}\n`;
+}
+
+/** Binding rules from sea-rs config.rs and identity.rs, plus the gateway's own delegation rules. Empty means valid. */
+export function validateServerConfig(c: ServerConfig): string[] {
+  const errors: string[] = [];
+  const uids = new Set<number>();
+  const actors = new Map<string, ServerBinding>();
+  for (const b of c.identity.bindings) {
+    if (!ACTOR_RE.test(b.actor_id)) errors.push("an actor_id is not a valid identifier");
+    if (actors.has(b.actor_id)) errors.push(`actor '${b.actor_id}' has more than one binding`);
+    actors.set(b.actor_id, b);
+    if (b.uid !== undefined) {
+      if (typeof b.uid !== "number" || !Number.isInteger(b.uid) || b.uid < 1 || b.uid > MAX_UID) {
+        errors.push(`uid for actor '${b.actor_id}' must be one unsigned integer uid, not root and not a wildcard`);
+      } else if (uids.has(b.uid)) {
+        errors.push(`uid is bound to more than one actor (actor '${b.actor_id}')`);
+      } else uids.add(b.uid);
+    }
+    if (b.roles.length === 0) errors.push(`actor '${b.actor_id}' has no roles`);
+  }
+  const op = actors.get(OPERATOR_ACTOR);
+  if (!op || op.uid !== undefined) errors.push("the operator actor must be bound with no uid");
+  const gw = c.gateway;
+  const gwBinding = actors.get(gw.actor);
+  if (!gwBinding || gwBinding.uid === undefined || gwBinding.uid !== gw.uid) errors.push("gateway uid must be bound to the gateway actor in identity.bindings");
+  if (new Set(gw.delegable_actors).size !== gw.delegable_actors.length) errors.push("gateway.delegable_actors has a duplicate");
+  for (const a of gw.delegable_actors) {
+    if (a === gw.actor) errors.push("the gateway actor must not be delegable");
+    const b = actors.get(a);
+    if (!b) errors.push(`delegable actor '${a}' has no binding`);
+    else if (b.roles.length === 0) errors.push(`delegable actor '${a}' has no roles`);
+  }
+  for (const w of c.cep_authority.worlds) if (!w.files.includes(w.entry)) errors.push(`world entry '${w.entry}' is not among its files`);
+  return errors;
+}
+
+/** The commit-intent resource the policy names, read from the same constant ignite uses. */
+export async function navigationCommitId(): Promise<string> {
+  const { NAVIGATION_INTENT_COMMIT } = await import("../src/capabilities/navigation-intent.ts");
+  return NAVIGATION_INTENT_COMMIT.id;
+}
+
+/** policy.yaml as ignite writes it, without the approval option: the operator owns it after placement. */
+export function renderPolicyYaml(commitResourceId: string): string {
+  if (!/^[A-Za-z0-9._:/-]+$/.test(commitResourceId)) throw new Error("commit resource id has characters the policy cannot quote");
+  return `# SEA-Forge policy for the gateway root. Placed once by scripts/install-sea-forge-gateway.sh; yours to edit.
+# SEA-Forge rereads it on every decision, so edits apply without a restart.
+version: "0.1"
+rules:
+  - name: navigation-commit
+    verdict: allow
+    actor_role: service
+    operation_kind: cognate_capability
+    resources: ["${commitResourceId}"]
+  - { name: horizon-capabilities, verdict: allow, actor_role: service, operation_kind: cognate_capability }
+  - { name: horizon-actions, verdict: allow, actor_role: service, operation_kind: cognate_action }
+  - { name: operator-approves, verdict: allow, actor_role: operator, operation_kind: approval_resolution }
+  - { name: evidence, verdict: allow, actor_role: service, operation_kind: evidence_mutation }
+  - { name: settlement, verdict: allow, actor_role: service, operation_kind: settlement_declaration }
+`;
 }
 
 export function statusRecord(l: GatewayLayout) {
@@ -372,6 +509,8 @@ export function stageDigest(stage: string): string {
     join(stage, "units", UNIT_GATEWAY),
     join(stage, "units", UNIT_RUNTIME),
     join(stage, "status.json"),
+    join(stage, "config", "server.yaml.in"),
+    join(stage, "config", "policy.yaml"),
   ];
   return sha256(Buffer.concat(parts.map((p) => readFileSync(p))));
 }
@@ -403,7 +542,13 @@ async function stage(args: string[]): Promise<number> {
   }
   for (const f of ["plan.tsv", "runtime-manifest.sha256", "status.json"]) rmSync(join(stageDir, f), { force: true });
   rmSync(join(stageDir, "runtime"), { recursive: true, force: true });
+  rmSync(join(stageDir, "config"), { recursive: true, force: true });
   mkdirSync(join(stageDir, "units"), { recursive: true });
+  mkdirSync(join(stageDir, "config"), { recursive: true });
+  // Templates only: the installer renders server.yaml with the runtime account's uid, and places policy.yaml.
+  const files = worldFiles(join(repo, "domain"));
+  writeFileSync(join(stageDir, "config", "server.yaml.in"), renderServerYaml(serverConfig(layout, files, UID_PLACEHOLDER)));
+  writeFileSync(join(stageDir, "config", "policy.yaml"), renderPolicyYaml(await navigationCommitId()));
   writeFileSync(join(stageDir, "plan.tsv"), renderPlanTsv(buildPlan(layout)));
   const { result, manifest } = stageRuntime(repo, join(stageDir, "runtime"));
   writeFileSync(join(stageDir, "runtime-manifest.sha256"), manifest);
