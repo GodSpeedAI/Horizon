@@ -4,7 +4,9 @@
  */
 import { describe, expect, test } from "bun:test";
 import { PAIRING_TTL_MS, Pairing } from "../src/remote/pairing.ts";
-import { clearedCookie, COOKIE_NAME, sessionCookie, Sessions, SESSION_TTL_MS } from "../src/remote/sessions.ts";
+import { createMemoryStore } from "@godspeedai/cognate-store-memory";
+import { createIdentityService } from "@godspeed/identity";
+import { clearedCookie, COOKIE_NAME, sessionCookie, SESSION_TTL_MS } from "../src/remote/sessions.ts";
 import { newChallenge } from "../src/remote/webauthn.ts";
 import { publicOriginOf, remoteSettings } from "../src/remote/settings.ts";
 
@@ -82,19 +84,26 @@ describe("challenges", () => {
 });
 
 describe("sessions", () => {
-  test("a session is bound to its device and generation; a bumped generation drops it", () => {
-    const sessions = new Sessions();
-    const token = sessions.open("device-a", 3, T0);
-    expect(sessions.get(token, 3, T0)?.deviceId).toBe("device-a");
-    expect(sessions.get(token, 4, T0)).toBeNull();
-    expect(sessions.get(null, 3, T0)).toBeNull();
+  test("a session is durable, resolves to its operator, and a bumped operator generation drops it", async () => {
+    const identity = createIdentityService(createMemoryStore(), { clock: () => T0 });
+    await identity.registerOperator({ tenant: "t1", operatorId: "operator" });
+    const issued = await identity.issueSession({ tenant: "t1", operatorId: "operator" });
+    const resolved = await identity.resolveSession(issued.token);
+    expect(resolved?.caller.actor.id).toBe("operator");
+    expect(await identity.resolveSession(null)).toBeUndefined();
+    await identity.revokeAll("t1", "operator", "test");
+    expect(await identity.resolveSession(issued.token)).toBeUndefined();
   });
 
-  test("a session expires after twelve hours", () => {
-    const sessions = new Sessions();
-    const token = sessions.open("device-a", 1, T0);
-    expect(sessions.get(token, 1, T0 + SESSION_TTL_MS - 1)).not.toBeNull();
-    expect(sessions.get(token, 1, T0 + SESSION_TTL_MS)).toBeNull();
+  test("a session expires after twelve hours", async () => {
+    let now = T0;
+    const identity = createIdentityService(createMemoryStore(), { clock: () => now });
+    await identity.registerOperator({ tenant: "t1", operatorId: "operator" });
+    const issued = await identity.issueSession({ tenant: "t1", operatorId: "operator", ttlMs: SESSION_TTL_MS });
+    now = T0 + SESSION_TTL_MS - 1;
+    expect(await identity.resolveSession(issued.token)).toBeDefined();
+    now = T0 + SESSION_TTL_MS;
+    expect(await identity.resolveSession(issued.token)).toBeUndefined();
   });
 
   test("the cookie is __Host-, HttpOnly, Secure, SameSite=Strict and path-scoped; clearing expires it", () => {

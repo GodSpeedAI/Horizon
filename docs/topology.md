@@ -14,7 +14,7 @@ only the executable substrate and its boundaries at that point in time.
 
 | Unit | Path | Responsibility | Depends on |
 | --- | --- | --- | --- |
-| Configuration | `src/config/` | Parse and validate `config/horizon.toml`; issue per-launch secret; derive operator/agent principals from the trusted local boundary. | Bun TOML, OS session |
+| Configuration | `src/config/` | Parse and validate `config/horizon.toml`; issue per-launch secret; derive operator principal from the configured operator actor (`identity.operator_ref`) and agent principals from the trusted local boundary. | Bun TOML, OS session |
 | Semantic adapter | `src/adapters/semantic.ts` | Read the canonical `.sea` source map and project it through `loadSemanticWorld`; assert the pinned DomainForge world identity. | `@godspeedai/cognate-domainforge`, `domain/` |
 | Research adapter | `src/adapters/research.ts` | Invoke the Python subsystem's typed process contract and validate its health envelope. A failed or absent subsystem is a typed degraded observation (`research_unavailable`), never a startup prerequisite; research-dependent operations fail closed. | `research/` |
 | Domain | `src/domain/` | Typed navigation frame, typed `CommitNavigationIntent` intent and `NavigationIntentRecord`. No I/O, runtime or adapter imports. | none |

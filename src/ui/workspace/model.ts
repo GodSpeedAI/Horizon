@@ -75,7 +75,11 @@ export interface WorkspaceMove {
   readonly settlement: WorkspaceClaim;
   /** The escalation a human can answer, when the commit is awaiting approval. */
   readonly approval_id: string | null;
-  /** Settlement can be requested explicitly: governed, recorded, and not yet final. */
+  /** Verified only when the stored attempt carries the typed approval id; older records are unverified. */
+  readonly approval_identity: ApprovalIdentity | null;
+  /** RealityTrace can observe the commit now: governed, decided, recorded, and no observation yet. */
+  readonly observable: boolean;
+  /** SEA-Forge can rule on the observed evidence now: as observable, but an observation already exists and nothing is final. */
   readonly settleable: boolean;
 }
 
@@ -101,7 +105,18 @@ export interface WorkspaceRemoteRail {
   readonly label: string;
 }
 
+/** Whether governed approvals run behind OS-isolated gateway protection. Anything unproven is "unknown", never "governed". */
+export type ApprovalAssurance = "governed" | "unisolated-development" | "unknown";
+
+/** Map the startup value (HORIZON_APPROVAL_ASSURANCE) to a typed assurance; missing or unrecognised input is "unknown". */
+export function approvalAssuranceOf(raw: string | null | undefined): ApprovalAssurance {
+  const value = raw?.trim();
+  return value === "governed" || value === "unisolated-development" ? value : "unknown";
+}
+
 export interface WorkspaceChrome {
+  /** Absent is treated as "unknown" by the renderer. */
+  readonly approvalAssurance?: ApprovalAssurance;
   readonly status: WorkspaceStatus;
   readonly onboarding: {
     readonly visible: boolean;
@@ -719,8 +734,10 @@ export interface StoredMoveFacts {
   readonly operation_ref: string;
   /** The committed record, when one exists. `expected` is true when the operation names an outcome to settle. */
   readonly committed: { readonly at: string; readonly expected: boolean } | null;
+  /** The SEA-Forge decision that authorized the commit, when one is recorded. Absent or null means none was recorded. */
+  readonly decision?: { readonly ref: string } | null;
   /** The latest audited attempt, when one exists. */
-  readonly attempt: { readonly outcome: "accepted" | "refused" | "awaiting_authority"; readonly reason: string | null } | null;
+  readonly attempt: { readonly outcome: "accepted" | "refused" | "awaiting_authority"; readonly reason: string | null; readonly approvalId?: string | null } | null;
   readonly settlement: {
     readonly status: string;
     readonly final: boolean;
@@ -730,16 +747,26 @@ export interface StoredMoveFacts {
   readonly at: string | null;
 }
 
+export type ApprovalIdentity = { readonly state: "verified"; readonly approvalId: string } | { readonly state: "unverified" };
+
 /** The three claims, kept apart: who decided, what recorded it, what observed it. */
 export function moveOf(facts: StoredMoveFacts, context: { readonly governed: boolean; readonly realitytrace: boolean }): WorkspaceMove {
   const { committed, attempt, settlement } = facts;
   const awaiting = attempt?.outcome === "awaiting_authority" && committed === null;
-  const approvalId = awaiting ? (/awaiting approval (\S+)$/.exec(attempt?.reason ?? "")?.[1] ?? null) : null;
+  const typedId = attempt?.approvalId;
+  const approvalIdentity: ApprovalIdentity | null = !awaiting ? null : typeof typedId === "string" && typedId !== "" ? { state: "verified", approvalId: typedId } : { state: "unverified" };
+  const approvalId = approvalIdentity?.state === "verified" ? approvalIdentity.approvalId : null;
   let decided: WorkspaceClaim;
+  const decisionRef = facts.decision?.ref ?? null;
   if (committed) {
-    decided = context.governed
-      ? { state: "allowed", text: "Allowed by SEA-Forge." }
-      : { state: "policy_only", text: "Horizon policy only: SEA-Forge is off." };
+    if (!context.governed) {
+      decided = { state: "policy_only", text: "Horizon policy only: SEA-Forge is off." };
+    } else if (decisionRef !== null) {
+      decided = { state: "allowed", text: `Allowed by SEA-Forge: decision ${decisionRef}.` };
+    } else {
+      // Committed without a recorded SEA-Forge decision: never credit SEA-Forge with it.
+      decided = { state: "unverified", text: "Committed by Horizon, but no SEA-Forge decision is recorded for this commit." };
+    }
   } else if (awaiting) {
     decided = { state: "awaiting", text: "Awaiting your approval at SEA-Forge." };
   } else {
@@ -778,6 +805,10 @@ export function moveOf(facts: StoredMoveFacts, context: { readonly governed: boo
   } else {
     settlementClaim = { state: "pending", text: "Not settled yet." };
   }
+  const governedDecided = context.governed && context.realitytrace && committed !== null && decisionRef !== null;
+  const open = settlement?.final !== true && (settlement === null || settlement === undefined || settlement.status === "pending" || settlement.status === "unavailable");
+  const canObserve = governedDecided && open && !settlement?.observation;
+  const canRule = governedDecided && open && Boolean(settlement?.observation);
   return Object.freeze({
     intent_id: facts.intent_id,
     operation_ref: facts.operation_ref,
@@ -787,11 +818,56 @@ export function moveOf(facts: StoredMoveFacts, context: { readonly governed: boo
     observed,
     settlement: settlementClaim,
     approval_id: approvalId,
-    // Offered until SEA-Forge has answered, and again while a settlement window is still open.
-    settleable:
-      context.governed && context.realitytrace && committed !== null && settlement?.final !== true &&
-      (settlement === null || settlement === undefined || settlement.status === "pending" || settlement.status === "unavailable"),
+    approval_identity: approvalIdentity,
+    // Both steps are offered only while nothing is final; the ruling needs the observation first.
+    observable: canObserve,
+    settleable: canRule,
   });
+}
+
+/** The one next step shown at the top of the workspace. It names where to act; it never acts itself. */
+export interface PrimaryAction {
+  readonly kind: "answer_escalation" | "observe" | "rule" | "finish_setup" | "choose_move" | "none";
+  readonly title: string;
+  readonly reason: string;
+  /** The region on this page where the operator takes the step. */
+  readonly href: string;
+}
+
+/**
+ * The fixed precedence for the primary action: a waiting human decision, then the observation and ruling of the
+ * latest commit, then unfinished setup, then the first available move. Nothing here decides or submits.
+ */
+export function primaryActionOf(input: {
+  readonly receipt: WorkspaceReceipt | null;
+  readonly onboarding: WorkspaceChrome["onboarding"];
+  readonly choices: readonly { readonly label: string; readonly available: boolean; readonly action_id: string | null }[];
+  readonly current: boolean;
+}): PrimaryAction {
+  const move = input.receipt?.move ?? null;
+  if (move?.approval_id) {
+    return { kind: "answer_escalation", title: "Answer the approval waiting for you", reason: "SEA-Forge is waiting for your decision on the latest move.", href: "#receipt" };
+  }
+  if (move?.observable) {
+    return { kind: "observe", title: "Observe the commit with RealityTrace", reason: "The latest move is committed but nothing has observed its effect yet.", href: "#receipt" };
+  }
+  if (move?.settleable) {
+    return { kind: "rule", title: "Ask SEA-Forge to rule on the observed evidence", reason: "RealityTrace has observed the latest move. SEA-Forge has not ruled yet.", href: "#receipt" };
+  }
+  if (input.onboarding.visible) {
+    const missing = input.onboarding.steps.find((step) => !step.done);
+    return {
+      kind: "finish_setup",
+      title: missing === undefined ? "Finish setup" : `Finish setup: ${missing.label}`,
+      reason: missing?.fix ?? missing?.detail ?? "Complete the remaining setup steps.",
+      href: "#getting-started",
+    };
+  }
+  const first = input.choices.find((choice) => choice.available && choice.action_id !== null);
+  if (input.current && first !== undefined) {
+    return { kind: "choose_move", title: `Choose the next move: ${first.label}`, reason: "This move is available at the current checkpoint.", href: "#region-decision" };
+  }
+  return { kind: "none", title: "No move is available here yet", reason: "Nothing can be committed at this checkpoint. The reasons are listed below.", href: "#region-decision" };
 }
 
 /** Name who refused a commit only when the recorded reason shows it; never credit SEA-Forge with Horizon's own checks. */

@@ -14,6 +14,21 @@ export const ENV_OPERATOR = "COGNATE_SEA_FORGE_OPERATOR";
 const ACTOR_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const APPROVAL_ID = /^[A-Za-z0-9_.:-]{1,200}$/;
 
+const PRINCIPAL_PREFIX = "actor:";
+const SEA_FORGE_ACTOR_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * The SEA-Forge actor id for a Horizon principal ref (`actor:<id>` becomes `<id>`). This is the one mapping
+ * from the runtime's operator ref to the id the gateway's server.yaml binds. The generator uses it too, so
+ * the unit, server.yaml and the adapter cannot disagree. A ref the gateway cannot bind is refused here.
+ */
+export function seaForgeActorOf(principalRef: string): string {
+  if (!principalRef.startsWith(PRINCIPAL_PREFIX)) throw new Error(`APPROVAL: operator ref ${JSON.stringify(principalRef)} must be actor:<id>`);
+  const id = principalRef.slice(PRINCIPAL_PREFIX.length);
+  if (!SEA_FORGE_ACTOR_ID.test(id)) throw new Error(`APPROVAL: SEA-Forge actor id ${JSON.stringify(id)} must match ${SEA_FORGE_ACTOR_ID} (the gateway's rule)`);
+  return id;
+}
+
 export interface SeaForgeActor {
   readonly actor_id: string;
   readonly role: string;
@@ -27,27 +42,31 @@ export interface ApprovalAuthority {
 }
 
 /**
- * `COGNATE_SEA_FORGE_OPERATOR` names the operator actor bound in SEA-Forge. Unset: no one can answer
- * an escalation from Horizon (allow/deny still work). Set without `COGNATE_GOVERNANCE=sea-forge`, or
- * equal to the service actor, it is a startup error, never a guess.
+ * `COGNATE_SEA_FORGE_OPERATOR` enables answering escalations from Horizon. Unset: no one can answer
+ * (allow/deny still work). The approver is the configured operator ref (`operatorRef`, from
+ * HORIZON_OPERATOR_REF / `identity.operator_ref`): one value for the cockpit's principal and the
+ * SEA-Forge actor. If the variable is set to anything else, or without `COGNATE_GOVERNANCE=sea-forge`,
+ * it is a startup error, never a guess.
  */
-export function approvalAuthorityFromEnv(env: Readonly<Record<string, string | undefined>>): ApprovalAuthority | undefined {
-  const operatorId = env[ENV_OPERATOR]?.trim();
+export function approvalAuthorityFromEnv(env: Readonly<Record<string, string | undefined>>, operatorRef: string): ApprovalAuthority | undefined {
+  const named = env[ENV_OPERATOR]?.trim();
   const governed = env.COGNATE_GOVERNANCE?.trim() === "sea-forge";
-  if (!operatorId) return undefined;
+  if (!named) return undefined;
   if (!governed) throw new Error(`${ENV_OPERATOR} is set but COGNATE_GOVERNANCE is not 'sea-forge'; refusing to guess`);
-  return approvalAuthority({ socketPath: env.COGNATE_SEA_FORGE_SOCKET?.trim() ?? "", operatorId, serviceId: env.COGNATE_SEA_FORGE_ACTOR?.trim() || undefined });
+  if (named !== operatorRef) throw new Error(`${ENV_OPERATOR} (${named}) must equal the configured operator ref (${operatorRef}); one identity, not two`);
+  return approvalAuthority({ socketPath: env.COGNATE_SEA_FORGE_SOCKET?.trim() ?? "", operatorId: operatorRef, serviceId: env.COGNATE_SEA_FORGE_ACTOR?.trim() || undefined });
 }
 
 export function approvalAuthority(options: { readonly socketPath: string; readonly operatorId: string; readonly serviceId?: string }): ApprovalAuthority {
   const serviceId = options.serviceId ?? "cognate-service";
   if (!options.socketPath) throw new Error("the SEA-Forge socket is required to answer escalations");
   if (!ACTOR_ID.test(options.operatorId)) throw new Error(`${ENV_OPERATOR} must name the operator actor bound in SEA-Forge`);
-  if (options.operatorId === serviceId) throw new Error(`${ENV_OPERATOR} must differ from the service actor: a requester cannot approve its own escalation`);
+  const operatorActor = seaForgeActorOf(options.operatorId);
+  if (operatorActor === serviceId) throw new Error(`${ENV_OPERATOR} must differ from the service actor: a requester cannot approve its own escalation`);
   return {
     socketPath: options.socketPath,
     service: { actor_id: serviceId, role: "service" },
-    operator: { actor_id: options.operatorId, role: "operator" },
+    operator: { actor_id: operatorActor, role: "operator" },
   };
 }
 
@@ -73,6 +92,18 @@ export async function resolveApproval(
   if (response.ok !== true) {
     throw new Error(`APPROVAL: SEA-Forge refused the resolution: ${String(response.error ?? response.error_class ?? JSON.stringify(response).slice(0, 300))}`);
   }
+}
+
+/**
+ * The approvals SEA-Forge lists (`authority_approvals`, read-only). Returns the rows as SEA-Forge sent
+ * them; the domain validates each row before it is shown (`src/domain/approval-inbox.ts`).
+ */
+export async function listApprovals(authority: ApprovalAuthority): Promise<unknown[]> {
+  const response = await seaForgeCall(authority.socketPath, { verb: "authority_approvals", actor: authority.service }, authority.timeoutMs ?? 15_000);
+  if (response.ok !== true || !Array.isArray(response.approvals)) {
+    throw new Error(`APPROVAL: SEA-Forge did not list approvals: ${String(response.error ?? response.error_class ?? "no approvals array")}`);
+  }
+  return response.approvals;
 }
 
 /** One NDJSON request/response over the SEA-Forge Unix socket. The socket is closed however it ends. */

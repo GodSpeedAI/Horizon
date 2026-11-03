@@ -1,0 +1,66 @@
+feature,area,priority,original,clone,notes
+Persistent platform shell with nav quicksearch and notifications,shell,must,yes,no,S01-S11; quicksearch has jump-to and full-results modes
+Folders and projects as the security boundary,filesystem,must,yes,no,permissions inherit from project or folder; also how skills inherit scope
+Define object types from a backing dataset,ontology,must,yes,no,S16; property types primary key title; one row = one object
+Allow an object type with no backing dataset so all objects come from actions,ontology,must,yes,no,object-types page; the action-only modelling path
+Define link types with cardinality and two sides,ontology,must,yes,no,1:1 1:n n:1 n:n; no implicit reverse link type; M:N is datasource-backed
+Define action types with parameters and rules,ontology,must,yes,no,params -> ontology edits; side effects notifications and webhooks
+Guard actions with submission criteria,ontology,must,yes,no,S16 + S23; nested MATCH ALL / MATCH ANY over typed operands (user group / object property / timestamp); unmet criteria disables the button with a stated reason
+Capture action edits into a writeback dataset,ontology,must,yes,no,action-types page; latest state with user edits stays readable downstream
+Build an operator app from the inbox pattern,app building,must,yes,no,filter rail with facet counts + table + object view + pinned actions; S23
+Bind widgets to object sets and carry typed variables,app building,must,yes,no,object sets filters primitives arrays structs geopoints geoshapes time series
+Wire user interaction to behaviour with events,app building,must,yes,no,row select -> update variable -> open overlay -> run action
+Inline action form for writeback from the app,app building,must,yes,no,form mode and table mode; submission criteria enforced
+Conversational agent that operates the platform through native tools,agent,must,yes,no,S38; intents -> platform operations -> explanation
+Agent acts under the requesting user's own identity,governance,must,yes,no,no service account; permission errors identical to manual attempts
+Tool approval before mutating operations with conservative defaults,governance,must,yes,no,per-action approve or session allow-always; read-only auto-approved
+Branch by default with proposal and review before merge,change control,must,yes,no,S53; agent never works on main; global branch where supported
+Outline as a typed transcript tree with per-node token counts,agent,must,yes,no,S38; user turn -> assistant -> tool -> artefact; also the context budget meter
+Modes scope documentation and tools per task,agent,must,yes,no,S41; mode is not permission; the mode states its tool count before Confirm
+Skill as name description and markdown body shared by permissions,agent,must,yes,no,S43; description decides when it loads; this session vs skill set
+Eval-driven development loop inside the agent,agent,must,yes,no,write case -> run suite -> read failures -> diagnose -> edit -> re-run; 90% failing to 90% passing in one iteration
+Feedback stored as a linked ontology object reusable as a test case,agent,must,yes,no,rejection prompt -> object linked to incident and to the agent execution
+Context ribbon to attach specific resources by category,agent,should,yes,no,Modes Skills Documentation Files Ontology Functions plus paste URLs and manual branch creation
+Search tools so the agent can discover resources itself,agent,should,yes,no,explicit toggle in the session
+Request clarification capability,agent,should,yes,no,multiple choice or free text mid-task; used to negotiate eval expectations with the human
+Generate plan sub-agent for review before acting,agent,should,yes,no,S41; plan becomes the task list the agent executes
+Closed-loop self-validation before claiming success,agent,should,yes,no,transform preview function preview CI check review
+Per-tool permission rule with branch allowlist,governance,should,yes,no,S40; If condition in allowlist then Allow or Ask · Else Allow or Ask
+Explicit consent before the agent switches mode mid-run,agent,should,yes,no,with an always-allow option; recorded in the transcript
+Session-scoped pre-approval scoped to branch or project,governance,should,yes,no,branch-aware: auto on feature branches require approval on protected
+Attribution of model and session on every transcript block,governance,should,yes,no,agent identity + model name shown above the turn
+Documentation bundles including org-authored custom docs as context,agent,should,yes,no,S38 Documentation popover; custom sources sit beside platform docs
+Agent can switch mode mid-task,agent,should,yes,no,part of the Manage capabilities capability
+Interfaces for object type polymorphism,ontology,should,yes,no,shared shape across types; permissioned via ontology roles; honest partial support matrix
+Prefill links to open a session with prompt and skills,agent,should,yes,no,S40; prompt skillRid autoStart; shareable repeatable entry point
+Audit trail attributing actions and tokens to the user,governance,should,yes,no,platform audit log plus LLM usage attribution per user
+Function-backed actions for logic the declarative rules cannot express,ontology,should,yes,no,TS or Python behind an action type
+Agent sessions with typed context items and event-driven state transitions,agent runtime,should,yes,no,durable sessions that pause for review and resume on event
+Session observability with raw view events and traces,observability,should,yes,no,S52; inspect why an agent behaved unexpectedly
+Reasoning effort control beside the model picker,agent,could,yes,no,automatic low medium high thinking
+View the system prompt from the session menu,agent,could,yes,no,transparency affordance; also names sessions after intent
+Session list with agent version and origin filters,observability,could,yes,no,S51; search by exact session ID; Origin names the spawning resource
+Session replay and monitoring UI,agent runtime,could,yes,no,agent manager style; valuable but depends on the session model existing
+Personal skill set reused across sessions,agent,could,yes,no,distinct from per-session skills; with apply-to-current-session semantics
+Evaluation suites for LLM-backed functions,evals,could,yes,no,test cases experiments across models variance; assert on ontology edits not text
+Multi-participant sessions that pause and resume,agent runtime,could,yes,no,participants in different apps contributing to one session
+Curated per-group workspaces,shell,could,yes,no,carbon-style composition of apps actions and analyses
+LLM-assisted pipeline authoring,data integration,could,yes,no,explain regex helper transform assist; use-LLM node with row trials
+Point-and-click pipeline with preview before deliver,data integration,could,yes,no,inputs -> transform -> preview -> deliver -> outputs
+Resource health monitoring with scoped rules,observability,could,yes,no,content and schema checks; alerts to email pagerduty slack
+Lineage graph over resources and widget bindings,observability,could,yes,no,provenance plus upgrade tooling
+The 300+ microservice estate and the multimodal data plane,infrastructure,skip,yes,no,skip: Iceberg Flink Spark at scale plus continuous delivery is not reconstructible from recon
+Mandatory access control and row/column security guarantees,governance,skip,yes,no,skip: the UX is copyable in a weekend; the enforcement guarantee is the product
+Enterprise connector catalogue,integrations,skip,yes,no,skip: SAP MES CRM and similar are partner and customer-specific assets
+Marketplace of partner applications,ecosystem,skip,yes,no,skip: the partner network is not part of the product you can rebuild
+Regulated certifications,compliance,skip,yes,no,skip: FedRAMP IL5 IL6 and CMMC attestations are contractual not technical
+First-party LLM provider contracts and capacity management,ai,skip,yes,no,skip: commercial relationships with no-retention terms; a clone brings its own model access
+The Forward Deployed Engineer human service model,services,skip,yes,no,skip: bootcamps and embedded engineers are a practice not software; AI FDE is named after it
+The vendor's own documentation corpus and doc moat,content,skip,yes,no,skip: years of writing; grounds AIP Assist and the agent's own doc bundles
+The installed base of customer ontologies and habits,network,skip,yes,no,skip: the hardest-to-copy asset; other people's models and operating practice
+Declare action submit authority as organization group or user,ontology,must,yes,no,S16 step 4; a new type requires a subject choice Organization | Group | User; authority is authored with the action not bolted on later
+Configure per-property security policy while creating an object type,ontology,must,yes,no,S16 step 6; policy table with Policy name / Type / Applies to / Actions defaulting to All properties; an action-only type still gets a dataset for permissions
+Generate CRUD action types for a new object type,ontology,should,yes,no,S16 step 4 offers Create / Modify / Delete each declaring the exact property set it writes
+Reuse one boolean condition builder for criteria permissions and triggers,governance,should,yes,no,same idiom for submission criteria tool approval rules and automation conditions; one widget three authorities
+Blocked action renders disabled with a stated reason,app building,must,yes,no,disabled Change Ticket Priority + tooltip Invalid state to apply action; the refusal is local and explained at the affordance
+Object view hub with concern tabs and a searchable timeline,app building,should,yes,no,S18; tabs per concern + paged event timeline + right rail of state-coloured consoles that jump into the apps acting on this object

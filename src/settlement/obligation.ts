@@ -37,6 +37,7 @@ import type { CapacityAllowance } from "../domain/payment.ts";
 import type { OperationBindingConfig } from "../config/types.ts";
 import type { DeclaredThreshold, RealityTraceObligation, VerifierRun } from "../adapters/realitytrace-obligation.ts";
 import { readLedger } from "../capabilities/capacity-ledger.ts";
+import { takeSnapshot } from "./snapshot.ts";
 import { type PendingIntent, reservePendingIntent, terminate, updatePending } from "../capabilities/pending-intent.ts";
 
 export class ObligationRefusal extends Error {
@@ -54,6 +55,8 @@ export interface ObligationDeps {
   readonly realityTrace: Pick<RealityTraceObligation, "declare" | "run"> | null;
   /** Null when no settlement confinement is configured. */
   readonly settlement: { readonly launcher: readonly string[]; readonly close_grace_s: number } | null;
+  /** Where the verifier's read-only store snapshot is taken from and to. Absent: the verifier is not given one. */
+  readonly snapshot?: { readonly liveStore: string; readonly dir: string };
   readonly allowances: readonly CapacityAllowance[];
   /** SEA-Forge settlement with RealityTrace corroboration is configured. */
   readonly settlementConfigured: boolean;
@@ -163,13 +166,25 @@ const evidenceOf = (run: VerifierRun, argv: readonly string[]): VerifierEvidence
 
 /** Run the pinned verifier once under the launcher, after re-checking every artifact digest. Null: not run. */
 function runVerifier(deps: ObligationDeps, binding: OperationBindingConfig, pending: PendingIntent, timeoutS: number): VerifierRun | null {
-  if (!deps.realityTrace || !deps.settlement || !binding.verifier || !pending.threshold || !pending.verifier_argv) return null;
+  return runVerifierWith(deps, binding, pending, timeoutS).run;
+}
+
+/** As runVerifier, saying why when the snapshot the verifier reads could not be taken (never run on a stale one). */
+function runVerifierWith(deps: ObligationDeps, binding: OperationBindingConfig, pending: PendingIntent, timeoutS: number): { readonly run: VerifierRun | null; readonly snapshotFailure?: string } {
+  if (!deps.realityTrace || !deps.settlement || !binding.verifier || !pending.threshold || !pending.verifier_argv) return { run: null };
   // Before every run: a digest mismatch makes the run undefined, so it is never run at all.
-  if (artifactMismatches(binding.verifier, observedDigests(binding, deps.digestOf)).length > 0) return null;
+  if (artifactMismatches(binding.verifier, observedDigests(binding, deps.digestOf)).length > 0) return { run: null };
+  if (deps.snapshot) {
+    try {
+      takeSnapshot(deps.snapshot.liveStore, deps.snapshot.dir);
+    } catch (error) {
+      return { run: null, snapshotFailure: error instanceof Error ? error.message : String(error) };
+    }
+  }
   try {
-    return deps.realityTrace.run(pending.threshold, pending.verifier_argv, deps.settlement.launcher, timeoutS);
+    return { run: deps.realityTrace.run(pending.threshold, pending.verifier_argv, deps.settlement.launcher, timeoutS) };
   } catch {
-    return null;
+    return { run: null };
   }
 }
 
@@ -180,8 +195,11 @@ function runVerifier(deps: ObligationDeps, binding: OperationBindingConfig, pend
 export async function discriminateRun(deps: ObligationDeps, binding: OperationBindingConfig, pending: PendingIntent): Promise<{ readonly run: VerifierRun | null; readonly decision: DiscriminationDecision }> {
   if (pending.window && !windowOpen(pending.window, deps.now())) return { run: null, decision: { proceed: false, refusal: "discrimination unknown" } };
   const timeout = pending.window ? runTimeoutS(pending.window, deps.now(), deps.settlement?.close_grace_s) : null;
-  const run = timeout === null ? null : runVerifier(deps, binding, pending, Math.min(timeout, 120));
-  const decision = discriminate(run ? evidenceOf(run, pending.verifier_argv ?? []) : null, pending.verifier_argv ?? []);
+  const attempt = timeout === null ? { run: null } : runVerifierWith(deps, binding, pending, Math.min(timeout, 120));
+  const run = attempt.run;
+  const decision: DiscriminationDecision = "snapshotFailure" in attempt && attempt.snapshotFailure
+    ? { proceed: false, refusal: `discrimination unknown: ${attempt.snapshotFailure}` }
+    : discriminate(run ? evidenceOf(run, pending.verifier_argv ?? []) : null, pending.verifier_argv ?? []);
   await updatePending(deps.store(), deps.tenant, pending.intent.intent_id, () => (run ? { discrimination: run } : {}));
   return { run, decision };
 }

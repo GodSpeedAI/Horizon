@@ -22,7 +22,7 @@ Horizon is a separate application repository in the shared GodSpeed stack worksp
 - **Cognate:** often `../cognate`; owns application runtime, events, projections, continuations and capability bindings.
 - **Product Actualizer:** `SPRIME01/Product-Actualizer`, especially `cockpit/`, `docs/workbench.md`, `docs/case-navigation.md`, `docs/world-debugger.md` and `tests/cockpit/grammar.test.ts`. Donor, not application runtime authority.
 - Workspace directory names differ from product names: SEA-Forge is `../sea-rs`, RealityTrace is `../sxr`, Context Kernel is `../Context_Kernel`, GodSpeed Agent is `../godspeed_agent`. The spec's `sources.existing_implementation.repositories` is the authoritative map.
-- Local sibling checkouts may lag their remotes (Cognate and DomainForge did at spec 0.2.0). Pin published releases; never fetch or switch branches in a sibling without the operator.
+- Local sibling checkouts may lag their remotes (Cognate and DomainForge did at spec 0.2.0). Pin published releases; fetch is allowed in a sibling, but never pull, switch branches, or reset there without the operator.
 - **godspeed_agent** is Horizon's predecessor: its developmental rules and Python ML research infrastructure move into Horizon (T17, T21). DomainForge, SEA-Forge, Gauntlet, RealityTrace and Context Kernel are independent owners. Inspect source and tests before assuming the integration APIs exist.
 - Product dispositions (supersede, host, join, defer) live in `.agents/reports/horizon-product-integration-register.yaml`.
 

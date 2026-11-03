@@ -1,7 +1,7 @@
 set shell := ["bash", "-uc"]
 
 domainforge_bin := env_var_or_default("DOMAINFORGE_BIN", "../domainforge/target/release/domainforge")
-world_ref := "world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290"
+world_ref := "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b"
 
 default:
     @just --list
@@ -245,3 +245,24 @@ gate-t21:
 gate-t22:
     @echo "gate-t22: not implemented; fails closed until T22 settles"
     @exit 1
+
+# SEA-Forge gateway and Horizon runtime, two service accounts (Linux/WSL). Nothing here runs privileged
+# commands on its own; the only privileged step is the sudo command gateway-install prints.
+# gateway-stage [--development]: unprivileged. Writes the staging bundle (plan, runtime tree, manifest, units, status).
+gateway-stage *args:
+    bun run scripts/gateway-setup.ts stage {{args}}
+
+# gateway-plan [--development]: stages, then prints the full privileged plan as a dry run. Changes nothing.
+gateway-plan *args:
+    bun run scripts/gateway-setup.ts stage {{args}}
+    scripts/install-sea-forge-gateway.sh --dry-run
+
+# gateway-install BINARY SHA256 BUN BUN_SHA256: dry run with the server binary and the runtime's bun verified (bun is
+# copied to a root-owned path by the owner's sudo step; nothing is downloaded), then prints the exact sudo command.
+gateway-install binary="" sha256="" bun="" bun_sha256="":
+    scripts/install-sea-forge-gateway.sh --dry-run --binary "{{binary}}" --sha256 "{{sha256}}" --bun "{{bun}}" --bun-sha256 "{{bun_sha256}}"
+    @echo "Then start the services (as you): sudo systemctl daemon-reload && sudo systemctl enable --now godspeed-sea-forge.service godspeed-horizon.service"
+
+# gateway-check: read-only ownership, mode, membership and socket-access check. Expects the agent to be denied the socket.
+gateway-check:
+    scripts/install-sea-forge-gateway.sh --check

@@ -204,7 +204,7 @@ describe("T09 workspace HTML", () => {
 
 /** The first-run panel, status rail, receipt and moves: the stored state each one shows. */
 describe("first-run cockpit rendering", () => {
-  const status = statusOf({ worldRef: "world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290", governed: false, realitytrace: false, approvals: false, operator: "local_operator" });
+  const status = statusOf({ worldRef: "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b", governed: false, realitytrace: false, approvals: false, operator: "local_operator" });
   const chromeFor = (overrides: Partial<WorkspaceChrome> = {}): WorkspaceChrome => ({
     status,
     onboarding: onboardingOf({ governed: false, realitytrace: false, caseOpen: false, committed: false, skipped: false }),
@@ -213,6 +213,19 @@ describe("first-run cockpit rendering", () => {
     receipt: null,
     moves: [],
     ...overrides,
+  });
+
+  test("approval assurance banner: insecure for unisolated-development, quiet for unknown, absent for governed", () => {
+    const insecure = pageWith(snapshot(), chromeFor({ approvalAssurance: "unisolated-development" }));
+    expect(insecure).toContain("without OS-isolated gateway protection and must not be treated as production-safe");
+    expect(insecure).toContain("INSECURE");
+    const unknown = pageWith(snapshot(), chromeFor({ approvalAssurance: "unknown" }));
+    expect(unknown).toContain("Approval isolation: not verified.");
+    expect(unknown).not.toContain("INSECURE");
+    const governed = pageWith(snapshot(), chromeFor({ approvalAssurance: "governed" }));
+    expect(governed).not.toContain("approval-assurance");
+    expect(governed).not.toContain("not verified");
+    expect(insecure).not.toMatch(/border-(left|right):\s*[2-9]\d*px/);
   });
 
   test("the empty moves list says what appears there and points at step 3", () => {
@@ -230,10 +243,21 @@ describe("first-run cockpit rendering", () => {
     expect(markup).toContain('data-step="stack" data-done="false" aria-current="step"');
   });
 
+  test("the page opens with one primary action, before the context and the decision", () => {
+    const markup = pageWith(snapshot(), chromeFor());
+    const primary = markup.indexOf('id="primary-action"');
+    expect(primary).toBeGreaterThan(-1);
+    expect(markup.slice(primary)).toContain("What to do now");
+    expect(primary).toBeLessThan(markup.indexOf('id="region-context"'));
+    expect(primary).toBeLessThan(markup.indexOf('id="region-decision"'));
+    // The panel links to the place the operator acts; it does not submit anything itself.
+    expect(markup.slice(primary, markup.indexOf("</section>", primary))).not.toContain("<form");
+  });
+
   test("the status rail states every process in text, not colour alone", () => {
     const markup = pageWith(snapshot(), chromeFor());
     expect(markup).toContain("World: <code");
-    expect(markup).toContain("horizon@701d6211");
+    expect(markup).toContain("horizon@0a10c20d");
     expect(markup).toContain("SEA-Forge: off");
     expect(markup).toContain("RealityTrace: off");
     expect(markup).toContain("Approvals: not configured");
@@ -242,7 +266,7 @@ describe("first-run cockpit rendering", () => {
 
   test("an escalated commit without approvals says so and gives the fix instead of buttons", () => {
     const move = moveOf(
-      { intent_id: "intent-9", operation_ref: "product.apply", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:7" }, settlement: null, at: null },
+      { intent_id: "intent-9", operation_ref: "product.apply", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:7", approvalId: "approval:7" }, settlement: null, at: null },
       { governed: true, realitytrace: true },
     );
     const markup = pageWith(snapshot(), chromeFor({ receipt: { intent_id: "intent-9", found: true, move, approvals: false } }));
@@ -252,9 +276,20 @@ describe("first-run cockpit rendering", () => {
     expect(markup).not.toContain('name="decision"');
   });
 
+  test("a legacy escalation with approval text but no typed id is shown unverified with no approve control", () => {
+    const move = moveOf(
+      { intent_id: "intent-11", operation_ref: "product.apply", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:99" }, settlement: null, at: null },
+      { governed: true, realitytrace: true },
+    );
+    const markup = pageWith(snapshot(), chromeFor({ receipt: { intent_id: "intent-11", found: true, move, approvals: true } }));
+    expect(markup).toContain("cannot be approved from here");
+    expect(markup).not.toContain('value="approve"');
+    expect(markup).not.toContain('name="approval_id"');
+  });
+
   test("with approvals configured the escalation offers Approve and Reject on its own approval", () => {
     const move = moveOf(
-      { intent_id: "intent-10", operation_ref: "product.apply", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:8" }, settlement: null, at: null },
+      { intent_id: "intent-10", operation_ref: "product.apply", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:8", approvalId: "approval:8" }, settlement: null, at: null },
       { governed: true, realitytrace: true },
     );
     const markup = pageWith(snapshot(), chromeFor({ receipt: { intent_id: "intent-10", found: true, move, approvals: true } }));

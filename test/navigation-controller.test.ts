@@ -24,7 +24,7 @@ import {
   type NavigationContext,
 } from "../src/domain/navigation.ts";
 
-const WORLD = "world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290";
+const WORLD = "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b";
 
 function gates(overrides: Partial<Record<keyof AffordanceGates, GateAssessment>> = {}): AffordanceGates {
   const base: Record<keyof AffordanceGates, GateAssessment> = {

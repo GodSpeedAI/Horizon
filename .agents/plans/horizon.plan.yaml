@@ -15,8 +15,8 @@ source:
     intended_repository_path: ".agents/specs/horizon.agent.spec.yaml"
     artifact_name: "horizon.agent.spec.yaml"
     spec_id: "HORIZON-001"
-    spec_version: "1.1.0"
-    sha256: "d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907"
+    spec_version: "1.2.0"
+    sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435"
     authority: "normative"
     current_status: "approved and frozen by the owner on 2026-10-19; amended to 1.0.1 (adds REQ-CMP-001, mapped to T16) and re-frozen on 2026-10-20; amended to 1.1.0 by SPEC-CR-002 (REQ-NAV-008..013, mapped to T07, T11, T13) and re-frozen on 2026-10-23"
   implementation_brief:

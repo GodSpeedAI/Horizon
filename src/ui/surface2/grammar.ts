@@ -127,12 +127,11 @@ export const CASE_REF = /^case:[A-Za-z][A-Za-z0-9_.:-]{0,127}$/;
 /** An actor is either the observer themselves or an agent acting on the observer's behalf. */
 export const ACTOR_REF = /^(actor|agent|os):[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 /**
- * The operator principal for the `local_operator` profile. Its identity comes from the OS
- * session (REQ-SEC-006), so the minted ref is `os:<user>:<uid>` and no `actor:` prefix is
- * ever invented for it: an invented prefix would present a fabricated authenticated identity.
+ * A human observer: a Cognate `actor:` principal. The local operator's ref is configured
+ * (`identity.operator_ref` / HORIZON_OPERATOR_REF, default `actor:operator`), never the OS account.
+ * The `os:` form is still accepted by this grammar for pre-existing fixtures; no profile mints it
+ * for the operator (see `assertOperatorRef` in src/config/load.ts).
  */
-export const OS_OPERATOR_REF = /^os:[A-Za-z0-9_.-][A-Za-z0-9_.:-]{0,126}$/;
-/** A human observer: a Cognate `actor:` principal or the authenticated OS operator. */
 export const OBSERVER_ACTOR_REF = /^(actor:|os:)[A-Za-z0-9_.-][A-Za-z0-9_.:-]{0,127}$/;
 export const AGENT_ACTOR_REF = /^agent:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 

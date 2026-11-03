@@ -1,7 +1,8 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, statSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
+import { horizonDocument, writeConfig } from "./support/config.ts";
 import {
   agentPrincipal,
   assertAgentPrincipal,
@@ -17,7 +18,7 @@ function fixture(overrides: Record<string, unknown> = {}): Record<string, unknow
     port: 4319,
     world_alias: "horizon",
     world_ref:
-      "world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290",
+      "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
     runtime_store: ".cognate/app.sqlite",
     research_command: ["uv", "run", "--project", "research", "python", "-m", "horizon_research.contract"],
     identity: { source: "os_session", operator_prefix: "os:", agent_prefix: "agent:" },
@@ -89,3 +90,59 @@ function toToml(document: Record<string, unknown>): string {
   }
   return lines.join("\n");
 }
+
+/** The local operator's identity is configured; the OS account (the runtime's service user) never is. */
+describe("local operator identity is configured, not the OS account", () => {
+  const withOperatorEnv = (value: string | undefined, run: () => void) => {
+    const before = process.env.HORIZON_OPERATOR_REF;
+    if (value === undefined) delete process.env.HORIZON_OPERATOR_REF;
+    else process.env.HORIZON_OPERATOR_REF = value;
+    try {
+      run();
+    } finally {
+      if (before === undefined) delete process.env.HORIZON_OPERATOR_REF;
+      else process.env.HORIZON_OPERATOR_REF = before;
+    }
+  };
+  let configPath = "";
+  beforeAll(async () => {
+    const root = mkdtempSync(join(tmpdir(), "horizon-operator-"));
+    configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "app.sqlite"), secretPath: join(root, "launch.secret") }));
+  });
+  const load = () => loadConfig(configPath);
+  const osRef = () => {
+    const info = userInfo();
+    return `os:${info.username}:${info.uid}`;
+  };
+
+  test("defaults to the configured actor ref when the environment is unset", () => {
+    withOperatorEnv(undefined, () => {
+      const loaded = load();
+      expect(loaded.operator.principal.id).toBe("actor:operator");
+      expect(loaded.operator.principal.id).not.toBe(osRef());
+    });
+  });
+
+  test("HORIZON_OPERATOR_REF overrides the configured default", () => {
+    withOperatorEnv("actor:cockpit-owner", () => {
+      expect(load().operator.principal.id).toBe("actor:cockpit-owner");
+    });
+  });
+
+  test("startup refuses an empty, OS-shaped, or malformed HORIZON_OPERATOR_REF", () => {
+    for (const bad of ["", "   ", "operator", "actor:", "actor:has space", osRef(), `os:${userInfo().username}`]) {
+      withOperatorEnv(bad, () => {
+        expect(() => load()).toThrow(/HORIZON_OPERATOR_REF/);
+      });
+    }
+  });
+
+  test("the OS account name and UID never appear in the operator principal", () => {
+    withOperatorEnv(undefined, () => {
+      const id = load().operator.principal.id;
+      expect(id).not.toContain(`:${userInfo().uid}`);
+      expect(id.startsWith("os:")).toBe(false);
+    });
+  });
+});
+

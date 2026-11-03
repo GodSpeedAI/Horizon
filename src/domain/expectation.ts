@@ -259,7 +259,7 @@ export type RunResult = "known_0" | "known_nonzero" | "undefined";
 
 export type DiscriminationDecision =
   | { readonly proceed: true }
-  | { readonly proceed: false; readonly refusal: "expected outcome already holds before acting" | "discrimination unknown" };
+  | { readonly proceed: false; readonly refusal: "expected outcome already holds before acting" | "discrimination unknown" | `discrimination unknown: ${string}` };
 
 /** Exit 0 before acting means the expectation cannot tell success from no change. */
 export function discriminate(run: VerifierEvidence | null, expectedArgv: readonly string[]): DiscriminationDecision {

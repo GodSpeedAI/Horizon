@@ -26,7 +26,7 @@ executable consequence of a surface is an enum member of `HORIZON_OPERATIONS`.
   `[grammar.ts:parseSourceExpression]`, `[grammar.ts:ActorAttribution]`, `[grammar.ts:Provenance]`,
   `[grammar.ts:SurfaceAction]`.
 - Reference patterns `[grammar.ts:SEMANTIC_REF]`: `SEMANTIC_REF`, `WORLD_REF`, `EVIDENCE_REF`,
-  `FRAME_REF`, `EXECUTION_REF`, `CASE_REF`, `ACTOR_REF`, `OS_OPERATOR_REF`, `OBSERVER_ACTOR_REF`,
+  `FRAME_REF`, `EXECUTION_REF`, `CASE_REF`, `ACTOR_REF`, `OBSERVER_ACTOR_REF`,
   `AGENT_ACTOR_REF`.
 - Limits `[grammar.ts:MAX_BLOCKS]`: `MAX_TEXT = 2048`, `MAX_BLOCKS = 64`, `MAX_ROWS = 500`,
   `MAX_COLUMNS = 12`, `MAX_NODES = 500`, `MAX_FIELDS = 32`, `MAX_SOURCE_DEPTH = 8`.

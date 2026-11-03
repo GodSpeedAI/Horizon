@@ -24,6 +24,7 @@ import { AwaitingAuthorityError, createApplication, type HorizonApplication } fr
 import { loadWorld } from "../src/adapters/semantic.ts";
 import { approvalAuthority, seaForgeCall } from "../src/adapters/sea-forge-approvals.ts";
 import { NAVIGATION_INTENT_COMMIT, readIntentAttempts, readIntentRecords } from "../src/capabilities/navigation-intent.ts";
+import { latestSettlement } from "../src/capabilities/navigation-settlement.ts";
 import { PINNED_WORLD_REF, horizonDocument, writeConfig } from "./support/config.ts";
 
 const BIN = process.env.SEA_FORGE_SERVER_BIN;
@@ -101,7 +102,7 @@ async function seaForge(commit: Commit, withRealityTrace = false) {
   const governance = governanceFromEnv({ COGNATE_GOVERNANCE: "sea-forge", COGNATE_SEA_FORGE_SOCKET: socket, COGNATE_WORLD_REF: loadWorld(PINNED_WORLD_REF).cognateWorldRef });
   expect(governance.mode).toBe("sea-forge");
   const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "app.sqlite"), secretPath: join(root, "launch.secret") }));
-  const app: HorizonApplication = await createApplication({ configPath, governance, approvals: approvalAuthority({ socketPath: socket, operatorId: "operator" }), realityTrace: rt ?? null });
+  const app: HorizonApplication = await createApplication({ configPath, governance, approvals: approvalAuthority({ socketPath: socket, operatorId: "actor:operator" }), realityTrace: rt ?? null });
   cleanups.push(() => void app.close?.());
   const records = async () => (await readIntentRecords(app.runtime.runtime.store)).map((r) => r.record.intent_id);
   const attempts = async () => readIntentAttempts(app.runtime.runtime.store);
@@ -252,4 +253,24 @@ settlementTest("J02 IS6/IS7: RealityTrace records the commit's trace; SEA-Forge 
   const again = await app.settleNavigationIntent(committed.intent.intent_id);
   expect(again.realitytrace_observation).toEqual(observation);
   expect(again.settlement_reference.status).toBe("unsettled");
+}, 240_000);
+
+settlementTest("observation and the SEA-Forge ruling are separate steps: observe records evidence without a ruling, rule needs the observation", async () => {
+  const { app } = await seaForge("allow", true);
+  const committed = await app.commitNavigationIntent({ operationRef: "horizon.health" });
+
+  // Ruling before observing refuses with a reason and writes no settlement record.
+  await expect(app.settleNavigationIntent(committed.intent.intent_id, "rule")).rejects.toThrow("observe the commit first");
+  expect(await latestSettlement(app.runtime.runtime.store, app.caller.tenant, committed.intent.intent_id)).toBeNull();
+
+  // Observing records the observation and stops: SEA-Forge has not ruled, so the status is pending.
+  const observed = await app.settleNavigationIntent(committed.intent.intent_id, "observe");
+  expect(observed.settlement_reference).toMatchObject({ status: "pending", final: false });
+  expect(observed.realitytrace_observation).not.toBeNull();
+
+  // Observing again keeps the same observation; the ruling then uses it.
+  expect(await app.settleNavigationIntent(committed.intent.intent_id, "observe")).toEqual(observed);
+  const ruled = await app.settleNavigationIntent(committed.intent.intent_id, "rule");
+  expect(ruled.realitytrace_observation).toEqual(observed.realitytrace_observation);
+  expect(ruled.settlement_reference.status).toBe("unsettled");
 }, 240_000);

@@ -7,6 +7,12 @@ export interface IdentityConfig {
   readonly source: "os_session" | "identity_provider";
   readonly operator_prefix: string;
   readonly agent_prefix: string;
+  /**
+   * The local human operator's durable ref (`actor:<id>`), the principal every local session and
+   * approval is attributed to. Configured here, overridable at startup by HORIZON_OPERATOR_REF.
+   * Never derived from the OS account, so it survives a change of service account or UID.
+   */
+  readonly operator_ref: string;
   readonly identity_provider?: string;
 }
 
@@ -64,6 +70,21 @@ export interface HorizonConfig {
   readonly settlement?: SettlementConfig;
   /** HC-06: where case economics are read from. Absent: the economics view shows an honest "not configured". */
   readonly economics?: EconomicsConfig;
+  /** Operator-to-SEA-Forge-actor mapping for remote and desktop sessions. Absent: the single-operator development default. */
+  readonly operators?: OperatorsConfig;
+}
+
+/**
+ * Which SEA-Forge actor each durable operator acts as. The only source of a session's SEA-Forge actor:
+ * never a request field, header or cookie. Validated at startup against the identity store.
+ */
+export interface OperatorsConfig {
+  /** The durable operator the cockpit's own (desktop) session approves pairing for. */
+  readonly desktop_operator?: string;
+  /** Actors the gateway may present `on_behalf_of`; every mapped actor must be listed. */
+  readonly delegable_actors?: readonly string[];
+  /** Durable operator id to SEA-Forge actor id. */
+  readonly actors: Readonly<Record<string, string>>;
 }
 
 /** One operation's reviewed, versioned capability binding (SPEC-CR-002 §1, §4). */
@@ -84,6 +105,11 @@ export interface SettlementConfig {
   /** The confinement prefix every verifier runs under (e.g. an attested bubblewrap with a read-only view, no network). */
   readonly launcher: readonly string[];
   readonly close_grace_s: number;
+  /**
+   * Directory holding the verifier's read-only snapshot of the store (`app.sqlite` inside it). The launcher mounts
+   * this, not the live store's directory. Absent: `verifier-snapshot` beside the live store's directory.
+   */
+  readonly snapshot_dir?: string;
 }
 
 export interface LoadedConfig {

@@ -10,7 +10,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
-import { buildLineage, buildWorkspace, moveOf, onboardingOf, scopeOf, shortRef, workspaceState, WORKSPACE_REGION_ORDER } from "../src/ui/workspace/model.ts";
+import { approvalAssuranceOf, buildLineage, buildWorkspace, moveOf, onboardingOf, scopeOf, shortRef, workspaceState, WORKSPACE_REGION_ORDER } from "../src/ui/workspace/model.ts";
 import type { GuiView, ProjectedNode } from "../src/ui/surface2/project.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
@@ -206,7 +206,7 @@ describe("first-run derivations", () => {
   const ungoverned = { governed: false, realitytrace: false };
 
   test("short refs keep the readable part and the digest prefix", () => {
-    expect(shortRef("world:horizon@sha256:701d6211e7ef60ebb35d100cd8968561a4982daec7162107e91937e3929af290")).toBe("horizon@701d6211");
+    expect(shortRef("world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b")).toBe("horizon@0a10c20d");
     expect(shortRef("obj:strategy:alpha")).toBe("obj:strategy:alpha");
     expect(shortRef("case:0123456789abcdef0123456789abcdef")).toBe("case:0123456789a…abcdef");
   });
@@ -241,11 +241,29 @@ describe("first-run derivations", () => {
 
   test("an escalated commit waits on the approval named in its stored attempt", () => {
     const move = moveOf(
-      { intent_id: "intent-2", operation_ref: "horizon.health", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:42" }, settlement: null, at: null },
+      { intent_id: "intent-2", operation_ref: "horizon.health", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:42", approvalId: "approval:42" }, settlement: null, at: null },
       governed,
     );
     expect(move.decided.state).toBe("awaiting");
     expect(move.approval_id).toBe("approval:42");
+  });
+
+  test("a legacy attempt whose text names an approval but has no typed id is unverified and offers no approve control", () => {
+    const move = moveOf(
+      { intent_id: "intent-3", operation_ref: "horizon.health", committed: null, attempt: { outcome: "awaiting_authority", reason: "SEA-Forge escalated; awaiting approval approval:99" }, settlement: null, at: null },
+      governed,
+    );
+    expect(move.approval_identity).toEqual({ state: "unverified" });
+    expect(move.approval_id).toBeNull();
+  });
+
+  test("a new attempt record carries its typed approval id and the model reads it without parsing text", () => {
+    const move = moveOf(
+      { intent_id: "intent-4", operation_ref: "horizon.health", committed: null, attempt: { outcome: "awaiting_authority", reason: "unrelated wording", approvalId: "approval:typed" }, settlement: null, at: null },
+      governed,
+    );
+    expect(move.approval_identity).toEqual({ state: "verified", approvalId: "approval:typed" });
+    expect(move.approval_id).toBe("approval:typed");
   });
 
   test("an ungoverned commit is policy only, never SEA-Forge's decision, and is not observed", () => {
@@ -264,6 +282,7 @@ describe("first-run derivations", () => {
       intent_id: "intent-4",
       operation_ref: "product.apply",
       committed: { at: "2026-10-24T00:00:00.000Z", expected: true },
+      decision: { ref: "inv-4" },
       attempt: null,
       settlement: { status: "pending", final: false, reason: null, observation: { evidence_id: "ev-1", sxr_observation_id: "sxr-1" } },
       at: null,
@@ -274,9 +293,77 @@ describe("first-run derivations", () => {
     expect(moveOf({ ...facts, settlement: { ...facts.settlement, final: true } }, governed).settleable).toBe(false);
   });
 
+  test("a governed commit with no recorded SEA-Forge decision is never presented as allowed by SEA-Forge", () => {
+    const base = {
+      intent_id: "intent-5",
+      operation_ref: "product.apply",
+      committed: { at: "2026-10-24T00:00:00.000Z", expected: true },
+      attempt: null,
+      settlement: null,
+      at: null,
+    };
+    const unrecorded = moveOf(base, governed);
+    expect(unrecorded.decided.state).not.toBe("allowed");
+    expect(unrecorded.decided.text).not.toContain("Allowed by SEA-Forge");
+    expect(unrecorded.decided.text).toContain("no SEA-Forge decision is recorded");
+    expect(unrecorded.settleable).toBe(false);
+
+    const recorded = moveOf({ ...base, decision: { ref: "inv-7" } }, governed);
+    expect(recorded.decided.state).toBe("allowed");
+    expect(recorded.decided.text).toBe("Allowed by SEA-Forge: decision inv-7.");
+  });
+
+  test("observation and the SEA-Forge ruling are separate steps: observing never offers or performs the ruling", () => {
+    const base = {
+      intent_id: "intent-6",
+      operation_ref: "product.apply",
+      committed: { at: "2026-10-24T00:00:00.000Z", expected: true },
+      decision: { ref: "inv-6" },
+      attempt: null,
+      at: null,
+    };
+    const unobserved = moveOf({ ...base, settlement: null }, governed);
+    expect(unobserved.observable).toBe(true);
+    expect(unobserved.settleable).toBe(false);
+
+    const observed = moveOf(
+      { ...base, settlement: { status: "pending", final: false, reason: null, observation: { evidence_id: "ev-6" } } },
+      governed,
+    );
+    expect(observed.observable).toBe(false);
+    expect(observed.settleable).toBe(true);
+  });
+
   test("the no-affordance message names the moves that can still be committed", () => {
     const base = { unresolved: 0, checkpointKnown: true, objects: 1, choices: 1, decision: "no_affordance" as const };
     expect(workspaceState({ ...base, submittable: 2 }).message).toBe("2 moves are available from this focus. Blocked moves show their reasons below.");
     expect(workspaceState({ ...base, submittable: 0 }).message).toBe("No move is available from this focus yet. The blocked reasons are shown below.");
+  });
+});
+
+describe("typed approval id on stored attempts", () => {
+  test("appendIntentAttempt persists approvalId and readIntentAttempts returns it; an attempt without one reads as null", async () => {
+    const { appendIntentAttempt, readIntentAttempts } = await import("../src/capabilities/navigation-intent.ts");
+    const store = application.runtime.runtime.store;
+    const base = { actor_ref: null, caller_ref: null, outcome: "awaiting_authority" as const, reason: "SEA-Forge escalated; awaiting approval ap-typed", at: new Date().toISOString() };
+    await appendIntentAttempt(store, { attempt: { ...base, intent_id: "typed-1", approvalId: "ap-typed" }, tenant: "t", scopeId: "s" });
+    await appendIntentAttempt(store, { attempt: { ...base, intent_id: "legacy-1" }, tenant: "t", scopeId: "s" });
+    const attempts = await readIntentAttempts(store);
+    expect(attempts.find((a) => a.intent_id === "typed-1")?.approvalId).toBe("ap-typed");
+    expect(attempts.find((a) => a.intent_id === "legacy-1")?.approvalId).toBeNull();
+  });
+});
+
+describe("approval assurance", () => {
+  test("known values map to themselves", () => {
+    expect(approvalAssuranceOf("governed")).toBe("governed");
+    expect(approvalAssuranceOf("unisolated-development")).toBe("unisolated-development");
+  });
+  test("missing or unrecognised values are unknown, never governed", () => {
+    expect(approvalAssuranceOf(undefined)).toBe("unknown");
+    expect(approvalAssuranceOf(null)).toBe("unknown");
+    expect(approvalAssuranceOf("")).toBe("unknown");
+    expect(approvalAssuranceOf("Governed!")).toBe("unknown");
+    expect(approvalAssuranceOf("production")).toBe("unknown");
   });
 });

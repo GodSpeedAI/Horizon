@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import type { StoredEvent } from "@godspeedai/cognate-events";
 import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
@@ -300,13 +300,35 @@ describe("structural walking skeleton", () => {
     }
   }, 60_000);
 
-  test("a spoofed observer is refused, the committed observer is the OS session, and the attempt is auditable", async () => {
+  test("HORIZON_OPERATOR_REF names the operator the cockpit header and approvals use, and an invalid one refuses startup", async () => {
+    const root = fixture();
+    process.env.HORIZON_OPERATOR_REF = "actor:cockpit-owner";
+    try {
+      application = await configuredApplication(root);
+      expect(application.caller.actor.id).toBe("actor:cockpit-owner");
+    } finally {
+      delete process.env.HORIZON_OPERATOR_REF;
+    }
+    process.env.HORIZON_OPERATOR_REF = `os:${userInfo().username}:${userInfo().uid}`;
+    try {
+      const refused = await configuredApplication(fixture()).then(() => null, (reason: unknown) => reason);
+      expect(refused).toBeInstanceOf(Error);
+      expect((refused as Error).message).toMatch(/HORIZON_OPERATOR_REF/);
+    } finally {
+      delete process.env.HORIZON_OPERATOR_REF;
+    }
+  }, 60_000);
+
+  test("a spoofed observer is refused, the committed observer is the configured operator, and the attempt is auditable", async () => {
     const root = fixture();
     application = await configuredApplication(root);
     const app = application;
     const { runtime, caller } = app;
     const operator = caller.actor.id;
-    expect(operator.startsWith("os:")).toBe(true);
+    // The operator is the configured ref (default actor:operator), never the OS account that runs the runtime.
+    expect(operator).toBe("actor:operator");
+    expect(operator).not.toContain(String(userInfo().uid));
+    expect(operator).not.toBe(`os:${userInfo().username}:${userInfo().uid}`);
     expect(app.frame()).toBeNull();
 
     const issued = await app.commitNavigationIntent({ operationRef: "horizon.health" });

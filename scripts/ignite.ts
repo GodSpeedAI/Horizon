@@ -6,17 +6,30 @@
  * is created on first run and reused afterwards, so a restart keeps cases, commits and evidence.
  * The policy file is written once and then belongs to the operator.
  *
- * The wiring is the one test/J02-live.test.ts proves: this uid is the Horizon service and the
- * SEA-Forge gateway; the operator has no uid and acts only through the gateway (on_behalf_of).
+ * Governed mode: the SEA-Forge gateway is a separately provisioned service account (default
+ * `godspeed-sea-forge`, configurable) that is not the account running Horizon; see
+ * scripts/install-sea-forge-gateway.sh. The operator has no uid and acts only through the gateway
+ * (on_behalf_of). `--unisolated-development` is the explicit, INSECURE single-account alternative
+ * (the wiring test/J02-live.test.ts proves); it is never selected silently.
  * Missing prerequisites stop the launch with the step that fixes them; nothing degrades silently.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { loadWorld } from "../src/adapters/semantic.ts";
 import { NAVIGATION_INTENT_COMMIT } from "../src/capabilities/navigation-intent.ts";
+import {
+  UNISOLATED_MODE,
+  planConfigWrite,
+  refusalMessage,
+  resolveGatewaySettings,
+  sidecarName,
+  statusFor,
+  validateGateway,
+  type AccountFact,
+} from "./gateway-identity.ts";
 import { REMOTE_DEFAULT_PORT, publicOriginOf } from "../src/remote/settings.ts";
 
 const args = process.argv.slice(2);
@@ -25,10 +38,14 @@ const opt = (name: string) => {
   return i === -1 ? undefined : args[i + 1];
 };
 if (args.includes("--help")) {
-  console.log(`usage: bun run ignite [--cell DIR] [--approve-commits] [--remote [PUBLIC_URL]] [--remote-port N]
+  console.log(`usage: bun run ignite [--cell DIR] [--approve-commits] [--unisolated-development] [--remote [PUBLIC_URL]] [--remote-port N]
 
   --cell DIR          cell directory (default: $XDG_DATA_HOME/horizon/cell)
   --approve-commits   on first run, write a policy where every commit needs your approval
+  --unisolated-development
+                      development only: run the gateway as this account; governed approvals are
+                      marked INSECURE. Gateway account: HORIZON_GATEWAY_ACCOUNT (default godspeed-sea-forge),
+                      socket owner: HORIZON_GATEWAY_SOCKET_OWNER.
   --remote [URL]      make phone remote control available: a loopback listener on 127.0.0.1:4320,
                       or, with URL (https://host), a public origin your tunnel serves. Nothing is
                       started until you press Start in the cockpit's panel, and no tunnel is started.
@@ -63,7 +80,6 @@ function which(bin: string): string | undefined {
 if (process.platform !== "linux") fail(`unsupported platform '${process.platform}'`, "run on Linux or WSL2 (see docs/IGNITION.md)");
 if (typeof process.getuid !== "function") fail("no POSIX uid available", "run on Linux or WSL2");
 const server = process.env.SEA_FORGE_SERVER_BIN?.trim() || which("sea-forge-server");
-if (!server) fail("sea-forge-server not found", "install the SEA-Forge release (docs/IGNITION.md step 2) or set SEA_FORGE_SERVER_BIN");
 const rt = process.env.REALITYTRACE_BIN?.trim() || which("realitytrace");
 if (!rt) fail("realitytrace not found", "cargo install realitytrace --locked (docs/IGNITION.md step 3) or set REALITYTRACE_BIN");
 if (!existsSync(join(repo, "node_modules"))) fail("dependencies are not installed", "run `just setup` in the Horizon checkout");
@@ -111,19 +127,64 @@ ${approve ? "    requires_approval: true\n" : ""}    actor_role: service
   );
 }
 
-const uid = process.getuid();
-const UNBOUND_UID = 4_294_967_000; // the operator never connects directly; it acts through the gateway
+// Gateway identity: explicit configuration, never derived from the launching process.
+const gatewayFile = join(cell, "gateway.json");
+const readJson = (p: string): Record<string, string> => {
+  try {
+    return JSON.parse(readFileSync(p, "utf8"));
+  } catch {
+    return {};
+  }
+};
+const serverYamlPath = join(cell, "server.yaml");
+const existingServerYaml = existsSync(serverYamlPath) ? readFileSync(serverYamlPath, "utf8") : null;
+// A cell written before gateway identities existed has no gateway.json: it keeps its legacy,
+// single-account layout, announced as unisolated-development and INSECURE.
+const legacyCell = existingServerYaml !== null && !existsSync(gatewayFile);
+const settings = resolveGatewaySettings(process.env, readJson(gatewayFile), args.includes("--unisolated-development") || legacyCell);
+const lookup = (name: string): AccountFact => {
+  const r = spawnSync("id", ["-u", name], { encoding: "utf8" });
+  const n = Number(r.stdout.trim());
+  return { name, uid: r.status === 0 && Number.isInteger(n) ? n : null };
+};
+const nameOfUid = (u: number): AccountFact => {
+  const r = spawnSync("getent", ["passwd", String(u)], { encoding: "utf8" });
+  return { name: r.status === 0 ? (r.stdout.split(":")[0] ?? "") : "", uid: u };
+};
 // A Unix socket path is limited to ~100 bytes: keep it in the cell when it fits, else in the runtime dir.
 const cellSocket = join(cell, "sea-forge.sock");
-const socket =
+let socket =
   Buffer.byteLength(cellSocket) <= 95
     ? cellSocket
     : join(process.env.XDG_RUNTIME_DIR?.trim() || tmpdir(), `horizon-${createHash("sha256").update(cell).digest("hex").slice(0, 12)}.sock`);
+const priorSocket = existingServerYaml === null ? undefined : (() => { try { return JSON.parse(existingServerYaml).socket_path as string | undefined; } catch { return undefined; } })();
+if (priorSocket) socket = priorSocket;
+const verdict = validateGateway(settings, {
+  gateway: lookup(settings.account),
+  socketOwner: existsSync(socket) ? nameOfUid(statSync(socket).uid) : null,
+  currentUid: process.getuid(),
+});
+if (!verdict.ok) {
+  console.error(`ignite: ${refusalMessage(verdict)}`);
+  process.exit(1);
+}
+// Record the account names (never the mode, never a uid) so a later plain run is governed, not legacy.
+if (!existsSync(gatewayFile) && !legacyCell) writeFileSync(gatewayFile, JSON.stringify({ account: settings.account, socket_owner: settings.socketOwner }, null, 2));
+const status = statusFor(verdict, settings);
+writeFileSync(join(cell, "gateway-status.json"), JSON.stringify(status, null, 2));
+if (verdict.insecure) {
+  console.warn(`ignite: WARNING mode ${UNISOLATED_MODE}${legacyCell ? " (legacy cell layout)" : ""}: governed approvals are INSECURE; use only for development`);
+} else {
+  console.log(`ignite: governed mode, gateway service account '${settings.account}'`);
+}
+
 const rtData = join(cell, "realitytrace", "data");
 const rtState = join(cell, "realitytrace", "state");
-writeFileSync(
-  join(cell, "server.yaml"),
-  JSON.stringify(
+if (verdict.insecure) {
+  if (!server) fail("sea-forge-server not found", "install the SEA-Forge release (docs/IGNITION.md step 2) or set SEA_FORGE_SERVER_BIN");
+  const uid = process.getuid(); // unisolated-development only: this account is both Horizon and the gateway
+  const UNBOUND_UID = 4_294_967_000; // the operator never connects directly; it acts through the gateway
+  const generated = JSON.stringify(
     {
       socket_path: socket,
       root: cell,
@@ -138,47 +199,59 @@ writeFileSync(
     },
     null,
     2,
-  ),
-);
-
-// 3. SEA-Forge, then the cockpit.
-if (existsSync(socket)) {
-  const probe = spawnSync("sh", ["-c", `command -v ss >/dev/null && ss -xl | grep -qF "${socket}"`]);
-  if (probe.status === 0) fail(`a SEA-Forge server is already listening on ${socket}`, "stop the other `bun run ignite`, or pass --cell with a different directory");
-  rmSync(socket, { force: true });
+  );
+  const plan = planConfigWrite(existingServerYaml, generated);
+  if (plan.action === "write") writeFileSync(serverYamlPath, generated);
+  else if (plan.action === "sidecar") {
+    const side = sidecarName(serverYamlPath, new Date());
+    writeFileSync(side, generated);
+    console.log(`ignite: ${serverYamlPath} is authoritative and differs from this checkout's generated config; kept it.\n  wrote ${side}\n  ${plan.summary.replace(/\n/g, "\n  ")}`);
+  }
+} else if (existingServerYaml === null) {
+  fail(`no SEA-Forge configuration at ${serverYamlPath}`, "the gateway service account owns it; see the plan printed by scripts/install-sea-forge-gateway.sh");
 }
+
+// 3. SEA-Forge, then the cockpit. Governed mode: the gateway service account runs SEA-Forge; Horizon only connects.
 const logPath = join(cell, "sea-forge.log");
-const sf = spawn(server, [], {
-  env: { ...process.env, SEA_FORGE_ROOT: cell, SEA_FORGE_SOCKET: socket },
-  stdio: ["ignore", openSync(logPath, "a"), openSync(logPath, "a")],
-});
-const children = [sf];
+const children: ReturnType<typeof spawn>[] = [];
 const stopAll = () => {
   for (const c of children.reverse()) if (c.exitCode === null) c.kill("SIGTERM");
 };
 process.on("SIGINT", stopAll);
 process.on("SIGTERM", stopAll);
-sf.on("exit", (code) => {
-  if (code !== 0 && code !== null) {
-    console.error(`ignite: sea-forge-server exited with code ${code}; see ${logPath}`);
-    stopAll();
-    process.exit(1);
+if (verdict.insecure) {
+  if (existsSync(socket)) {
+    const probe = spawnSync("sh", ["-c", `command -v ss >/dev/null && ss -xl | grep -qF "${socket}"`]);
+    if (probe.status === 0) fail(`a SEA-Forge server is already listening on ${socket}`, "stop the other `bun run ignite`, or pass --cell with a different directory");
+    rmSync(socket, { force: true });
   }
-});
-const deadline = Date.now() + 30_000;
-while (!existsSync(socket)) {
-  if (Date.now() > deadline) {
-    stopAll();
-    fail("SEA-Forge did not open its socket within 30s", `read ${logPath}`);
+  const sf = spawn(server!, [], {
+    env: { ...process.env, SEA_FORGE_ROOT: cell, SEA_FORGE_SOCKET: socket },
+    stdio: ["ignore", openSync(logPath, "a"), openSync(logPath, "a")],
+  });
+  children.push(sf);
+  sf.on("exit", (code) => {
+    if (code !== 0 && code !== null) {
+      console.error(`ignite: sea-forge-server exited with code ${code}; see ${logPath}`);
+      stopAll();
+      process.exit(1);
+    }
+  });
+  const deadline = Date.now() + 30_000;
+  while (!existsSync(socket)) {
+    if (Date.now() > deadline) {
+      stopAll();
+      fail("SEA-Forge did not open its socket within 30s", `read ${logPath}`);
+    }
+    await Bun.sleep(100);
   }
-  await Bun.sleep(100);
 }
 
 // Read world_ref without loadConfig, which would also write a launch secret.
 const configPath = resolve(repo, process.env.HORIZON_CONFIG ?? "config/horizon.toml");
 const world = loadWorld((Bun.TOML.parse(readFileSync(configPath, "utf8")) as { world_ref: string }).world_ref);
 console.log(`ignite: cell ${cell}`);
-console.log(`ignite: SEA-Forge ${server} (log ${logPath})`);
+console.log(`ignite: SEA-Forge ${server ?? "(run by the gateway service account)"} (log ${logPath})`);
 console.log(`ignite: RealityTrace ${rt}`);
 if (remote !== null) {
   const cockpitPort = (Bun.TOML.parse(readFileSync(configPath, "utf8")) as { port?: number }).port ?? 4319;
@@ -195,7 +268,8 @@ const cockpit = spawn("bun", ["run", "src/main.ts"], {
     COGNATE_GOVERNANCE: "sea-forge",
     COGNATE_SEA_FORGE_SOCKET: socket,
     COGNATE_WORLD_REF: world.cognateWorldRef,
-    COGNATE_SEA_FORGE_OPERATOR: "operator",
+    COGNATE_SEA_FORGE_OPERATOR: "operator", // logical actor id, a single-operator development default
+    HORIZON_APPROVAL_ASSURANCE: status.approvals,
     COGNATE_REALITYTRACE_BIN: rt,
     COGNATE_REALITYTRACE_DATA_HOME: rtData,
     COGNATE_REALITYTRACE_STATE_HOME: rtState,

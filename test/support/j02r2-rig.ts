@@ -122,7 +122,11 @@ export async function cell(commit: "allow" | "deny" | "escalate", options: { com
 
   const storeDir = join(root, "store");
   mkdirSync(storeDir);
-  const store = join(storeDir, "app.sqlite");
+  // The verifier reads a read-only snapshot of the store, so the launcher mounts the snapshot directory only.
+  const snapshotDir = join(root, "verifier-snapshot");
+  mkdirSync(snapshotDir);
+  const store = join(snapshotDir, "app.sqlite");
+  const liveStore = join(storeDir, "app.sqlite");
   const verifier = (tenantLiteral: string) => ({
     template_id: "horizon.intent-recorded",
     version: "1",
@@ -135,10 +139,10 @@ export async function cell(commit: "allow" | "deny" | "escalate", options: { com
     BWRAP!, "--unshare-all", "--die-with-parent", "--new-session",
     "--ro-bind", "/usr", "/usr", "--ro-bind-try", "/lib", "/lib", "--ro-bind-try", "/lib64", "/lib64",
     "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
-    "--ro-bind", storeDir, storeDir, "--ro-bind", verifierBin.bin, verifierBin.bin, "--chdir", "/",
+    "--ro-bind", snapshotDir, snapshotDir, "--ro-bind", verifierBin.bin, verifierBin.bin, "--chdir", "/",
   ];
   const doc = {
-    ...horizonDocument({ storePath: store, secretPath: join(root, "launch.secret") }),
+    ...horizonDocument({ storePath: liveStore, secretPath: join(root, "launch.secret") }),
     operations: [
       { operation_ref: RECORD, label: "Record a navigation intent", reversibility: "reversible", payment: bounds({ compute: 1, steering_attention: 1 }), verifier: verifier(TENANT_PLACEHOLDER) },
       { operation_ref: WRONG_TENANT, label: "Record, checked under another tenant", reversibility: "reversible", payment: bounds({}, "binding:elsewhere@1"), verifier: verifier("tenant-that-is-not-this-one") },
@@ -148,7 +152,7 @@ export async function cell(commit: "allow" | "deny" | "escalate", options: { com
       { currency: "compute", unit: "units", allowance: options.computeAllowance ?? 10, period: "none" },
       { currency: "steering_attention", unit: "decisions", allowance: options.steeringAllowance ?? 20, period: "day" },
     ],
-    settlement: { launcher, close_grace_s: GRACE_S },
+    settlement: { launcher, close_grace_s: GRACE_S, snapshot_dir: snapshotDir },
   };
   const governance = governanceFromEnv({ COGNATE_GOVERNANCE: "sea-forge", COGNATE_SEA_FORGE_SOCKET: socket, COGNATE_WORLD_REF: loadWorld(PINNED_WORLD_REF).cognateWorldRef });
   const open = async () => {

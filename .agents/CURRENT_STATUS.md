@@ -1,8 +1,35 @@
 # Horizon Current Status
 
-**Revision:** 30 · **Recorded:** 2026-10-23T17:50:00Z · **Stage:** spec HORIZON-001 **1.1.0** frozen (SPEC-CR-002: payment and IS7 settlement); REQ-NAV-008..013 not yet implemented; next ready task **T11**
+**Revision:** 32 · **Recorded:** 2026-11-01T00:00:00Z · **Stage:** unchanged settlement state — spec HORIZON-001 **1.1.0** frozen (SPEC-CR-002: payment and IS7 settlement); REQ-NAV-008..013 not yet implemented; next ready task **T11**. Two **non-normative** recon reports added.
 
 **Spec:** HORIZON-001 v1.1.0, frozen 2026-10-23; SHA-256 `d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907`.
+
+## Recon deliverable — Palantir Foundry + AI FDE (non-normative, no task settled)
+
+Applied the owner-supplied `replica-recon` skill to the operator-confirmed slice *"the Ontology system that
+encodes the data, logic, action and security of the enterprise to automate decisions across business
+operations + the agent that builds it."* Output: `.agents/reports/2026-11-01-palantir-foundry-aifde-recon.md`
+(54 screens, 12 flows, ~50 entities, UI/UX anatomy, evidence grades) and
+`2026-11-01-palantir-foundry-aifde-features.csv` (65 rows). Public sources only: docs, architecture center,
+one conference page, two official recordings, one practitioner recording, and 56 public product screenshots.
+
+Three passes: docs and marketing; then official recordings plus the AI FDE screenshots; then the
+ontology-half screenshots, which upgraded the type wizard, action authoring and submission criteria from
+`[D]` to `[O]`. Pass 3 reversed six further inferences — most importantly that **security is authored with
+the type** (step 6 of a six-step creation wizard, a per-property policy table) rather than configured
+afterwards, that the wizard **generates Create/Modify/Delete action types and requires a submit authority**
+(`Organization | Group | User`), and that submission criteria are a nested `MATCH ALL / MATCH ANY` predicate
+tree over typed operands rather than a flat condition. It also produced the recon's only observed negative
+state: a disabled action with tooltip `Invalid state to apply action`.
+
+All 56 screenshots are staged in `.tmp/palintar-screens/` (six folders) with `INDEX.md` mapping every file to
+its screen ID and public source URL. `.tmp/` is gitignored at `.gitignore:25`, so they cannot be committed
+or shipped.
+
+This changes no requirement, plan task, gate or proof level. It is comparative research recorded where
+`.agents/AGENTS.md` says investigations live. Grading note for future readers: no Palantir account was used,
+so empty/error/denied states remain unobserved; the report marks every claim `[O]`/`[D]`/`[I]`/`[?]` and
+carries a corrections table against its own first pass.
 
 
 ## SPEC-CR-002 — spec 1.1.0: payment and IS7 settlement (normative, not yet implemented)
