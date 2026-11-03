@@ -211,9 +211,9 @@ socket group with `groupdel`. The installer header lists the same steps.
 
 ## Known open items
 
-- The gateway unit's read-only binds (step 7) are not yet verified on the live system. Run step 7 after the restart.
-- The live approval round-trip through the inbox (approve and reject a real request, and confirm SEA-Forge records the
-  operator identity) is not yet done.
-- The runtime's connection to the socket as `godspeed-horizon` is not yet confirmed from the cockpit.
+- Verified on this machine: step 7 (the gateway cannot replace `policy.yaml`: `Device or resource busy`, file kept), and the
+  runtime reaching the gateway socket (`/workspace/approvals` returns 200 and lists from SEA-Forge).
+- Not yet done: the live approve and reject round-trip. It needs a real request waiting for a decision, and the operator
+  decides when to create one. Afterwards, confirm SEA-Forge records the operator identity.
 - RealityTrace is not installed by this setup.
 - The socket check depends on `python3`.
