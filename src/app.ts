@@ -88,6 +88,22 @@ import { remotePanelPage } from "./remote/panel.ts";
 type HttpServer = Server<unknown>;
 
 /** The frame this application most recently issued and the gates assessed on it. */
+/**
+ * Why `approver` may not answer an escalation that `requester` raised, or null when it may. Fails closed: an unknown
+ * requester or approver is refused, never treated as distinct. The requester is compared both as its recorded id and
+ * as the SEA-Forge actor it maps to, so neither spelling lets a requester approve its own escalation.
+ */
+export function selfApprovalRefusal(input: {
+  readonly requester: string | null | undefined;
+  readonly approver: string | null | undefined;
+  readonly actorFor: (id: string) => string | undefined;
+}): string | null {
+  if (typeof input.approver !== "string" || input.approver === "") return "the approver's identity cannot be determined, so this escalation cannot be approved";
+  if (typeof input.requester !== "string" || input.requester === "") return "the requester of this escalation cannot be determined, so it cannot be approved";
+  if (input.requester === input.approver || input.actorFor(input.requester) === input.approver) return "the requester cannot approve its own escalation";
+  return null;
+}
+
 export interface FrameView {
   readonly frame: NavigationFrameV1;
 }
@@ -495,11 +511,13 @@ export async function createApplication(
     if (who !== undefined) {
       const refusal = sessionRefusal(who);
       if (refusal !== null) throw new Error(`APPROVAL: ${refusal}`);
-      const approver = mappedActors.actorFor(who.actor.id)!;
-      const asked = (await readIntentAttempts(runtime.runtime.store)).filter((entry) => entry.outcome === "awaiting_authority" && entry.approvalId === request.approvalId).at(-1);
-      if (asked !== undefined && mappedActors.actorFor(asked.caller_ref ?? "") === approver) throw new Error("APPROVAL: the requester cannot approve its own escalation");
-      authority = { ...approvals, operator: { actor_id: approver, role: "operator" } };
+      authority = { ...approvals, operator: { actor_id: mappedActors.actorFor(who.actor.id)!, role: "operator" } };
     }
+    // The check runs on every path (session or desktop) and always fails closed on an unknown identity.
+    const approver = who !== undefined ? mappedActors.actorFor(who.actor.id) : approvals.operator.actor_id;
+    const asked = (await readIntentAttempts(runtime.runtime.store)).filter((entry) => entry.outcome === "awaiting_authority" && entry.approvalId === request.approvalId).at(-1);
+    const selfRefusal = selfApprovalRefusal({ requester: asked?.caller_ref, approver, actorFor: (id) => mappedActors.actorFor(id) });
+    if (selfRefusal !== null) throw new Error(`APPROVAL: ${selfRefusal}`);
     // Pick up a decision already made at SEA-Forge directly before answering again.
     await runtime.runtime.pollApprovals();
     const wait = (await runtime.runtime.service.listContinuations(caller, {})).find(
