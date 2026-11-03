@@ -57,8 +57,16 @@ Nothing runs privileged commands by itself. The only privileged step is the `sud
 The stage digest changes whenever you run `just gateway-stage`. The `sudo` command must use the digest printed by the
 latest `just gateway-stage`. Recompute a binary's hash with `sha256sum <path>` if you rebuild or upgrade it.
 
-RealityTrace is not installed by this setup. The runtime unit points at
-`/usr/local/lib/godspeed-horizon/bin/realitytrace`. Place a root-owned copy there yourself if you use RealityTrace.
+RealityTrace is used by the runtime. The unit points at `/usr/local/lib/godspeed-horizon/bin/realitytrace`, which must be
+a root-owned copy (the agents must not be able to replace it). Install it once, as root, and check the hash:
+
+```bash
+sudo install -o root -g root -m 0755 "$(readlink -f "$(command -v realitytrace)")" /usr/local/lib/godspeed-horizon/bin/realitytrace
+sha256sum /usr/local/lib/godspeed-horizon/bin/realitytrace
+```
+
+On this machine it is `realitytrace 0.3.0`, sha256 `41466eb9539d9c63600a9ab6606a0795f04d12196d5aeff54ac48355215ba89e`. The
+installer check reports it as `ok` once present. Upgrading RealityTrace means repeating the install and restarting the runtime.
 
 ## Steps
 
@@ -223,5 +231,4 @@ socket group with `groupdel`. The installer header lists the same steps.
   runtime reaching the gateway socket (`/workspace/approvals` returns 200 and lists from SEA-Forge).
 - Not yet done: the live approve and reject round-trip. It needs a real request waiting for a decision, and the operator
   decides when to create one. Afterwards, confirm SEA-Forge records the operator identity.
-- RealityTrace is not installed by this setup.
 - The socket check depends on `python3`.
