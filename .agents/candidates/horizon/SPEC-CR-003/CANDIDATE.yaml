@@ -1,0 +1,95 @@
+candidate_revision:
+  id: SPEC-CR-003
+  task: none (spec source and requirement delta; applies to the next spec version)
+  prepared_at: "2026-11-02"
+  prepared_by: builder (Claude session, settlement approval gate)
+  status: proposed. NOT applied, NOT frozen. Blocked on decision D1 (see blockers) and on independent verdict.
+  authorization:
+    decision: owner choice recorded in the request of 2026-11-02 (gate external-authority settlement_declaration only; operator-role approvers only; ship via spec change request)
+    scope: >-
+      The owner decided the behaviour. This candidate does not authorize applying it. Application needs a new
+      spec version, an independent ACCEPT verdict in REVIEW.md, owner freeze approval, a plan rebind and a
+      re-freeze through scripts/freeze-formation.sh.
+  active_pins:
+    freeze_id: HORIZON-001-1.2.0@2026-11-02
+    spec_path: .agents/specs/horizon.agent.spec.yaml
+    spec_sha256: 7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
+    plan_path: .agents/plans/horizon.plan.yaml
+    plan_sha256: eafd9bc7d80f18baad9121e38e22e8c9dea06d3c45d3c7b90973432978a70ac2
+    ledger_path: requirements/ledger.yaml
+    ledger_sha256: 1e81c1af7508ce414b91e3b5953167aaaf754e470e69f2985e476dd2868e92c3
+  observed_inconsistency: >-
+    .agents/CURRENT_STATUS.md (revision 32) names HORIZON-001 1.1.0 as the frozen spec, while the Wayfinder
+    header names HORIZON-001-1.2.0@2026-11-02. Not changed by this candidate; to be reconciled by the owner.
+  resolves: []
+  unblocks: []
+  adds_requirements: [REQ-SET-GATE-001 (proposed id, not in ledger)]
+  changes_fields: []
+  semantic_diff: DELTA.md
+  blockers:
+    - id: D1
+      state: UNRESOLVED
+      finding: >-
+        The policy rule matcher cannot select external-authority declarations. settlement_declaration uses the
+        Reserved match arm with a fallback of true (sea-rs crates/sea-forge-authority/src/lib.rs, Reserved arm,
+        default `_ => true`), and the gate passes only {operation_id, surface} as parameters
+        (crates/sea-forge-authority/src/cep.rs gate(), ~line 1466-1480). The `resources` selector is rejected for
+        any operation_kind other than cognate_action / cognate_capability (lib.rs ~1356-1366). PolicyRule uses
+        deny_unknown_fields, so an invented selector key fails to load.
+      consequence: >-
+        A policy-only rule gates EVERY service-role settlement_declaration, including local authority. Scoping to
+        external authority needs sea-rs code: (a) add the authority reference to the gate parameters and a matching
+        arm in matches_rule, or (b) a distinct actor role or identity for the external adapter (ActorRole enum in
+        sea-forge-core/src/types.rs ~line 355). Either is a sea-rs change with its own tests and review.
+      owner_options: >-
+        Choose (a), (b), or accept gating all service settlement_declaration records.
+    - id: D2-SWE-SEED-PATH
+      state: OPEN, needs owner or runtime confirmation
+      finding: >-
+        The server-owned SWE_SEED declaration path (crates/sea-forge-server/src/delegation.rs submit_swe_seed_declaration,
+        ~line 879-967) calls swe_seed_reconciliation::append_and_reconcile_swe_seed_declaration (line 77), which
+        calls sea_forge_settlement::append_declaration_ledgered_once (sea-forge-settlement/src/declaration.rs ~65-90).
+        That path consults no authority gate. A cep rule therefore does not gate it.
+      consequence: >-
+        Whether the SWE_SEED declaration reaches production through this path is UNVERIFIED. If it does, the
+        approval gate must be added to that path in code, not in policy.
+  actor_role_verification:
+    external_adapter_caller: cognate/packages/runtime-bun/src/sea-forge-authority.ts (SeaForgeAuthority, default actor role "service" at line 319; authority_settle at line 406)
+    server_role_source: >-
+      sea-rs crates/sea-forge-server/src/lib.rs ~2569-2577 and ~2751-2770: the role used for the gate is the
+      VERIFIED SOCKET IDENTITY role. The request actor field is not trusted for role.
+    production_binding: >-
+      scripts/gateway-setup.ts ~345-347: runtime uid bound to actor_id cognate-service with roles ["service"].
+      Operator actor bound with roles ["operator"] and reached only through the gateway.
+    verified_role: service
+    verified_selector_for_external_only: UNVERIFIED (none exists, see D1)
+  policy_rule:
+    placement: >-
+      Insert as the FIRST rule of the rules list in scripts/gateway-setup.ts renderPolicyYaml (line ~421-433),
+      and as the first rule of the cell policy in scripts/ignite.ts (line ~118 template) if the cell gate is wanted.
+      The gate must precede the existing `settlement` rule because rules are first-match.
+    yaml: |
+      - name: settlement-approval-gate
+        verdict: allow
+        requires_approval: true
+        actor_role: service
+        operation_kind: settlement_declaration
+        # SELECTOR PLACEHOLDER (UNRESOLVED D1): the rule above gates ALL service settlement_declaration
+        # records. It is NOT the owner's decision (external authority only). Do not place this file in
+        # /var/lib/godspeed-sea-forge/policy.yaml until D1 is resolved and a selector exists in code.
+    cannot_apply_until: "D1 resolved; sea-rs supports the chosen selector; independent ACCEPT; owner freeze approval."
+  approver_policy:
+    approver_role: operator
+    evidence: >-
+      scripts/gateway-setup.ts ~line 430 rule `operator-approves` (actor_role operator, operation_kind
+      approval_resolution). Escalate emits approval-role:<approver_role> from SoD rules (lib.rs ~2473).
+    requester_self_approval: refused by SEA-Forge (owner states the fix is merged in SEA-Forge; not re-verified here)
+  independent_verdict_required: >-
+    A reviewer independent of the builder (a different model) checks DELTA.md against the frozen spec and the
+    sea-rs and Horizon evidence cited here, and files ACCEPT, ACCEPT_WITH_CHANGES or REJECT in REVIEW.md.
+    Nothing is applied before ACCEPT.
+  validation_run_2026_11_02:
+    - "just ledger: pass (105 requirements, 105 acceptance contracts; check-ledger-freeze.sh ok)"
+    - "just wayfinder: pass (0 errors; check-ledger-freeze.sh ok)"
+    - "scripts/apply-candidate-revision.py: NOT run (it is wired to T04-CR-001 and writes composed files)"
+    - "cargo test in sea-rs: NOT run (no code changed by this candidate)"
