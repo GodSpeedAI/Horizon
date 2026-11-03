@@ -11,7 +11,7 @@ not from this file.
 
 | Identity | Name on this machine | Used for |
 | --- | --- | --- |
-| Operator login (your normal login, the agent account) | `sprime01` | `just` recipes, `--check` as a non-root user |
+| Operator login (your normal login, the agent account) | `<login>` (`id -un`) | `just` recipes, `--check` as a non-root user |
 | Gateway service account | `godspeed-sea-forge` | runs `sea-forge-server` |
 | Runtime service account | `godspeed-horizon` | runs the Horizon runtime (Bun) |
 | Socket group | `godspeed-sock` | the gateway socket is group-readable by this group only |
@@ -45,11 +45,11 @@ Nothing runs privileged commands by itself. The only privileged step is the `sud
 
 | Item | Value |
 | --- | --- |
-| SEA-Forge server binary (built from `sea-rs`, PR #73 merged as `6fae052`) | `/home/sprime01/projects/sea-rs-socket-group/target/release/sea-forge-server` |
+| SEA-Forge server binary (built from `sea-rs`, PR #73 merged as `6fae052`) | `$SEA_FORGE_BIN`, the release build in your `sea-rs` checkout |
 | SEA-Forge sha256 | `9d2487cd18fceb6c377d5fb26f739c28251862c55663cfde64ab6c6072a32c85` |
-| Bun binary (used as `~/.local/bin/bun`, resolves to the nub path) | `/home/sprime01/.local/bin/bun` |
+| Bun binary (used as `~/.local/bin/bun`, resolves to the nub path) | `$BUN` |
 | Bun sha256 (Bun 1.4.0) | `33d56b070be6a9e3da0ab013038b43d1645d0534ca811ecdba4472599117eb4b` |
-| Stage directory | `/home/sprime01/.cache/godspeed/gateway-stage` |
+| Stage directory | `$STAGE` |
 | Stage digest (current, from `just gateway-stage` at commit `42cec18`) | `3e714a192c8159c0796ff8644c801061b77126b290fd8e55a6724d13320a8720` |
 | Socket | `/run/godspeed-sea-forge/sea-forge.sock` (group `godspeed-sock`, mode 0660) |
 | Gateway root (config and state) | `/var/lib/godspeed-sea-forge` |
@@ -61,6 +61,14 @@ RealityTrace is not installed by this setup. The runtime unit points at
 `/usr/local/lib/godspeed-horizon/bin/realitytrace`. Place a root-owned copy there yourself if you use RealityTrace.
 
 ## Steps
+
+Set these once in your login shell. The variables expand before `sudo` runs, so the root step gets the real paths:
+
+```bash
+export STAGE="$HOME/.cache/godspeed/gateway-stage"
+export SEA_FORGE_BIN="<path to your sea-rs checkout>/target/release/sea-forge-server"
+export BUN="$HOME/.local/bin/bun"
+```
 
 1. Stage the bundle, which is unprivileged:
 
@@ -82,11 +90,11 @@ RealityTrace is not installed by this setup. The runtime unit points at
 
    ```bash
    sudo scripts/install-sea-forge-gateway.sh --authorize-privileged \
-     --stage /home/sprime01/.cache/godspeed/gateway-stage \
-     --binary /home/sprime01/projects/sea-rs-socket-group/target/release/sea-forge-server \
+     --stage "$STAGE" \
+     --binary "$SEA_FORGE_BIN" \
      --sha256 9d2487cd18fceb6c377d5fb26f739c28251862c55663cfde64ab6c6072a32c85 \
      --replace-binary \
-     --bun /home/sprime01/.local/bin/bun \
+     --bun "$BUN" \
      --bun-sha256 33d56b070be6a9e3da0ab013038b43d1645d0534ca811ecdba4472599117eb4b \
      --expect-stage-sha256 3e714a192c8159c0796ff8644c801061b77126b290fd8e55a6724d13320a8720
    ```
@@ -98,8 +106,8 @@ RealityTrace is not installed by this setup. The runtime unit points at
 4. Check, read-only. Run it as your login first, then as root:
 
    ```bash
-   scripts/install-sea-forge-gateway.sh --check --stage /home/sprime01/.cache/godspeed/gateway-stage
-   sudo scripts/install-sea-forge-gateway.sh --check --stage /home/sprime01/.cache/godspeed/gateway-stage
+   scripts/install-sea-forge-gateway.sh --check --stage "$STAGE"
+   sudo scripts/install-sea-forge-gateway.sh --check --stage "$STAGE"
    ```
 
    The check ends with `check: ok` or `check: N problem(s)`. The lines read:
@@ -183,7 +191,7 @@ so the check reports a note there instead of a result. As your login, the check 
 ## Troubleshooting
 
 - **`no staged bundle at /root/.cache/godspeed/gateway-stage`.** You ran the installer with `sudo` and no `--stage`. Add
-  `--stage /home/sprime01/.cache/godspeed/gateway-stage`.
+  `--stage "$STAGE"`.
 - **A `MISSING` line after apply.** The apply stopped before that row. Rerun the same `sudo` command and read the last lines
   of its output.
 - **`BAD` on `/var/lib/godspeed-sea-forge` mode.** The gateway restarted and enforced 711. Run the apply, which expects 711,
