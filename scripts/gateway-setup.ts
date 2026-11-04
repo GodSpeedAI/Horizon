@@ -414,7 +414,10 @@ export async function navigationCommitId(): Promise<string> {
   return NAVIGATION_INTENT_COMMIT.id;
 }
 
-/** policy.yaml as ignite writes it, without the approval option: the operator owns it after placement. */
+/**
+ * policy.yaml for the gateway root. The external settlement gate is part of the rendered policy, not an option: an
+ * external declaration must be approved by an operator. The operator owns the placed file after placement.
+ */
 export function renderPolicyYaml(commitResourceId: string): string {
   if (!/^[A-Za-z0-9._:/-]+$/.test(commitResourceId)) throw new Error("commit resource id has characters the policy cannot quote");
   return `# SEA-Forge policy for the gateway root. Placed once by scripts/install-sea-forge-gateway.sh; yours to edit.
@@ -430,6 +433,22 @@ rules:
   - { name: horizon-actions, verdict: allow, actor_role: service, operation_kind: cognate_action }
   - { name: operator-approves, verdict: allow, actor_role: operator, operation_kind: approval_resolution }
   - { name: evidence, verdict: allow, actor_role: service, operation_kind: evidence_mutation }
+  # External settlement declarations (SWE_SEED and artifact transitions) stop at Escalate until an operator other
+  # than the requester approves them. Matched by settlement_authority_class, so local declarations are unaffected.
+  - name: settlement-external-approval
+    verdict: allow
+    requires_approval: true
+    actor_role: service
+    operation_kind: settlement_declaration
+    boundary_constraints:
+      settlement_authority_class: [external]
+  - name: settlement-external-approval-operator
+    verdict: allow
+    requires_approval: true
+    actor_role: operator
+    operation_kind: settlement_declaration
+    boundary_constraints:
+      settlement_authority_class: [external]
   - { name: settlement, verdict: allow, actor_role: service, operation_kind: settlement_declaration }
 `;
 }

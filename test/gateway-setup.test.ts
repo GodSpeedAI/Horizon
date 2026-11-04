@@ -555,6 +555,26 @@ describe("server.yaml and policy.yaml (rendered from the runtime account's uid, 
     expect(() => renderPolicyYaml('bad"id')).toThrow();
   });
 
+  test("external settlement declarations escalate to an operator before the plain allow, and local ones are not gated", async () => {
+    const policy = renderPolicyYaml(await navigationCommitId());
+    // Rules are first-match in file order: each gate must come before the ungated fallback.
+    const plain = policy.indexOf("name: settlement, verdict: allow");
+    expect(plain).toBeGreaterThan(-1);
+    expect(policy.indexOf("name: settlement-external-approval\n")).toBeGreaterThan(-1);
+    expect(policy.indexOf("name: settlement-external-approval\n")).toBeLessThan(plain);
+    expect(policy.indexOf("name: settlement-external-approval-operator")).toBeLessThan(plain);
+    // Each gate matches only external declarations and requires approval.
+    const gated = policy.split("  - name: settlement-external-approval").slice(1);
+    expect(gated).toHaveLength(2);
+    for (const block of gated) {
+      expect(block).toContain("requires_approval: true");
+      expect(block).toContain("operation_kind: settlement_declaration");
+      expect(block).toContain("settlement_authority_class: [external]");
+    }
+    // The fallback allow carries no class constraint, so it still covers local declarations.
+    expect(policy.split("\n").find((line) => line.includes("name: settlement, verdict: allow"))).not.toMatch(/boundary|external/);
+  });
+
   test("the plan renders server.yaml and policy.yaml from templates and copies the worlds, with gateway-owned realitytrace homes", () => {
     const rows = buildPlan(layout);
     const cfg = rows.filter((r) => r[0] === "config-file");
