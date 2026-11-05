@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { listApprovals, type ApprovalAuthority } from "../src/adapters/sea-forge-approvals.ts";
 import { buildInbox, parseApproval } from "../src/domain/approval-inbox.ts";
 import { renderApprovalInboxPage } from "../src/ui/workspace/approval-inbox.tsx";
-import { createApplication } from "../src/app.ts";
+import { createApplication, selfApprovalRefusal } from "../src/app.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 
 const NOW = new Date("2026-11-02T12:00:00Z");
@@ -208,5 +208,27 @@ describe("GET /workspace/approvals through the application", () => {
       expect(html).toContain("Waiting for a decision (1)");
       expect(html).not.toContain('action="/workspace/approval"');
     });
+  });
+});
+
+describe("selfApprovalRefusal (fail closed)", () => {
+  const actors = new Map([["op:sam", "actor:sam"], ["op:alex", "actor:alex"]]);
+  const actorFor = (id: string) => actors.get(id);
+  test("the requester approving its own escalation is refused, by recorded id or by mapped actor", () => {
+    expect(selfApprovalRefusal({ requester: "actor:sam", approver: "actor:sam", actorFor })).toBe("the requester cannot approve its own escalation");
+    expect(selfApprovalRefusal({ requester: "op:sam", approver: "actor:sam", actorFor })).toBe("the requester cannot approve its own escalation");
+  });
+  test("an unknown requester is refused, not allowed", () => {
+    expect(selfApprovalRefusal({ requester: undefined, approver: "actor:alex", actorFor })).toContain("requester of this escalation cannot be determined");
+    expect(selfApprovalRefusal({ requester: null, approver: "actor:alex", actorFor })).toContain("cannot be determined");
+    expect(selfApprovalRefusal({ requester: "", approver: "actor:alex", actorFor })).toContain("cannot be determined");
+  });
+  test("an unknown approver is refused, not allowed", () => {
+    expect(selfApprovalRefusal({ requester: "op:sam", approver: undefined, actorFor })).toContain("approver's identity cannot be determined");
+    expect(selfApprovalRefusal({ requester: "op:sam", approver: "", actorFor })).toContain("cannot be determined");
+  });
+  test("a distinct requester and approver are allowed", () => {
+    expect(selfApprovalRefusal({ requester: "op:sam", approver: "actor:alex", actorFor })).toBeNull();
+    expect(selfApprovalRefusal({ requester: "agent:builder", approver: "actor:alex", actorFor })).toBeNull();
   });
 });
