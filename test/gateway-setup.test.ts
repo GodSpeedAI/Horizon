@@ -401,6 +401,7 @@ describe("installer (shell) against a temporary root", () => {
   const bunSha = createHash("sha256").update(readFileSync(bunBin)).digest("hex");
   const env = { ...process.env, HORIZON_GATEWAY_ROOT: root, ...FAKE, HORIZON_OPERATOR_ACCOUNT: "" };
 
+  const seamEnv = { ...env, INSTALLER_TEST_MODE: "1", INSTALLER_TEST_PLAN_TABLE: join(stage, "plan.tsv") }; // fake accounts and a temp root are not in the fixed table
   const run = async (args: string[], e: Record<string, string | undefined> = env) => {
     const p = Bun.spawn(["bash", resolve(repoRoot, "scripts/install-sea-forge-gateway.sh"), ...args], {
       env: e as Record<string, string>,
@@ -422,7 +423,7 @@ describe("installer (shell) against a temporary root", () => {
     const tsDigest = /bundle digest: ([0-9a-f]{64})/.exec(stdout)?.[1];
     expect(tsDigest).toBeDefined();
 
-    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", sha, "--bun", bunBin, "--bun-sha256", bunSha]);
+    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", sha, "--bun", bunBin, "--bun-sha256", bunSha], seamEnv);
     expect(dry.code).toBe(0);
     expect(dry.out).toContain(`stage digest: ${tsDigest}`);
     expect(dry.out).toContain("no changes made");
@@ -443,7 +444,7 @@ describe("installer (shell) against a temporary root", () => {
 
   test("checksum mismatch is refused in dry-run and in authorized mode", async () => {
     const wrong = "0".repeat(64);
-    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", wrong]);
+    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", wrong], seamEnv);
     expect(dry.code).toBe(1);
     expect(dry.err).toContain("not copied");
     const apply = await run(["--authorize-privileged", "--stage", stage, "--binary", bin, "--sha256", wrong, "--expect-stage-sha256", "x"]);
@@ -452,7 +453,7 @@ describe("installer (shell) against a temporary root", () => {
   });
 
   test("a bun checksum mismatch is refused before anything is copied", async () => {
-    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", sha, "--bun", bunBin, "--bun-sha256", "0".repeat(64)]);
+    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", sha, "--bun", bunBin, "--bun-sha256", "0".repeat(64)], seamEnv);
     expect(dry.code).toBe(1);
     expect(dry.err).toContain("bun");
     expect(dry.err).toContain("not copied");
@@ -642,6 +643,11 @@ describe("stage ownership and pinned directories", () => {
     writeFileSync(join(notStage, "precious.txt"), "x\n");
     expect(() => resetStageDir(notStage)).toThrow(/does not look like a stage/);
     expect(existsSync(join(notStage, "precious.txt"))).toBe(true);
+    const symPlan = tempDir("reset-symplan");
+    writeFileSync(join(symPlan, "real"), "x\n");
+    symlinkSync(join(symPlan, "real"), join(symPlan, "plan.tsv"));
+    expect(() => resetStageDir(symPlan)).toThrow(/does not look like a stage/);
+    expect(existsSync(join(symPlan, "real"))).toBe(true);
     const target = tempDir("reset-target");
     const link = join(tempDir("reset-link"), "l");
     symlinkSync(target, link);

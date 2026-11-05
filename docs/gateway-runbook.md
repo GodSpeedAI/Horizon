@@ -112,6 +112,7 @@ export BUN="$HOME/.local/bin/bun"
    changing the stage or the binaries while it runs has no effect. The digest covers every regular file in the stage
    outside `runtime/`, plus `runtime-manifest.sha256` and `runtime-symlinks.tsv` (every directory and symlink), which pin `runtime/` exactly.
    As root, set no `HORIZON_GATEWAY_*` variable and pass `--stage`; `--verify-only` cannot be combined with `--authorize-privileged`.
+   The installer applies only plan rows that match its own fixed table (paths, accounts, owner, group, mode); a plan staged with other values (a development layout or `HORIZON_GATEWAY_ROOT`) is refused with `not in the installer's fixed table`.
    `just gateway-stage` clears the stage directory first (it refuses a non-empty directory that has no `plan.tsv`).
 
    To run the same snapshot and checks without root and without installing anything:

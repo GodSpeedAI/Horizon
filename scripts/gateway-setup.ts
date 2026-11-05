@@ -629,8 +629,12 @@ export function resetStageDir(stageDir: string): void {
   }
   if (stageDir === dirname(stageDir) || stageDir === resolve(homedir())) throw new Error(`refusing to clear ${stageDir}: not a stage directory`);
   if (st.isSymbolicLink() || !st.isDirectory()) throw new Error(`refusing to clear ${stageDir}: it is a symlink or not a directory`);
-  if (readdirSync(stageDir).length > 0 && !existsSync(join(stageDir, "plan.tsv"))) {
-    throw new Error(`refusing to clear ${stageDir}: it is not empty and has no plan.tsv, so it does not look like a stage; point --stage at an empty or earlier stage directory`);
+  let planIsFile = false;
+  try {
+    planIsFile = lstatSync(join(stageDir, "plan.tsv")).isFile(); // a symlinked or special plan.tsv is not a stage marker
+  } catch {}
+  if (readdirSync(stageDir).length > 0 && !planIsFile) {
+    throw new Error(`refusing to clear ${stageDir}: it is not empty and has no regular-file plan.tsv, so it does not look like a stage; point --stage at an empty or earlier stage directory`);
   }
   rmSync(stageDir, { recursive: true, force: true });
   mkdirSync(stageDir, { recursive: true });

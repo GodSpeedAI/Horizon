@@ -39,15 +39,16 @@ function makeStage(): string {
   writeFileSync(
     join(stage, "plan.tsv"),
     [
-      "account\tsvc\tgateway",
-      "worlds\troot\tsock\t/x/worlds\truntime/domain",
-      "deploy-tree\troot\troot\t/x/tree",
-      "config-file\troot\tsock\t0640\t/x/server.yaml\tconfig/server.yaml.in",
-      "config-file\troot\tsock\t0640\t/x/policy.yaml\tconfig/policy.yaml",
-      "generated\troot\tsock\t0640\tstatus.json\t/x/status.json",
-      "generated\troot\troot\t0644\tunits/godspeed-sea-forge.service\t/x/a.service",
-      "generated\troot\troot\t0644\tunits/godspeed-horizon.service\t/x/b.service",
-      "socket\t/x/s.sock",
+      "account\tgodspeed-sea-forge\tgateway",
+      "worlds\troot\tgodspeed-sock\t/var/lib/godspeed-sea-forge/worlds\truntime/domain",
+      "deploy-tree\troot\troot\t/opt/godspeed-horizon",
+      "place-binary\troot\troot\t0755\t/usr/local/lib/godspeed-sea-forge/bin/sea-forge-server",
+      "config-file\troot\tgodspeed-sock\t0640\t/var/lib/godspeed-sea-forge/server.yaml\tconfig/server.yaml.in",
+      "config-file\troot\tgodspeed-sock\t0640\t/var/lib/godspeed-sea-forge/policy.yaml\tconfig/policy.yaml",
+      "generated\troot\tgodspeed-sock\t0640\tstatus.json\t/var/lib/godspeed-sea-forge/status.json",
+      "generated\troot\troot\t0644\tunits/godspeed-sea-forge.service\t/etc/systemd/system/godspeed-sea-forge.service",
+      "generated\troot\troot\t0644\tunits/godspeed-horizon.service\t/etc/systemd/system/godspeed-horizon.service",
+      "socket\t/run/godspeed-sea-forge/sea-forge.sock",
     ].join("\n") + "\n",
   );
   writeFileSync(join(stage, "status.json"), "{}\n");
@@ -265,10 +266,41 @@ describe("installer verifies a snapshot of the stage", () => {
   test("a plan row with an unknown step or a plan source outside the stage refuses", () => {
     const stage = makeStage();
     appendFileSync(join(stage, "plan.tsv"), "generated\troot\troot\t0644\t../escape\t/x/e\n");
-    expect(verify(stage).err).toContain("not a plain relative path");
+    expect(verify(stage).err).toContain("fixed table");
     const stage2 = makeStage();
     appendFileSync(join(stage2, "plan.tsv"), "frobnicate\tx\n");
-    expect(verify(stage2).err).toContain("unknown plan step");
+    expect(verify(stage2).err).toContain("fixed table");
+  });
+
+  test("plan rows may only select from the installer's fixed table (owner, mode, destination)", () => {
+    const crafted = [
+      "deploy-tree\tagent\tagent\t/opt/godspeed-horizon",
+      "place-binary\troot\troot\t4755\t/usr/local/lib/godspeed-sea-forge/bin/sea-forge-server",
+      "worlds\troot\tgodspeed-sock\t/etc\truntime/domain",
+      "deploy-tree\troot\troot\t/etc",
+      "dir\troot\troot\t0755\t/etc/cron.d",
+    ];
+    for (const row of crafted) {
+      const stage = makeStage();
+      appendFileSync(join(stage, "plan.tsv"), `${row}\n`);
+      const r = verify(stage); // digest recomputed, so only the table check can refuse
+      expect(r.code).toBe(1);
+      expect(r.err).toContain("fixed table");
+    }
+  });
+
+  test("a *.sea entry that is a symlink or directory is refused up front", () => {
+    const stage = makeStage();
+    mkdirSync(join(stage, "runtime", "domain", "d.sea"));
+    appendFileSync(join(stage, "runtime-symlinks.tsv"), "dir\tdomain/d.sea\n");
+    const r = verify(stage);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("directory or symlink");
+  });
+
+  test("the dry-run plan is labelled display-only", () => {
+    const r = Bun.spawnSync(["bash", SCRIPT, "--dry-run", "--stage", makeStage()], { env: { ...process.env, TMPDIR: tmpdir() } });
+    expect(r.stdout.toString()).toContain("display only; root re-verifies");
   });
 
   test("a symlinked stage root is refused", () => {

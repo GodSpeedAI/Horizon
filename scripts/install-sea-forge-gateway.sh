@@ -164,8 +164,12 @@ chmod 0700 "$SNAP"
 trap 'rm -rf -- "$SNAP"' EXIT
 { [ -d "$STAGE_SRC" ] && [ ! -L "$STAGE_SRC" ]; } || refuse "stage $STAGE_SRC is not a real directory (a symlinked stage root is refused)"
 mkdir -- "$SNAP/stage"
+STAGE_ID="$(stat -c %d:%i -- "$STAGE_SRC")" || refuse "cannot stat the stage $STAGE_SRC"
 # cp -a copies symlinks as links (never follows them); ownership is not preserved, so the copy is owned by the invoker.
-cp -a --no-preserve=ownership -- "$STAGE_SRC/." "$SNAP/stage/" || refuse "could not snapshot the stage $STAGE_SRC"
+# No -a: ACLs, xattrs and ownership are not carried into root's copy (mode, times and links are; modes are normalised below).
+cp -dR --preserve=mode,timestamps,links --no-preserve=ownership -- "$STAGE_SRC/." "$SNAP/stage/" || refuse "could not snapshot the stage $STAGE_SRC"
+# The stage root must still be the same non-symlink directory it was when it was checked and measured.
+{ [ -d "$STAGE_SRC" ] && [ ! -L "$STAGE_SRC" ] && [ "$(stat -c %d:%i -- "$STAGE_SRC")" = "$STAGE_ID" ]; } || refuse "stage $STAGE_SRC changed while it was copied"
 STAGE="$SNAP/stage"
 snapshot_file() {
   local label="$1" src="$2" dst="$3"
@@ -174,12 +178,13 @@ snapshot_file() {
   [ -f "$src" ] || refuse "$label $src is not a regular file"
   # cp -a recreates a special file instead of reading it (a fifo swapped in cannot hang root); the copy is then required
   # to be a regular file, so a symlink or special file swapped in after the checks above is refused, not followed.
-  cp -a --no-preserve=ownership -- "$src" "$dst" || refuse "could not snapshot $label $src"
+  cp -dR --preserve=mode,timestamps,links --no-preserve=ownership -- "$src" "$dst" || refuse "could not snapshot $label $src"
   { [ -f "$dst" ] && [ ! -L "$dst" ]; } || refuse "$label $src changed while it was copied (the copy is not a regular file)"
 }
 if [ -n "$BINARY" ]; then snapshot_file binary "$BINARY_SRC" "$SNAP/binary"; BINARY="$SNAP/binary"; fi
 if [ -n "$BUN_BINARY" ]; then snapshot_file bun "$BUN_SRC" "$SNAP/bun"; BUN_BINARY="$SNAP/bun"; fi
 # Whatever mode bits the agent set on the originals never reach root's working copy: owner-only, no setuid/setgid/sticky.
+if command -v setfacl >/dev/null 2>&1; then setfacl -R -b -- "$SNAP" 2>/dev/null || true; fi
 chmod -R u+rwX,go-rwx -- "$SNAP"
 find "$SNAP" ! -type l -exec chmod ugo-s,-t {} +
 # The hook gets only the original stage path: no TMPDIR to find the snapshot by, no SNAP variable.
@@ -266,11 +271,49 @@ verify_tree() {
 # The staged runtime tree must equal its manifest and symlink list before anything is installed from it.
 verify_tree "$STAGE/runtime" "$STAGE/runtime-manifest.sha256" "$STAGE/runtime-symlinks.tsv" || refuse "staged runtime tree does not match its manifest; run: just gateway-stage"
 
+# The only plan rows root will act on. plan.tsv is written by the unprivileged stager, so it can only SELECT from this table:
+# every destination, owner, group and mode root applies comes from here, never from the plan. Fields are separated by "|"
+# here and by a tab in plan.tsv. A staged plan with another path, account, owner, group or mode (for example a development
+# layout or HORIZON_GATEWAY_ROOT) is refused in every mode; change this table in a reviewed commit to support it.
+PLAN_TABLE='account|godspeed-sea-forge|gateway
+account|godspeed-horizon|runtime
+group|godspeed-sock
+member|godspeed-sea-forge|godspeed-sock
+member|godspeed-horizon|godspeed-sock
+dir|root|root|0755|/usr/local/lib/godspeed-sea-forge
+dir|root|root|0755|/usr/local/lib/godspeed-sea-forge/bin
+dir|root|root|0755|/usr/local/lib/godspeed-horizon/bin
+dir|godspeed-sea-forge|godspeed-sock|0750|/run/godspeed-sea-forge
+dir|godspeed-sea-forge|godspeed-sea-forge|711|/var/lib/godspeed-sea-forge
+dir|godspeed-sea-forge|godspeed-sea-forge|0700|/var/lib/godspeed-sea-forge/realitytrace/data
+dir|godspeed-sea-forge|godspeed-sea-forge|0700|/var/lib/godspeed-sea-forge/realitytrace/state
+worlds|root|godspeed-sock|/var/lib/godspeed-sea-forge/worlds|runtime/domain
+dir|godspeed-horizon|godspeed-horizon|0700|/var/lib/godspeed-horizon
+place-bun|root|root|0755|/usr/local/lib/godspeed-horizon/bin/bun
+optional-exec|/usr/local/lib/godspeed-horizon/bin/realitytrace
+place-binary|root|root|0755|/usr/local/lib/godspeed-sea-forge/bin/sea-forge-server
+deploy-tree|root|root|/opt/godspeed-horizon
+config-file|root|godspeed-sock|0640|/var/lib/godspeed-sea-forge/server.yaml|config/server.yaml.in
+config-file|root|godspeed-sock|0640|/var/lib/godspeed-sea-forge/policy.yaml|config/policy.yaml
+generated|root|godspeed-sock|0640|status.json|/var/lib/godspeed-sea-forge/status.json
+generated|root|root|0644|units/godspeed-sea-forge.service|/etc/systemd/system/godspeed-sea-forge.service
+generated|root|root|0644|units/godspeed-horizon.service|/etc/systemd/system/godspeed-horizon.service
+socket|/run/godspeed-sea-forge/sea-forge.sock'
+# Test seam (non-root, test mode, never with --authorize-privileged): INSTALLER_TEST_PLAN_TABLE=FILE replaces the table with
+# the rows of that file, so tests can stage fake accounts and a temporary root. It is refused as root like the other seams.
+if [ "${INSTALLER_TEST_MODE:-}" = 1 ] && [ -n "${INSTALLER_TEST_PLAN_TABLE:-}" ] && [ "$(id -u)" != 0 ] && [ "$(id -ru)" != 0 ] && [ "${EUID:-1}" != 0 ]; then
+  PLAN_TABLE="$(tr '\t' '|' < "$INSTALLER_TEST_PLAN_TABLE")"
+fi
+plan_row_allowed() { local want; want="$(printf '%s' "$1" | tr '\t' '|')"; printf '%s\n' "$PLAN_TABLE" | grep -qxF -- "$want"; }
+
 # Every staged source the plan reads must exist as a regular file in the snapshot, so --verify-only cannot bless a bundle the
 # apply would fail on half-way. The list is derived from the plan rows, not hardcoded.
 check_plan_sources() {
   local -a F
-  while IFS=$'\t' read -r -u 3 -a F; do
+  local line
+  while IFS= read -r -u 3 line; do
+    plan_row_allowed "$line" || refuse "plan row is not in the installer's fixed table (destination, owner, group or mode differs): $(printf '%q' "$line")"
+    IFS=$'\t' read -r -a F <<< "$line"
     case "${F[0]}" in
       account|group|member|dir|place-bun|optional-exec|place-binary|socket) ;;
       deploy-tree) [ -d "$STAGE/runtime" ] ;;
@@ -279,7 +322,8 @@ check_plan_sources() {
       worlds)
         case "${F[4]:-}" in runtime/*) ;; *) refuse "plan worlds source '${F[4]:-}' is not under runtime/" ;; esac
         case "${F[4]}" in *..*) refuse "plan worlds source '${F[4]}' is not a plain relative path" ;; esac
-        { [ -d "$STAGE/${F[4]}" ] && [ ! -L "$STAGE/${F[4]}" ]; } || refuse "plan worlds source ${F[4]} is missing or not a real directory in the stage" ;;
+        { [ -d "$STAGE/${F[4]}" ] && [ ! -L "$STAGE/${F[4]}" ]; } || refuse "plan worlds source ${F[4]} is missing or not a real directory in the stage"
+        [ -z "$(find "$STAGE/${F[4]}" -name '*.sea' ! -type f -print -quit)" ] || refuse "a *.sea entry under ${F[4]} is a directory or symlink, not a regular file" ;;
       *) refuse "unknown plan step '${F[0]}'" ;;
     esac
   done 3< "$STAGE/plan.tsv"
@@ -291,7 +335,7 @@ BINARY_NOTE="not given (pass --binary PATH --sha256 HEX)"
 if [ -n "$BINARY" ]; then
   [ -n "$SHA256" ] || refuse "--sha256 is required with --binary"
   SHA256="$(printf '%s' "$SHA256" | tr 'A-F' 'a-f')"
-  ACTUAL="$(sha256sum "$BINARY" | cut -d' ' -f1)"
+  ACTUAL="$(sha256sum -- "$BINARY" | cut -d' ' -f1)"
   if [ "$ACTUAL" != "$SHA256" ]; then
     refuse "sha256 of $BINARY_SRC does not match the approved sha256; not copied"
   fi
@@ -303,7 +347,7 @@ BUN_NOTE="not given (pass --bun PATH --bun-sha256 HEX; the owner runs this step)
 if [ -n "$BUN_BINARY" ]; then
   [ -n "$BUN_SHA256" ] || refuse "--bun-sha256 is required with --bun"
   BUN_SHA256="$(printf '%s' "$BUN_SHA256" | tr 'A-F' 'a-f')"
-  BUN_ACTUAL="$(sha256sum "$BUN_BINARY" | cut -d' ' -f1)"
+  BUN_ACTUAL="$(sha256sum -- "$BUN_BINARY" | cut -d' ' -f1)"
   if [ "$BUN_ACTUAL" != "$BUN_SHA256" ]; then
     refuse "sha256 of bun $BUN_SRC does not match the approved sha256; not copied"
   fi
@@ -314,7 +358,7 @@ fi
 # Decide file placement; mirrors decideBinaryPlacement() in scripts/gateway-setup.ts.
 decide_file() {
   local dest="$1" want="$2" existing=""
-  [ -e "$dest" ] && existing="$(sha256sum "$dest" | cut -d' ' -f1)"
+  [ -e "$dest" ] && existing="$(sha256sum -- "$dest" | cut -d' ' -f1)"
   if [ -z "$existing" ]; then echo install
   elif [ "$existing" = "$want" ]; then echo keep
   elif [ "$REPLACE_BINARY" = 1 ]; then echo replace
@@ -328,7 +372,7 @@ place_file() {
   action="$(decide_file "$dest" "$want")"
   case "$action" in
     install) say "$label $dest: install $owner:$group $mode after sha256 check" ;;
-    keep) say "$label $dest: identical, kept (mode and owner corrected)" ;;
+    keep) say "$label $dest: identical, kept (set to $owner:$group $mode)" ;;
     replace) say "$label $dest: different; old copy kept as $dest.replaced-$TS (requires --replace-binary)" ;;
     refuse) say "$label $dest: differs from $want; refusing (pass --replace-binary to replace, old kept as a sidecar)" ;;
   esac
@@ -344,24 +388,24 @@ place_file() {
 
 row_account() {
   local name="$1" role="$2"
-  if id -u "$name" >/dev/null 2>&1; then say "account $name ($role): exists, reused"; return; fi
+  if id -u -- "$name" >/dev/null 2>&1; then say "account $name ($role): exists, reused"; return; fi
   say "account $name ($role): missing; run: groupadd --system $name; useradd --system --gid $name --no-create-home --shell /usr/sbin/nologin $name"
   if [ "$APPLY" = 1 ]; then
-    getent group "$name" >/dev/null || groupadd --system "$name"
-    useradd --system --gid "$name" --no-create-home --shell /usr/sbin/nologin "$name"
+    getent group -- "$name" >/dev/null || groupadd --system -- "$name"
+    useradd --system --gid "$name" --no-create-home --shell /usr/sbin/nologin -- "$name"
   fi
 }
 
 row_group() {
   local name="$1"
   say "group $name: groupadd --system $name (if missing)"
-  if [ "$APPLY" = 1 ]; then getent group "$name" >/dev/null || groupadd --system "$name"; fi
+  if [ "$APPLY" = 1 ]; then getent group -- "$name" >/dev/null || groupadd --system -- "$name"; fi
 }
 
 row_member() {
   local user="$1" group="$2"
   say "member: usermod -a -G $group $user"
-  if [ "$APPLY" = 1 ]; then usermod -a -G "$group" "$user"; fi
+  if [ "$APPLY" = 1 ]; then usermod -a -G "$group" -- "$user"; fi
 }
 
 row_dir() {
@@ -373,7 +417,7 @@ row_dir() {
 row_place_bun() {
   local owner="$1" group="$2" mode="$3" dest="$4"
   if [ -z "$BUN_BINARY" ]; then
-    say "bun $dest: copy a Bun you already trust to root:root 0755 here (owner runs this step; no network install); pass --bun PATH --bun-sha256 HEX"
+    say "bun $dest: copy a Bun you already trust to $owner:$group $mode here (owner runs this step; no network install); pass --bun PATH --bun-sha256 HEX"
     if [ "$APPLY" = 1 ]; then refuse "no bun given: pass --bun PATH --bun-sha256 HEX"; fi
     return
   fi
@@ -399,11 +443,12 @@ row_place_binary() {
 
 row_deploy_tree() {
   local owner="$1" group="$2" dst="$3" new="$3.new-$TS"
-  say "deploy runtime (snapshot of $STAGE_SRC) -> $dst: root-owned copy (dirs 0755, files 0644), manifest verified, previous tree kept as $dst.previous-$TS"
+  say "deploy runtime (snapshot of $STAGE_SRC) -> $dst: copy owned $owner:$group (dirs 0755, files 0644), manifest verified, previous tree kept as $dst.previous-$TS"
   if [ "$APPLY" = 1 ]; then
-    install -d -o "$owner" -g "$group" -m 0755 -- "$(dirname "$dst")"
+    install -d -o "$owner" -g "$group" -m 0755 -- "$(dirname -- "$dst")"
     rm -rf -- "$new"
-    cp -a -- "$STAGE/runtime" "$new"
+    cp -dR --preserve=mode,timestamps,links --no-preserve=ownership -- "$STAGE/runtime" "$new"
+    if command -v setfacl >/dev/null 2>&1; then setfacl -R -b -- "$new" 2>/dev/null || true; fi
     chown -R -h "$owner:$group" -- "$new"
     find "$new" -type d -exec chmod 0755 {} +
     find "$new" -type f -exec chmod 0644 {} +
@@ -426,14 +471,14 @@ render_config() {
   local tmpl="$1" rt="$2" out="$3" uid="" gid="" sock=""
   cp -- "$STAGE/$tmpl" "$out"
   if grep -q '"__RUNTIME_UID__"' "$STAGE/$tmpl"; then
-    uid="$(id -u "$rt")" || refuse "runtime account '$rt' does not exist; the account step must run first"
+    uid="$(id -u -- "$rt")" || refuse "runtime account '$rt' does not exist; the account step must run first"
     [[ "$uid" =~ ^[1-9][0-9]{0,9}$ ]] || refuse "runtime account '$rt' has no usable uid (root and non-numeric are refused)"
     sed -i "s/\"__RUNTIME_UID__\"/$uid/g" "$out"
   fi
   if grep -q '"__SOCKET_GID__"' "$STAGE/$tmpl"; then
     sock="$(awk -F'\t' '$1=="group"{print $2; exit}' "$STAGE/plan.tsv")"
     [ -n "$sock" ] || refuse "the staged plan names no socket group"
-    gid="$(getent group "$sock" | cut -d: -f3)"
+    gid="$(getent group -- "$sock" | cut -d: -f3)"
     [[ "$gid" =~ ^[1-9][0-9]{0,9}$ ]] || refuse "socket group '$sock' has no usable gid (root and non-numeric are refused)"
     sed -i "s/\"__SOCKET_GID__\"/$gid/g" "$out"
   fi
@@ -448,14 +493,14 @@ row_config_file() {
     else say "config $path: placed from $tmpl, $owner:$group $mode"; fi
     return
   fi
-  new="$(mktemp)"
+  new="$(mktemp "$SNAP/render.XXXXXX")"
   render_config "$tmpl" "$rt" "$new"
   if [ ! -e "$path" ]; then
     install -o "$owner" -g "$group" -m "$mode" -- "$new" "$path"
     say "config $path: rendered, $owner:$group $mode"
-  elif cmp -s "$new" "$path"; then
+  elif cmp -s -- "$new" "$path"; then
     chown "$owner:$group" -- "$path"; chmod "$mode" -- "$path"
-    say "config $path: identical, kept (mode and owner corrected)"
+    say "config $path: identical, kept (set to $owner:$group $mode)"
   else
     install -o "$owner" -g "$group" -m "$mode" -- "$new" "$path.generated-$TS"
     SIDECARS=$((SIDECARS+1))
@@ -466,7 +511,7 @@ row_config_file() {
 
 row_worlds() {
   local owner="$1" group="$2" dest="$3" src="$STAGE/$4" list
-  list="$(cd "$src" && find . -name '*.sea' -not -path '*/validation/*' -not -path '*/__pycache__/*' | sed 's|^\./||' | sort)"
+  list="$(cd -- "$src" && find . -name '*.sea' -not -path '*/validation/*' -not -path '*/__pycache__/*' | sed 's|^\./||' | sort)"
   say "worlds $dest: $(printf '%s\n' "$list" | grep -c .) .sea file(s) copied from the verified runtime domain, $owner:$group 0644"
   if [ "$APPLY" = 1 ]; then
     rm -rf -- "$dest"
@@ -480,12 +525,12 @@ row_worlds() {
 row_generated() {
   local owner="$1" group="$2" mode="$3" src="$4" dst="$5"
   if [ ! -e "$dst" ]; then say "generated $dst: install $owner:$group $mode"
-  elif cmp -s "$STAGE/$src" "$dst"; then say "generated $dst: identical, kept (mode corrected)"
+  elif cmp -s -- "$STAGE/$src" "$dst"; then say "generated $dst: identical, kept (set to $owner:$group $mode)"
   else say "generated $dst: differs; old copy kept as $dst.generated-$TS"
   fi
   if [ "$APPLY" = 1 ]; then
-    mkdir -p -- "$(dirname "$dst")"
-    if [ -e "$dst" ] && ! cmp -s "$STAGE/$src" "$dst"; then mv -- "$dst" "$dst.generated-$TS"; fi
+    mkdir -p -- "$(dirname -- "$dst")"
+    if [ -e "$dst" ] && ! cmp -s -- "$STAGE/$src" "$dst"; then mv -- "$dst" "$dst.generated-$TS"; fi
     install -o "$owner" -g "$group" -m "$mode" -- "$STAGE/$src" "$dst"
   fi
 }
@@ -508,8 +553,8 @@ check_row_stat() {
     # A path under a directory this login cannot traverse looks missing. That is the containment working, not an absent file.
     # Only root can confirm it. Report it as unverified, not as a problem.
     # Walk up to the nearest ancestor this login can see. If that ancestor exists but is closed, the path is unverified.
-    local ancestor; ancestor="$(dirname "$path")"
-    while [ "$ancestor" != "/" ] && [ ! -e "$ancestor" ]; do ancestor="$(dirname "$ancestor")"; done
+    local ancestor; ancestor="$(dirname -- "$path")"
+    while [ "$ancestor" != "/" ] && [ ! -e "$ancestor" ]; do ancestor="$(dirname -- "$ancestor")"; done
     if [ "$(id -u)" != 0 ] && [ -e "$ancestor" ] && { [ ! -x "$ancestor" ] || [ ! -r "$ancestor" ]; }; then
       echo "  UNVERIFIED $path (not visible to this login; $ancestor is closed to other accounts; run the check as root to confirm)"
       return 0
@@ -539,7 +584,7 @@ run_check() {
   if [ "$agent" = "$gw" ] || [ "$agent" = "$rt" ]; then fails=$((fails+1)); echo "  FAIL    agent is a service account"; fi
   while IFS=$'\t' read -r -u 3 -a F; do
     case "${F[0]}" in
-      account) id -u "${F[1]}" >/dev/null 2>&1 && echo "  ok      account ${F[1]} exists" || { fails=$((fails+1)); echo "  MISSING account ${F[1]}"; } ;;
+      account) id -u -- "${F[1]}" >/dev/null 2>&1 && echo "  ok      account ${F[1]} exists" || { fails=$((fails+1)); echo "  MISSING account ${F[1]}"; } ;;
       member) id -nG "${F[1]}" 2>/dev/null | tr ' ' '\n' | grep -qx "${F[2]}" && echo "  ok      ${F[1]} in ${F[2]}" || { fails=$((fails+1)); echo "  MISSING ${F[1]} not in ${F[2]}"; } ;;
       dir|config-file|generated|place-binary|place-bun)
         case "${F[0]}" in
@@ -550,7 +595,7 @@ run_check() {
         esac ;;
       optional-exec) [ -x "${F[1]}" ] && echo "  ok      ${F[1]} present" || echo "  note    ${F[1]} absent (RealityTrace not installed by this installer)" ;;
       deploy-tree)
-        if (cd "${F[3]}" 2>/dev/null && sha256sum -c --quiet "${F[3]}.manifest.sha256" 2>/dev/null); then
+        if (cd -- "${F[3]}" 2>/dev/null && sha256sum -c --quiet "${F[3]}.manifest.sha256" 2>/dev/null); then
           echo "  ok      runtime tree ${F[3]} matches its manifest"
         else fails=$((fails+1)); echo "  BAD     runtime tree ${F[3]} missing or not matching its manifest"; fi ;;
       socket)
@@ -604,14 +649,14 @@ echo "stage: $STAGE_SRC (verified from a private snapshot)"
 echo "stage digest: $STAGE_DIGEST"
 echo "binary: $BINARY_NOTE"
 echo "bun: $BUN_NOTE"
-echo "privileged plan:"
+if [ "$APPLY" = 1 ]; then echo "privileged plan:"; else echo "privileged plan (display only; root re-verifies the snapshot, digest and every plan row against its fixed table at apply time):"; fi
 
 if [ "$APPLY" = 1 ]; then
   [ -n "$BINARY" ] || refuse "--binary and --sha256 are required with --authorize-privileged"
   [ -n "$BUN_BINARY" ] || refuse "--bun and --bun-sha256 are required with --authorize-privileged"
   # The operator who ran sudo must not become a gateway, runtime or socket-group member.
   invoker="${SUDO_USER:-root}"
-  if [ "$invoker" != root ] && id -u "$invoker" >/dev/null 2>&1; then
+  if [ "$invoker" != root ] && id -u -- "$invoker" >/dev/null 2>&1; then
     while IFS=$'\t' read -r -u 3 -a F; do
       if [ "${F[0]}" = account ] && [ "${F[1]}" = "$invoker" ]; then refuse "the invoking login '$invoker' is a service account in the plan"; fi
       if [ "${F[0]}" = group ] && id -nG "$invoker" | tr ' ' '\n' | grep -qx "${F[1]}"; then refuse "the invoking login '$invoker' is in the socket group ${F[1]}"; fi
