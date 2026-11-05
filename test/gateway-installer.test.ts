@@ -338,7 +338,7 @@ describe("installer verifies a snapshot of the stage", () => {
     const lines = readFileSync(SCRIPT, "utf8").split("\n");
     const end = lines.findIndex((l) => l.startsWith("# SNAPSHOT-END"));
     expect(end).toBeGreaterThan(0);
-    const message = /^\s*(say|refuse|echo|printf)\b|\brefuse "|_NOTE=|^\s*#|^\s*local /;
+    const message = /^\s*(say|refuse|echo|printf|qarg)\b|\brefuse "|_NOTE=|^\s*#|^\s*local /;
     for (const [i, l] of lines.entries()) {
       if (i <= end || !/\b(STAGE_SRC|BINARY_SRC|BUN_SRC)\b/.test(l)) continue;
       expect({ line: i + 1, text: l, ok: message.test(l) || /^\s+--(bun|stage|binary)/.test(l) }).toMatchObject({ ok: true });
