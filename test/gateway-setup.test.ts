@@ -469,7 +469,7 @@ describe("installer (shell) against a temporary root", () => {
     const copy = join(tempDir("tamper"), "bundle");
     rmSync(copy, { recursive: true, force: true });
     mkdirSync(copy, { recursive: true });
-    for (const f of ["plan.tsv", "runtime-manifest.sha256", "status.json"]) writeFileSync(join(copy, f), readFileSync(join(stage, f)));
+    for (const f of ["plan.tsv", "runtime-manifest.sha256", "runtime-symlinks.tsv", "status.json"]) writeFileSync(join(copy, f), readFileSync(join(stage, f)));
     mkdirSync(join(copy, "units"));
     for (const f of readdirSync(join(stage, "units"))) writeFileSync(join(copy, "units", f), readFileSync(join(stage, "units", f)));
     mkdirSync(join(copy, "config"));

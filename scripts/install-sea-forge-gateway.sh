@@ -12,9 +12,19 @@
 #   4. `sudo ... --authorize-privileged`: applies the plan as root (idempotent; never overwrites an authoritative file)
 #
 # Usage:
-#   install-sea-forge-gateway.sh [--dry-run] [--check] [--stage DIR]
+#   install-sea-forge-gateway.sh [--dry-run] [--check] [--verify-only --expect-stage-sha256 HEX [--binary ... --bun ...]] [--stage DIR]
 #       [--authorize-privileged --binary PATH --sha256 HEX --bun PATH --bun-sha256 HEX
 #        --expect-stage-sha256 HEX [--replace-binary]]
+#
+# Snapshot (threat: agents run as the owner's login and can write the stage and the --binary/--bun sources at any time,
+# including while this script runs as root): every mode that reads the stage first copies the stage dir, --binary and --bun
+# into a fresh private directory (mktemp -d under /run or /root as root, removed on exit) with symlinks copied as links.
+# Every check and install step reads only that snapshot: the digest, the manifest check, the hashes and the plan.
+# The stage digest is sha256 over sorted `sha256  path` lines of every regular file in the stage outside runtime/
+# (the manifest and symlink list among them, which pin runtime/ exactly). Any other entry type there is refused.
+# runtime/ must equal runtime-manifest.sha256 (files) and runtime-symlinks.tsv (relative, in-tree symlinks): an unlisted
+# entry, a missing or changed file or link, an absolute or escaping link, or a device/fifo/socket is refused.
+# --verify-only runs snapshot + digest + tree checks and exits; it needs no root and installs nothing.
 #
 # Environment (defaults are product names; nothing is derived from the current user):
 #   HORIZON_GATEWAY_STAGE   staging bundle directory (~/.cache/godspeed/gateway-stage); --stage overrides
@@ -63,6 +73,7 @@ PRODUCT=godspeed
 DRY=0
 APPLY=0
 CHECK=0
+VERIFY=0
 STAGE="${HORIZON_GATEWAY_STAGE:-${XDG_CACHE_HOME:-$HOME/.cache}/$PRODUCT/gateway-stage}"
 BINARY=""
 SHA256=""
@@ -76,6 +87,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1 ;;
     --check) CHECK=1 ;;
+    --verify-only) VERIFY=1 ;;
     --authorize-privileged) APPLY=1 ;;
     --stage) STAGE="${2:?--stage needs a directory}"; shift ;;
     --binary) BINARY="${2:?--binary needs a path}"; shift ;;
@@ -92,8 +104,10 @@ done
 # --dry-run together with --authorize-privileged stays a dry run.
 if [ "$DRY" = 1 ]; then APPLY=0; fi
 if [ "$CHECK" = 1 ]; then APPLY=0; fi
+if [ "$VERIFY" = 1 ] && { [ "$DRY" = 1 ] || [ "$CHECK" = 1 ]; }; then echo "--verify-only cannot be combined with --dry-run or --check" >&2; exit 2; fi
 MODE=dry-run
 [ "$CHECK" = 1 ] && MODE=check
+if [ "$VERIFY" = 1 ]; then APPLY=0; MODE=verify-only; fi
 [ "$APPLY" = 1 ] && MODE=apply
 
 say() { printf '  %s\n' "$*"; }
@@ -101,8 +115,11 @@ refuse() { echo "refusing: $*" >&2; exit 1; }
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 
 # ---- staged bundle ----------------------------------------------------------------------------------
+STAGE_SRC="$STAGE"
+BINARY_SRC="$BINARY"
+BUN_SRC="$BUN_BINARY"
 STAGED=1
-for f in plan.tsv runtime-manifest.sha256 status.json units/godspeed-sea-forge.service units/godspeed-horizon.service runtime; do
+for f in plan.tsv runtime-manifest.sha256 runtime-symlinks.tsv status.json units/godspeed-sea-forge.service units/godspeed-horizon.service runtime; do
   [ -e "$STAGE/$f" ] || STAGED=0
 done
 if [ "$STAGED" = 0 ]; then
@@ -113,35 +130,127 @@ if [ "$STAGED" = 0 ]; then
   echo "no changes made."
   exit 0
 fi
-STAGE_DIGEST="$(cat "$STAGE/plan.tsv" "$STAGE/runtime-manifest.sha256" "$STAGE/units/godspeed-sea-forge.service" "$STAGE/units/godspeed-horizon.service" "$STAGE/status.json" "$STAGE/config/server.yaml.in" "$STAGE/config/policy.yaml" | sha256sum | cut -d' ' -f1)"
 
-# The staged runtime tree must match its manifest before anything is installed from it.
-(cd "$STAGE/runtime" && sha256sum -c --quiet "$STAGE/runtime-manifest.sha256") || refuse "staged runtime tree does not match its manifest; run: just gateway-stage"
+# The privileged mode needs root before anything else is read.
+if [ "$APPLY" = 1 ]; then
+  [ "$(id -u)" = 0 ] || refuse "--authorize-privileged must run as root (sudo)"
+fi
+
+# ---- snapshot: from here on only the private copy is read ---------------------------------------------
+# Test seam (never active as root): INSTALLER_TEST_MODE=1 with --verify-only runs INSTALLER_TEST_HOOK_AFTER_SNAPSHOT
+# (a bash script path) right after the snapshot, so a test can modify the original stage and show it is not used.
+if [ "$(id -u)" = 0 ]; then
+  SNAP_PARENT=/run; [ -d /run ] && [ -w /run ] || SNAP_PARENT=/root
+else
+  SNAP_PARENT="${TMPDIR:-/tmp}"
+fi
+SNAP="$(mktemp -d "$SNAP_PARENT/gateway-snapshot.XXXXXX")" || refuse "cannot create a snapshot directory under $SNAP_PARENT"
+chmod 0700 "$SNAP"
+trap 'rm -rf -- "$SNAP"' EXIT
+[ -d "$STAGE_SRC" ] || refuse "stage $STAGE_SRC is not a directory"
+mkdir "$SNAP/stage"
+# cp -a copies symlinks as links (never follows them); ownership is not preserved, so the copy is owned by the invoker.
+cp -a --no-preserve=ownership "$STAGE_SRC/." "$SNAP/stage/" || refuse "could not snapshot the stage $STAGE_SRC"
+STAGE="$SNAP/stage"
+snapshot_file() {
+  local label="$1" src="$2" dst="$3"
+  [ -f "$src" ] || refuse "$label $src does not exist"
+  [ ! -L "$src" ] || refuse "$label $src is a symlink; pass the resolved path (readlink -f)"
+  cp --no-preserve=ownership "$src" "$dst" || refuse "could not snapshot $label $src"
+}
+if [ -n "$BINARY" ]; then snapshot_file binary "$BINARY_SRC" "$SNAP/binary"; BINARY="$SNAP/binary"; fi
+if [ -n "$BUN_BINARY" ]; then snapshot_file bun "$BUN_SRC" "$SNAP/bun"; BUN_BINARY="$SNAP/bun"; fi
+if [ "$VERIFY" = 1 ] && [ "${INSTALLER_TEST_MODE:-}" = 1 ] && [ "$(id -u)" != 0 ] && [ -n "${INSTALLER_TEST_HOOK_AFTER_SNAPSHOT:-}" ]; then
+  bash "$INSTALLER_TEST_HOOK_AFTER_SNAPSHOT"
+fi
+
+for f in plan.tsv runtime-manifest.sha256 runtime-symlinks.tsv status.json units/godspeed-sea-forge.service units/godspeed-horizon.service; do
+  [ -f "$STAGE/$f" ] && [ ! -L "$STAGE/$f" ] || refuse "staged $f is missing or not a regular file"
+done
+[ -d "$STAGE/runtime" ] && [ ! -L "$STAGE/runtime" ] || refuse "staged runtime is missing or not a real directory"
+
+# The digest: sha256 over sorted "sha256  path" lines of every regular file outside runtime/ (computed on the snapshot).
+# Anything else outside runtime/ (symlink, device, fifo, socket) is refused, so nothing root reads goes unbound.
+compute_stage_digest() {
+  local d="$1" odd
+  odd="$(cd "$d" && find . -path ./runtime -prune -o ! -type d ! -type f -print -quit)"
+  [ -z "$odd" ] || { echo "refusing: non-regular entry in the stage outside runtime: $odd" >&2; return 1; }
+  odd="$(cd "$d" && find . -path ./runtime -prune -o -name $'*\n*' -print -quit)"
+  [ -z "$odd" ] || { echo "refusing: stage path with a newline in its name" >&2; return 1; }
+  (cd "$d" && find . -path ./runtime -prune -o -type f -print0 | LC_ALL=C sort -z \
+    | while IFS= read -r -d '' p; do p="${p#./}"; printf '%s  %s\n' "$(sha256sum < "$p" | cut -d' ' -f1)" "$p"; done) | sha256sum | cut -d' ' -f1
+}
+STAGE_DIGEST="$(compute_stage_digest "$STAGE")" || refuse "cannot compute the stage digest"
+
+# Compare the approved digest before anything else is looked at (verify-only and apply).
+if [ "$APPLY" = 1 ] || [ "$VERIFY" = 1 ]; then
+  [ "$EXPECT_STAGE" = "$STAGE_DIGEST" ] || refuse "--expect-stage-sha256 does not match the staged bundle digest $STAGE_DIGEST; review the plan and pass that digest"
+fi
+
+# verify_tree DIR MANIFEST SYMLINKS: DIR must be exactly what the manifest (files + sha256) and the symlink list name.
+verify_tree() {
+  local dir="$1" manifest="$2" links="$3" odd want got root target
+  odd="$(find "$dir" ! -type f ! -type d ! -type l -print -quit)"
+  [ -z "$odd" ] || { echo "refusing: non-regular entry in the runtime tree (device, fifo or socket): $odd" >&2; return 1; }
+  odd="$(find "$dir" -name $'*\n*' -print -quit)"
+  [ -z "$odd" ] || { echo "refusing: runtime path with a newline in its name" >&2; return 1; }
+  # files: the set must be exactly the manifest's, then every hash
+  want="$(sed -E 's/^[0-9a-f]{64}  //' "$manifest" | LC_ALL=C sort)"
+  got="$(cd "$dir" && find . -type f -print | sed 's|^\./||' | LC_ALL=C sort)"
+  if [ "$want" != "$got" ]; then
+    echo "refusing: runtime files differ from the manifest (unlisted or missing):" >&2
+    diff <(printf '%s\n' "$want") <(printf '%s\n' "$got") | grep '^[<>]' | head -10 >&2 || true
+    return 1
+  fi
+  (cd "$dir" && sha256sum -c --quiet "$manifest" >/dev/null 2>&1) || { echo "refusing: a runtime file differs from its manifest hash" >&2; return 1; }
+  # symlinks: exactly the listed ones, same targets
+  want="$(LC_ALL=C sort "$links")"
+  got="$(cd "$dir" && find . -type l -printf 'symlink\t%l\t%P\n' | LC_ALL=C sort)"
+  if [ "$want" != "$got" ]; then
+    echo "refusing: runtime symlinks differ from the list (extra, missing or changed target):" >&2
+    diff <(printf '%s\n' "$want") <(printf '%s\n' "$got") | grep '^[<>]' | head -10 >&2 || true
+    return 1
+  fi
+  # every link relative and, once resolved, inside the tree
+  root="$(realpath "$dir")"
+  while IFS= read -r -d '' l; do
+    target="$(readlink "$l")"
+    case "$target" in /*) echo "refusing: absolute symlink ${l#"$dir"/} -> $target" >&2; return 1 ;; esac
+    case "$(realpath -m "$l")/" in "$root"/*) ;; *) echo "refusing: symlink ${l#"$dir"/} -> $target escapes the runtime tree" >&2; return 1 ;; esac
+  done < <(find "$dir" -type l -print0)
+  return 0
+}
+
+# The staged runtime tree must equal its manifest and symlink list before anything is installed from it.
+verify_tree "$STAGE/runtime" "$STAGE/runtime-manifest.sha256" "$STAGE/runtime-symlinks.tsv" || refuse "staged runtime tree does not match its manifest; run: just gateway-stage"
 
 # ---- the server binary: verified before any mode, and always refused on mismatch ----------------------
 BINARY_NOTE="not given (pass --binary PATH --sha256 HEX)"
 if [ -n "$BINARY" ]; then
-  [ -f "$BINARY" ] || refuse "binary $BINARY does not exist"
   [ -n "$SHA256" ] || refuse "--sha256 is required with --binary"
   SHA256="$(printf '%s' "$SHA256" | tr 'A-F' 'a-f')"
   ACTUAL="$(sha256sum "$BINARY" | cut -d' ' -f1)"
   if [ "$ACTUAL" != "$SHA256" ]; then
-    refuse "sha256 of $BINARY is $ACTUAL, expected $SHA256; not copied"
+    refuse "sha256 of $BINARY_SRC is $ACTUAL, expected $SHA256; not copied"
   fi
-  BINARY_NOTE="$BINARY verified sha256 $ACTUAL"
+  BINARY_NOTE="$BINARY_SRC verified (snapshot) sha256 $ACTUAL"
 fi
 
 # The runtime's bun: a copy the owner supplies and verifies; never downloaded here.
 BUN_NOTE="not given (pass --bun PATH --bun-sha256 HEX; the owner runs this step)"
 if [ -n "$BUN_BINARY" ]; then
-  [ -f "$BUN_BINARY" ] || refuse "bun $BUN_BINARY does not exist"
   [ -n "$BUN_SHA256" ] || refuse "--bun-sha256 is required with --bun"
   BUN_SHA256="$(printf '%s' "$BUN_SHA256" | tr 'A-F' 'a-f')"
   BUN_ACTUAL="$(sha256sum "$BUN_BINARY" | cut -d' ' -f1)"
   if [ "$BUN_ACTUAL" != "$BUN_SHA256" ]; then
-    refuse "sha256 of bun $BUN_BINARY is $BUN_ACTUAL, expected $BUN_SHA256; not copied"
+    refuse "sha256 of bun $BUN_SRC is $BUN_ACTUAL, expected $BUN_SHA256; not copied"
   fi
-  BUN_NOTE="$BUN_BINARY verified sha256 $BUN_ACTUAL"
+  BUN_NOTE="$BUN_SRC verified (snapshot) sha256 $BUN_ACTUAL"
+fi
+
+if [ "$VERIFY" = 1 ]; then
+  echo "verify-only: ok; stage $STAGE_SRC digest $STAGE_DIGEST, runtime tree matches manifest and symlink list. Nothing installed."
+  exit 0
 fi
 
 # ---- execution helpers ------------------------------------------------------------------------------
@@ -233,7 +342,7 @@ row_place_binary() {
 
 row_deploy_tree() {
   local owner="$1" group="$2" dst="$3" new="$3.new-$TS"
-  say "deploy $STAGE/runtime -> $dst: root-owned copy (dirs 0755, files 0644), manifest verified, previous tree kept as $dst.previous-$TS"
+  say "deploy runtime (snapshot of $STAGE_SRC) -> $dst: root-owned copy (dirs 0755, files 0644), manifest verified, previous tree kept as $dst.previous-$TS"
   if [ "$APPLY" = 1 ]; then
     install -d -o "$owner" -g "$group" -m 0755 "$(dirname "$dst")"
     rm -rf "$new"
@@ -241,7 +350,7 @@ row_deploy_tree() {
     chown -R -h "$owner:$group" "$new"
     find "$new" -type d -exec chmod 0755 {} +
     find "$new" -type f -exec chmod 0644 {} +
-    if ! (cd "$new" && sha256sum -c --quiet "$STAGE/runtime-manifest.sha256"); then
+    if ! verify_tree "$new" "$STAGE/runtime-manifest.sha256" "$STAGE/runtime-symlinks.tsv"; then
       rm -rf "$new"
       refuse "copied runtime tree does not match the manifest"
     fi
@@ -418,21 +527,19 @@ run_plan() {
 }
 
 if [ "$CHECK" = 1 ]; then
-  echo "SEA-Forge gateway check (read-only); stage $STAGE, digest $STAGE_DIGEST"
+  echo "SEA-Forge gateway check (read-only); stage $STAGE_SRC, digest $STAGE_DIGEST"
   run_check
   exit $?
 fi
 
 echo "SEA-Forge gateway setup (mode: $MODE)"
-echo "stage: $STAGE"
+echo "stage: $STAGE_SRC (verified from a private snapshot)"
 echo "stage digest: $STAGE_DIGEST"
 echo "binary: $BINARY_NOTE"
 echo "bun: $BUN_NOTE"
 echo "privileged plan:"
 
 if [ "$APPLY" = 1 ]; then
-  [ "$(id -u)" = 0 ] || refuse "--authorize-privileged must run as root (sudo)"
-  [ "$EXPECT_STAGE" = "$STAGE_DIGEST" ] || refuse "--expect-stage-sha256 does not match the staged bundle digest $STAGE_DIGEST; review the plan and pass that digest"
   [ -n "$BINARY" ] || refuse "--binary and --sha256 are required with --authorize-privileged"
   [ -n "$BUN_BINARY" ] || refuse "--bun and --bun-sha256 are required with --authorize-privileged"
   # The operator who ran sudo must not become a gateway, runtime or socket-group member.
@@ -457,5 +564,5 @@ fi
 
 echo "no changes made."
 echo "to apply, as root (sudo asks for your password; the owner runs this, including the bun step):"
-echo "  sudo $0 --authorize-privileged --stage $STAGE --binary ${BINARY:-<path to sea-forge-server>} --sha256 ${SHA256:-<sha256>} --bun ${BUN_BINARY:-<path to a trusted bun>} --bun-sha256 ${BUN_SHA256:-<sha256 of bun>} --expect-stage-sha256 $STAGE_DIGEST"
+echo "  sudo $0 --authorize-privileged --stage $STAGE_SRC --binary ${BINARY_SRC:-<path to sea-forge-server>} --sha256 ${SHA256:-<sha256>} --bun ${BUN_SRC:-<path to a trusted bun>} --bun-sha256 ${BUN_SHA256:-<sha256 of bun>} --expect-stage-sha256 $STAGE_DIGEST"
 echo "the installer renders server.yaml (runtime uid from id -u) and places policy.yaml in the gateway root; --check verifies them."

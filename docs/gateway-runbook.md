@@ -50,7 +50,7 @@ Nothing runs privileged commands by itself. The only privileged step is the `sud
 | Bun binary (used as `~/.local/bin/bun`, resolves to the nub path) | `$BUN` |
 | Bun sha256 (Bun 1.4.0) | `33d56b070be6a9e3da0ab013038b43d1645d0534ca811ecdba4472599117eb4b` |
 | Stage directory | `$STAGE` |
-| Stage digest (current, from `just gateway-stage` at commit `42cec18`) | `3e714a192c8159c0796ff8644c801061b77126b290fd8e55a6724d13320a8720` |
+| Stage digest | printed by `just gateway-stage`; the value from before the snapshot change (`3e714a19...`) is no longer valid |
 | Socket | `/run/godspeed-sea-forge/sea-forge.sock` (group `godspeed-sock`, mode 0660) |
 | Gateway root (config and state) | `/var/lib/godspeed-sea-forge` |
 
@@ -104,8 +104,22 @@ export BUN="$HOME/.local/bin/bun"
      --replace-binary \
      --bun "$BUN" \
      --bun-sha256 33d56b070be6a9e3da0ab013038b43d1645d0534ca811ecdba4472599117eb4b \
-     --expect-stage-sha256 3e714a192c8159c0796ff8644c801061b77126b290fd8e55a6724d13320a8720
+     --expect-stage-sha256 "$STAGE_DIGEST"
    ```
+
+   As root the installer first copies the stage, `--binary` and `--bun` into a private `mktemp -d` under `/run` (or
+   `/root`), removed on exit. Digest, manifest and hash checks and every install step read only that copy, so an agent
+   changing the stage or the binaries while it runs has no effect. The digest covers every regular file in the stage
+   outside `runtime/`, plus `runtime-manifest.sha256` and `runtime-symlinks.tsv`, which pin `runtime/` exactly.
+
+   To run the same snapshot and checks without root and without installing anything:
+
+   ```bash
+   scripts/install-sea-forge-gateway.sh --verify-only --stage "$STAGE" --binary "$SEA_FORGE_BIN" --sha256 <hex> \
+     --bun "$BUN" --bun-sha256 <hex> --expect-stage-sha256 "$STAGE_DIGEST"
+   ```
+
+   It ends with `verify-only: ok` or a `refusing:` line.
 
    `--replace-binary` keeps the old gateway binary as `*.replaced-<UTC>`. The installer applies the plan rows in order
    and stops at the first failing row. Rerunning the same command is safe. Every step is idempotent, and an existing
@@ -206,6 +220,11 @@ so the check reports a note there instead of a result. As your login, the check 
   or re-stage if the expectation changed.
 - **`Socket check skipped: python3 missing`.** The check uses `python3` to test the socket. Install it, or verify containment
   by hand (step 6).
+- **`refusing: runtime files differ from the manifest`** (lines `<` are listed, `>` are present): the staged `runtime/` has
+  an unlisted, missing or changed file. **`runtime symlinks differ`**, **`absolute symlink`**, **`escapes the runtime tree`**:
+  a link was added, retargeted or points outside the tree. **`non-regular entry`**: a device, fifo, socket or (outside
+  `runtime/`) symlink is in the stage. All mean the stage was altered or is stale. Do not apply; re-run `just gateway-stage`
+  and review the new plan. **`is a symlink`** for `--binary`/`--bun`: pass the resolved path (`readlink -f`).
 - **Stage digest mismatch.** You re-ran `just gateway-stage` after the dry run. Use the new digest in `--expect-stage-sha256`.
 - **Refused: invoking login is in the socket group or a service account.** Your login must not be in `godspeed-sock`, and
   must not be a service account. Remove that membership and re-stage.

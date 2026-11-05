@@ -497,6 +497,13 @@ export interface StageResult {
   files: string[];
   excluded: string[];
   symlinks: number;
+  /** Every symlink in the runtime tree: path (tree-relative) and its exact target text. */
+  links: { path: string; target: string }[];
+}
+
+/** Names the manifest formats (sha256sum lines, tab-separated symlink lines) cannot carry safely. */
+function assertPlainName(what: string, value: string): void {
+  if (/[\n\r\t\\]/.test(value)) throw new Error(`${what} has a newline, tab or backslash and cannot be staged: ${JSON.stringify(value)}`);
 }
 
 function copyTree(src: string, dst: string, rel: string, out: StageResult): void {
@@ -511,8 +518,16 @@ function copyTree(src: string, dst: string, rel: string, out: StageResult): void
     const from = join(src, r);
     const to = join(dst, r);
     if (ent.isSymbolicLink()) {
-      symlinkSync(readlinkSync(from), to);
+      const target = readlinkSync(from);
+      assertPlainName("symlink path", r);
+      assertPlainName("symlink target", target);
+      // Root installs the tree: a link must be relative and stay inside it (the installer refuses otherwise).
+      if (isAbsolute(target) || !inside(resolve(dirname(join(dst, r)), target), resolve(dst))) {
+        throw new Error(`symlink ${r} -> ${target} is absolute or leaves the runtime tree and cannot be staged`);
+      }
+      symlinkSync(target, to);
       out.symlinks++;
+      out.links.push({ path: r, target });
     } else if (ent.isDirectory()) {
       mkdirSync(to, { mode: 0o755, recursive: true });
       chmodSync(to, 0o755);
@@ -520,6 +535,7 @@ function copyTree(src: string, dst: string, rel: string, out: StageResult): void
     } else if (ent.isFile()) {
       copyFileSync(from, to);
       chmodSync(to, 0o644);
+      assertPlainName("file path", r);
       out.files.push(r);
     }
   }
@@ -533,8 +549,8 @@ export function sha256(bytes: Buffer | string): string {
  * Copy the runtime entries of `repo` into `dest` with root-owned modes (0755 dirs, 0644 files), skipping
  * .git, .agents, .tmp, scratch and secret-looking files, and return the sha256sum-format manifest text.
  */
-export function stageRuntime(repo: string, dest: string, entries: string[] = RUNTIME_ENTRIES): { result: StageResult; manifest: string } {
-  const result: StageResult = { files: [], excluded: [], symlinks: 0 };
+export function stageRuntime(repo: string, dest: string, entries: string[] = RUNTIME_ENTRIES): { result: StageResult; manifest: string; symlinkManifest: string } {
+  const result: StageResult = { files: [], excluded: [], symlinks: 0, links: [] };
   mkdirSync(dest, { recursive: true, mode: 0o755 });
   chmodSync(dest, 0o755);
   for (const entry of entries) {
@@ -552,26 +568,37 @@ export function stageRuntime(repo: string, dest: string, entries: string[] = RUN
     } else {
       copyFileSync(from, join(dest, entry));
       chmodSync(join(dest, entry), 0o644);
+      assertPlainName("file path", entry);
       result.files.push(entry);
     }
   }
   result.files.sort();
   const manifest = result.files.map((f) => `${sha256(readFileSync(join(dest, f)))}  ${f}`).join("\n") + "\n";
-  return { result, manifest };
+  // One line per symlink: `symlink<TAB>target<TAB>path`, sorted by bytes. The installer requires the tree's links to equal this list.
+  result.links.sort((a, b) => Buffer.compare(Buffer.from(a.path), Buffer.from(b.path)));
+  const symlinkManifest = result.links.map((l) => `symlink\t${l.target}\t${l.path}\n`).join("");
+  return { result, manifest, symlinkManifest };
 }
 
-/** Digest over the staged bundle, in the order the installer checks it. Must match the shell digest. */
+/**
+ * Digest over the staged bundle. Must match the installer's compute_stage_digest: sha256 over the byte-sorted lines
+ * `sha256  path` of every regular file in the stage outside runtime/. That covers the manifest and the symlink list
+ * (which pin runtime/ exactly), the plan, units, config templates and status. Any other entry type is an error.
+ */
 export function stageDigest(stage: string): string {
-  const parts = [
-    join(stage, "plan.tsv"),
-    join(stage, "runtime-manifest.sha256"),
-    join(stage, "units", UNIT_GATEWAY),
-    join(stage, "units", UNIT_RUNTIME),
-    join(stage, "status.json"),
-    join(stage, "config", "server.yaml.in"),
-    join(stage, "config", "policy.yaml"),
-  ];
-  return sha256(Buffer.concat(parts.map((p) => readFileSync(p))));
+  const lines: { path: string; line: string }[] = [];
+  const walk = (rel: string): void => {
+    for (const ent of readdirSync(join(stage, rel), { withFileTypes: true })) {
+      const r = rel === "" ? ent.name : `${rel}/${ent.name}`;
+      if (r === "runtime") continue;
+      if (ent.isDirectory()) walk(r);
+      else if (ent.isFile()) lines.push({ path: r, line: `${sha256(readFileSync(join(stage, r)))}  ${r}\n` });
+      else throw new Error(`non-regular entry in the stage outside runtime: ${r}`);
+    }
+  };
+  walk("");
+  lines.sort((a, b) => Buffer.compare(Buffer.from(a.path), Buffer.from(b.path)));
+  return sha256(lines.map((l) => l.line).join(""));
 }
 
 export function defaultStageDir(env: Record<string, string | undefined> = process.env): string {
@@ -601,8 +628,9 @@ async function stage(args: string[]): Promise<number> {
     for (const e of errors) console.error(`gateway-stage: ${e}`);
     return 1;
   }
-  for (const f of ["plan.tsv", "runtime-manifest.sha256", "status.json"]) rmSync(join(stageDir, f), { force: true });
+  for (const f of ["plan.tsv", "runtime-manifest.sha256", "runtime-symlinks.tsv", "status.json"]) rmSync(join(stageDir, f), { force: true });
   rmSync(join(stageDir, "runtime"), { recursive: true, force: true });
+  rmSync(join(stageDir, "units"), { recursive: true, force: true }); // nothing stale may ride into the digest
   rmSync(join(stageDir, "config"), { recursive: true, force: true });
   mkdirSync(join(stageDir, "units"), { recursive: true });
   mkdirSync(join(stageDir, "config"), { recursive: true });
@@ -611,8 +639,9 @@ async function stage(args: string[]): Promise<number> {
   writeFileSync(join(stageDir, "config", "server.yaml.in"), renderServerYaml(serverConfig(layout, files, UID_PLACEHOLDER)));
   writeFileSync(join(stageDir, "config", "policy.yaml"), renderPolicyYaml(await navigationCommitId()));
   writeFileSync(join(stageDir, "plan.tsv"), renderPlanTsv(buildPlan(layout)));
-  const { result, manifest } = stageRuntime(repo, join(stageDir, "runtime"));
+  const { result, manifest, symlinkManifest } = stageRuntime(repo, join(stageDir, "runtime"));
   writeFileSync(join(stageDir, "runtime-manifest.sha256"), manifest);
+  writeFileSync(join(stageDir, "runtime-symlinks.tsv"), symlinkManifest);
   for (const [name, text] of Object.entries(unitFiles(layout))) writeFileSync(join(stageDir, "units", name), text);
   writeFileSync(join(stageDir, "status.json"), `${JSON.stringify(statusRecord(layout), null, 2)}\n`);
   console.log(`gateway-stage: ${layout.environment} bundle in ${stageDir}`);
