@@ -158,7 +158,7 @@ export async function cell(commit: "allow" | "deny" | "escalate", options: { com
   const open = async () => {
     // The tenant is per host; resolve it from a first app so the verifier template names the real one.
     const configPath = await writeConfig(join(root, "horizon.toml"), JSON.parse(JSON.stringify(doc).replaceAll(TENANT_PLACEHOLDER, tenantOf())));
-    const app = await createApplication({ configPath, governance, approvals: approvalAuthority({ socketPath: socket, operatorId: "operator" }), realityTrace: rt, seaForgeSocket: socket });
+    const app = await createApplication({ configPath, governance, approvals: approvalAuthority({ socketPath: socket, operatorId: "actor:operator" }), realityTrace: rt, seaForgeSocket: socket });
     cleanups.push(() => void app.close());
     return app;
   };
