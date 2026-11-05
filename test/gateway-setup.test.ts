@@ -25,6 +25,7 @@ import {
   renderPlanTsv,
   resolveLayout,
   resetStageDir,
+  STAGE_MARKER,
   stageRuntime,
   statusRecord,
   unitFiles,
@@ -632,7 +633,7 @@ describe("stage ownership and pinned directories", () => {
 
   test("resetStageDir empties a stage (has plan.tsv), creates a missing dir, and refuses a non-stage", () => {
     const old = tempDir("reset-old");
-    writeFileSync(join(old, "plan.tsv"), "x\n");
+    writeFileSync(join(old, STAGE_MARKER), "horizon gateway stage v1\n");
     writeFileSync(join(old, "stray.bak"), "x\n");
     resetStageDir(old);
     expect(readdirSync(old)).toEqual([]);
@@ -643,9 +644,12 @@ describe("stage ownership and pinned directories", () => {
     writeFileSync(join(notStage, "precious.txt"), "x\n");
     expect(() => resetStageDir(notStage)).toThrow(/does not look like a stage/);
     expect(existsSync(join(notStage, "precious.txt"))).toBe(true);
+    const planOnly = tempDir("reset-planonly");
+    writeFileSync(join(planOnly, "plan.tsv"), "x\n");
+    expect(() => resetStageDir(planOnly)).toThrow(/does not look like a stage/); // a plan.tsv alone is not enough
     const symPlan = tempDir("reset-symplan");
-    writeFileSync(join(symPlan, "real"), "x\n");
-    symlinkSync(join(symPlan, "real"), join(symPlan, "plan.tsv"));
+    writeFileSync(join(symPlan, "real"), "horizon gateway stage v1\n");
+    symlinkSync(join(symPlan, "real"), join(symPlan, STAGE_MARKER));
     expect(() => resetStageDir(symPlan)).toThrow(/does not look like a stage/);
     expect(existsSync(join(symPlan, "real"))).toBe(true);
     const target = tempDir("reset-target");

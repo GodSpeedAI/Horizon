@@ -166,8 +166,9 @@ trap 'rm -rf -- "$SNAP"' EXIT
 mkdir -- "$SNAP/stage"
 STAGE_ID="$(stat -c %d:%i -- "$STAGE_SRC")" || refuse "cannot stat the stage $STAGE_SRC"
 # cp -a copies symlinks as links (never follows them); ownership is not preserved, so the copy is owned by the invoker.
-# No -a: ACLs, xattrs and ownership are not carried into root's copy (mode, times and links are; modes are normalised below).
-cp -dR --preserve=mode,timestamps,links --no-preserve=ownership -- "$STAGE_SRC/." "$SNAP/stage/" || refuse "could not snapshot the stage $STAGE_SRC"
+# No -a and no --preserve=mode (GNU cp would carry ACLs with it): neither ACLs, xattrs, ownership nor mode bits reach root's copy;
+# modes are set explicitly by the chmod normalisation below and by the install steps.
+cp -dR --preserve=timestamps,links --no-preserve=mode,ownership,xattr,context -- "$STAGE_SRC/." "$SNAP/stage/" || refuse "could not snapshot the stage $STAGE_SRC"
 # The stage root must still be the same non-symlink directory it was when it was checked and measured.
 { [ -d "$STAGE_SRC" ] && [ ! -L "$STAGE_SRC" ] && [ "$(stat -c %d:%i -- "$STAGE_SRC")" = "$STAGE_ID" ]; } || refuse "stage $STAGE_SRC changed while it was copied"
 STAGE="$SNAP/stage"
@@ -178,13 +179,12 @@ snapshot_file() {
   [ -f "$src" ] || refuse "$label $src is not a regular file"
   # cp -a recreates a special file instead of reading it (a fifo swapped in cannot hang root); the copy is then required
   # to be a regular file, so a symlink or special file swapped in after the checks above is refused, not followed.
-  cp -dR --preserve=mode,timestamps,links --no-preserve=ownership -- "$src" "$dst" || refuse "could not snapshot $label $src"
+  cp -dR --preserve=timestamps,links --no-preserve=mode,ownership,xattr,context -- "$src" "$dst" || refuse "could not snapshot $label $src"
   { [ -f "$dst" ] && [ ! -L "$dst" ]; } || refuse "$label $src changed while it was copied (the copy is not a regular file)"
 }
 if [ -n "$BINARY" ]; then snapshot_file binary "$BINARY_SRC" "$SNAP/binary"; BINARY="$SNAP/binary"; fi
 if [ -n "$BUN_BINARY" ]; then snapshot_file bun "$BUN_SRC" "$SNAP/bun"; BUN_BINARY="$SNAP/bun"; fi
 # Whatever mode bits the agent set on the originals never reach root's working copy: owner-only, no setuid/setgid/sticky.
-if command -v setfacl >/dev/null 2>&1; then setfacl -R -b -- "$SNAP" 2>/dev/null || true; fi
 chmod -R u+rwX,go-rwx -- "$SNAP"
 find "$SNAP" ! -type l -exec chmod ugo-s,-t {} +
 # The hook gets only the original stage path: no TMPDIR to find the snapshot by, no SNAP variable.
@@ -275,45 +275,67 @@ verify_tree "$STAGE/runtime" "$STAGE/runtime-manifest.sha256" "$STAGE/runtime-sy
 # every destination, owner, group and mode root applies comes from here, never from the plan. Fields are separated by "|"
 # here and by a tab in plan.tsv. A staged plan with another path, account, owner, group or mode (for example a development
 # layout or HORIZON_GATEWAY_ROOT) is refused in every mode; change this table in a reviewed commit to support it.
-PLAN_TABLE='account|godspeed-sea-forge|gateway
-account|godspeed-horizon|runtime
-group|godspeed-sock
-member|godspeed-sea-forge|godspeed-sock
-member|godspeed-horizon|godspeed-sock
-dir|root|root|0755|/usr/local/lib/godspeed-sea-forge
-dir|root|root|0755|/usr/local/lib/godspeed-sea-forge/bin
-dir|root|root|0755|/usr/local/lib/godspeed-horizon/bin
-dir|godspeed-sea-forge|godspeed-sock|0750|/run/godspeed-sea-forge
-dir|godspeed-sea-forge|godspeed-sea-forge|711|/var/lib/godspeed-sea-forge
-dir|godspeed-sea-forge|godspeed-sea-forge|0700|/var/lib/godspeed-sea-forge/realitytrace/data
-dir|godspeed-sea-forge|godspeed-sea-forge|0700|/var/lib/godspeed-sea-forge/realitytrace/state
-worlds|root|godspeed-sock|/var/lib/godspeed-sea-forge/worlds|runtime/domain
-dir|godspeed-horizon|godspeed-horizon|0700|/var/lib/godspeed-horizon
-place-bun|root|root|0755|/usr/local/lib/godspeed-horizon/bin/bun
-optional-exec|/usr/local/lib/godspeed-horizon/bin/realitytrace
-place-binary|root|root|0755|/usr/local/lib/godspeed-sea-forge/bin/sea-forge-server
-deploy-tree|root|root|/opt/godspeed-horizon
-config-file|root|godspeed-sock|0640|/var/lib/godspeed-sea-forge/server.yaml|config/server.yaml.in
-config-file|root|godspeed-sock|0640|/var/lib/godspeed-sea-forge/policy.yaml|config/policy.yaml
-generated|root|godspeed-sock|0640|status.json|/var/lib/godspeed-sea-forge/status.json
-generated|root|root|0644|units/godspeed-sea-forge.service|/etc/systemd/system/godspeed-sea-forge.service
-generated|root|root|0644|units/godspeed-horizon.service|/etc/systemd/system/godspeed-horizon.service
-socket|/run/godspeed-sea-forge/sea-forge.sock'
+PLAN_TABLE=(
+  $'account\tgodspeed-sea-forge\tgateway'
+  $'account\tgodspeed-horizon\truntime'
+  $'group\tgodspeed-sock'
+  $'member\tgodspeed-sea-forge\tgodspeed-sock'
+  $'member\tgodspeed-horizon\tgodspeed-sock'
+  $'dir\troot\troot\t0755\t/usr/local/lib/godspeed-sea-forge'
+  $'dir\troot\troot\t0755\t/usr/local/lib/godspeed-sea-forge/bin'
+  $'dir\troot\troot\t0755\t/usr/local/lib/godspeed-horizon/bin'
+  $'dir\tgodspeed-sea-forge\tgodspeed-sock\t0750\t/run/godspeed-sea-forge'
+  $'dir\tgodspeed-sea-forge\tgodspeed-sea-forge\t711\t/var/lib/godspeed-sea-forge'
+  $'dir\tgodspeed-sea-forge\tgodspeed-sea-forge\t0700\t/var/lib/godspeed-sea-forge/realitytrace/data'
+  $'dir\tgodspeed-sea-forge\tgodspeed-sea-forge\t0700\t/var/lib/godspeed-sea-forge/realitytrace/state'
+  $'worlds\troot\tgodspeed-sock\t/var/lib/godspeed-sea-forge/worlds\truntime/domain'
+  $'dir\tgodspeed-horizon\tgodspeed-horizon\t0700\t/var/lib/godspeed-horizon'
+  $'place-bun\troot\troot\t0755\t/usr/local/lib/godspeed-horizon/bin/bun'
+  $'optional-exec\t/usr/local/lib/godspeed-horizon/bin/realitytrace'
+  $'place-binary\troot\troot\t0755\t/usr/local/lib/godspeed-sea-forge/bin/sea-forge-server'
+  $'deploy-tree\troot\troot\t/opt/godspeed-horizon'
+  $'config-file\troot\tgodspeed-sock\t0640\t/var/lib/godspeed-sea-forge/server.yaml\tconfig/server.yaml.in'
+  $'config-file\troot\tgodspeed-sock\t0640\t/var/lib/godspeed-sea-forge/policy.yaml\tconfig/policy.yaml'
+  $'generated\troot\tgodspeed-sock\t0640\tstatus.json\t/var/lib/godspeed-sea-forge/status.json'
+  $'generated\troot\troot\t0644\tunits/godspeed-sea-forge.service\t/etc/systemd/system/godspeed-sea-forge.service'
+  $'generated\troot\troot\t0644\tunits/godspeed-horizon.service\t/etc/systemd/system/godspeed-horizon.service'
+  $'socket\t/run/godspeed-sea-forge/sea-forge.sock'
+)
 # Test seam (non-root, test mode, never with --authorize-privileged): INSTALLER_TEST_PLAN_TABLE=FILE replaces the table with
 # the rows of that file, so tests can stage fake accounts and a temporary root. It is refused as root like the other seams.
 if [ "${INSTALLER_TEST_MODE:-}" = 1 ] && [ -n "${INSTALLER_TEST_PLAN_TABLE:-}" ] && [ "$(id -u)" != 0 ] && [ "$(id -ru)" != 0 ] && [ "${EUID:-1}" != 0 ]; then
-  PLAN_TABLE="$(tr '\t' '|' < "$INSTALLER_TEST_PLAN_TABLE")"
+  mapfile -t PLAN_TABLE < "$INSTALLER_TEST_PLAN_TABLE"
 fi
-plan_row_allowed() { local want; want="$(printf '%s' "$1" | tr '\t' '|')"; printf '%s\n' "$PLAN_TABLE" | grep -qxF -- "$want"; }
+
+# load_plan: the ONLY place plan.tsv is opened. It is read once from the snapshot into PLAN_ROWS, and every later consumer
+# (check_plan_sources, run_plan, run_check, dry-run printing, account and group lookups) reads that array. The file is refused
+# unless it ends in a newline, has no CR, "|" or NUL, and every line is exactly one PLAN_TABLE row (tabs preserved), which also
+# fixes each step's field count.
+PLAN_ROWS=()
+load_plan() {
+  local raw row t ok
+  if IFS= read -r -d '' raw < "$STAGE/plan.tsv"; then refuse "plan.tsv contains a NUL byte"; fi
+  [[ "$raw" == *$'\n' ]] || refuse "plan.tsv does not end with a newline"
+  case "$raw" in *$'\r'*) refuse "plan.tsv contains a carriage return" ;; esac
+  case "$raw" in *'|'*) refuse "plan.tsv contains a '|'" ;; esac
+  [[ "$raw" != *$'\n\n'* && "$raw" != $'\n'* ]] || refuse "plan.tsv has an empty line"
+  mapfile -t PLAN_ROWS <<< "${raw%$'\n'}"
+  [ "${#PLAN_ROWS[@]}" -gt 0 ] || refuse "plan.tsv has no rows"
+  for row in "${PLAN_ROWS[@]}"; do
+    ok=0
+    for t in "${PLAN_TABLE[@]}"; do [ "$row" = "$t" ] && { ok=1; break; }; done
+    [ "$ok" = 1 ] || refuse "plan row is not in the installer's fixed table (destination, owner, group or mode differs): $(printf '%q' "$row")"
+  done
+}
 
 # Every staged source the plan reads must exist as a regular file in the snapshot, so --verify-only cannot bless a bundle the
 # apply would fail on half-way. The list is derived from the plan rows, not hardcoded.
 check_plan_sources() {
   local -a F
-  local line
-  while IFS= read -r -u 3 line; do
-    plan_row_allowed "$line" || refuse "plan row is not in the installer's fixed table (destination, owner, group or mode differs): $(printf '%q' "$line")"
-    IFS=$'\t' read -r -a F <<< "$line"
+  local row
+  load_plan
+  for row in "${PLAN_ROWS[@]}"; do
+    IFS=$'\t' read -r -a F <<< "$row"
     case "${F[0]}" in
       account|group|member|dir|place-bun|optional-exec|place-binary|socket) ;;
       deploy-tree) [ -d "$STAGE/runtime" ] ;;
@@ -326,7 +348,7 @@ check_plan_sources() {
         [ -z "$(find "$STAGE/${F[4]}" -name '*.sea' ! -type f -print -quit)" ] || refuse "a *.sea entry under ${F[4]} is a directory or symlink, not a regular file" ;;
       *) refuse "unknown plan step '${F[0]}'" ;;
     esac
-  done 3< "$STAGE/plan.tsv"
+  done
 }
 check_plan_sources
 
@@ -447,8 +469,7 @@ row_deploy_tree() {
   if [ "$APPLY" = 1 ]; then
     install -d -o "$owner" -g "$group" -m 0755 -- "$(dirname -- "$dst")"
     rm -rf -- "$new"
-    cp -dR --preserve=mode,timestamps,links --no-preserve=ownership -- "$STAGE/runtime" "$new"
-    if command -v setfacl >/dev/null 2>&1; then setfacl -R -b -- "$new" 2>/dev/null || true; fi
+    cp -dR --preserve=timestamps,links --no-preserve=mode,ownership,xattr,context -- "$STAGE/runtime" "$new"
     chown -R -h "$owner:$group" -- "$new"
     find "$new" -type d -exec chmod 0755 {} +
     find "$new" -type f -exec chmod 0644 {} +
@@ -463,7 +484,14 @@ row_deploy_tree() {
 }
 
 # The runtime account's name comes from the plan, never from a constant.
-runtime_account_name() { awk -F'\t' '$1=="account" && $3=="runtime" {print $2; exit}' "$STAGE/plan.tsv"; }
+runtime_account_name() {
+  local row; local -a F
+  for row in "${PLAN_ROWS[@]}"; do IFS=$'\t' read -r -a F <<< "$row"; if [ "${F[0]}" = account ] && [ "${F[2]}" = runtime ]; then echo "${F[1]}"; return; fi; done
+}
+socket_group_name() {
+  local row; local -a F
+  for row in "${PLAN_ROWS[@]}"; do IFS=$'\t' read -r -a F <<< "$row"; if [ "${F[0]}" = group ]; then echo "${F[1]}"; return; fi; done
+}
 
 # Render a staged template into $3. Two substitutions, read at install: the runtime uid (`id -u`) and the
 # socket group's gid (`getent group`, the group named in the staged plan). Root and non-numeric values are refused.
@@ -476,7 +504,7 @@ render_config() {
     sed -i "s/\"__RUNTIME_UID__\"/$uid/g" "$out"
   fi
   if grep -q '"__SOCKET_GID__"' "$STAGE/$tmpl"; then
-    sock="$(awk -F'\t' '$1=="group"{print $2; exit}' "$STAGE/plan.tsv")"
+    sock="$(socket_group_name)"
     [ -n "$sock" ] || refuse "the staged plan names no socket group"
     gid="$(getent group -- "$sock" | cut -d: -f3)"
     [[ "$gid" =~ ^[1-9][0-9]{0,9}$ ]] || refuse "socket group '$sock' has no usable gid (root and non-numeric are refused)"
@@ -568,13 +596,14 @@ check_row_stat() {
 
 run_check() {
   local fails=0 agent groups sock_group="" rt="" gw="" socket=""
-  while IFS=$'\t' read -r -u 3 -a F; do
+  for row in "${PLAN_ROWS[@]}"; do
+    IFS=$'\t' read -r -a F <<< "$row"
     case "${F[0]}" in
       account) [ "${F[2]}" = gateway ] && gw="${F[1]}"; [ "${F[2]}" = runtime ] && rt="${F[1]}" ;;
       group) sock_group="${F[1]}" ;;
       socket) socket="${F[1]}" ;;
     esac
-  done 3< "$STAGE/plan.tsv"
+  done
   agent="$(id -un)"
   groups=" $(id -Gn "$agent") "
   echo "agent account (the login running this check): $agent"
@@ -582,7 +611,8 @@ run_check() {
   if [ -n "$gw" ] && [[ "$groups" == *" $gw "* ]]; then fails=$((fails+1)); echo "  FAIL    agent is in gateway group $gw"; fi
   if [ -n "$rt" ] && [[ "$groups" == *" $rt "* ]]; then fails=$((fails+1)); echo "  FAIL    agent is in runtime group $rt"; fi
   if [ "$agent" = "$gw" ] || [ "$agent" = "$rt" ]; then fails=$((fails+1)); echo "  FAIL    agent is a service account"; fi
-  while IFS=$'\t' read -r -u 3 -a F; do
+  for row in "${PLAN_ROWS[@]}"; do
+    IFS=$'\t' read -r -a F <<< "$row"
     case "${F[0]}" in
       account) id -u -- "${F[1]}" >/dev/null 2>&1 && echo "  ok      account ${F[1]} exists" || { fails=$((fails+1)); echo "  MISSING account ${F[1]}"; } ;;
       member) id -nG "${F[1]}" 2>/dev/null | tr ' ' '\n' | grep -qx "${F[2]}" && echo "  ok      ${F[1]} in ${F[2]}" || { fails=$((fails+1)); echo "  MISSING ${F[1]} not in ${F[2]}"; } ;;
@@ -612,14 +642,15 @@ except OSError as e: print("error: %s" % e)' "${F[1]}")"
           else fails=$((fails+1)); echo "  FAIL    agent socket open: $result"; fi
         else echo "  note    socket ${F[1]} not present or python3 missing; socket check skipped"; fi ;;
     esac
-  done 3< "$STAGE/plan.tsv"
+  done
   if [ "$fails" = 0 ]; then echo "check: ok"; return 0; fi
   echo "check: $fails problem(s)"; return 1
 }
 
 # ---- plan execution ---------------------------------------------------------------------------------
 run_plan() {
-  while IFS=$'\t' read -r -u 3 -a F; do
+  for row in "${PLAN_ROWS[@]}"; do
+    IFS=$'\t' read -r -a F <<< "$row"
     case "${F[0]}" in
       account) row_account "${F[1]}" "${F[2]}" ;;
       group) row_group "${F[1]}" ;;
@@ -635,7 +666,7 @@ run_plan() {
       socket) say "socket ${F[1]}: created by the gateway service, checked by --check" ;;
       *) refuse "unknown plan step '${F[0]}'" ;;
     esac
-  done 3< "$STAGE/plan.tsv"
+  done
 }
 
 if [ "$CHECK" = 1 ]; then
@@ -657,10 +688,11 @@ if [ "$APPLY" = 1 ]; then
   # The operator who ran sudo must not become a gateway, runtime or socket-group member.
   invoker="${SUDO_USER:-root}"
   if [ "$invoker" != root ] && id -u -- "$invoker" >/dev/null 2>&1; then
-    while IFS=$'\t' read -r -u 3 -a F; do
+    for row in "${PLAN_ROWS[@]}"; do
+    IFS=$'\t' read -r -a F <<< "$row"
       if [ "${F[0]}" = account ] && [ "${F[1]}" = "$invoker" ]; then refuse "the invoking login '$invoker' is a service account in the plan"; fi
       if [ "${F[0]}" = group ] && id -nG "$invoker" | tr ' ' '\n' | grep -qx "${F[1]}"; then refuse "the invoking login '$invoker' is in the socket group ${F[1]}"; fi
-    done 3< "$STAGE/plan.tsv"
+    done
   fi
 fi
 

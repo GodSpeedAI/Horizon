@@ -289,6 +289,36 @@ describe("installer verifies a snapshot of the stage", () => {
     }
   });
 
+  test("a malformed plan.tsv is refused: unterminated last line, pipes for tabs, CRLF, NUL", () => {
+    const edit = (f: (plan: string) => string | Buffer) => {
+      const stage = makeStage();
+      const plan = readFileSync(join(stage, "plan.tsv"), "utf8");
+      writeFileSync(join(stage, "plan.tsv"), f(plan));
+      return verify(stage);
+    };
+    let r = edit((p) => `${p}account\tevil-runtime\truntime`); // substituted account row, no final newline
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/does not end with a newline|fixed table/);
+    r = edit((p) => p.replace("account\tgodspeed-sea-forge\tgateway", "account|godspeed-sea-forge|gateway"));
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("'|'");
+    r = edit((p) => p.replace(/\n/g, "\r\n"));
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("carriage return");
+    r = edit((p) => p.slice(0, -1)); // unterminated final line that is itself a valid table row
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("does not end with a newline");
+    r = edit((p) => Buffer.from(`${p}\0`));
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("NUL");
+  });
+
+  test("static: plan.tsv is opened in exactly one place and no awk or grep reads it", () => {
+    const text = readFileSync(SCRIPT, "utf8");
+    expect(text.split('"$STAGE/plan.tsv"').length - 1).toBe(1);
+    expect(text).not.toMatch(/awk[^\n]*plan\.tsv|grep[^\n]*plan\.tsv|3<\s*"\$STAGE/);
+  });
+
   test("a *.sea entry that is a symlink or directory is refused up front", () => {
     const stage = makeStage();
     mkdirSync(join(stage, "runtime", "domain", "d.sea"));
@@ -402,6 +432,18 @@ describe("deployed copy is verified again after the copy", () => {
     expect(r.exitCode).toBe(0);
     expect(existsSync(join(dst, "src", "main.ts"))).toBe(true);
     expect(existsSync(`${dst}.manifest.sha256`)).toBe(true);
+  });
+
+  test("the deployed copy carries no xattrs", () => {
+    const stage = makeStage();
+    const f = join(stage, "runtime", "src", "main.ts");
+    if (Bun.spawnSync(["which", "setfattr"]).exitCode !== 0 || Bun.spawnSync(["setfattr", "-n", "user.t", "-v", "1", f]).exitCode !== 0) {
+      console.log("skipped: setfattr missing or user xattrs unsupported on this filesystem");
+      return;
+    }
+    const dst = join(tmp("dstx"), "tree");
+    expect(deploy(stage, dst).exitCode).toBe(0);
+    expect(Bun.spawnSync(["getfattr", "-d", join(dst, "src", "main.ts")]).stdout.toString()).not.toContain("user.t");
   });
 
   test("a copy that differs from the manifest after cp is refused and removed", () => {

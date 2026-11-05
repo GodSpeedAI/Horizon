@@ -614,10 +614,13 @@ export function defaultStageDir(env: Record<string, string | undefined> = proces
   return env.HORIZON_GATEWAY_STAGE?.trim() || join(env.XDG_CACHE_HOME?.trim() || join(homedir(), ".cache"), PRODUCT, "gateway-stage");
 }
 
+/** Written by the stager into every stage it makes; resetStageDir deletes only an empty directory or one holding it. */
+export const STAGE_MARKER = ".horizon-gateway-stage";
+const STAGE_MARKER_TEXT = "horizon gateway stage v1\n";
+
 /**
  * Make the stage directory contain only what the stager is about to produce. Refuses (never deletes) when the path is a
- * symlink, not a directory, the filesystem root or the home directory, or is non-empty without a plan.tsv (it does not
- * look like a stage).
+ * symlink, not a directory, the filesystem root or the home directory, or is non-empty without the stage marker file.
  */
 export function resetStageDir(stageDir: string): void {
   let st;
@@ -629,12 +632,13 @@ export function resetStageDir(stageDir: string): void {
   }
   if (stageDir === dirname(stageDir) || stageDir === resolve(homedir())) throw new Error(`refusing to clear ${stageDir}: not a stage directory`);
   if (st.isSymbolicLink() || !st.isDirectory()) throw new Error(`refusing to clear ${stageDir}: it is a symlink or not a directory`);
-  let planIsFile = false;
+  let marked = false;
   try {
-    planIsFile = lstatSync(join(stageDir, "plan.tsv")).isFile(); // a symlinked or special plan.tsv is not a stage marker
+    const m = join(stageDir, STAGE_MARKER);
+    marked = lstatSync(m).isFile() && readFileSync(m, "utf8") === STAGE_MARKER_TEXT; // a symlinked or foreign marker does not count
   } catch {}
-  if (readdirSync(stageDir).length > 0 && !planIsFile) {
-    throw new Error(`refusing to clear ${stageDir}: it is not empty and has no regular-file plan.tsv, so it does not look like a stage; point --stage at an empty or earlier stage directory`);
+  if (readdirSync(stageDir).length > 0 && !marked) {
+    throw new Error(`refusing to clear ${stageDir}: it is not empty and has no ${STAGE_MARKER} marker file, so it does not look like a stage made by the stager; point --stage at an empty directory or remove it yourself`);
   }
   rmSync(stageDir, { recursive: true, force: true });
   mkdirSync(stageDir, { recursive: true });
@@ -671,6 +675,7 @@ async function stage(args: string[]): Promise<number> {
   }
   mkdirSync(join(stageDir, "units"), { recursive: true });
   mkdirSync(join(stageDir, "config"), { recursive: true });
+  writeFileSync(join(stageDir, STAGE_MARKER), STAGE_MARKER_TEXT);
   // Templates only: the installer renders server.yaml with the runtime account's uid, and places policy.yaml.
   const files = worldFiles(join(repo, "domain"));
   writeFileSync(join(stageDir, "config", "server.yaml.in"), renderServerYaml(serverConfig(layout, files, UID_PLACEHOLDER)));
