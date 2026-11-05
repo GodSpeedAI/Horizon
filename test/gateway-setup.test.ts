@@ -298,6 +298,18 @@ describe("unit files", () => {
     expect(gw).toContain(`ReadOnlyPaths=${layout.gatewayStateDir}/server.yaml ${layout.gatewayStateDir}/policy.yaml`);
   });
 
+  test("the gateway unit recreates its socket directory before each start, matching the plan's dir row", () => {
+    // /run is emptied at boot; without this the sandbox cannot be set up and the gateway never starts again.
+    const dirRow = buildPlan(layout).find((r) => r[0] === "dir" && r[4]?.endsWith(layout.socketDir));
+    expect(dirRow).toBeDefined();
+    const [, owner, group, mode] = dirRow!;
+    const pre = `ExecStartPre=+/usr/bin/install -d -o ${owner} -g ${group} -m ${mode} ${layout.socketDir}`;
+    expect(gw).toContain(pre);
+    expect(gw.indexOf(pre)).toBeLessThan(gw.indexOf(`ExecStart=${layout.binPath}`));
+    // Only the directory step runs unsandboxed; the server's own ExecStart carries no privilege prefix.
+    expect(gw).not.toMatch(/^ExecStart=[+!]/m);
+  });
+
   test("the runtime unit runs as the runtime account, requires the gateway, and is governed", () => {
     expect(rt).toContain(`User=${FAKE.HORIZON_RUNTIME_ACCOUNT}`);
     expect(rt).toContain(`Requires=${UNIT_GATEWAY}`);
