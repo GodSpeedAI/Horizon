@@ -110,7 +110,9 @@ export BUN="$HOME/.local/bin/bun"
    As root the installer first copies the stage, `--binary` and `--bun` into a private `mktemp -d` under `/run` (or
    `/root`), removed on exit. Digest, manifest and hash checks and every install step read only that copy, so an agent
    changing the stage or the binaries while it runs has no effect. The digest covers every regular file in the stage
-   outside `runtime/`, plus `runtime-manifest.sha256` and `runtime-symlinks.tsv`, which pin `runtime/` exactly.
+   outside `runtime/`, plus `runtime-manifest.sha256` and `runtime-symlinks.tsv` (every directory and symlink), which pin `runtime/` exactly.
+   As root, set no `HORIZON_GATEWAY_*` variable and pass `--stage`; `--verify-only` cannot be combined with `--authorize-privileged`.
+   `just gateway-stage` clears the stage directory first (it refuses a non-empty directory that has no `plan.tsv`).
 
    To run the same snapshot and checks without root and without installing anything:
 
@@ -221,7 +223,7 @@ so the check reports a note there instead of a result. As your login, the check 
 - **`Socket check skipped: python3 missing`.** The check uses `python3` to test the socket. Install it, or verify containment
   by hand (step 6).
 - **`refusing: runtime files differ from the manifest`** (lines `<` are listed, `>` are present): the staged `runtime/` has
-  an unlisted, missing or changed file. **`runtime symlinks differ`**, **`absolute symlink`**, **`escapes the runtime tree`**:
+  an unlisted, missing or changed file. **`runtime directories differ`**, **`runtime symlinks differ`**, **`runtime path or symlink target with a newline`**, **`absolute symlink`**, **`escapes the runtime tree`**:
   a link was added, retargeted or points outside the tree. **`non-regular entry`**: a device, fifo, socket or (outside
   `runtime/`) symlink is in the stage. All mean the stage was altered or is stale. Do not apply; re-run `just gateway-stage`
   and review the new plan. **`is a symlink`** for `--binary`/`--bun`: pass the resolved path (`readlink -f`).

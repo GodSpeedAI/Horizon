@@ -17,7 +17,7 @@
  * scripts/ignite.ts passes to the cockpit, read from config/horizon.toml and the semantic loader.
  */
 import { createHash } from "node:crypto";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, lstatSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -497,6 +497,8 @@ export interface StageResult {
   files: string[];
   excluded: string[];
   symlinks: number;
+  /** Every directory below the runtime tree root (tree-relative); the installer pins the directory set exactly. */
+  dirs: string[];
   /** Every symlink in the runtime tree: path (tree-relative) and its exact target text. */
   links: { path: string; target: string }[];
 }
@@ -529,6 +531,8 @@ function copyTree(src: string, dst: string, rel: string, out: StageResult): void
       out.symlinks++;
       out.links.push({ path: r, target });
     } else if (ent.isDirectory()) {
+      assertPlainName("directory path", r);
+      out.dirs.push(r);
       mkdirSync(to, { mode: 0o755, recursive: true });
       chmodSync(to, 0o755);
       copyTree(src, dst, r, out);
@@ -550,7 +554,7 @@ export function sha256(bytes: Buffer | string): string {
  * .git, .agents, .tmp, scratch and secret-looking files, and return the sha256sum-format manifest text.
  */
 export function stageRuntime(repo: string, dest: string, entries: string[] = RUNTIME_ENTRIES): { result: StageResult; manifest: string; symlinkManifest: string } {
-  const result: StageResult = { files: [], excluded: [], symlinks: 0, links: [] };
+  const result: StageResult = { files: [], excluded: [], symlinks: 0, dirs: [], links: [] };
   mkdirSync(dest, { recursive: true, mode: 0o755 });
   chmodSync(dest, 0o755);
   for (const entry of entries) {
@@ -562,6 +566,8 @@ export function stageRuntime(repo: string, dest: string, entries: string[] = RUN
       continue;
     }
     if (statSync(from).isDirectory()) {
+      assertPlainName("directory path", entry);
+      result.dirs.push(entry);
       mkdirSync(join(dest, entry), { mode: 0o755, recursive: true });
       chmodSync(join(dest, entry), 0o755);
       copyTree(repo, dest, entry, result);
@@ -574,9 +580,12 @@ export function stageRuntime(repo: string, dest: string, entries: string[] = RUN
   }
   result.files.sort();
   const manifest = result.files.map((f) => `${sha256(readFileSync(join(dest, f)))}  ${f}`).join("\n") + "\n";
-  // One line per symlink: `symlink<TAB>target<TAB>path`, sorted by bytes. The installer requires the tree's links to equal this list.
-  result.links.sort((a, b) => Buffer.compare(Buffer.from(a.path), Buffer.from(b.path)));
-  const symlinkManifest = result.links.map((l) => `symlink\t${l.target}\t${l.path}\n`).join("");
+  // runtime-symlinks.tsv: `dir<TAB>path` for every directory, then `symlink<TAB>target<TAB>path` for every link, each sorted by
+  // bytes of the path. The installer requires the tree's directories and links to equal this list exactly.
+  const byPath = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.from(b));
+  result.dirs.sort(byPath);
+  result.links.sort((a, b) => byPath(a.path, b.path));
+  const symlinkManifest = result.dirs.map((d) => `dir\t${d}\n`).join("") + result.links.map((l) => `symlink\t${l.target}\t${l.path}\n`).join("");
   return { result, manifest, symlinkManifest };
 }
 
@@ -605,6 +614,28 @@ export function defaultStageDir(env: Record<string, string | undefined> = proces
   return env.HORIZON_GATEWAY_STAGE?.trim() || join(env.XDG_CACHE_HOME?.trim() || join(homedir(), ".cache"), PRODUCT, "gateway-stage");
 }
 
+/**
+ * Make the stage directory contain only what the stager is about to produce. Refuses (never deletes) when the path is a
+ * symlink, not a directory, the filesystem root or the home directory, or is non-empty without a plan.tsv (it does not
+ * look like a stage).
+ */
+export function resetStageDir(stageDir: string): void {
+  let st;
+  try {
+    st = lstatSync(stageDir);
+  } catch {
+    mkdirSync(stageDir, { recursive: true });
+    return;
+  }
+  if (stageDir === dirname(stageDir) || stageDir === resolve(homedir())) throw new Error(`refusing to clear ${stageDir}: not a stage directory`);
+  if (st.isSymbolicLink() || !st.isDirectory()) throw new Error(`refusing to clear ${stageDir}: it is a symlink or not a directory`);
+  if (readdirSync(stageDir).length > 0 && !existsSync(join(stageDir, "plan.tsv"))) {
+    throw new Error(`refusing to clear ${stageDir}: it is not empty and has no plan.tsv, so it does not look like a stage; point --stage at an empty or earlier stage directory`);
+  }
+  rmSync(stageDir, { recursive: true, force: true });
+  mkdirSync(stageDir, { recursive: true });
+}
+
 async function stage(args: string[]): Promise<number> {
   const flag = (name: string) => {
     const i = args.indexOf(name);
@@ -628,10 +659,12 @@ async function stage(args: string[]): Promise<number> {
     for (const e of errors) console.error(`gateway-stage: ${e}`);
     return 1;
   }
-  for (const f of ["plan.tsv", "runtime-manifest.sha256", "runtime-symlinks.tsv", "status.json"]) rmSync(join(stageDir, f), { force: true });
-  rmSync(join(stageDir, "runtime"), { recursive: true, force: true });
-  rmSync(join(stageDir, "units"), { recursive: true, force: true }); // nothing stale may ride into the digest
-  rmSync(join(stageDir, "config"), { recursive: true, force: true });
+  try {
+    resetStageDir(stageDir); // the stage holds only what this run produces; nothing else may ride into the digest
+  } catch (error) {
+    console.error(`gateway-stage: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
   mkdirSync(join(stageDir, "units"), { recursive: true });
   mkdirSync(join(stageDir, "config"), { recursive: true });
   // Templates only: the installer renders server.yaml with the runtime account's uid, and places policy.yaml.

@@ -22,13 +22,17 @@
 # Every check and install step reads only that snapshot: the digest, the manifest check, the hashes and the plan.
 # The stage digest is sha256 over sorted `sha256  path` lines of every regular file in the stage outside runtime/
 # (the manifest and symlink list among them, which pin runtime/ exactly). Any other entry type there is refused.
-# runtime/ must equal runtime-manifest.sha256 (files) and runtime-symlinks.tsv (relative, in-tree symlinks): an unlisted
-# entry, a missing or changed file or link, an absolute or escaping link, or a device/fifo/socket is refused.
+# runtime/ must equal runtime-manifest.sha256 (files) and runtime-symlinks.tsv (`dir<TAB>path` lines for every directory,
+# `symlink<TAB>target<TAB>path` lines for every relative, in-tree symlink): an unlisted or missing entry of any kind,
+# a changed file or link target, an absolute or escaping link, a device/fifo/socket, or a path or link target containing
+# a newline, carriage return, tab or backslash is refused. The same checks run again on the deployed copy.
+# Every staged file the plan reads (config templates, units, status, worlds) must exist as a regular file.
 # --verify-only runs snapshot + digest + tree checks and exits; it needs no root and installs nothing.
 #
 # Environment (defaults are product names; nothing is derived from the current user):
-#   HORIZON_GATEWAY_STAGE   staging bundle directory (~/.cache/godspeed/gateway-stage); --stage overrides
+#   HORIZON_GATEWAY_STAGE   staging bundle directory (~/.cache/godspeed/gateway-stage); --stage overrides; ignored as root
 #   HORIZON_GATEWAY_ROOT    prefix for all paths, for testing against a temporary directory (staging records it)
+#   As root (uid 0) the script refuses when any HORIZON_GATEWAY_* variable is set and requires --stage.
 #   Account, path and bun settings are read by `gateway-setup.ts stage`; see its header.
 #
 # Privileged plan (what --authorize-privileged does, in order):
@@ -74,7 +78,7 @@ DRY=0
 APPLY=0
 CHECK=0
 VERIFY=0
-STAGE="${HORIZON_GATEWAY_STAGE:-${XDG_CACHE_HOME:-$HOME/.cache}/$PRODUCT/gateway-stage}"
+STAGE=""
 BINARY=""
 SHA256=""
 BUN_BINARY=""
@@ -101,6 +105,16 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+[ "$VERIFY" = 1 ] && [ "$APPLY" = 1 ] && { echo "--verify-only cannot be combined with --authorize-privileged (it installs nothing; run them separately)" >&2; exit 2; }
+if [ -n "${INSTALLER_TEST_MODE:-}" ] && [ "$APPLY" = 1 ]; then echo "INSTALLER_TEST_MODE cannot be combined with --authorize-privileged" >&2; exit 2; fi
+if [ "$(id -u)" = 0 ] || [ "$(id -ru)" = 0 ] || [ "${EUID:-1}" = 0 ]; then
+  # Root never takes a destination, stage or test seam from the environment.
+  if [ -n "${INSTALLER_TEST_MODE:-}" ]; then echo "refusing: INSTALLER_TEST_MODE is set; the installer test seam is never active as root" >&2; exit 2; fi
+  if compgen -e | grep -q '^HORIZON_GATEWAY_'; then echo "refusing: a HORIZON_GATEWAY_* variable is set ($(compgen -e | grep '^HORIZON_GATEWAY_' | tr '\n' ' ')); unset it before running as root" >&2; exit 2; fi
+  [ -n "$STAGE" ] || { echo "refusing: pass --stage DIR explicitly when running as root" >&2; exit 2; }
+elif [ -z "$STAGE" ]; then
+  STAGE="${HORIZON_GATEWAY_STAGE:-${XDG_CACHE_HOME:-$HOME/.cache}/$PRODUCT/gateway-stage}"
+fi
 # --dry-run together with --authorize-privileged stays a dry run.
 if [ "$DRY" = 1 ]; then APPLY=0; fi
 if [ "$CHECK" = 1 ]; then APPLY=0; fi
@@ -115,7 +129,8 @@ refuse() { echo "refusing: $*" >&2; exit 1; }
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 
 # ---- staged bundle ----------------------------------------------------------------------------------
-STAGE_SRC="$STAGE"
+STAGE_SRC="${STAGE%"${STAGE##*[!/]}"}" # no trailing slash, so the symlink test below sees the stage root itself
+STAGE="$STAGE_SRC"
 BINARY_SRC="$BINARY"
 BUN_SRC="$BUN_BINARY"
 STAGED=1
@@ -147,26 +162,39 @@ fi
 SNAP="$(mktemp -d "$SNAP_PARENT/gateway-snapshot.XXXXXX")" || refuse "cannot create a snapshot directory under $SNAP_PARENT"
 chmod 0700 "$SNAP"
 trap 'rm -rf -- "$SNAP"' EXIT
-[ -d "$STAGE_SRC" ] || refuse "stage $STAGE_SRC is not a directory"
-mkdir "$SNAP/stage"
+{ [ -d "$STAGE_SRC" ] && [ ! -L "$STAGE_SRC" ]; } || refuse "stage $STAGE_SRC is not a real directory (a symlinked stage root is refused)"
+mkdir -- "$SNAP/stage"
 # cp -a copies symlinks as links (never follows them); ownership is not preserved, so the copy is owned by the invoker.
-cp -a --no-preserve=ownership "$STAGE_SRC/." "$SNAP/stage/" || refuse "could not snapshot the stage $STAGE_SRC"
+cp -a --no-preserve=ownership -- "$STAGE_SRC/." "$SNAP/stage/" || refuse "could not snapshot the stage $STAGE_SRC"
 STAGE="$SNAP/stage"
 snapshot_file() {
   local label="$1" src="$2" dst="$3"
-  [ -f "$src" ] || refuse "$label $src does not exist"
+  [ -e "$src" ] || [ -L "$src" ] || refuse "$label $src does not exist"
   [ ! -L "$src" ] || refuse "$label $src is a symlink; pass the resolved path (readlink -f)"
-  cp --no-preserve=ownership "$src" "$dst" || refuse "could not snapshot $label $src"
+  [ -f "$src" ] || refuse "$label $src is not a regular file"
+  # cp -a recreates a special file instead of reading it (a fifo swapped in cannot hang root); the copy is then required
+  # to be a regular file, so a symlink or special file swapped in after the checks above is refused, not followed.
+  cp -a --no-preserve=ownership -- "$src" "$dst" || refuse "could not snapshot $label $src"
+  { [ -f "$dst" ] && [ ! -L "$dst" ]; } || refuse "$label $src changed while it was copied (the copy is not a regular file)"
 }
 if [ -n "$BINARY" ]; then snapshot_file binary "$BINARY_SRC" "$SNAP/binary"; BINARY="$SNAP/binary"; fi
 if [ -n "$BUN_BINARY" ]; then snapshot_file bun "$BUN_SRC" "$SNAP/bun"; BUN_BINARY="$SNAP/bun"; fi
-if [ "$VERIFY" = 1 ] && [ "${INSTALLER_TEST_MODE:-}" = 1 ] && [ "$(id -u)" != 0 ] && [ -n "${INSTALLER_TEST_HOOK_AFTER_SNAPSHOT:-}" ]; then
-  bash "$INSTALLER_TEST_HOOK_AFTER_SNAPSHOT"
+# Whatever mode bits the agent set on the originals never reach root's working copy: owner-only, no setuid/setgid/sticky.
+chmod -R u+rwX,go-rwx -- "$SNAP"
+find "$SNAP" ! -type l -exec chmod ugo-s,-t {} +
+# The hook gets only the original stage path: no TMPDIR to find the snapshot by, no SNAP variable.
+if [ "$VERIFY" = 1 ] && [ "${INSTALLER_TEST_MODE:-}" = 1 ] && [ -n "${INSTALLER_TEST_HOOK_AFTER_SNAPSHOT:-}" ] \
+  && [ "$(id -u)" != 0 ] && [ "$(id -ru)" != 0 ] && [ "${EUID:-1}" != 0 ]; then
+  env -u TMPDIR -u SNAP bash "$INSTALLER_TEST_HOOK_AFTER_SNAPSHOT" "$STAGE_SRC"
 fi
+# SNAPSHOT-END: STAGE_SRC, BINARY_SRC and BUN_SRC are used for messages only from here on.
 
-for f in plan.tsv runtime-manifest.sha256 runtime-symlinks.tsv status.json units/godspeed-sea-forge.service units/godspeed-horizon.service; do
-  [ -f "$STAGE/$f" ] && [ ! -L "$STAGE/$f" ] || refuse "staged $f is missing or not a regular file"
-done
+# staged_file REL: a staged path root reads must be a regular file in the snapshot, inside the stage, never a symlink.
+staged_file() {
+  case "$1" in ""|/*|..|../*|*/..|*/../*) refuse "staged path '$1' is not a plain relative path" ;; esac
+  { [ -f "$STAGE/$1" ] && [ ! -L "$STAGE/$1" ]; } || refuse "staged $1 is missing or not a regular file"
+}
+for f in plan.tsv runtime-manifest.sha256 runtime-symlinks.tsv status.json; do staged_file "$f"; done
 [ -d "$STAGE/runtime" ] && [ ! -L "$STAGE/runtime" ] || refuse "staged runtime is missing or not a real directory"
 
 # The digest: sha256 over sorted "sha256  path" lines of every regular file outside runtime/ (computed on the snapshot).
@@ -187,13 +215,16 @@ if [ "$APPLY" = 1 ] || [ "$VERIFY" = 1 ]; then
   [ "$EXPECT_STAGE" = "$STAGE_DIGEST" ] || refuse "--expect-stage-sha256 does not match the staged bundle digest $STAGE_DIGEST; review the plan and pass that digest"
 fi
 
-# verify_tree DIR MANIFEST SYMLINKS: DIR must be exactly what the manifest (files + sha256) and the symlink list name.
+# verify_tree DIR MANIFEST LIST: DIR must be exactly what the manifest (files + sha256) and the list (dir/symlink lines) name.
 verify_tree() {
-  local dir="$1" manifest="$2" links="$3" odd want got root target
+  local dir="$1" manifest="$2" list="$3" odd want got root target nlines
   odd="$(find "$dir" ! -type f ! -type d ! -type l -print -quit)"
   [ -z "$odd" ] || { echo "refusing: non-regular entry in the runtime tree (device, fifo or socket): $odd" >&2; return 1; }
-  odd="$(find "$dir" -name $'*\n*' -print -quit)"
-  [ -z "$odd" ] || { echo "refusing: runtime path with a newline in its name" >&2; return 1; }
+  # Names the manifest and list formats cannot carry unambiguously (same rule as the stager's assertPlainName): checked on the
+  # full relative path (-path, below the tree root) and on every link target (-lname), not just base names.
+  odd="$(cd "$dir" && find . -mindepth 1 \( -path $'*\n*' -o -path $'*\r*' -o -path $'*\t*' -o -path '*\\*' \
+    -o -lname $'*\n*' -o -lname $'*\r*' -o -lname $'*\t*' -o -lname '*\\*' \) -print -quit)"
+  [ -z "$odd" ] || { echo "refusing: runtime path or symlink target with a newline, carriage return, tab or backslash in it" >&2; return 1; }
   # files: the set must be exactly the manifest's, then every hash
   want="$(sed -E 's/^[0-9a-f]{64}  //' "$manifest" | LC_ALL=C sort)"
   got="$(cd "$dir" && find . -type f -print | sed 's|^\./||' | LC_ALL=C sort)"
@@ -203,8 +234,19 @@ verify_tree() {
     return 1
   fi
   (cd "$dir" && sha256sum -c --quiet "$manifest" >/dev/null 2>&1) || { echo "refusing: a runtime file differs from its manifest hash" >&2; return 1; }
+  # the list holds only dir and symlink lines
+  nlines="$(grep -c '' "$list" || true)"
+  [ "$nlines" = "$(grep -cE $'^(dir\t[^\t]+|symlink\t[^\t]+\t[^\t]+)$' "$list" || true)" ] || { echo "refusing: the runtime list has a line that is neither dir nor symlink" >&2; return 1; }
+  # directories: exactly the listed ones (a directory nothing names is still something root would install)
+  want="$(grep $'^dir\t' "$list" | LC_ALL=C sort || true)"
+  got="$(cd "$dir" && find . -mindepth 1 -type d -printf 'dir\t%P\n' | LC_ALL=C sort)"
+  if [ "$want" != "$got" ]; then
+    echo "refusing: runtime directories differ from the list (extra or missing):" >&2
+    diff <(printf '%s\n' "$want") <(printf '%s\n' "$got") | grep '^[<>]' | head -10 >&2 || true
+    return 1
+  fi
   # symlinks: exactly the listed ones, same targets
-  want="$(LC_ALL=C sort "$links")"
+  want="$(grep $'^symlink\t' "$list" | LC_ALL=C sort || true)"
   got="$(cd "$dir" && find . -type l -printf 'symlink\t%l\t%P\n' | LC_ALL=C sort)"
   if [ "$want" != "$got" ]; then
     echo "refusing: runtime symlinks differ from the list (extra, missing or changed target):" >&2
@@ -224,6 +266,26 @@ verify_tree() {
 # The staged runtime tree must equal its manifest and symlink list before anything is installed from it.
 verify_tree "$STAGE/runtime" "$STAGE/runtime-manifest.sha256" "$STAGE/runtime-symlinks.tsv" || refuse "staged runtime tree does not match its manifest; run: just gateway-stage"
 
+# Every staged source the plan reads must exist as a regular file in the snapshot, so --verify-only cannot bless a bundle the
+# apply would fail on half-way. The list is derived from the plan rows, not hardcoded.
+check_plan_sources() {
+  local -a F
+  while IFS=$'\t' read -r -u 3 -a F; do
+    case "${F[0]}" in
+      account|group|member|dir|place-bun|optional-exec|place-binary|socket) ;;
+      deploy-tree) [ -d "$STAGE/runtime" ] ;;
+      config-file) staged_file "${F[5]:-}" ;;
+      generated) staged_file "${F[4]:-}" ;;
+      worlds)
+        case "${F[4]:-}" in runtime/*) ;; *) refuse "plan worlds source '${F[4]:-}' is not under runtime/" ;; esac
+        case "${F[4]}" in *..*) refuse "plan worlds source '${F[4]}' is not a plain relative path" ;; esac
+        { [ -d "$STAGE/${F[4]}" ] && [ ! -L "$STAGE/${F[4]}" ]; } || refuse "plan worlds source ${F[4]} is missing or not a real directory in the stage" ;;
+      *) refuse "unknown plan step '${F[0]}'" ;;
+    esac
+  done 3< "$STAGE/plan.tsv"
+}
+check_plan_sources
+
 # ---- the server binary: verified before any mode, and always refused on mismatch ----------------------
 BINARY_NOTE="not given (pass --binary PATH --sha256 HEX)"
 if [ -n "$BINARY" ]; then
@@ -231,7 +293,7 @@ if [ -n "$BINARY" ]; then
   SHA256="$(printf '%s' "$SHA256" | tr 'A-F' 'a-f')"
   ACTUAL="$(sha256sum "$BINARY" | cut -d' ' -f1)"
   if [ "$ACTUAL" != "$SHA256" ]; then
-    refuse "sha256 of $BINARY_SRC is $ACTUAL, expected $SHA256; not copied"
+    refuse "sha256 of $BINARY_SRC does not match the approved sha256; not copied"
   fi
   BINARY_NOTE="$BINARY_SRC verified (snapshot) sha256 $ACTUAL"
 fi
@@ -243,14 +305,9 @@ if [ -n "$BUN_BINARY" ]; then
   BUN_SHA256="$(printf '%s' "$BUN_SHA256" | tr 'A-F' 'a-f')"
   BUN_ACTUAL="$(sha256sum "$BUN_BINARY" | cut -d' ' -f1)"
   if [ "$BUN_ACTUAL" != "$BUN_SHA256" ]; then
-    refuse "sha256 of bun $BUN_SRC is $BUN_ACTUAL, expected $BUN_SHA256; not copied"
+    refuse "sha256 of bun $BUN_SRC does not match the approved sha256; not copied"
   fi
   BUN_NOTE="$BUN_SRC verified (snapshot) sha256 $BUN_ACTUAL"
-fi
-
-if [ "$VERIFY" = 1 ]; then
-  echo "verify-only: ok; stage $STAGE_SRC digest $STAGE_DIGEST, runtime tree matches manifest and symlink list. Nothing installed."
-  exit 0
 fi
 
 # ---- execution helpers ------------------------------------------------------------------------------
@@ -277,9 +334,9 @@ place_file() {
   esac
   if [ "$APPLY" = 1 ]; then
     case "$action" in
-      install) install -o "$owner" -g "$group" -m "$mode" "$src" "$dest" ;;
-      keep) chown "$owner:$group" "$dest"; chmod "$mode" "$dest" ;;
-      replace) mv "$dest" "$dest.replaced-$TS"; install -o "$owner" -g "$group" -m "$mode" "$src" "$dest" ;;
+      install) install -o "$owner" -g "$group" -m "$mode" -- "$src" "$dest" ;;
+      keep) chown "$owner:$group" -- "$dest"; chmod "$mode" -- "$dest" ;;
+      replace) mv -- "$dest" "$dest.replaced-$TS"; install -o "$owner" -g "$group" -m "$mode" -- "$src" "$dest" ;;
       refuse) refuse "$label $dest differs; pass --replace-binary" ;;
     esac
   fi
@@ -310,7 +367,7 @@ row_member() {
 row_dir() {
   local owner="$1" group="$2" mode="$3" path="$4"
   say "dir: install -d -o $owner -g $group -m $mode $path"
-  if [ "$APPLY" = 1 ]; then install -d -o "$owner" -g "$group" -m "$mode" "$path"; fi
+  if [ "$APPLY" = 1 ]; then install -d -o "$owner" -g "$group" -m "$mode" -- "$path"; fi
 }
 
 row_place_bun() {
@@ -344,19 +401,19 @@ row_deploy_tree() {
   local owner="$1" group="$2" dst="$3" new="$3.new-$TS"
   say "deploy runtime (snapshot of $STAGE_SRC) -> $dst: root-owned copy (dirs 0755, files 0644), manifest verified, previous tree kept as $dst.previous-$TS"
   if [ "$APPLY" = 1 ]; then
-    install -d -o "$owner" -g "$group" -m 0755 "$(dirname "$dst")"
-    rm -rf "$new"
-    cp -a "$STAGE/runtime" "$new"
-    chown -R -h "$owner:$group" "$new"
+    install -d -o "$owner" -g "$group" -m 0755 -- "$(dirname "$dst")"
+    rm -rf -- "$new"
+    cp -a -- "$STAGE/runtime" "$new"
+    chown -R -h "$owner:$group" -- "$new"
     find "$new" -type d -exec chmod 0755 {} +
     find "$new" -type f -exec chmod 0644 {} +
     if ! verify_tree "$new" "$STAGE/runtime-manifest.sha256" "$STAGE/runtime-symlinks.tsv"; then
-      rm -rf "$new"
+      rm -rf -- "$new"
       refuse "copied runtime tree does not match the manifest"
     fi
-    if [ -e "$dst" ]; then mv "$dst" "$dst.previous-$TS"; fi
-    mv "$new" "$dst"
-    install -o "$owner" -g "$group" -m 0644 "$STAGE/runtime-manifest.sha256" "$dst.manifest.sha256"
+    if [ -e "$dst" ]; then mv -- "$dst" "$dst.previous-$TS"; fi
+    mv -- "$new" "$dst"
+    install -o "$owner" -g "$group" -m 0644 -- "$STAGE/runtime-manifest.sha256" "$dst.manifest.sha256"
   fi
 }
 
@@ -367,7 +424,7 @@ runtime_account_name() { awk -F'\t' '$1=="account" && $3=="runtime" {print $2; e
 # socket group's gid (`getent group`, the group named in the staged plan). Root and non-numeric values are refused.
 render_config() {
   local tmpl="$1" rt="$2" out="$3" uid="" gid="" sock=""
-  cp "$STAGE/$tmpl" "$out"
+  cp -- "$STAGE/$tmpl" "$out"
   if grep -q '"__RUNTIME_UID__"' "$STAGE/$tmpl"; then
     uid="$(id -u "$rt")" || refuse "runtime account '$rt' does not exist; the account step must run first"
     [[ "$uid" =~ ^[1-9][0-9]{0,9}$ ]] || refuse "runtime account '$rt' has no usable uid (root and non-numeric are refused)"
@@ -394,17 +451,17 @@ row_config_file() {
   new="$(mktemp)"
   render_config "$tmpl" "$rt" "$new"
   if [ ! -e "$path" ]; then
-    install -o "$owner" -g "$group" -m "$mode" "$new" "$path"
+    install -o "$owner" -g "$group" -m "$mode" -- "$new" "$path"
     say "config $path: rendered, $owner:$group $mode"
   elif cmp -s "$new" "$path"; then
-    chown "$owner:$group" "$path"; chmod "$mode" "$path"
+    chown "$owner:$group" -- "$path"; chmod "$mode" -- "$path"
     say "config $path: identical, kept (mode and owner corrected)"
   else
-    install -o "$owner" -g "$group" -m "$mode" "$new" "$path.generated-$TS"
+    install -o "$owner" -g "$group" -m "$mode" -- "$new" "$path.generated-$TS"
     SIDECARS=$((SIDECARS+1))
     say "config $path: authoritative and differs from this checkout; kept it, wrote $path.generated-$TS"
   fi
-  rm -f "$new"
+  rm -f -- "$new"
 }
 
 row_worlds() {
@@ -412,10 +469,10 @@ row_worlds() {
   list="$(cd "$src" && find . -name '*.sea' -not -path '*/validation/*' -not -path '*/__pycache__/*' | sed 's|^\./||' | sort)"
   say "worlds $dest: $(printf '%s\n' "$list" | grep -c .) .sea file(s) copied from the verified runtime domain, $owner:$group 0644"
   if [ "$APPLY" = 1 ]; then
-    rm -rf "$dest"
+    rm -rf -- "$dest"
     while IFS= read -r f; do
       [ -n "$f" ] || continue
-      install -D -o "$owner" -g "$group" -m 0644 "$src/$f" "$dest/$f"
+      install -D -o "$owner" -g "$group" -m 0644 -- "$src/$f" "$dest/$f"
     done <<< "$list"
   fi
 }
@@ -427,11 +484,21 @@ row_generated() {
   else say "generated $dst: differs; old copy kept as $dst.generated-$TS"
   fi
   if [ "$APPLY" = 1 ]; then
-    mkdir -p "$(dirname "$dst")"
-    if [ -e "$dst" ] && ! cmp -s "$STAGE/$src" "$dst"; then mv "$dst" "$dst.generated-$TS"; fi
-    install -o "$owner" -g "$group" -m "$mode" "$STAGE/$src" "$dst"
+    mkdir -p -- "$(dirname "$dst")"
+    if [ -e "$dst" ] && ! cmp -s "$STAGE/$src" "$dst"; then mv -- "$dst" "$dst.generated-$TS"; fi
+    install -o "$owner" -g "$group" -m "$mode" -- "$STAGE/$src" "$dst"
   fi
 }
+
+# Test seam (non-root only, never with --authorize-privileged): INSTALLER_TEST_MODE=1 --verify-only with
+# INSTALLER_TEST_DEPLOY_DST=DIR runs the real deploy-tree copy and its post-copy verification into DIR, owned by the invoker.
+if [ "$VERIFY" = 1 ]; then
+  if [ "${INSTALLER_TEST_MODE:-}" = 1 ] && [ -n "${INSTALLER_TEST_DEPLOY_DST:-}" ] && [ "$(id -u)" != 0 ] && [ "$(id -ru)" != 0 ] && [ "${EUID:-1}" != 0 ]; then
+    APPLY=1 row_deploy_tree "$(id -un)" "$(id -gn)" "$INSTALLER_TEST_DEPLOY_DST"
+  fi
+  echo "verify-only: ok; stage $STAGE_SRC digest $STAGE_DIGEST, runtime tree matches manifest and list, plan sources present. Nothing installed."
+  exit 0
+fi
 
 # ---- checks (read-only; used by --check and as a precondition of --authorize-privileged) ------------
 check_row_stat() {
@@ -564,5 +631,14 @@ fi
 
 echo "no changes made."
 echo "to apply, as root (sudo asks for your password; the owner runs this, including the bun step):"
-echo "  sudo $0 --authorize-privileged --stage $STAGE_SRC --binary ${BINARY_SRC:-<path to sea-forge-server>} --sha256 ${SHA256:-<sha256>} --bun ${BUN_SRC:-<path to a trusted bun>} --bun-sha256 ${BUN_SHA256:-<sha256 of bun>} --expect-stage-sha256 $STAGE_DIGEST"
+# Every interpolated value is %q-quoted; an empty value prints an angle-bracket placeholder the owner replaces.
+qarg() { if [ -n "$2" ]; then printf '%s %q ' "$1" "$2"; else printf '%s <%s> ' "$1" "$3"; fi; }
+printf '  sudo %q --authorize-privileged ' "$0"
+qarg --stage "$STAGE_SRC" ""
+qarg --binary "$BINARY_SRC" "path to sea-forge-server"
+qarg --sha256 "$SHA256" "sha256"
+qarg --bun "$BUN_SRC" "path to a trusted bun"
+qarg --bun-sha256 "$BUN_SHA256" "sha256 of bun"
+qarg --expect-stage-sha256 "$STAGE_DIGEST" ""
+printf '\n'
 echo "the installer renders server.yaml (runtime uid from id -u) and places policy.yaml in the gateway root; --check verifies them."

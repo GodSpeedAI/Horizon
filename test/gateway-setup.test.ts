@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { seaForgeActorOf } from "../src/adapters/sea-forge-approvals.ts";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, symlinkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { userInfo, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -24,6 +24,7 @@ import {
   excludeReason,
   renderPlanTsv,
   resolveLayout,
+  resetStageDir,
   stageRuntime,
   statusRecord,
   unitFiles,
@@ -616,5 +617,34 @@ describe("server.yaml and policy.yaml (rendered from the runtime account's uid, 
     const dev = layoutFor(root, {}, true);
     expect(renderServerYaml(serverConfig(dev, files, 4242))).toBe(render(4242));
     expect(statusRecord(dev).environment).toBe("development");
+  });
+});
+
+describe("stage ownership and pinned directories", () => {
+  test("the stager lists every runtime directory as a dir line", () => {
+    const repo = tempDir("dirs-repo");
+    mkdirSync(join(repo, "src", "deep"), { recursive: true });
+    writeFileSync(join(repo, "src", "deep", "a.ts"), "x\n");
+    const { symlinkManifest } = stageRuntime(repo, join(tempDir("dirs-out"), "runtime"), ["src"]);
+    expect(symlinkManifest).toBe("dir\tsrc\ndir\tsrc/deep\n");
+  });
+
+  test("resetStageDir empties a stage (has plan.tsv), creates a missing dir, and refuses a non-stage", () => {
+    const old = tempDir("reset-old");
+    writeFileSync(join(old, "plan.tsv"), "x\n");
+    writeFileSync(join(old, "stray.bak"), "x\n");
+    resetStageDir(old);
+    expect(readdirSync(old)).toEqual([]);
+    const fresh = join(tempDir("reset-new"), "stage");
+    resetStageDir(fresh);
+    expect(existsSync(fresh)).toBe(true);
+    const notStage = tempDir("reset-notstage");
+    writeFileSync(join(notStage, "precious.txt"), "x\n");
+    expect(() => resetStageDir(notStage)).toThrow(/does not look like a stage/);
+    expect(existsSync(join(notStage, "precious.txt"))).toBe(true);
+    const target = tempDir("reset-target");
+    const link = join(tempDir("reset-link"), "l");
+    symlinkSync(target, link);
+    expect(() => resetStageDir(link)).toThrow(/symlink/);
   });
 });
