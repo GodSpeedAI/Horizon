@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { seaForgeActorOf } from "../src/adapters/sea-forge-approvals.ts";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, symlinkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { userInfo, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -24,6 +24,8 @@ import {
   excludeReason,
   renderPlanTsv,
   resolveLayout,
+  resetStageDir,
+  STAGE_MARKER,
   stageRuntime,
   statusRecord,
   unitFiles,
@@ -400,6 +402,7 @@ describe("installer (shell) against a temporary root", () => {
   const bunSha = createHash("sha256").update(readFileSync(bunBin)).digest("hex");
   const env = { ...process.env, HORIZON_GATEWAY_ROOT: root, ...FAKE, HORIZON_OPERATOR_ACCOUNT: "" };
 
+  const seamEnv = { ...env, INSTALLER_TEST_MODE: "1", INSTALLER_TEST_PLAN_TABLE: join(stage, "plan.tsv") }; // fake accounts and a temp root are not in the fixed table
   const run = async (args: string[], e: Record<string, string | undefined> = env) => {
     const p = Bun.spawn(["bash", resolve(repoRoot, "scripts/install-sea-forge-gateway.sh"), ...args], {
       env: e as Record<string, string>,
@@ -421,7 +424,7 @@ describe("installer (shell) against a temporary root", () => {
     const tsDigest = /bundle digest: ([0-9a-f]{64})/.exec(stdout)?.[1];
     expect(tsDigest).toBeDefined();
 
-    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", sha, "--bun", bunBin, "--bun-sha256", bunSha]);
+    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", sha, "--bun", bunBin, "--bun-sha256", bunSha], seamEnv);
     expect(dry.code).toBe(0);
     expect(dry.out).toContain(`stage digest: ${tsDigest}`);
     expect(dry.out).toContain("no changes made");
@@ -442,7 +445,7 @@ describe("installer (shell) against a temporary root", () => {
 
   test("checksum mismatch is refused in dry-run and in authorized mode", async () => {
     const wrong = "0".repeat(64);
-    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", wrong]);
+    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", wrong], seamEnv);
     expect(dry.code).toBe(1);
     expect(dry.err).toContain("not copied");
     const apply = await run(["--authorize-privileged", "--stage", stage, "--binary", bin, "--sha256", wrong, "--expect-stage-sha256", "x"]);
@@ -451,7 +454,7 @@ describe("installer (shell) against a temporary root", () => {
   });
 
   test("a bun checksum mismatch is refused before anything is copied", async () => {
-    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", sha, "--bun", bunBin, "--bun-sha256", "0".repeat(64)]);
+    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", sha, "--bun", bunBin, "--bun-sha256", "0".repeat(64)], seamEnv);
     expect(dry.code).toBe(1);
     expect(dry.err).toContain("bun");
     expect(dry.err).toContain("not copied");
@@ -469,7 +472,7 @@ describe("installer (shell) against a temporary root", () => {
     const copy = join(tempDir("tamper"), "bundle");
     rmSync(copy, { recursive: true, force: true });
     mkdirSync(copy, { recursive: true });
-    for (const f of ["plan.tsv", "runtime-manifest.sha256", "status.json"]) writeFileSync(join(copy, f), readFileSync(join(stage, f)));
+    for (const f of ["plan.tsv", "runtime-manifest.sha256", "runtime-symlinks.tsv", "status.json"]) writeFileSync(join(copy, f), readFileSync(join(stage, f)));
     mkdirSync(join(copy, "units"));
     for (const f of readdirSync(join(stage, "units"))) writeFileSync(join(copy, "units", f), readFileSync(join(stage, "units", f)));
     mkdirSync(join(copy, "config"));
@@ -616,5 +619,42 @@ describe("server.yaml and policy.yaml (rendered from the runtime account's uid, 
     const dev = layoutFor(root, {}, true);
     expect(renderServerYaml(serverConfig(dev, files, 4242))).toBe(render(4242));
     expect(statusRecord(dev).environment).toBe("development");
+  });
+});
+
+describe("stage ownership and pinned directories", () => {
+  test("the stager lists every runtime directory as a dir line", () => {
+    const repo = tempDir("dirs-repo");
+    mkdirSync(join(repo, "src", "deep"), { recursive: true });
+    writeFileSync(join(repo, "src", "deep", "a.ts"), "x\n");
+    const { symlinkManifest } = stageRuntime(repo, join(tempDir("dirs-out"), "runtime"), ["src"]);
+    expect(symlinkManifest).toBe("dir\tsrc\ndir\tsrc/deep\n");
+  });
+
+  test("resetStageDir empties a stage (has plan.tsv), creates a missing dir, and refuses a non-stage", () => {
+    const old = tempDir("reset-old");
+    writeFileSync(join(old, STAGE_MARKER), "horizon gateway stage v1\n");
+    writeFileSync(join(old, "stray.bak"), "x\n");
+    resetStageDir(old);
+    expect(readdirSync(old)).toEqual([]);
+    const fresh = join(tempDir("reset-new"), "stage");
+    resetStageDir(fresh);
+    expect(existsSync(fresh)).toBe(true);
+    const notStage = tempDir("reset-notstage");
+    writeFileSync(join(notStage, "precious.txt"), "x\n");
+    expect(() => resetStageDir(notStage)).toThrow(/does not look like a stage/);
+    expect(existsSync(join(notStage, "precious.txt"))).toBe(true);
+    const planOnly = tempDir("reset-planonly");
+    writeFileSync(join(planOnly, "plan.tsv"), "x\n");
+    expect(() => resetStageDir(planOnly)).toThrow(/does not look like a stage/); // a plan.tsv alone is not enough
+    const symPlan = tempDir("reset-symplan");
+    writeFileSync(join(symPlan, "real"), "horizon gateway stage v1\n");
+    symlinkSync(join(symPlan, "real"), join(symPlan, STAGE_MARKER));
+    expect(() => resetStageDir(symPlan)).toThrow(/does not look like a stage/);
+    expect(existsSync(join(symPlan, "real"))).toBe(true);
+    const target = tempDir("reset-target");
+    const link = join(tempDir("reset-link"), "l");
+    symlinkSync(target, link);
+    expect(() => resetStageDir(link)).toThrow(/symlink/);
   });
 });
