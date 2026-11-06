@@ -1,0 +1,121 @@
+candidate_revision:
+  id: SPEC-CR-003
+  task: none (spec source and requirement delta; applies to the next spec version)
+  prepared_at: "2026-11-02"
+  revised_at: "2026-11-03"
+  prepared_by: builder (Claude session, settlement approval gate)
+  status: >-
+    proposed, revised 2026-11-03 to the design now merged in sea-rs (PR #79, PR #81). NOT applied, NOT frozen.
+    Blocked on two owner decisions about open review findings (F-A, F-B), an independent ACCEPT, and owner freeze approval.
+  authorization:
+    decision: owner choice recorded in the request of 2026-11-02 (gate external-authority settlement_declaration only; operator-role approvers only; ship via spec change request)
+    scope: >-
+      The owner decided the behaviour. This candidate does not authorize applying it. Application needs a new
+      spec version, an independent ACCEPT verdict in REVIEW.md, owner freeze approval, a plan rebind and a
+      re-freeze through scripts/freeze-formation.sh.
+  active_pins:
+    freeze_id: HORIZON-001-1.2.0@2026-11-02
+    spec_path: .agents/specs/horizon.agent.spec.yaml
+    spec_sha256: 7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
+    plan_path: .agents/plans/horizon.plan.yaml
+    plan_sha256: eafd9bc7d80f18baad9121e38e22e8c9dea06d3c45d3c7b90973432978a70ac2
+    ledger_path: requirements/ledger.yaml
+    ledger_sha256: 1e81c1af7508ce414b91e3b5953167aaaf754e470e69f2985e476dd2868e92c3
+  observed_inconsistency: >-
+    .agents/CURRENT_STATUS.md (revision 32) names HORIZON-001 1.1.0 as the frozen spec, while the Wayfinder
+    header names HORIZON-001-1.2.0@2026-11-02. Not changed by this candidate; to be reconciled by the owner.
+  resolves: []
+  unblocks: []
+  adds_requirements: [REQ-SET-GATE-001 (proposed id, not in ledger)]
+  changes_fields: []
+  semantic_diff: DELTA.md
+  implementation_evidence:
+    sea_rs_main: 09c2541b (PR #81, squash); PR #79 merged as 652ed710
+    selector: "settlement_declaration rules accept boundary_constraints.settlement_authority_class: [external] (crates/sea-forge-authority/src/lib.rs ~1418-1440, matcher ~3064). An external class must escalate for approval."
+    class_source: "derive_settlement_authority_class in crates/sea-forge-authority/src/cep.rs, computed from the verified ingress, not from the request"
+    gate_on_server_path: "crates/sea-forge-server/src/delegation.rs submit_swe_seed_declaration calls cep::authorize_settlement_declaration (~line 973) before the declaration is appended"
+    pending_record: "settlement_pending record created once per bound request hash via commit_typed_once; approval id apr-settlement-pending-<pending_id>"
+    claim: "approved -> resuming:N is a single create-only claim; approved-but-unclaimed refuses declarations (authorization_unclaimed)"
+    settle_after_failure: "PR #81: a resume that errors after claiming is released if no declaration names it, completed if an authorised declaration does, otherwise left open"
+    verification_gate: "verify_case_declarations (crates/sea-forge-authority/src/cep/declaration_authority.rs) is the one verifier used by reconciliation, reads, resume and promotion"
+  blockers:
+    - id: D1
+      state: RESOLVED in sea-rs code (was: no selector for external-only scope)
+      evidence: "settlement_authority_class selector, see implementation_evidence.selector. Tested in sea-rs crates/sea-forge-authority tests."
+      remaining: "A rule with this selector must be checked against the production policy.yaml, which is root-owned and not in the repo."
+    - id: D2-SWE-SEED-PATH
+      state: RESOLVED in code (was: server path bypassed the gate)
+      evidence: "delegation.rs submit_swe_seed_declaration calls authorize_settlement_declaration before append (implementation_evidence.gate_on_server_path)."
+      remaining: "Confirm in the live round trip that the SWE_SEED path returns awaiting approval for an external declaration."
+    - id: D3-DECLARER-ROLE
+      state: OPEN, UNVERIFIED
+      finding: >-
+        Declarer.role for SWE_SEED is permitted_declarer_roles.first() from the policy's settlement_authorities block
+        (delegation.rs ~895-896). Fixtures use R-AA and operator. The production value is not in the repo, and it is a
+        free string, not the ActorRole the gate uses.
+      consequence: "The gate decides on the verified socket role and the derived class, not on this string. Confirm the production value before apply."
+    - id: F-A-DECLARATION-BINDING
+      state: OPEN, owner decision (CodeRabbit Major, security, on PR #80; code from PR #79)
+      finding: >-
+        verify_one (declaration_authority.rs) authorises a declaration from its copied authorization_request_sha256 and
+        declaration_id. It does not recompute declaration_hash, and it does not check the declared content against the
+        approved declared_request_sha256. A Completed record is bound only by declaration_ref == declaration_id. Promotion
+        and the Thoth view read the unchained settlement/declarations.jsonl view, so a local edit to that view can change
+        status, weight, tags, or qualifies_for_capability.
+      owner_decision: >-
+        Decide which record is authoritative for promotion: the hash-chained case ledger only (promotion reads ledger
+        entries and verifies the payload hash), or the view with its own hash check. Recommended: the chained ledger.
+        This is a security-model change and needs owner approval before implementation.
+    - id: F-B-RESUME-START-RECONCILE
+      state: OPEN, owner decision (CodeRabbit Major, stability, on PR #80; code from PR #79)
+      finding: >-
+        reconcile_open_settlement_attempts runs at the start of every resume. For a claimed attempt with no declaration yet,
+        it records a terminal failed status. A concurrent resume that is still declaring can therefore fail, and its
+        declaration is then quarantined and the approval is spent.
+      owner_decision: >-
+        Choose one: (1) reconcile only claims older than a bound larger than the declare timeout; or (2) refuse to resume
+        while a claim is open and run reconciliation only in an explicit recovery step. Recommended: (1), because it needs
+        no new operator step.
+  actor_role_verification:
+    external_adapter_caller: cognate/packages/runtime-bun/src/sea-forge-authority.ts (SeaForgeAuthority, default actor role "service" at line 319; authority_settle at line 406)
+    server_role_source: >-
+      sea-rs crates/sea-forge-server/src/lib.rs ~2569-2577 and ~2751-2770: the role used for the gate is the
+      VERIFIED SOCKET IDENTITY role. The request actor field is not trusted for role.
+    production_binding: >-
+      scripts/gateway-setup.ts ~345-347: runtime uid bound to actor_id cognate-service with roles ["service"].
+      Operator actor bound with roles ["operator"] and reached only through the gateway.
+    verified_role: service
+    verified_selector_for_external_only: "settlement_authority_class: [external] (implemented; see D1)"
+  policy_rule:
+    placement: >-
+      Insert as the FIRST rule of the rules list in scripts/gateway-setup.ts renderPolicyYaml (line ~421-433),
+      and as the first rule of the cell policy in scripts/ignite.ts (line ~118 template) if the cell gate is wanted.
+      The gate must precede the existing `settlement` rule because rules are first-match.
+    yaml: |
+      - name: settlement-external-approval-gate
+        verdict: allow
+        requires_approval: true
+        actor_role: service
+        operation_kind: settlement_declaration
+        boundary_constraints:
+          settlement_authority_class: [external]
+    cannot_apply_until: "F-A and F-B decided; independent ACCEPT; owner freeze approval; the rule is confirmed against lib.rs validation (external rules must escalate) in the live round trip."
+  approver_policy:
+    approver_role: operator
+    evidence: >-
+      scripts/gateway-setup.ts ~line 430 rule `operator-approves` (actor_role operator, operation_kind
+      approval_resolution). Escalate emits approval-role:<approver_role> from SoD rules (lib.rs ~2473).
+    requester_self_approval: >-
+      refused by SEA-Forge when the identity is known, and fails closed when it is unknown (commit 18f0c40 in Horizon;
+      sea-rs PR #76). Not re-verified against the live gateway.
+  independent_verdict_required: >-
+    A reviewer independent of the builder (a different model) checks DELTA.md against the frozen spec and the
+    sea-rs and Horizon evidence cited here, and files ACCEPT, ACCEPT_WITH_CHANGES or REJECT in REVIEW.md.
+    Nothing is applied before ACCEPT.
+  validation_run_2026_11_02:
+    - "just ledger: pass (105 requirements, 105 acceptance contracts; check-ledger-freeze.sh ok)"
+    - "just wayfinder: pass (0 errors; check-ledger-freeze.sh ok)"
+    - "scripts/apply-candidate-revision.py: NOT run (it is wired to T04-CR-001 and writes composed files)"
+    - "cargo test in sea-rs: run on the implementation PRs (#79, #81), not for this candidate"
+  validation_run_2026_11_03:
+    - "Checked the D1 selector and D2 gate call by reading sea-rs main (09c2541b). No file in this worktree was run or frozen."
