@@ -15,7 +15,7 @@ import { createMemoryStore } from "@godspeedai/cognate-store-memory";
 import { buildAuthorityRequest, interpretDecision, type GovernanceAuthority } from "@godspeedai/cognate-runtime-bun";
 import { createIdentityService, DEVICES, OPERATORS, SESSIONS } from "@godspeed/identity";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
-import { approvalAuthority } from "../src/adapters/sea-forge-approvals.ts";
+import { approvalAuthority } from "../src/adapters/sea-forge-config.ts";
 import { delegatingAuthority } from "../src/adapters/delegating-authority.ts";
 import { loadWorld } from "../src/adapters/semantic.ts";
 import { readIntentAttempts, readIntentRecords } from "../src/capabilities/navigation-intent.ts";

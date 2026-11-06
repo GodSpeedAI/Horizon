@@ -21,7 +21,7 @@ import { chmodSync, lstatSync, copyFileSync, existsSync, mkdirSync, readFileSync
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { seaForgeActorOf } from "../src/adapters/sea-forge-approvals.ts";
+import { seaForgeActorOf } from "../src/adapters/sea-forge-config.ts";
 
 export const PRODUCT = "godspeed";
 export const DEFAULT_GATEWAY_ACCOUNT = `${PRODUCT}-sea-forge`;

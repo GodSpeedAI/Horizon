@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { seaForgeActorOf } from "../src/adapters/sea-forge-approvals.ts";
+import { seaForgeActorOf } from "../src/adapters/sea-forge-config.ts";
 import { existsSync, symlinkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { userInfo, tmpdir } from "node:os";
 import { join, resolve } from "node:path";

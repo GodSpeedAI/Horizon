@@ -10,7 +10,8 @@
  */
 import { buildAuthorityRequest, interpretDecision, type GovernanceAuthority, type GovernanceDecision, type GovernedOperation } from "@godspeedai/cognate-runtime-bun";
 import type { OperatorActors } from "../remote/operators.ts";
-import { seaForgeCall, type SeaForgeActor } from "./sea-forge-approvals.ts";
+import { seaForgeCall } from "./sea-forge-approvals.ts";
+import type { SeaForgeActor } from "./sea-forge-config.ts";
 
 type Send = (request: Record<string, unknown>) => Promise<Record<string, unknown>>;
 
