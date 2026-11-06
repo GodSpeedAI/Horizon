@@ -79,13 +79,30 @@ import { CONTEXT_REFERENCE } from "./capabilities/context.ts";
 import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type DebuggerOperation, type DebuggerSources } from "./domain/debugger.ts";
 import { renderWorkspacePage } from "./ui/workspace/render.tsx";
 import { renderEconomicsPage } from "./ui/workspace/economics.tsx";
-import { renderApprovalInboxPage, type InboxNotice } from "./ui/workspace/approval-inbox.tsx";
+import { parseInboxErrorCode, renderApprovalInboxPage, type InboxErrorCode, type InboxNotice } from "./ui/workspace/approval-inbox.tsx";
 import type { Server } from "bun";
 import { RemoteController, type RemoteStatus } from "./remote/server.ts";
 import { remoteSettings } from "./remote/settings.ts";
 import { remotePanelPage } from "./remote/panel.ts";
 
 type HttpServer = Server<unknown>;
+
+/** The decision was recorded by SEA-Forge, but a step after it (polling, settling the commit) failed. Same message as the original error. */
+export class ApprovalFollowUpError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApprovalFollowUpError";
+  }
+}
+
+/** The fixed outcome codes the inbox redirect may carry. The page owns the copy; no error text travels in the URL. */
+export function approvalErrorCode(error: unknown): InboxErrorCode {
+  if (error instanceof ApprovalFollowUpError) return "followup_failed";
+  const message = error instanceof Error ? error.message : "";
+  if (/already decided|no governed commit waits|does not belong/.test(message)) return "not_pending";
+  if (/^APPROVAL: /.test(message)) return "refused";
+  return "unavailable";
+}
 
 /** The frame this application most recently issued and the gates assessed on it. */
 /**
@@ -540,8 +557,14 @@ export async function createApplication(
     }
     const resolved = await seaForge!.resolveApproval({ approvalId: request.approvalId, resolution: request.resolution, onBehalfOf: authority.operator });
     if (!resolved.ok) throw new Error(`APPROVAL: SEA-Forge refused the resolution: ${resolved.error === "no detail" ? resolved.errorClass : resolved.error}`);
-    await runtime.runtime.pollApprovals();
-    return settleCommitRun(intent, await runOutcome(run.runId, terminal));
+    // SEA-Forge has recorded the decision. A failure from here on must not read as "not recorded".
+    try {
+      await runtime.runtime.pollApprovals();
+      return await settleCommitRun(intent, await runOutcome(run.runId, terminal));
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("INTENT: governed commit refused")) throw error;
+      throw new ApprovalFollowUpError(error instanceof Error ? error.message : String(error));
+    }
   }
 
   /** Append a settlement record for an executed intent, keeping the RealityTrace observation already recorded. */
@@ -1185,11 +1208,13 @@ export async function createApplication(
 
   /** The banner the inbox shows after a click, read from the query it was redirected with. Display only; the listing is what it is checked against. */
   function inboxNotice(params: URLSearchParams): InboxNotice | undefined {
+    const approval = params.get("approval") ?? params.get("resolved");
+    const approvalId = approval === null ? null : approval.slice(0, 200);
     const resolved = params.get("resolved");
     const decision = params.get("decision");
     if (resolved && (decision === "approve" || decision === "reject")) return { kind: "resolved", approvalId: resolved.slice(0, 200), decision };
     const error = params.get("error");
-    if (error) return { kind: "error", approvalId: params.get("approval")?.slice(0, 200) ?? null, message: error.slice(0, 400) };
+    if (error !== null) return { kind: "error", approvalId, code: parseInboxErrorCode(error) };
     return undefined;
   }
 
@@ -1556,12 +1581,12 @@ export async function createApplication(
             const fromInbox = form?.get("return_to") === "inbox";
             const backToInbox = (params: Record<string, string>) => Response.redirect(`/workspace/approvals?${new URLSearchParams(params).toString()}`, 303);
             if (typeof approvalId !== "string" || approvalId === "" || (decision !== "approve" && decision !== "reject")) {
-              if (fromInbox) return backToInbox({ error: "approval_id and decision (approve or reject) are required" });
+              if (fromInbox) return backToInbox({ error: "invalid" });
               return Response.json({ code: "invalid_argument", message: "APPROVAL: approval_id and decision (approve or reject) are required" }, { status: 400 });
             }
             const intentId = await intentIdForApproval(approvalId);
             if (intentId === null) {
-              if (fromInbox) return backToInbox({ error: "no escalated commit waits on this approval any more", approval: approvalId });
+              if (fromInbox) return backToInbox({ error: "not_pending", approval: approvalId });
               return Response.json({ code: "not_found", message: "APPROVAL: no escalated commit waits on this approval" }, { status: 404 });
             }
             try {
@@ -1569,7 +1594,7 @@ export async function createApplication(
             } catch (error) {
               // A rejected commit fails by design and is audited; its receipt says so. Anything else is refused here.
               if (!(error instanceof Error && error.message.startsWith("INTENT: governed commit refused"))) {
-                if (fromInbox) return backToInbox({ error: error instanceof Error ? error.message : String(error), approval: approvalId });
+                if (fromInbox) return backToInbox({ error: approvalErrorCode(error), approval: approvalId });
                 return Response.json({ code: "approval_refused", message: error instanceof Error ? error.message : String(error) }, { status: 409 });
               }
             }

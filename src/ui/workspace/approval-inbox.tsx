@@ -25,37 +25,74 @@ const EXTRA_STYLE = `
 .inbox-warn { border:1px solid var(--edge); border-left:4px solid var(--focus); border-radius:.5rem; padding:.6rem .9rem; }
 `;
 
-/** What the page was sent back with after a click: the outcome the listing shows, or the refusal as it was reported. */
+/** The fixed outcomes a decision can come back with. The server sends only these codes; the copy below is the page's own. */
+export const INBOX_ERROR_CODES = ["refused", "not_pending", "invalid", "unavailable", "followup_failed"] as const;
+export type InboxErrorCode = (typeof INBOX_ERROR_CODES)[number] | "unknown";
+
+export function parseInboxErrorCode(value: string): InboxErrorCode {
+  return (INBOX_ERROR_CODES as readonly string[]).includes(value) ? (value as InboxErrorCode) : "unknown";
+}
+
+/** What the page was sent back with after a click. Only fixed codes and an approval id travel in the link; the listing decides what is true. */
 export type InboxNotice =
   | { readonly kind: "resolved"; readonly approvalId: string; readonly decision: "approve" | "reject" }
-  | { readonly kind: "error"; readonly approvalId: string | null; readonly message: string };
+  | { readonly kind: "error"; readonly approvalId: string | null; readonly code: InboxErrorCode };
+
+const ERROR_COPY: Record<InboxErrorCode, string> = {
+  refused: "SEA-Forge or Horizon refused the decision, for example because you requested it yourself or may not decide it.",
+  not_pending: "No commit is waiting on this approval any more; it may already have been decided.",
+  invalid: "The request was incomplete, so it was not sent.",
+  unavailable: "The decision could not be sent or answered.",
+  followup_failed: "SEA-Forge recorded the decision, but a follow-up step in Horizon failed, so the waiting commit may not have finished.",
+  unknown: "Something went wrong with that decision.",
+};
 
 function Notice({ notice, items }: { readonly notice: InboxNotice; readonly items: readonly InboxItem[] }): ReactNode {
+  // What is true is read from SEA-Forge's listing, never from the link, which could say anything.
+  const item = notice.approvalId === null ? undefined : items.find((candidate) => candidate.approval_id === notice.approvalId);
+  const listed = item && item.state !== "pending" ? (
+    <>
+      {" "}SEA-Forge lists approval <code>{item.approval_id}</code> as <strong>{item.state}</strong>
+      {item.resolved_by ? <> (resolved by <code>{item.resolved_by}</code>)</> : null}.
+    </>
+  ) : null;
   if (notice.kind === "error") {
+    if (notice.code === "followup_failed") {
+      return (
+        <div className="inbox-warn" role="alert" data-notice="followup_failed">
+          <strong>The decision was recorded, but a follow-up step failed.</strong> {ERROR_COPY.followup_failed}{listed} Check the list below.
+        </div>
+      );
+    }
+    if (listed) {
+      return (
+        <div className="inbox-warn" role="alert" data-notice="error">
+          <strong>That click did not decide this approval.</strong> {ERROR_COPY[notice.code]}{listed}
+        </div>
+      );
+    }
+    const changed = notice.code === "unknown" || notice.code === "unavailable" ? " Check the list below before trying again." : " Nothing was approved or rejected by this click.";
     return (
       <div className="inbox-warn" role="alert" data-notice="error">
-        <strong>That decision was not recorded.</strong>{" "}
-        {notice.approvalId ? <>Approval <code>{notice.approvalId}</code>: </> : null}
-        {notice.message} Nothing was approved or rejected by this click. Check the list below, then try again or decide it in SEA-Forge.
+        <strong>That decision was not recorded.</strong> {ERROR_COPY[notice.code]}{changed}
       </div>
     );
   }
-  // What happened is read from SEA-Forge's listing, never from the click: the link that brought you here could say anything.
-  const item = items.find((candidate) => candidate.approval_id === notice.approvalId);
-  const chose = notice.decision === "approve" ? "approve" : "reject";
-  if (item && item.state !== "pending") {
+  const wanted = notice.decision === "approve" ? "approved" : "rejected";
+  if (item && item.state === wanted) {
     return (
       <div className="inbox-ok" role="status" data-notice="resolved">
         <strong>Done.</strong> Approval <code>{item.approval_id}</code> is now <strong>{item.state}</strong>
-        {item.resolved_by ? <> (resolved by <code>{item.resolved_by}</code>)</> : null}. You chose to {chose} it.
+        {item.resolved_by ? <> (resolved by <code>{item.resolved_by}</code>)</> : null}. You chose to {notice.decision} it.
         {item.state === "rejected" ? " The commit that was waiting on it was refused and will not run." : null}
       </div>
     );
   }
   return (
     <div className="inbox-warn" role="status" data-notice="unconfirmed">
-      <strong>Not confirmed.</strong> You chose to {chose} approval <code>{notice.approvalId}</code>, but SEA-Forge's listing
-      {item ? <> still shows it as <strong>{item.state}</strong></> : " does not show it"}. Reload to check again before deciding anything else.
+      <strong>Not confirmed.</strong> You chose to {notice.decision} approval <code>{notice.approvalId}</code>, but SEA-Forge's listing
+      {item ? <> shows it as <strong>{item.state}</strong>{item.resolved_by ? <> (by <code>{item.resolved_by}</code>)</> : null}</> : " does not show it"}.
+      {item && item.state !== "pending" ? " The listed state is the truth." : " Reload to check again before deciding anything else."}
     </div>
   );
 }

@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { SeaForgeAuthority, type ApprovalStanding } from "@godspeedai/cognate-runtime-bun";
 import type { ApprovalAuthority } from "../src/adapters/sea-forge-config.ts";
 import { buildInbox } from "../src/domain/approval-inbox.ts";
-import { renderApprovalInboxPage } from "../src/ui/workspace/approval-inbox.tsx";
-import { createApplication, selfApprovalRefusal } from "../src/app.ts";
+import { parseInboxErrorCode, renderApprovalInboxPage } from "../src/ui/workspace/approval-inbox.tsx";
+import { ApprovalFollowUpError, approvalErrorCode, createApplication, selfApprovalRefusal } from "../src/app.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 
 const NOW = new Date("2026-11-02T12:00:00Z");
@@ -139,11 +139,61 @@ describe("renderApprovalInboxPage clarity (issue #24)", () => {
     expect(missing).toContain('data-notice="unconfirmed"');
   });
   test("a refusal is shown as an alert and says nothing was changed", () => {
-    const html = page([row()], 0, [], { kind: "error", approvalId: "apr-a", message: "the requester cannot approve its own escalation" });
+    const html = page([row()], 0, [], { kind: "error", approvalId: "apr-a", code: "refused" });
     expect(html).toContain('role="alert"');
     expect(html).toContain("That decision was not recorded.");
-    expect(html).toContain("the requester cannot approve its own escalation");
+    expect(html).toContain("refused the decision");
     expect(html).toContain("Nothing was approved or rejected by this click.");
+  });
+  test("a refusal for an approval the listing shows resolved says so and never claims nothing changed", () => {
+    const html = page([row({ approval_id: "apr-a", state: "approved", resolved_by: "actor:other" })], 0, [], { kind: "error", approvalId: "apr-a", code: "refused" });
+    expect(html).toContain("SEA-Forge lists approval");
+    expect(html).toContain("actor:other");
+    expect(html).not.toContain("Nothing was approved");
+  });
+  test("resolve ok, follow-up failed: the banner says the decision was recorded and never says nothing was changed", () => {
+    for (const rows of [[row({ approval_id: "apr-a" })], [row({ approval_id: "apr-a", state: "approved", resolved_by: "actor:operator" })], []]) {
+      const html = page(rows, 0, [], { kind: "error", approvalId: "apr-a", code: "followup_failed" });
+      expect(html).toContain('data-notice="followup_failed"');
+      expect(html).toContain("The decision was recorded, but a follow-up step failed.");
+      expect(html).not.toContain("Nothing was approved");
+      expect(html).not.toContain("not recorded");
+    }
+  });
+  test("an unknown error code renders generic fixed copy", () => {
+    const html = page([row()], 0, [], { kind: "error", approvalId: null, code: parseInboxErrorCode("<script>alert(1)</script>") });
+    expect(html).toContain("Something went wrong with that decision.");
+    expect(html).not.toContain("<script>alert");
+    expect(html).not.toContain("Nothing was approved");
+  });
+  test("a claimed decision that disagrees with the listed state is not confirmed, and the listed state is shown", () => {
+    const html = page([row({ approval_id: "apr-b", state: "rejected", resolved_by: "actor:other" })], 0, [], { kind: "resolved", approvalId: "apr-b", decision: "approve" });
+    expect(html).toContain('data-notice="unconfirmed"');
+    expect(html).not.toContain('data-notice="resolved"');
+    expect(html).toContain("shows it as");
+    expect(html).toContain("rejected");
+    expect(html).toContain("The listed state is the truth.");
+  });
+  test("hostile text in every notice field and every row field is escaped", () => {
+    const evil = '"><script>alert(1)</script>';
+    const html = page(
+      [row({ approval_id: "apr-x", operation_name: evil, requester: evil, resource_id: evil, resolved_by: evil, state: "approved" })],
+      0,
+      [],
+      { kind: "resolved", approvalId: "apr-x", decision: "approve" },
+    );
+    expect(html).not.toContain("<script>alert");
+    const alert = page([], 0, [], { kind: "error", approvalId: evil, code: "refused" });
+    expect(html + alert).not.toContain("<script>alert");
+  });
+  test("approvalErrorCode maps failures to the fixed set", () => {
+    expect(approvalErrorCode(new ApprovalFollowUpError("boom"))).toBe("followup_failed");
+    expect(approvalErrorCode(new Error("APPROVAL: abc was already decided (run failed)"))).toBe("not_pending");
+    expect(approvalErrorCode(new Error("APPROVAL: no governed commit waits on abc"))).toBe("not_pending");
+    expect(approvalErrorCode(new Error("APPROVAL: SEA-Forge refused the resolution: x"))).toBe("refused");
+    expect(approvalErrorCode(new Error("APPROVAL: the requester cannot approve its own escalation"))).toBe("refused");
+    expect(approvalErrorCode(new Error("socket closed"))).toBe("unavailable");
+    expect(approvalErrorCode("x")).toBe("unavailable");
   });
 });
 
@@ -255,10 +305,21 @@ describe("POST /workspace/approval from the inbox returns to the inbox", () => {
         expect(post.status).toBe(303);
         const location = post.headers.get("location") ?? "";
         expect(location).toContain("/workspace/approvals?");
-        expect(location).toContain("error=");
+        expect(new URL(location, base).searchParams.get("error")).toBe("not_pending");
         const html = await (await fetch(new URL(location, base))).text();
         expect(html).toContain('data-notice="error"');
         expect(html).toContain("That decision was not recorded.");
+        // Invalid arguments from the inbox come back as a fixed code, not as JSON and not as text.
+        const bad = await fetch(new URL("/workspace/approval", base), { method: "POST", body: new URLSearchParams({ approval_id: "apr-x", decision: "maybe", return_to: "inbox" }), redirect: "manual" });
+        expect(bad.status).toBe(303);
+        expect(new URL(bad.headers.get("location") ?? "", base).searchParams.get("error")).toBe("invalid");
+        const badPlain = await fetch(new URL("/workspace/approval", base), { method: "POST", body: new URLSearchParams({ approval_id: "apr-x", decision: "maybe" }), redirect: "manual" });
+        expect(badPlain.status).toBe(400);
+        // Hostile query parameters never reach the page as markup or as text.
+        const evil = encodeURIComponent('"><script>alert(1)</script>');
+        const hostile = await (await fetch(new URL(`/workspace/approvals?resolved=${evil}&decision=${evil}&error=${evil}&approval=${evil}`, base))).text();
+        expect(hostile).not.toContain("<script>alert");
+        expect(hostile).not.toContain("alert(1)");
         // Without return_to the older JSON answer is unchanged.
         const plain = await fetch(new URL("/workspace/approval", base), { method: "POST", body: new URLSearchParams({ approval_id: "apr-none", decision: "reject" }), redirect: "manual" });
         expect(plain.status).toBe(404);

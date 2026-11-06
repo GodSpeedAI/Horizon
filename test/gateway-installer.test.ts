@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { stageDigest, stageRuntime } from "../scripts/gateway-setup.ts";
+import { buildPlan, resolveLayout, stageDigest, stageRuntime } from "../scripts/gateway-setup.ts";
 
 const SCRIPT = resolve(import.meta.dir, "../scripts/install-sea-forge-gateway.sh");
 const dirs: string[] = [];
@@ -89,6 +89,24 @@ function verify(stage: string, opts: { digest?: string; extra?: string[]; env?: 
   );
   return { code: r.exitCode, out: r.stdout.toString(), err: r.stderr.toString() };
 }
+
+/** The installer's PLAN_TABLE, parsed from the script itself so no copy can drift from it. */
+function installerTable(): string[] {
+  const text = readFileSync(SCRIPT, "utf8");
+  const body = /PLAN_TABLE=\(\n([\s\S]*?)\n\)/.exec(text)?.[1] ?? "";
+  return [...body.matchAll(/\$'([^']*)'/g)].map((m) => m[1]!.replace(/\\t/g, "\t"));
+}
+
+describe("the stager and the installer agree on the plan", () => {
+  test("buildPlan of the production layout equals the installer's PLAN_TABLE, row for row", () => {
+    const layout = resolveLayout({}, { development: false, world: { pinned: "w@sha256:0", cognate: "w" }, operatorRef: "actor:operator" });
+    const rows = buildPlan(layout).map((r) => r.join("\t"));
+    expect(rows).toEqual(installerTable());
+  });
+  test("the test's hand-copied stage table equals the installer's", () => {
+    expect(PLAN_ROWS).toEqual(installerTable());
+  });
+});
 
 describe("installer verifies a snapshot of the stage", () => {
   test("g. a clean stage passes, and the shell digest equals the TypeScript digest", () => {
