@@ -8,12 +8,9 @@
  * are not session operators (agents, the runtime's own system principal, the cockpit's launch-secret
  * operator) are left to the wrapped authority unchanged.
  */
-import { buildAuthorityRequest, interpretDecision, type GovernanceAuthority, type GovernanceDecision, type GovernedOperation } from "@godspeedai/cognate-runtime-bun";
+import type { GovernanceAuthority, GovernanceDecision, GovernedOperation, SeaForgeAuthority } from "@godspeedai/cognate-runtime-bun";
 import type { OperatorActors } from "../remote/operators.ts";
-import { seaForgeCall } from "./sea-forge-approvals.ts";
 import type { SeaForgeActor } from "./sea-forge-config.ts";
-
-type Send = (request: Record<string, unknown>) => Promise<Record<string, unknown>>;
 
 export interface DelegationOptions {
   readonly service: SeaForgeActor;
@@ -21,11 +18,8 @@ export interface DelegationOptions {
   readonly actors: () => OperatorActors | null;
   /** The cockpit's launch-secret operator principal: not a session operator. */
   readonly serverPrincipalId: string;
-  readonly send: Send;
-}
-
-export function delegationSender(socketPath: string, timeoutMs?: number): Send {
-  return (request) => seaForgeCall(socketPath, request, timeoutMs);
+  /** The gateway client; only `decide` is used. Tests inject a fake. */
+  readonly client: Pick<SeaForgeAuthority, "decide">;
 }
 
 /** The human a governed operation is run for, when it is a session operator; otherwise null. */
@@ -42,20 +36,7 @@ export function delegatingAuthority(inner: GovernanceAuthority, options: Delegat
     const actorId = options.actors()?.actorFor(operator.id);
     if (actorId === undefined) return { disposition: "unknown", reason: `no SEA-Forge actor is configured for operator ${operator.id}; refusing rather than falling back to another identity` };
     if (actorId === options.service.actor_id) return { disposition: "unknown", reason: "the gateway service identity cannot act as the human operator" };
-    const sent = buildAuthorityRequest(operation, worldRef, new Date(), approval);
-    let response: Record<string, unknown>;
-    try {
-      response = await options.send({
-        verb: "authority_request",
-        envelope: sent.envelope,
-        request_id: sent.operationId,
-        actor: options.service,
-        on_behalf_of: { actor_id: actorId, role: "operator" },
-      });
-    } catch (error) {
-      return { disposition: "unknown", reason: `sea-forge unreachable: ${error instanceof Error ? error.message : String(error)}` };
-    }
-    return interpretDecision(response, sent, worldRef, approval);
+    return options.client.decide(operation, worldRef, approval, undefined, { onBehalfOf: { actor_id: actorId, role: "operator" } });
   };
   return new Proxy(inner, {
     get(target, property) {

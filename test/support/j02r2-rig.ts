@@ -10,7 +10,7 @@ import { dirname, join, relative } from "node:path";
 import { governanceFromEnv } from "@godspeedai/cognate-runtime-bun";
 import { createApplication, type HorizonApplication } from "../../src/app.ts";
 import { loadWorld } from "../../src/adapters/semantic.ts";
-import { seaForgeCall } from "../../src/adapters/sea-forge-approvals.ts";
+import { seaForgeCall } from "./sea-forge-raw.ts";
 import { approvalAuthority } from "../../src/adapters/sea-forge-config.ts";
 import { NAVIGATION_INTENT_COMMIT } from "../../src/capabilities/navigation-intent.ts";
 import { readPending } from "../../src/capabilities/pending-intent.ts";

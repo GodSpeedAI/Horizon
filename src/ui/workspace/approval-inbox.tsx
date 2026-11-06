@@ -85,8 +85,8 @@ function Body({ readout }: { readonly readout: InboxReadout }): ReactNode {
         <h2 id="decided-heading">Decided ({inbox.decided.length})</h2>
         {inbox.decided.length === 0 ? <p className="inbox-note">No decided approvals are listed.</p> : <ul className="inbox-list">{inbox.decided.map((item) => <Item key={item.approval_id} item={item} />)}</ul>}
       </section>
-      {inbox.malformed > 0 ? (
-        <p className="inbox-warn">{inbox.malformed} record(s) from SEA-Forge did not match the expected shape and are not shown.</p>
+      {inbox.excluded > 0 ? (
+        <p className="inbox-warn">{inbox.excluded} record(s) from SEA-Forge did not match the expected shape and are not shown.</p>
       ) : null}
     </>
   );

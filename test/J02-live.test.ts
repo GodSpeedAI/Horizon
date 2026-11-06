@@ -22,7 +22,7 @@ import { governanceFromEnv } from "@godspeedai/cognate-runtime-bun";
 import { governedTraceFor } from "@godspeedai/cognate-realitytrace";
 import { AwaitingAuthorityError, createApplication, type HorizonApplication } from "../src/app.ts";
 import { loadWorld } from "../src/adapters/semantic.ts";
-import { seaForgeCall } from "../src/adapters/sea-forge-approvals.ts";
+import { seaForgeCall } from "./support/sea-forge-raw.ts";
 import { approvalAuthority } from "../src/adapters/sea-forge-config.ts";
 import { NAVIGATION_INTENT_COMMIT, readIntentAttempts, readIntentRecords } from "../src/capabilities/navigation-intent.ts";
 import { latestSettlement } from "../src/capabilities/navigation-settlement.ts";

@@ -2,9 +2,9 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { listApprovals } from "../src/adapters/sea-forge-approvals.ts";
+import { SeaForgeAuthority, type ApprovalStanding } from "@godspeedai/cognate-runtime-bun";
 import type { ApprovalAuthority } from "../src/adapters/sea-forge-config.ts";
-import { buildInbox, parseApproval } from "../src/domain/approval-inbox.ts";
+import { buildInbox } from "../src/domain/approval-inbox.ts";
 import { renderApprovalInboxPage } from "../src/ui/workspace/approval-inbox.tsx";
 import { createApplication, selfApprovalRefusal } from "../src/app.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
@@ -12,7 +12,7 @@ import { writeConfig, horizonDocument } from "./support/config.ts";
 const NOW = new Date("2026-11-02T12:00:00Z");
 const OPERATOR = "actor:operator";
 
-function row(over: Record<string, unknown> = {}): Record<string, unknown> {
+function row(over: Partial<ApprovalStanding> = {}): ApprovalStanding {
   return {
     approval_id: "apr-cep:op-1",
     state: "pending",
@@ -29,57 +29,36 @@ function row(over: Record<string, unknown> = {}): Record<string, unknown> {
   };
 }
 
-describe("parseApproval", () => {
-  test("accepts a well-formed SEA-Forge row", () => {
-    expect(parseApproval(row())?.approval_id).toBe("apr-cep:op-1");
-  });
-  test("refuses rows that do not match the shape, and never coerces them", () => {
-    expect(parseApproval(null)).toBeNull();
-    expect(parseApproval([])).toBeNull();
-    expect(parseApproval(row({ state: "maybe" }))).toBeNull();
-    expect(parseApproval(row({ approval_id: "has space" }))).toBeNull();
-    expect(parseApproval(row({ expires_at: "not a time" }))).toBeNull();
-    expect(parseApproval(row({ requester: "" }))).toBeNull();
-    expect(parseApproval(row({ resolved_by: 7 }))).toBeNull();
-    const { requester: _omitted, ...missing } = row();
-    expect(parseApproval(missing)).toBeNull();
-  });
-});
-
 describe("buildInbox", () => {
   test("only a pending approval that a Horizon commit waits on is decidable here", () => {
-    const inbox = buildInbox([row({ approval_id: "apr-a" }), row({ approval_id: "apr-b" })], { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR });
+    const inbox = buildInbox([row({ approval_id: "apr-a" }), row({ approval_id: "apr-b" })], 0, { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR });
     const byId = Object.fromEntries(inbox.waiting.map((item) => [item.approval_id, item.decision.kind]));
     expect(byId).toEqual({ "apr-a": "decidable", "apr-b": "not_decidable_here" });
   });
   test("a clock-expired pending approval is never offered, even if a commit waits on it", () => {
-    const inbox = buildInbox([row({ expires_at: "2026-11-02T11:00:00Z" })], { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
+    const inbox = buildInbox([row({ expires_at: "2026-11-02T11:00:00Z" })], 0, { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
     expect(inbox.waiting[0]?.decision).toEqual({ kind: "not_decidable_here", reason: "past its expiry time" });
     expect(inbox.waiting[0]?.past_expiry).toBe(true);
   });
   test("a decided approval is listed as decided, with who resolved it, and offers nothing", () => {
-    const inbox = buildInbox([row({ state: "approved", resolved_by: "actor:operator" })], { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
+    const inbox = buildInbox([row({ state: "approved", resolved_by: "actor:operator" })], 0, { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
     expect(inbox.waiting).toHaveLength(0);
     expect(inbox.decided[0]?.resolved_by).toBe("actor:operator");
     expect(inbox.decided[0]?.decision).toEqual({ kind: "not_decidable_here", reason: "already approved" });
   });
   test("a request the operator made is not decidable by the operator", () => {
-    const inbox = buildInbox([row({ requester: OPERATOR })], { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
+    const inbox = buildInbox([row({ requester: OPERATOR })], 0, { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
     expect(inbox.waiting[0]?.decision.kind).toBe("not_decidable_here");
   });
-  test("malformed rows are counted and never shown", () => {
-    const inbox = buildInbox([row(), { state: "approved" }, "junk"], { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR });
-    expect(inbox.malformed).toBe(2);
+  test("rows the client excluded are reported and never shown", () => {
+    const inbox = buildInbox([row()], 2, { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR });
+    expect(inbox.excluded).toBe(2);
     expect(inbox.waiting).toHaveLength(1);
-  });
-  test("a non-array listing shows nothing and reports no fabricated approvals", () => {
-    const inbox = buildInbox({ approvals: [row()] }, { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR });
-    expect(inbox.waiting).toHaveLength(0);
-    expect(inbox.decided).toHaveLength(0);
   });
   test("waiting items are ordered soonest expiry first", () => {
     const inbox = buildInbox(
       [row({ approval_id: "apr-late", expires_at: "2026-11-02T15:00:00Z" }), row({ approval_id: "apr-soon", expires_at: "2026-11-02T13:00:00Z" })],
+      0,
       { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR },
     );
     expect(inbox.waiting.map((item) => item.approval_id)).toEqual(["apr-soon", "apr-late"]);
@@ -88,7 +67,7 @@ describe("buildInbox", () => {
 
 describe("renderApprovalInboxPage", () => {
   test("offers the existing decision form only for a decidable item", () => {
-    const inbox = buildInbox([row({ approval_id: "apr-a" }), row({ approval_id: "apr-b" })], { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR });
+    const inbox = buildInbox([row({ approval_id: "apr-a" }), row({ approval_id: "apr-b" })], 0, { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR });
     const html = renderApprovalInboxPage({ state: "listed", inbox });
     expect(html.match(/action="\/workspace\/approval"/g)?.length).toBe(1);
     expect(html).toContain('data-approval="apr-a" data-state="pending" data-decidable="yes"');
@@ -96,7 +75,7 @@ describe("renderApprovalInboxPage", () => {
     expect(html).toContain("no Horizon commit waits on it");
   });
   test("escapes SEA-Forge-supplied text", () => {
-    const inbox = buildInbox([row({ operation_name: "<script>x</script>" })], { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR });
+    const inbox = buildInbox([row({ operation_name: "<script>x</script>" })], 0, { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR });
     const html = renderApprovalInboxPage({ state: "listed", inbox });
     expect(html).not.toContain("<script>x</script>");
     expect(html).toContain("&lt;script&gt;");
@@ -114,7 +93,7 @@ describe("renderApprovalInboxPage", () => {
   });
 });
 
-describe("listApprovals over the SEA-Forge socket", () => {
+describe("the SDK client listing over the SEA-Forge socket", () => {
   const dir = mkdtempSync(join(tmpdir(), "inbox-sock-"));
   const socketPath = join(dir, "sea-forge.sock");
   const received: Record<string, unknown>[] = [];
@@ -134,23 +113,19 @@ describe("listApprovals over the SEA-Forge socket", () => {
     server.stop(true);
     rmSync(dir, { recursive: true, force: true });
   });
-  const authority: ApprovalAuthority = {
-    socketPath,
-    service: { actor_id: "cognate-service", role: "service" },
-    operator: { actor_id: OPERATOR, role: "operator" },
-    timeoutMs: 2_000,
-  };
+  const client = new SeaForgeAuthority({ socketPath, actor: { actor_id: "cognate-service", role: "service" }, timeoutMs: 2_000 });
 
   test("sends the read-only verb as the service actor and returns the rows", async () => {
     reply = { ok: true, approvals: [row()] };
-    const rows = await listApprovals(authority);
-    expect(rows).toHaveLength(1);
+    const listed = await client.listApprovals();
+    expect(listed.ok && listed.approvals).toHaveLength(1);
     expect(received.at(-1)).toEqual({ verb: "authority_approvals", actor: { actor_id: "cognate-service", role: "service" } });
   });
 
   test("a refusal from SEA-Forge is an error, never an empty list", async () => {
     reply = { ok: false, error_class: "identity_authentication_refused" };
-    await expect(listApprovals(authority)).rejects.toThrow("did not list approvals");
+    const listed = await client.listApprovals();
+    expect(listed).toMatchObject({ ok: false, errorClass: "identity_authentication_refused" });
   });
 });
 
