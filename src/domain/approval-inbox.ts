@@ -2,7 +2,7 @@
  * The approval inbox (P2.1): a pure presentation of SEA-Forge's `authority_approvals` listing.
  *
  * SEA-Forge owns every fact here: the state, who resolved it, and when it expires. This module only
- * validates rows (a malformed row is counted and never shown), groups them, and decides which
+ * receives rows the SDK client validated (an excluded row is counted and never shown), groups them, and decides which
  * decision buttons may be offered. It never approves, rejects, or infers an approval. A decision
  * still goes through SEA-Forge, and SEA-Forge refuses anything it does not allow.
  *
@@ -10,25 +10,10 @@
  * no waiting commit is shown but not decided here: that decision belongs to SEA-Forge's own tooling.
  */
 
-export const APPROVAL_STATES = ["pending", "approved", "rejected", "expired", "used"] as const;
-export type ApprovalState = (typeof APPROVAL_STATES)[number];
+import type { ApprovalStanding } from "@godspeedai/cognate-runtime-bun";
 
-const APPROVAL_ID = /^[A-Za-z0-9_.:-]{1,200}$/;
-
-/** One SEA-Forge approval as the listing reports it. Every field is validated before it is used. */
-export interface InboxApproval {
-  readonly approval_id: string;
-  readonly state: ApprovalState;
-  readonly requester: string;
-  readonly world_ref: string;
-  readonly operation_kind: string;
-  readonly operation_name: string;
-  readonly resource_id: string;
-  readonly subject_actor_ref: string;
-  readonly request_ref: string;
-  readonly expires_at: string;
-  readonly resolved_by: string | null;
-}
+/** One SEA-Forge approval as the listing reports it; the SDK client has already validated every field. */
+export type InboxApproval = ApprovalStanding;
 
 export type DecisionAvailability =
   | { readonly kind: "decidable" }
@@ -43,48 +28,8 @@ export interface InboxItem extends InboxApproval {
 export interface Inbox {
   readonly waiting: readonly InboxItem[];
   readonly decided: readonly InboxItem[];
-  /** Rows that failed validation. They are counted, not shown, so a bad record cannot look like a decision. */
-  readonly malformed: number;
-}
-
-function text(row: Record<string, unknown>, key: string): string | null {
-  const value = row[key];
-  return typeof value === "string" && value.trim() !== "" ? value : null;
-}
-
-/** Validate one listing row. Returns null for any row that does not match the SEA-Forge shape. */
-export function parseApproval(row: unknown): InboxApproval | null {
-  if (typeof row !== "object" || row === null || Array.isArray(row)) return null;
-  const r = row as Record<string, unknown>;
-  const approvalId = text(r, "approval_id");
-  const state = text(r, "state");
-  const requester = text(r, "requester");
-  const worldRef = text(r, "world_ref");
-  const kind = text(r, "operation_kind");
-  const name = text(r, "operation_name");
-  const resource = text(r, "resource_id");
-  const subject = text(r, "subject_actor_ref");
-  const requestRef = text(r, "request_ref");
-  const expires = text(r, "expires_at");
-  if ([approvalId, state, requester, worldRef, kind, name, resource, subject, requestRef, expires].some((v) => v === null)) return null;
-  if (!APPROVAL_ID.test(approvalId!)) return null;
-  if (!(APPROVAL_STATES as readonly string[]).includes(state!)) return null;
-  if (Number.isNaN(Date.parse(expires!))) return null;
-  const resolvedRaw = r.resolved_by;
-  if (resolvedRaw !== null && (typeof resolvedRaw !== "string" || resolvedRaw === "")) return null;
-  return {
-    approval_id: approvalId!,
-    state: state as ApprovalState,
-    requester: requester!,
-    world_ref: worldRef!,
-    operation_kind: kind!,
-    operation_name: name!,
-    resource_id: resource!,
-    subject_actor_ref: subject!,
-    request_ref: requestRef!,
-    expires_at: expires!,
-    resolved_by: resolvedRaw,
-  };
+  /** Rows the SDK client excluded as malformed. They are counted, not shown, so a bad record cannot look like a decision. */
+  readonly excluded: number;
 }
 
 /** What the inbox page can show: an honest state for each way the listing can be absent. */
@@ -98,16 +43,11 @@ export type InboxReadout =
  * `operatorRef` is the configured operator; it is used only to explain a refusal, never to decide.
  */
 export function buildInbox(
-  rows: unknown,
+  rows: readonly ApprovalStanding[],
+  excluded: number,
   options: { readonly now: Date; readonly waitingApprovalIds: ReadonlySet<string>; readonly operatorRef: string },
 ): Inbox {
-  const parsed: InboxApproval[] = [];
-  let malformed = 0;
-  for (const row of Array.isArray(rows) ? rows : []) {
-    const approval = parseApproval(row);
-    if (approval === null) malformed += 1;
-    else parsed.push(approval);
-  }
+  const parsed = rows;
   const items = parsed.map((approval): InboxItem => {
     const pastExpiry = approval.state === "pending" && Date.parse(approval.expires_at) <= options.now.getTime();
     let decision: DecisionAvailability;
@@ -126,5 +66,5 @@ export function buildInbox(
   });
   const waiting = items.filter((item) => item.state === "pending").sort((a, b) => Date.parse(a.expires_at) - Date.parse(b.expires_at));
   const decided = items.filter((item) => item.state !== "pending").sort((a, b) => b.expires_at.localeCompare(a.expires_at));
-  return { waiting, decided, malformed };
+  return { waiting, decided, excluded };
 }

@@ -2,7 +2,7 @@
  * Durable operator sessions and the mapped SEA-Forge actor, through the real phone routes.
  *
  * Every test here is a refusal: the request is refused with a clear error and nothing is committed.
- * SEA-Forge is a scripted wire (the `delegationSend` seam) that records what Horizon sends, so the
+ * SEA-Forge is a scripted wire (the `delegationClient` seam) that records what Horizon sends, so the
  * actor the gateway presents on behalf of the human is observable. The wire is not an authority
  * claim: live containment of the OS-isolated gateway is a separate deployment gate.
  */
@@ -12,10 +12,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
-import { buildAuthorityRequest, interpretDecision, type GovernanceAuthority } from "@godspeedai/cognate-runtime-bun";
+import { buildAuthorityRequest, interpretDecision, type GovernanceAuthority, type SeaForgeAuthority } from "@godspeedai/cognate-runtime-bun";
 import { createIdentityService, DEVICES, OPERATORS, SESSIONS } from "@godspeed/identity";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
-import { approvalAuthority } from "../src/adapters/sea-forge-approvals.ts";
+import { approvalAuthority } from "../src/adapters/sea-forge-config.ts";
 import { delegatingAuthority } from "../src/adapters/delegating-authority.ts";
 import { loadWorld } from "../src/adapters/semantic.ts";
 import { readIntentAttempts, readIntentRecords } from "../src/capabilities/navigation-intent.ts";
@@ -83,7 +83,15 @@ function scriptedWire(world: string) {
       return interpretDecision(await send({ verb: "authority_request", envelope: sent.envelope, request_id: sent.operationId, actor: { actor_id: SERVICE, role: "service" } }), sent, worldRef, approval);
     },
   };
-  return { seen, send, inner, escalateCommits: (on: boolean) => void (escalate = on) };
+  /** The typed gateway client's `decide`: records the call's arguments and returns the scripted decision. */
+  const client: Pick<SeaForgeAuthority, "decide"> = {
+    async decide(operation, worldRef, approval, _carry, delegation) {
+      const sent = buildAuthorityRequest(operation, worldRef, new Date(), approval);
+      const request = { verb: "authority_request", envelope: sent.envelope, request_id: sent.operationId, actor: { actor_id: SERVICE, role: "service" }, ...(delegation ? { on_behalf_of: { actor_id: delegation.onBehalfOf.actor_id, role: delegation.onBehalfOf.role } } : {}) };
+      return interpretDecision(await send(request), sent, worldRef, approval);
+    },
+  };
+  return { seen, send, client, inner, escalateCommits: (on: boolean) => void (escalate = on) };
 }
 
 interface Rig {
@@ -108,7 +116,7 @@ async function rig(name: string): Promise<Rig> {
     approvals: approvalAuthority({ socketPath: join(root, "none.sock"), operatorId: "actor:operator" }),
     realityTrace: null,
     operators: { desktop_operator: "operator", delegable_actors: [MAPPED, "operator"], actors: { operator: MAPPED } },
-    delegationSend: wire.send,
+    delegationClient: wire.client,
   });
   await seedOperationalFixture(app.runtime.runtime.store, undefined, app.caller.tenant);
   await app.remote.start();
@@ -378,7 +386,7 @@ describe("an operator with no mapping, and the gateway identity", () => {
     let called = 0;
     const authority = delegatingAuthority(
       { decide: async () => ((called += 1), { disposition: "allow" as const, reason: "inner" }) },
-      { service: { actor_id: SERVICE, role: "service" }, actors: () => new OperatorActors(new Map([["operator", MAPPED]]), "operator"), serverPrincipalId: "os:server:1", send: async (request) => (sent.push(request), {}) },
+      { service: { actor_id: SERVICE, role: "service" }, actors: () => new OperatorActors(new Map([["operator", MAPPED]]), "operator"), serverPrincipalId: "os:server:1", client: { decide: async (...args) => (sent.push(args), { disposition: "allow" as const, reason: "client" }) } },
     );
     const decision = await authority.decide({ kind: "action", action: "thread.state.read" as never, caller: { tenant: "t", actor: { id: "ghost", kind: "user" } }, resource: "r" }, "world:x");
     expect(decision.disposition).toBe("unknown");
