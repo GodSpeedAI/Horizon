@@ -5,9 +5,9 @@
  * `Bun.connect({ unix: ... })` call (each of the three patterns in turn), and requires the scan to fail
  * on the planted file. Exits non-zero unless every mutant is caught.
  */
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "..");
 
@@ -16,10 +16,11 @@ function scan(copy: string): { code: number; stderr: string } {
   return { code: run.exitCode ?? 1, stderr: run.stderr.toString() };
 }
 
-const MUTANTS: readonly { id: string; source: string }[] = [
+const MUTANTS: readonly { id: string; source: string; file?: string }[] = [
   { id: "raw Bun.connect over a Unix socket", source: 'export const x = Bun.connect({ unix: "/tmp/x.sock", socket: {} });\n' },
   { id: "a Unix-socket address", source: 'export const address = { unix: "/tmp/x.sock" };\n' },
   { id: "a hand-written SFWP message", source: 'export const message = { verb: "authority_request", actor: {} };\n' },
+  { id: "a raw Unix-socket call in a nested .tsx file", file: join("ui", "workspace", "deep", "planted-wire.tsx"), source: 'export const x = Bun.connect({ unix: "/tmp/x.sock", socket: {} });\nexport const View = () => null;\n' },
 ];
 
 const failures: string[] = [];
@@ -32,7 +33,8 @@ try {
   for (const [index, mutant] of MUTANTS.entries()) {
     const copy = join(work, `mutant-${index}`);
     cpSync(join(ROOT, "src"), join(copy, "src"), { recursive: true });
-    const planted = join(copy, "src", "adapters", "planted-wire.ts");
+    const planted = join(copy, "src", mutant.file ?? join("adapters", "planted-wire.ts"));
+    mkdirSync(dirname(planted), { recursive: true });
     writeFileSync(planted, mutant.source);
     const result = scan(copy);
     if (result.code === 0 || !result.stderr.includes("planted-wire.ts")) failures.push(`NOT CAUGHT: ${mutant.id} (exit ${result.code})`);
