@@ -6,7 +6,7 @@ import { SeaForgeAuthority, type ApprovalStanding } from "@godspeedai/cognate-ru
 import type { ApprovalAuthority } from "../src/adapters/sea-forge-config.ts";
 import { buildInbox } from "../src/domain/approval-inbox.ts";
 import { parseInboxErrorCode, renderApprovalInboxPage } from "../src/ui/workspace/approval-inbox.tsx";
-import { ApprovalFollowUpError, approvalErrorCode, createApplication, selfApprovalRefusal } from "../src/app.ts";
+import { ApprovalFollowUpError, afterRecordedDecision, approvalErrorCode, createApplication, selfApprovalRefusal } from "../src/app.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 
 const NOW = new Date("2026-11-02T12:00:00Z");
@@ -151,14 +151,40 @@ describe("renderApprovalInboxPage clarity (issue #24)", () => {
     expect(html).toContain("actor:other");
     expect(html).not.toContain("Nothing was approved");
   });
-  test("resolve ok, follow-up failed: the banner says the decision was recorded and never says nothing was changed", () => {
-    for (const rows of [[row({ approval_id: "apr-a" })], [row({ approval_id: "apr-a", state: "approved", resolved_by: "actor:operator" })], []]) {
+  test("follow-up failed: a listing that shows the approval resolved is stated, and nothing says nothing changed", () => {
+    const html = page([row({ approval_id: "apr-a", state: "approved", resolved_by: "actor:operator" })], 0, [], { kind: "error", approvalId: "apr-a", code: "followup_failed" });
+    expect(html).toContain('data-notice="followup_failed"');
+    expect(html).toContain("A follow-up step failed");
+    expect(html).toContain("SEA-Forge lists approval");
+    expect(html).toContain("actor:operator");
+    expect(html).not.toContain("Nothing was approved");
+    expect(html).not.toContain("not recorded");
+  });
+  test("follow-up failed: a forged link for an approval still pending, or absent, is Not confirmed and does not say the decision was recorded", () => {
+    for (const rows of [[row({ approval_id: "apr-a" })], []]) {
       const html = page(rows, 0, [], { kind: "error", approvalId: "apr-a", code: "followup_failed" });
-      expect(html).toContain('data-notice="followup_failed"');
-      expect(html).toContain("The decision was recorded, but a follow-up step failed.");
+      expect(html).toContain('data-notice="followup_unconfirmed"');
+      expect(html).toContain("Not confirmed");
+      expect(html).not.toContain("was recorded");
       expect(html).not.toContain("Nothing was approved");
-      expect(html).not.toContain("not recorded");
     }
+  });
+  test("resolve succeeds, then the follow-up throws: the failure is a follow-up failure, not a failed resolve", async () => {
+    let resolved = false;
+    const stub = { resolveApproval: async () => { resolved = true; return { ok: true as const }; }, pollApprovals: async () => { throw new Error("poll: socket closed"); } };
+    const run = async () => {
+      const result = await stub.resolveApproval();
+      if (!result.ok) throw new Error("APPROVAL: SEA-Forge refused the resolution");
+      return afterRecordedDecision(async () => { await stub.pollApprovals(); return "settled"; });
+    };
+    const error = await run().catch((e: unknown) => e);
+    expect(resolved).toBe(true);
+    expect(error).toBeInstanceOf(ApprovalFollowUpError);
+    expect((error as Error).message).toBe("poll: socket closed");
+    expect(approvalErrorCode(error)).toBe("followup_failed");
+    // A refused commit after a recorded decision keeps its own message and is not reclassified.
+    const refused = await afterRecordedDecision(async () => { throw new Error("INTENT: governed commit refused: rejected"); }).catch((e: unknown) => e);
+    expect(refused).not.toBeInstanceOf(ApprovalFollowUpError);
   });
   test("an unknown error code renders generic fixed copy", () => {
     const html = page([row()], 0, [], { kind: "error", approvalId: null, code: parseInboxErrorCode("<script>alert(1)</script>") });

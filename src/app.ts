@@ -95,6 +95,16 @@ export class ApprovalFollowUpError extends Error {
   }
 }
 
+/** Run the steps that follow a decision SEA-Forge has already recorded; any failure but a refused commit becomes an ApprovalFollowUpError. */
+export async function afterRecordedDecision<T>(steps: () => Promise<T>): Promise<T> {
+  try {
+    return await steps();
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("INTENT: governed commit refused")) throw error;
+    throw new ApprovalFollowUpError(error instanceof Error ? error.message : String(error));
+  }
+}
+
 /** The fixed outcome codes the inbox redirect may carry. The page owns the copy; no error text travels in the URL. */
 export function approvalErrorCode(error: unknown): InboxErrorCode {
   if (error instanceof ApprovalFollowUpError) return "followup_failed";
@@ -558,13 +568,10 @@ export async function createApplication(
     const resolved = await seaForge!.resolveApproval({ approvalId: request.approvalId, resolution: request.resolution, onBehalfOf: authority.operator });
     if (!resolved.ok) throw new Error(`APPROVAL: SEA-Forge refused the resolution: ${resolved.error === "no detail" ? resolved.errorClass : resolved.error}`);
     // SEA-Forge has recorded the decision. A failure from here on must not read as "not recorded".
-    try {
+    return afterRecordedDecision(async () => {
       await runtime.runtime.pollApprovals();
-      return await settleCommitRun(intent, await runOutcome(run.runId, terminal));
-    } catch (error) {
-      if (error instanceof Error && error.message.startsWith("INTENT: governed commit refused")) throw error;
-      throw new ApprovalFollowUpError(error instanceof Error ? error.message : String(error));
-    }
+      return settleCommitRun(intent, await runOutcome(run.runId, terminal));
+    });
   }
 
   /** Append a settlement record for an executed intent, keeping the RealityTrace observation already recorded. */

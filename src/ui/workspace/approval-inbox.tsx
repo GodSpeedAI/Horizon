@@ -43,7 +43,7 @@ const ERROR_COPY: Record<InboxErrorCode, string> = {
   not_pending: "No commit is waiting on this approval any more; it may already have been decided.",
   invalid: "The request was incomplete, so it was not sent.",
   unavailable: "The decision could not be sent or answered.",
-  followup_failed: "SEA-Forge recorded the decision, but a follow-up step in Horizon failed, so the waiting commit may not have finished.",
+  followup_failed: "A follow-up step in Horizon failed, so the waiting commit may not have finished.",
   unknown: "Something went wrong with that decision.",
 };
 
@@ -58,9 +58,11 @@ function Notice({ notice, items }: { readonly notice: InboxNotice; readonly item
   ) : null;
   if (notice.kind === "error") {
     if (notice.code === "followup_failed") {
+      // The link says SEA-Forge recorded the decision; only the listing can confirm that.
       return (
-        <div className="inbox-warn" role="alert" data-notice="followup_failed">
-          <strong>The decision was recorded, but a follow-up step failed.</strong> {ERROR_COPY.followup_failed}{listed} Check the list below.
+        <div className="inbox-warn" role="alert" data-notice={listed ? "followup_failed" : "followup_unconfirmed"}>
+          <strong>A follow-up step failed after the decision was sent.</strong> {ERROR_COPY.followup_failed}
+          {listed ?? <> <strong>Not confirmed:</strong> the listing does not show this approval as decided yet.</>} Check the list below.
         </div>
       );
     }
