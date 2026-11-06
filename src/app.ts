@@ -79,7 +79,7 @@ import { CONTEXT_REFERENCE } from "./capabilities/context.ts";
 import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type DebuggerOperation, type DebuggerSources } from "./domain/debugger.ts";
 import { renderWorkspacePage } from "./ui/workspace/render.tsx";
 import { renderEconomicsPage } from "./ui/workspace/economics.tsx";
-import { renderApprovalInboxPage } from "./ui/workspace/approval-inbox.tsx";
+import { renderApprovalInboxPage, type InboxNotice } from "./ui/workspace/approval-inbox.tsx";
 import type { Server } from "bun";
 import { RemoteController, type RemoteStatus } from "./remote/server.ts";
 import { remoteSettings } from "./remote/settings.ts";
@@ -1183,6 +1183,16 @@ export async function createApplication(
     }
   }
 
+  /** The banner the inbox shows after a click, read from the query it was redirected with. Display only; the listing is what it is checked against. */
+  function inboxNotice(params: URLSearchParams): InboxNotice | undefined {
+    const resolved = params.get("resolved");
+    const decision = params.get("decision");
+    if (resolved && (decision === "approve" || decision === "reject")) return { kind: "resolved", approvalId: resolved.slice(0, 200), decision };
+    const error = params.get("error");
+    if (error) return { kind: "error", approvalId: params.get("approval")?.slice(0, 200) ?? null, message: error.slice(0, 400) };
+    return undefined;
+  }
+
   /** The approval an escalated commit waits on, and the intent it belongs to; null when nothing waits on it. */
   async function intentIdForApproval(approvalId: string): Promise<string | null> {
     const waiting = (await readIntentAttempts(runtime.runtime.store)).filter((entry) => entry.outcome === "awaiting_authority" && entry.approvalId === approvalId);
@@ -1441,7 +1451,7 @@ export async function createApplication(
           }
           if (url.pathname === "/workspace/approvals" && request.method === "GET") {
             // Read-only listing. Decisions are POSTed to /workspace/approval, which SEA-Forge decides.
-            return new Response(renderApprovalInboxPage(await approvalInbox(), themeOf(url.searchParams.get("theme"))), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+            return new Response(renderApprovalInboxPage(await approvalInbox(), themeOf(url.searchParams.get("theme")), inboxNotice(url.searchParams)), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
           }
           if (url.pathname === "/workspace/inspect" && request.method === "GET") {
             // Read-only, deliberately: GET, no form, no commit. The operation is one of the seven
@@ -1542,19 +1552,28 @@ export async function createApplication(
             const form = await request.formData().catch(() => null);
             const approvalId = form?.get("approval_id");
             const decision = form?.get("decision");
+            // A click on the inbox page comes back to the inbox with its outcome or its refusal; any other caller keeps the JSON errors and the receipt redirect.
+            const fromInbox = form?.get("return_to") === "inbox";
+            const backToInbox = (params: Record<string, string>) => Response.redirect(`/workspace/approvals?${new URLSearchParams(params).toString()}`, 303);
             if (typeof approvalId !== "string" || approvalId === "" || (decision !== "approve" && decision !== "reject")) {
+              if (fromInbox) return backToInbox({ error: "approval_id and decision (approve or reject) are required" });
               return Response.json({ code: "invalid_argument", message: "APPROVAL: approval_id and decision (approve or reject) are required" }, { status: 400 });
             }
             const intentId = await intentIdForApproval(approvalId);
-            if (intentId === null) return Response.json({ code: "not_found", message: "APPROVAL: no escalated commit waits on this approval" }, { status: 404 });
+            if (intentId === null) {
+              if (fromInbox) return backToInbox({ error: "no escalated commit waits on this approval any more", approval: approvalId });
+              return Response.json({ code: "not_found", message: "APPROVAL: no escalated commit waits on this approval" }, { status: 404 });
+            }
             try {
               await resolveNavigationApproval({ approvalId, resolution: decision === "approve" ? "approved" : "rejected" });
             } catch (error) {
               // A rejected commit fails by design and is audited; its receipt says so. Anything else is refused here.
               if (!(error instanceof Error && error.message.startsWith("INTENT: governed commit refused"))) {
+                if (fromInbox) return backToInbox({ error: error instanceof Error ? error.message : String(error), approval: approvalId });
                 return Response.json({ code: "approval_refused", message: error instanceof Error ? error.message : String(error) }, { status: 409 });
               }
             }
+            if (fromInbox) return backToInbox({ resolved: approvalId, decision });
             return Response.redirect(`/workspace?receipt=${encodeURIComponent(intentId)}#receipt`, 303);
           }
           if (url.pathname === "/workspace/settle" && request.method === "POST") {

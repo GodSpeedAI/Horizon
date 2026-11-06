@@ -18,16 +18,53 @@ const EXTRA_STYLE = `
 .inbox-item dd { margin:0; overflow-wrap:anywhere; }
 .inbox-note { color:var(--muted); font-size:.9rem; }
 .inbox-actions { display:flex; gap:.5rem; flex-wrap:wrap; }
+.inbox-ok { border:1px solid var(--edge); border-left:4px solid var(--ok, var(--focus)); border-radius:.5rem; padding:.6rem .9rem; margin:.6rem 0; }
+.inbox-actions form { margin:0; }
+.inbox-choice { display:flex; flex-direction:column; gap:.25rem; max-width:20rem; }
+.inbox-status { font-weight:600; margin:.4rem 0; }
 .inbox-warn { border:1px solid var(--edge); border-left:4px solid var(--focus); border-radius:.5rem; padding:.6rem .9rem; }
 `;
+
+/** What the page was sent back with after a click: the outcome the listing shows, or the refusal as it was reported. */
+export type InboxNotice =
+  | { readonly kind: "resolved"; readonly approvalId: string; readonly decision: "approve" | "reject" }
+  | { readonly kind: "error"; readonly approvalId: string | null; readonly message: string };
+
+function Notice({ notice, items }: { readonly notice: InboxNotice; readonly items: readonly InboxItem[] }): ReactNode {
+  if (notice.kind === "error") {
+    return (
+      <div className="inbox-warn" role="alert" data-notice="error">
+        <strong>That decision was not recorded.</strong>{" "}
+        {notice.approvalId ? <>Approval <code>{notice.approvalId}</code>: </> : null}
+        {notice.message} Nothing was approved or rejected by this click. Check the list below, then try again or decide it in SEA-Forge.
+      </div>
+    );
+  }
+  // What happened is read from SEA-Forge's listing, never from the click: the link that brought you here could say anything.
+  const item = items.find((candidate) => candidate.approval_id === notice.approvalId);
+  const chose = notice.decision === "approve" ? "approve" : "reject";
+  if (item && item.state !== "pending") {
+    return (
+      <div className="inbox-ok" role="status" data-notice="resolved">
+        <strong>Done.</strong> Approval <code>{item.approval_id}</code> is now <strong>{item.state}</strong>
+        {item.resolved_by ? <> (resolved by <code>{item.resolved_by}</code>)</> : null}. You chose to {chose} it.
+        {item.state === "rejected" ? " The commit that was waiting on it was refused and will not run." : null}
+      </div>
+    );
+  }
+  return (
+    <div className="inbox-warn" role="status" data-notice="unconfirmed">
+      <strong>Not confirmed.</strong> You chose to {chose} approval <code>{notice.approvalId}</code>, but SEA-Forge's listing
+      {item ? <> still shows it as <strong>{item.state}</strong></> : " does not show it"}. Reload to check again before deciding anything else.
+    </div>
+  );
+}
 
 function Details({ item }: { readonly item: InboxItem }): ReactNode {
   return (
     <dl>
       <dt>Approval</dt>
       <dd><code>{item.approval_id}</code></dd>
-      <dt>State</dt>
-      <dd>{item.state}{item.resolved_by ? ` by ${item.resolved_by}` : ""}</dd>
       <dt>Operation</dt>
       <dd>{item.operation_name} <span className="inbox-note">({item.operation_kind})</span></dd>
       <dt>Resource</dt>
@@ -40,6 +77,8 @@ function Details({ item }: { readonly item: InboxItem }): ReactNode {
       <dd><code>{item.world_ref}</code></dd>
       <dt>Request</dt>
       <dd><code>{item.request_ref}</code></dd>
+      <dt>Requested at</dt>
+      <dd className="inbox-note">SEA-Forge does not report when it was requested</dd>
       <dt>Expires</dt>
       <dd>{item.expires_at}{item.past_expiry ? " (past expiry)" : ""}</dd>
     </dl>
@@ -49,12 +88,24 @@ function Details({ item }: { readonly item: InboxItem }): ReactNode {
 function Item({ item }: { readonly item: InboxItem }): ReactNode {
   return (
     <li className="inbox-item" data-approval={item.approval_id} data-state={item.state} data-decidable={item.decision.kind === "decidable" ? "yes" : "no"}>
+      <p className="inbox-status" data-status>
+        {item.state === "pending"
+          ? `Waiting for a decision: ${item.operation_name}, requested by ${item.requester}`
+          : `${item.state[0]!.toUpperCase()}${item.state.slice(1)}${item.resolved_by ? ` by ${item.resolved_by}` : ""}: ${item.operation_name}, requested by ${item.requester}`}
+      </p>
       <Details item={item} />
       {item.decision.kind === "decidable" ? (
         <form method="post" action="/workspace/approval" className="inbox-actions">
           <input type="hidden" name="approval_id" value={item.approval_id} />
-          <button type="submit" name="decision" value="approve" className="primary">Approve</button>
-          <button type="submit" name="decision" value="reject">Reject</button>
+          <input type="hidden" name="return_to" value="inbox" />
+          <div className="inbox-choice">
+            <button type="submit" name="decision" value="approve" className="primary" aria-describedby={`approve-${item.approval_id}`}>Approve</button>
+            <span id={`approve-${item.approval_id}`} className="inbox-note">SEA-Forge lets the waiting commit go ahead.</span>
+          </div>
+          <div className="inbox-choice">
+            <button type="submit" name="decision" value="reject" aria-describedby={`reject-${item.approval_id}`}>Reject</button>
+            <span id={`reject-${item.approval_id}`} className="inbox-note">SEA-Forge refuses the waiting commit; it will not run.</span>
+          </div>
         </form>
       ) : (
         <p className="inbox-note">Not decided here: {item.decision.reason}.</p>
@@ -63,36 +114,53 @@ function Item({ item }: { readonly item: InboxItem }): ReactNode {
   );
 }
 
-function Body({ readout }: { readonly readout: InboxReadout }): ReactNode {
+function Body({ readout, notice }: { readonly readout: InboxReadout; readonly notice?: InboxNotice }): ReactNode {
+  // A refusal is shown even when the listing is absent; a success can only be confirmed against a listing.
+  const alert = notice?.kind === "error" ? <Notice notice={notice} items={[]} /> : null;
   if (readout.state === "not_configured") {
-    return <p className="inbox-warn">No approver is configured (COGNATE_SEA_FORGE_OPERATOR). Nothing can be approved from here.</p>;
+    return (
+      <>
+        {alert}
+        <p className="inbox-warn">No approver is configured (COGNATE_SEA_FORGE_OPERATOR). Nothing can be approved from here.</p>
+      </>
+    );
   }
   if (readout.state === "unreachable") {
     return (
-      <p className="inbox-warn">
-        SEA-Forge did not list approvals, so this page cannot say what is waiting. {readout.message}
-      </p>
+      <>
+        {alert}
+        <p className="inbox-warn">
+          SEA-Forge did not list approvals, so this page cannot say what is waiting. {readout.message}
+        </p>
+      </>
     );
   }
   const { inbox } = readout;
   return (
     <>
+      {notice ? <Notice notice={notice} items={[...inbox.waiting, ...inbox.decided]} /> : null}
+      {inbox.waiting.length === 0 && inbox.decided.length === 0 && inbox.excluded === 0 ? (
+        <p className="inbox-note" data-empty>The inbox is empty: SEA-Forge lists no approvals at all.</p>
+      ) : null}
       <section aria-labelledby="waiting-heading">
         <h2 id="waiting-heading">Waiting for a decision ({inbox.waiting.length})</h2>
-        {inbox.waiting.length === 0 ? <p className="inbox-note">Nothing is waiting at SEA-Forge.</p> : <ul className="inbox-list">{inbox.waiting.map((item) => <Item key={item.approval_id} item={item} />)}</ul>}
+        {inbox.waiting.length === 0 ? <p className="inbox-note">Nothing is waiting at SEA-Forge, so nothing needs your decision.</p> : <ul className="inbox-list">{inbox.waiting.map((item) => <Item key={item.approval_id} item={item} />)}</ul>}
       </section>
       <section aria-labelledby="decided-heading">
         <h2 id="decided-heading">Decided ({inbox.decided.length})</h2>
         {inbox.decided.length === 0 ? <p className="inbox-note">No decided approvals are listed.</p> : <ul className="inbox-list">{inbox.decided.map((item) => <Item key={item.approval_id} item={item} />)}</ul>}
       </section>
       {inbox.excluded > 0 ? (
-        <p className="inbox-warn">{inbox.excluded} record(s) from SEA-Forge did not match the expected shape and are not shown.</p>
+        <p className="inbox-warn" data-excluded={inbox.excluded}>
+          {inbox.excluded} approval record(s) excluded. SEA-Forge listed them in a shape this page does not recognise, so it cannot show what
+          they are or offer a decision on them. They are counted here so they are not hidden; look at them in SEA-Forge.
+        </p>
       ) : null}
     </>
   );
 }
 
-export function ApprovalInboxPage({ readout, theme }: { readonly readout: InboxReadout; readonly theme?: WorkspaceTheme }): ReactNode {
+export function ApprovalInboxPage({ readout, theme, notice }: { readonly readout: InboxReadout; readonly theme?: WorkspaceTheme; readonly notice?: InboxNotice }): ReactNode {
   return (
     <html lang="en" data-theme={theme}>
       <head>
@@ -112,13 +180,13 @@ export function ApprovalInboxPage({ readout, theme }: { readonly readout: InboxR
           <p className="state">Listed from SEA-Forge. Approve or reject sends your decision to SEA-Forge, which decides it.</p>
         </header>
         <main id="main" tabIndex={-1}>
-          <Body readout={readout} />
+          <Body readout={readout} {...(notice ? { notice } : {})} />
         </main>
       </body>
     </html>
   );
 }
 
-export function renderApprovalInboxPage(readout: InboxReadout, theme?: WorkspaceTheme): string {
-  return `<!doctype html>${renderToStaticMarkup(<ApprovalInboxPage readout={readout} theme={theme} />)}`;
+export function renderApprovalInboxPage(readout: InboxReadout, theme?: WorkspaceTheme, notice?: InboxNotice): string {
+  return `<!doctype html>${renderToStaticMarkup(<ApprovalInboxPage readout={readout} theme={theme} {...(notice ? { notice } : {})} />)}`;
 }
