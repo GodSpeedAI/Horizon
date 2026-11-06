@@ -10,7 +10,7 @@
     "check": "bun run scripts/check.ts",
     "test": "bun test && uv run --project research pytest -q",
     "boundaries": "bun run scripts/check-boundaries.ts",
-    "verify": "bun run scripts/check-single-cognate.ts && bun run check && bun test && bun run scripts/check-boundaries.ts && uv run --project research pytest -q && python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --require-freeze && python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py . --ledger requirements/ledger.yaml"
+    "verify": "bun run scripts/check-single-cognate.ts && bun run check && bun test && bun run scripts/check-boundaries.ts && bun run scripts/teeth-inv2-mutation.ts && uv run --project research pytest -q && python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --require-freeze && python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py . --ledger requirements/ledger.yaml"
   },
   "dependencies": {
     "@godspeed/identity": "file:./.cognate/vendor/godspeed-identity-0.1.0.tgz",
