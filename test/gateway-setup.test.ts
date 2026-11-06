@@ -289,6 +289,12 @@ describe("unit files", () => {
   const gw = units[UNIT_GATEWAY]!;
   const rt = units[UNIT_RUNTIME]!;
 
+  test("the gateway unit kills its whole control group on stop, within a bounded time (sea-rs#86)", () => {
+    expect(gw).toContain("\nKillMode=control-group\n");
+    expect(gw).toContain("\nTimeoutStopSec=30\n");
+    expect(rt).not.toContain("KillMode=");
+  });
+
   test("the gateway unit runs as the configured account with the hardening set", () => {
     expect(gw).toContain(`User=${FAKE.HORIZON_GATEWAY_ACCOUNT}`);
     expect(gw).toContain("NoNewPrivileges=yes");
