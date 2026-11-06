@@ -3,32 +3,46 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const root = process.cwd();
+// Optional first argument: the project root (default: the current directory). The tests pass a fake tree.
+const root = process.argv[2] ?? process.cwd();
 const found = new Map<string, string[]>();
 
-function walk(dir: string): void {
+function isDir(p: string): boolean {
+  try {
+    return statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** Visit every package directory under one node_modules, scoped or not, and recurse into its own node_modules. */
+function walkModules(modules: string): void {
   let entries: string[];
   try {
-    entries = readdirSync(dir);
+    entries = readdirSync(modules);
   } catch {
     return;
   }
   for (const e of entries) {
-    const p = join(dir, e);
-    if (e === "@godspeedai") {
-      for (const name of readdirSync(p)) {
-        if (!name.startsWith("cognate-")) continue;
-        const pkg = JSON.parse(readFileSync(join(p, name, "package.json"), "utf8")) as { name: string; version: string };
-        found.set(pkg.name, [...(found.get(pkg.name) ?? []), `${pkg.version} @ ${join(p, name)}`]);
-      }
-    } else if (e === "node_modules" || e.startsWith("@")) {
-      if (statSync(p).isDirectory()) walk(p);
-    } else if (dir.endsWith("node_modules") && statSync(p).isDirectory()) {
-      walk(join(p, "node_modules"));
+    const p = join(modules, e);
+    if (!isDir(p)) continue;
+    if (e.startsWith("@")) {
+      for (const name of readdirSync(p)) visitPackage(join(p, name), `${e}/${name}`);
+    } else if (e !== ".bin") {
+      visitPackage(p, e);
     }
   }
 }
-walk(join(root, "node_modules"));
+
+function visitPackage(dir: string, name: string): void {
+  if (!isDir(dir)) return;
+  if (name.startsWith("@godspeedai/cognate-")) {
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { name: string; version: string };
+    found.set(pkg.name, [...(found.get(pkg.name) ?? []), `${pkg.version} @ ${dir}`]);
+  }
+  walkModules(join(dir, "node_modules"));
+}
+walkModules(join(root, "node_modules"));
 
 const bad = [...found].filter(([, v]) => v.length !== 1);
 if (found.size === 0) {
