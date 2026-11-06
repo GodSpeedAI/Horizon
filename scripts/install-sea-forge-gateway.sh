@@ -326,6 +326,15 @@ load_plan() {
     for t in "${PLAN_TABLE[@]}"; do [ "$row" = "$t" ] && { ok=1; break; }; done
     [ "$ok" = 1 ] || refuse "plan row is not in the installer's fixed table (destination, owner, group or mode differs): $(printf '%q' "$row")"
   done
+  # The table is a required set, not a whitelist: every row exactly once, in order. A plan that drops, repeats or reorders rows
+  # would pass the per-row check yet stop the apply half-way (or run steps in the wrong order).
+  if [ "${#PLAN_ROWS[@]}" -ne "${#PLAN_TABLE[@]}" ]; then
+    refuse "plan.tsv has ${#PLAN_ROWS[@]} rows; the installer's fixed table requires exactly ${#PLAN_TABLE[@]}"
+  fi
+  local i
+  for i in "${!PLAN_TABLE[@]}"; do
+    [ "${PLAN_ROWS[$i]}" = "${PLAN_TABLE[$i]}" ] || refuse "plan row $((i + 1)) differs from the installer's fixed table (missing, duplicated or reordered row): $(printf '%q' "${PLAN_ROWS[$i]}")"
+  done
 }
 
 # Every staged source the plan reads must exist as a regular file in the snapshot, so --verify-only cannot bless a bundle the

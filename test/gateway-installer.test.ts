@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { stageDigest, stageRuntime } from "../scripts/gateway-setup.ts";
+import { buildPlan, resolveLayout, stageDigest, stageRuntime } from "../scripts/gateway-setup.ts";
 
 const SCRIPT = resolve(import.meta.dir, "../scripts/install-sea-forge-gateway.sh");
 const dirs: string[] = [];
@@ -18,6 +18,34 @@ afterAll(() => {
   for (const d of dirs) rmSync(d, { recursive: true, force: true });
 });
 const sha = (b: string | Buffer) => createHash("sha256").update(b).digest("hex");
+
+/** The installer's fixed PLAN_TABLE, copied here on purpose: the table is a required set, so a stage must carry every row once, in order. */
+const PLAN_ROWS = [
+      "account\tgodspeed-sea-forge\tgateway",
+      "account\tgodspeed-horizon\truntime",
+      "group\tgodspeed-sock",
+      "member\tgodspeed-sea-forge\tgodspeed-sock",
+      "member\tgodspeed-horizon\tgodspeed-sock",
+      "dir\troot\troot\t0755\t/usr/local/lib/godspeed-sea-forge",
+      "dir\troot\troot\t0755\t/usr/local/lib/godspeed-sea-forge/bin",
+      "dir\troot\troot\t0755\t/usr/local/lib/godspeed-horizon/bin",
+      "dir\tgodspeed-sea-forge\tgodspeed-sock\t0750\t/run/godspeed-sea-forge",
+      "dir\tgodspeed-sea-forge\tgodspeed-sea-forge\t711\t/var/lib/godspeed-sea-forge",
+      "dir\tgodspeed-sea-forge\tgodspeed-sea-forge\t0700\t/var/lib/godspeed-sea-forge/realitytrace/data",
+      "dir\tgodspeed-sea-forge\tgodspeed-sea-forge\t0700\t/var/lib/godspeed-sea-forge/realitytrace/state",
+      "worlds\troot\tgodspeed-sock\t/var/lib/godspeed-sea-forge/worlds\truntime/domain",
+      "dir\tgodspeed-horizon\tgodspeed-horizon\t0700\t/var/lib/godspeed-horizon",
+      "place-bun\troot\troot\t0755\t/usr/local/lib/godspeed-horizon/bin/bun",
+      "optional-exec\t/usr/local/lib/godspeed-horizon/bin/realitytrace",
+      "place-binary\troot\troot\t0755\t/usr/local/lib/godspeed-sea-forge/bin/sea-forge-server",
+      "deploy-tree\troot\troot\t/opt/godspeed-horizon",
+      "config-file\troot\tgodspeed-sock\t0640\t/var/lib/godspeed-sea-forge/server.yaml\tconfig/server.yaml.in",
+      "config-file\troot\tgodspeed-sock\t0640\t/var/lib/godspeed-sea-forge/policy.yaml\tconfig/policy.yaml",
+      "generated\troot\tgodspeed-sock\t0640\tstatus.json\t/var/lib/godspeed-sea-forge/status.json",
+      "generated\troot\troot\t0644\tunits/godspeed-sea-forge.service\t/etc/systemd/system/godspeed-sea-forge.service",
+      "generated\troot\troot\t0644\tunits/godspeed-horizon.service\t/etc/systemd/system/godspeed-horizon.service",
+      "socket\t/run/godspeed-sea-forge/sea-forge.sock",
+];
 
 /** A minimal stage with the same shape `gateway-setup.ts stage` writes. */
 function makeStage(): string {
@@ -38,18 +66,7 @@ function makeStage(): string {
   writeFileSync(join(stage, "runtime-symlinks.tsv"), symlinkManifest);
   writeFileSync(
     join(stage, "plan.tsv"),
-    [
-      "account\tgodspeed-sea-forge\tgateway",
-      "worlds\troot\tgodspeed-sock\t/var/lib/godspeed-sea-forge/worlds\truntime/domain",
-      "deploy-tree\troot\troot\t/opt/godspeed-horizon",
-      "place-binary\troot\troot\t0755\t/usr/local/lib/godspeed-sea-forge/bin/sea-forge-server",
-      "config-file\troot\tgodspeed-sock\t0640\t/var/lib/godspeed-sea-forge/server.yaml\tconfig/server.yaml.in",
-      "config-file\troot\tgodspeed-sock\t0640\t/var/lib/godspeed-sea-forge/policy.yaml\tconfig/policy.yaml",
-      "generated\troot\tgodspeed-sock\t0640\tstatus.json\t/var/lib/godspeed-sea-forge/status.json",
-      "generated\troot\troot\t0644\tunits/godspeed-sea-forge.service\t/etc/systemd/system/godspeed-sea-forge.service",
-      "generated\troot\troot\t0644\tunits/godspeed-horizon.service\t/etc/systemd/system/godspeed-horizon.service",
-      "socket\t/run/godspeed-sea-forge/sea-forge.sock",
-    ].join("\n") + "\n",
+    PLAN_ROWS.join("\n") + "\n",
   );
   writeFileSync(join(stage, "status.json"), "{}\n");
   writeFileSync(join(stage, "units", "godspeed-sea-forge.service"), "[Service]\n");
@@ -72,6 +89,24 @@ function verify(stage: string, opts: { digest?: string; extra?: string[]; env?: 
   );
   return { code: r.exitCode, out: r.stdout.toString(), err: r.stderr.toString() };
 }
+
+/** The installer's PLAN_TABLE, parsed from the script itself so no copy can drift from it. */
+function installerTable(): string[] {
+  const text = readFileSync(SCRIPT, "utf8");
+  const body = /PLAN_TABLE=\(\n([\s\S]*?)\n\)/.exec(text)?.[1] ?? "";
+  return [...body.matchAll(/\$'([^']*)'/g)].map((m) => m[1]!.replace(/\\t/g, "\t"));
+}
+
+describe("the stager and the installer agree on the plan", () => {
+  test("buildPlan of the production layout equals the installer's PLAN_TABLE, row for row", () => {
+    const layout = resolveLayout({}, { development: false, world: { pinned: "w@sha256:0", cognate: "w" }, operatorRef: "actor:operator" });
+    const rows = buildPlan(layout).map((r) => r.join("\t"));
+    expect(rows).toEqual(installerTable());
+  });
+  test("the test's hand-copied stage table equals the installer's", () => {
+    expect(PLAN_ROWS).toEqual(installerTable());
+  });
+});
 
 describe("installer verifies a snapshot of the stage", () => {
   test("g. a clean stage passes, and the shell digest equals the TypeScript digest", () => {
@@ -287,6 +322,27 @@ describe("installer verifies a snapshot of the stage", () => {
       expect(r.code).toBe(1);
       expect(r.err).toContain("fixed table");
     }
+  });
+
+  test("the table is a required set: a dropped, duplicated or reordered row is refused under --verify-only", () => {
+    const edit = (f: (rows: string[]) => string[]) => {
+      const stage = makeStage();
+      writeFileSync(join(stage, "plan.tsv"), f([...PLAN_ROWS]).join("\n") + "\n");
+      return verify(stage); // digest recomputed, so only the plan check can refuse
+    };
+    const dropped = edit((r) => r.filter((_, i) => i !== 5));
+    expect(dropped.code).toBe(1);
+    expect(dropped.err).toContain("requires exactly");
+    const duplicated = edit((r) => [...r, r[3]!]);
+    expect(duplicated.code).toBe(1);
+    expect(duplicated.err).toContain("requires exactly");
+    const swapped = edit((r) => { [r[2], r[3]] = [r[3]!, r[2]!]; return r; }); // same count, same rows, wrong order
+    expect(swapped.code).toBe(1);
+    expect(swapped.err).toContain("missing, duplicated or reordered");
+    const replaced = edit((r) => { r[4] = r[3]!; return r; }); // same count, one row duplicated in place of another
+    expect(replaced.code).toBe(1);
+    expect(replaced.err).toContain("missing, duplicated or reordered");
+    expect(edit((r) => r).code).toBe(0);
   });
 
   test("a malformed plan.tsv is refused: unterminated last line, pipes for tabs, CRLF, NUL", () => {
