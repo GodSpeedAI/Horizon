@@ -2,6 +2,7 @@
 /** Decide (design 5.1): "What needs me?" Notices wait at the top, then decision cards oldest first, then the ones on hold. */
 import type { ReactNode } from "react";
 import { DecisionCard } from "../DecisionCard.tsx";
+import { NextDecision } from "../NextDecision.tsx";
 import type { ViewProps } from "./Today.tsx";
 
 export interface DecideViewProps extends ViewProps {
@@ -54,6 +55,7 @@ export function Decide({ ui, data, dispatch, confirm, release, nowMs }: DecideVi
           ))}
         </div>
       )}
+      <NextDecision next={ui.next} />
       {held.length > 0 ? (
         <div className="held">
           <h2>On hold ({held.length})</h2>

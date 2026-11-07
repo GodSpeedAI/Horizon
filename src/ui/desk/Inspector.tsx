@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type { NoteView } from "../../capabilities/notes.ts";
 import type { Action, UiState } from "./attention.ts";
 import { dayLabel, type DeskState } from "./model.ts";
+import { DEBUGGER_QUESTIONS, InspectPanel, type InspectIo } from "./Answers.tsx";
 import { NoteBody, NoteEditor, TagList, type NoteIo, type OpenLink } from "./NoteEditor.tsx";
 import { StateWord } from "./StateWord.tsx";
 
@@ -43,7 +44,7 @@ export function findSelected(ui: UiState): Selected | null {
 export interface InspectorProps {
   readonly ui: UiState;
   readonly dispatch: (action: Action) => void;
-  readonly io: NoteIo;
+  readonly io: NoteIo & Partial<InspectIo>;
   readonly onLink: OpenLink;
 }
 
@@ -97,6 +98,16 @@ export function Inspector({ ui, dispatch, io, onLink }: InspectorProps): ReactNo
           <p className="muted">{selected.at}</p>
         </div>
       )}
+      <InspectPanel
+        inspection={ui.inspection}
+        operations={DEBUGGER_QUESTIONS}
+        onAsk={(operation, query) => {
+          dispatch({ type: "inspect-start", operation, query });
+          void (io.inspect?.(operation, query) ?? Promise.resolve({ ok: false as const, message: "Asking is not set up in this window." })).then((result) =>
+            dispatch(result.ok ? { type: "inspect-result", answer: result.answer, problem: null } : { type: "inspect-result", answer: null, problem: result.message }),
+          );
+        }}
+      />
     </aside>
   );
 }

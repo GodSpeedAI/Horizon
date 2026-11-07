@@ -8,6 +8,7 @@ import type { Action, UiState } from "./attention.ts";
 import { confirmOffReason } from "./Preview.tsx";
 import type { RemoteIo } from "./RemotePanel.tsx";
 import type { SaveLabel } from "./LabelControl.tsx";
+import type { InspectIo } from "./Answers.tsx";
 import type { RecordPin } from "./model.ts";
 import { Composer } from "./Composer.tsx";
 import { Inspector } from "./Inspector.tsx";
@@ -30,7 +31,7 @@ export interface DecideInput {
   readonly reason: string;
 }
 
-export interface DeskIo extends NoteIo {
+export interface DeskIo extends NoteIo, InspectIo {
   readonly setPresenting: (on: boolean) => void;
   /** Sends one decision. A refusal comes back as `ok: false` with the words to show; nothing throws. */
   readonly decide: (input: DecideInput) => Promise<{ readonly ok: boolean; readonly message: string }>;

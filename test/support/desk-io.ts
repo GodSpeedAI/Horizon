@@ -8,6 +8,7 @@ export function quietIo(over: Partial<DeskIo> = {}): DeskIo {
     decide: async () => ({ ok: false, message: "not used" }),
     saveLabel: async () => ({ ok: false, message: "not used" }),
     remote: null,
+    inspect: async () => ({ ok: false, message: "not used" }),
     ...over,
   };
 }

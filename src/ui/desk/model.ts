@@ -4,7 +4,7 @@
  * words come only from the parts themselves.
  */
 import type { NoteRevision, NoteView } from "../../capabilities/notes.ts";
-import type { WorkspaceMove, WorkspaceOnboardingStep } from "../workspace/model.ts";
+import type { WorkspaceBlocked, WorkspaceChoice, WorkspaceDebugger, WorkspaceMove, WorkspaceOnboardingStep, WorkspaceRetrieval } from "../workspace/model.ts";
 
 export const NOT_CONNECTED = "Not connected";
 export const POLL_MS = 2000;
@@ -122,6 +122,22 @@ export interface DecideState {
   readonly notices: readonly string[];
   /** Waiting, oldest first, then held. */
   readonly cards: readonly DecisionCardData[];
+}
+
+/** The frame-based "next decision": what can be done next from the shared focus, and what cannot and why. */
+export interface NextState {
+  readonly state: string;
+  readonly state_message: string;
+  readonly focus: string;
+  readonly choices: readonly WorkspaceChoice[];
+  readonly blocked: readonly WorkspaceBlocked[];
+}
+
+/** One answer to a debugger question, with the reference material cited beside it (null when no question text was asked). */
+export interface InspectionAnswer {
+  readonly operations: readonly string[];
+  readonly debugger: WorkspaceDebugger;
+  readonly retrieval: WorkspaceRetrieval | null;
 }
 
 export interface HomeState {

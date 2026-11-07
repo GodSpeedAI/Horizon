@@ -1804,6 +1804,12 @@ export async function createApplication(
           if (url.pathname === "/desk/work.json" && request.method === "GET") {
             return Response.json(await deskWork(url.searchParams), { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
           }
+          if (url.pathname === "/desk/next.json" && request.method === "GET") {
+            // The frame-based "next decision": read-only. It builds a frame, so the desk asks only when Decide is open.
+            const data = await workspace({});
+            const snap = data.snapshot;
+            return Response.json({ state: snap.state, state_message: snap.state_message, focus: snap.frame.focus_ref, choices: snap.choices, blocked: snap.blocked }, { headers: { "cache-control": "no-store" } });
+          }
           if (url.pathname === "/desk/first-move.json" && request.method === "GET") {
             // The one move the first-run path offers. Computed only when asked for, because it builds a frame.
             const data = await workspace({});

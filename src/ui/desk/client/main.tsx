@@ -10,6 +10,7 @@ import { START, deskReducer, type FirstMove, type Pin, type UiState } from "../a
 import { Desk, type DeskIo } from "../Desk.tsx";
 import type { RemoteInfo } from "../RemotePanel.tsx";
 import type { WorkData } from "../work-build.ts";
+import type { InspectionAnswer, NextState } from "../model.ts";
 import { resolveKey } from "../keys.ts";
 import { POLL_MS, itemsOf, shiftDay, type DeskState, type SearchResult } from "../model.ts";
 
@@ -111,6 +112,20 @@ function App() {
     return () => window.clearInterval(timer);
   }, [ui.view, workKey, loadWork]);
 
+  // The next decision comes from the shared frame; read when Decide opens and every 15 seconds while it is open.
+  useEffect(() => {
+    if (ui.view !== "decide") return;
+    const load = (): void => {
+      void fetch("/desk/next.json")
+        .then((r) => r.json() as Promise<NextState>)
+        .then((next) => dispatch({ type: "next", next }))
+        .catch(() => undefined);
+    };
+    load();
+    const timer = window.setInterval(load, 15_000);
+    return () => window.clearInterval(timer);
+  }, [ui.view]);
+
   // The first move is built only when the first-run path reaches it, because building it makes a frame.
   const wantsFirstMove = ui.data?.home.onboarding.visible === true && ui.data.home.onboarding.steps.find((step) => !step.done)?.id === "move";
   useEffect(() => {
@@ -208,6 +223,17 @@ function App() {
   }, []);
 
   const io: DeskIo = {
+    inspect: async (operation, query) => {
+      try {
+        const params = new URLSearchParams({ operation });
+        if (query.trim() !== "") params.set("query", query);
+        const response = await fetch(`/workspace/inspect?${params}`);
+        const body = (await response.json()) as InspectionAnswer & { message?: string };
+        return response.ok ? { ok: true, answer: body } : { ok: false, message: body.message ?? "The question could not be answered." };
+      } catch {
+        return { ok: false, message: "Horizon did not answer, so nothing is shown." };
+      }
+    },
     decide: async (input) => {
       try {
         const response = await fetch("/desk/decide", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });

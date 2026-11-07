@@ -15,6 +15,7 @@ import { Desk } from "../src/ui/desk/Desk.tsx";
 import type { DeskState, SearchResult } from "../src/ui/desk/model.ts";
 import { fakeCaseKeeper, type FakeKeeper } from "./support/fake-case-keeper.ts";
 import { quietIo } from "./support/desk-io.ts";
+import type { InspectionAnswer, NextState } from "../src/ui/desk/model.ts";
 import { horizonDocument, writeConfig } from "./support/config.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 
@@ -153,6 +154,66 @@ describe("desk parity with the old workspace", () => {
     const back = await stateAt();
     expect(back.home.onboarding.visible).toBe(true);
     expect(draw(withData(back))).toContain('id="getting-started"');
+  });
+
+  test("debugger answer content is in the inspector", async () => {
+    const answer = (await (await fetch(`${base}/workspace/inspect?focus=${FOCUS}&operation=why`)).json()) as InspectionAnswer;
+    expect(answer.debugger.operation).toBe("why");
+    const state = await stateAt();
+    // Before anything is asked, the panel is there and offers all seven questions.
+    const idle = draw(withData(state));
+    expect(idle).toContain("data-inspect-panel");
+    for (const op of ["why", "impact", "diff", "timeline", "counterfactual", "reach", "replay"]) expect(idle).toContain(`value="${op}"`);
+    expect(idle).not.toContain('id="debugger-answer"');
+    // After asking, the answer is drawn from the same read model, with its facts, sources and the refusal to claim authority.
+    const html = draw(withData(state, { inspection: { operation: "why", query: "", busy: false, answer, problem: null } }));
+    expect(html).toContain('id="debugger-answer"');
+    expect(html).toContain('data-operation="why"');
+    expect(text(html)).toContain(`why: ${answer.debugger.question}`);
+    expect(text(html)).toContain("Grants no authority. Settles nothing.");
+    for (const value of answer.debugger.values.slice(0, 3)) expect(text(html)).toContain(value.key);
+    // A refusal or failure to answer is said in words, not left blank.
+    const refused = draw(withData(state, { inspection: { operation: "why", query: "", busy: false, answer: null, problem: "Horizon did not answer, so nothing is shown." } }));
+    expect(refused).toContain("Horizon did not answer");
+  });
+
+  test("reference citations content is in the inspector", async () => {
+    const answer = (await (await fetch(`${base}/workspace/inspect?focus=${FOCUS}&operation=why&query=what%20is%20alpha`)).json()) as InspectionAnswer;
+    expect(answer.retrieval).not.toBeNull();
+    const state = await stateAt();
+    const withQuery = draw(withData(state, { inspection: { operation: "why", query: "what is alpha", busy: false, answer, problem: null } }));
+    expect(withQuery).toContain('id="reference-citations"');
+    expect(withQuery).toContain('data-canonical="false"');
+    expect(text(withQuery)).toContain(answer.retrieval!.outcome);
+    // No citation: "No sources", and nothing is said as fact.
+    expect(withQuery).toContain("data-no-sources");
+    expect(text(withQuery)).toContain("No sources.");
+    expect(text(withQuery)).toContain("Not canonical");
+    // No question text: still says so, never blank.
+    const noQuery = draw(withData(state, { inspection: { operation: "why", query: "", busy: false, answer: { ...answer, retrieval: null }, problem: null } }));
+    expect(text(noQuery)).toContain("No sources. No question text was asked");
+    // Cited sources are quoted as reference material, not as fact.
+    const cited: InspectionAnswer = { ...answer, retrieval: { ...answer.retrieval!, outcome: "results", references: [{ uri: "doc://guide", anchor: "a1", heading: "Alpha", excerpt: "<b>Alpha</b> is the strategy.", score: 0.9, class: "untrusted_reference" } as never] } };
+    const citedHtml = draw(withData(state, { inspection: { operation: "why", query: "x", busy: false, answer: cited, problem: null } }));
+    expect(citedHtml).toContain("doc://guide#a1");
+    expect(citedHtml).toContain("&lt;b&gt;Alpha&lt;/b&gt; is the strategy.");
+    expect(citedHtml).not.toContain("data-no-sources");
+  });
+
+  test("the next decision content is in Decide", async () => {
+    const next = (await (await fetch(`${base}/desk/next.json`)).json()) as NextState;
+    expect(next.focus).not.toBe("");
+    expect(next.choices.length + next.blocked.length).toBeGreaterThan(0);
+    const state = await stateAt();
+    const html = draw(withData(state, { view: "decide", next }));
+    expect(html).toContain("data-next");
+    expect(text(html)).toContain("The next decision");
+    for (const choice of next.choices.slice(0, 3)) expect(text(html)).toContain(choice.label);
+    for (const entry of next.blocked.slice(0, 3)) expect(text(html)).toContain(entry.reason);
+    // An available choice posts to the same route as before; the page never decides for the operator.
+    if (next.choices.some((c) => c.available && c.action_id !== null)) expect(html).toContain('action="/workspace/intent"');
+    // Before it is read, it says so instead of showing nothing.
+    expect(text(draw(withData(state, { view: "decide" })))).toContain("The next decision Still loading.");
   });
 
   test("intent goes through the composer", async () => {

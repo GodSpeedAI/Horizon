@@ -5,7 +5,7 @@
  * Rule 7: no record means "not recorded", counted as unchecked. Rule 9: a pin keeps its content and says when its source moved.
  */
 import { NOT_RECORDED } from "../workspace/compare-model.ts";
-import type { DeskState, RecordPin, SearchResult, ViewId } from "./model.ts";
+import type { DeskState, InspectionAnswer, NextState, RecordPin, SearchResult, ViewId } from "./model.ts";
 import type { WorkData } from "./work-build.ts";
 
 // ---- Rule 6: every state in words (design section 2) ----
@@ -182,6 +182,10 @@ export interface UiState {
   readonly workQuery: WorkQuery;
   /** `undefined` until asked for. */
   readonly firstMove?: FirstMove | null;
+  /** The next decision from the shared frame; null until read. */
+  readonly next: NextState | null;
+  /** The last debugger answer asked for in the inspector. */
+  readonly inspection: { readonly operation: string; readonly query: string; readonly busy: boolean; readonly answer: InspectionAnswer | null; readonly problem: string | null } | null;
 }
 
 export const START: UiState = {
@@ -203,6 +207,8 @@ export const START: UiState = {
   decideNote: null,
   work: null,
   workQuery: { source: null, repo: null, day: null, session: null, only: null },
+  next: null,
+  inspection: null,
 };
 
 export type Action =
@@ -234,6 +240,9 @@ export type Action =
   | { readonly type: "decision-busy" }
   | { readonly type: "decision-result"; readonly ok: boolean; readonly message: string }
   | { readonly type: "first-move"; readonly move: FirstMove | null }
+  | { readonly type: "next"; readonly next: NextState }
+  | { readonly type: "inspect-start"; readonly operation: string; readonly query: string }
+  | { readonly type: "inspect-result"; readonly answer: InspectionAnswer | null; readonly problem: string | null }
   | { readonly type: "work"; readonly work: WorkData }
   | { readonly type: "work-query"; readonly patch: Partial<WorkQuery> };
 
@@ -320,6 +329,12 @@ export function deskReducer(ui: UiState, action: Action): UiState {
     case "decision-result":
       if (action.ok) return { ...ui, decision: null, decideNote: { ok: true, message: action.message }, focus: "list" };
       return ui.decision === null ? { ...ui, decideNote: { ok: false, message: action.message } } : { ...ui, decision: { ...ui.decision, busy: false, problem: action.message } };
+    case "next":
+      return { ...ui, next: action.next };
+    case "inspect-start":
+      return { ...ui, inspection: { operation: action.operation, query: action.query, busy: true, answer: null, problem: null } };
+    case "inspect-result":
+      return ui.inspection === null ? ui : { ...ui, inspection: { ...ui.inspection, busy: false, answer: action.answer, problem: action.problem } };
     case "first-move":
       return { ...ui, firstMove: action.move };
     case "work":
