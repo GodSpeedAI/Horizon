@@ -52,6 +52,18 @@ export function extractLinks(body: string): NoteLink[] {
   return [...found.values()];
 }
 
+const INLINE_TAG = /(?:^|\s)#([\p{L}\p{N}][\p{L}\p{N}_-]*)/gu;
+
+/** `#word` typed in a note makes a tag, so the Tags list fills as you write. It is only a label, like any other tag. */
+export function extractInlineTags(body: string): string[] {
+  const found: string[] = [];
+  for (const match of body.matchAll(INLINE_TAG)) {
+    const tag = normalizeTag(match[1]!);
+    if (tag !== null && !found.includes(tag)) found.push(tag);
+  }
+  return found;
+}
+
 export function checkNote(raw: unknown): NoteCheck {
   const shaped = NoteInput.safeParse(raw);
   if (!shaped.success) return { ok: false, message: "That note could not be read. Try typing it again." };
@@ -64,6 +76,8 @@ export function checkNote(raw: unknown): NoteCheck {
     if (tag === null) return { ok: false, message: `"${each.slice(0, 40)}" cannot be used as a tag. Tags are short, with no slashes, quotes or angle brackets.` };
     if (!tags.includes(tag)) tags.push(tag);
   }
+  for (const tag of extractInlineTags(input.body)) if (!tags.includes(tag)) tags.push(tag);
+  if (tags.length > TAGS_MAX) return { ok: false, message: `A note can carry ${TAGS_MAX} tags at most. This one has ${tags.length}.` };
   const links = new Map<string, NoteLink>();
   for (const link of [...extractLinks(input.body), ...(input.links ?? [])]) links.set(`${link.kind}:${link.ref}`, link);
   return { ok: true, body: input.body, tags, links: [...links.values()], case_ref: input.case_ref ?? null, note_id: input.note_id ?? null };

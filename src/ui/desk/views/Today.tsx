@@ -2,9 +2,10 @@
 /** Today (design 6.3): the day's notes and activity in time order, each source named, and an empty day that says why. */
 import type { ReactNode } from "react";
 import { newCount, shownCount, type Action, type UiState } from "../attention.ts";
-import { dayLabel, emptyDayReason, timeLabel, type DeskState } from "../model.ts";
+import { activityReason, dayLabel, emptyDayReason, timeLabel, type DeskState } from "../model.ts";
 import { NoteCard, type OpenLink } from "../NoteEditor.tsx";
 import { StateWord } from "../StateWord.tsx";
+import { GettingStarted, Moves, Receipt } from "./Home.tsx";
 
 export interface ViewProps {
   readonly ui: UiState;
@@ -42,6 +43,13 @@ export function Today({ ui, data, dispatch, onLink }: ViewProps): ReactNode {
           </>
         ) : null}
       </p>
+      {data.home.receipt !== null ? <Receipt receipt={data.home.receipt} dispatch={dispatch} /> : null}
+      {data.home.onboarding.visible ? <GettingStarted home={data.home} firstMove={ui.firstMove} /> : null}
+      {data.home.onboarding.skipped ? (
+        <form method="post" action="/workspace/onboarding/resume">
+          <button type="submit">Show getting started again</button>
+        </form>
+      ) : null}
       {ui.pins.length > 0 ? (
         <div className="pins" role="region" aria-label="Pinned">
           <h2>Pinned</h2>
@@ -98,19 +106,12 @@ export function Today({ ui, data, dispatch, onLink }: ViewProps): ReactNode {
             );
           })}
         </ul>
-      ) : null}
-      <ul className="sources" aria-label="Where activity comes from">
-        {data.sources.map((source) => (
-          <li key={source.name} data-connected={source.connected ? "yes" : "no"}>
-            {source.href !== null ? <a href={source.href}>{source.words}</a> : source.words}
-          </li>
-        ))}
-      </ul>
-      {total === 0 && reason !== null ? (
-        <p className="empty" data-empty-reason>
-          {reason}
+      ) : (
+        <p className="empty" data-activity-reason data-empty-reason={total === 0 ? "" : undefined}>
+          {total === 0 && reason !== null ? reason : activityReason(data)}
         </p>
-      ) : null}
+      )}
+      <Moves moves={data.home.moves} assurance={data.home.assurance} />
     </section>
   );
 }

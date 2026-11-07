@@ -6,8 +6,10 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import type { NoteView } from "../../../capabilities/notes.ts";
-import { START, deskReducer, type Pin, type UiState } from "../attention.ts";
+import { START, deskReducer, type FirstMove, type Pin, type UiState } from "../attention.ts";
 import { Desk, type DeskIo } from "../Desk.tsx";
+import type { RemoteInfo } from "../RemotePanel.tsx";
+import type { WorkData } from "../work-build.ts";
 import { resolveKey } from "../keys.ts";
 import { POLL_MS, itemsOf, shiftDay, type DeskState, type SearchResult } from "../model.ts";
 
@@ -30,14 +32,21 @@ function write(key: string, value: unknown): void {
   }
 }
 
+/** The old addresses still open the right view: /workspace/approvals is Decide, /workspace/economics is Work. */
+function viewFromPath(): UiState["view"] {
+  const path = window.location.pathname;
+  return path.startsWith("/workspace/approvals") ? "decide" : path.startsWith("/workspace/economics") ? "work" : "today";
+}
+
 function initial(): UiState {
   const draft = read<string>(DRAFT_KEY, "");
-  return { ...START, pins: read<Pin[]>(PINS_KEY, []), composer: { ...START.composer, text: draft, selStart: draft.length, selEnd: draft.length } };
+  return { ...START, view: viewFromPath(), pins: read<Pin[]>(PINS_KEY, []), composer: { ...START.composer, text: draft, selStart: draft.length, selEnd: draft.length } };
 }
 
 function focusTarget(focus: string): HTMLElement | null {
   if (focus === "composer") return document.getElementById("composer-input");
   if (focus === "list") return document.querySelector<HTMLElement>('[data-focus="list"]');
+  if (focus === "decision") return document.querySelector<HTMLElement>("#decision-preview [data-autofocus]") ?? document.getElementById("decision-preview");
   if (focus.startsWith("layer:")) return document.querySelector<HTMLElement>(`#layer-${focus.slice(6)} [data-autofocus], #layer-${focus.slice(6)} button`);
   return null;
 }
@@ -53,6 +62,11 @@ function App() {
     const params = new URLSearchParams({ since: rev.current });
     if (current.day !== null) params.set("day", current.day);
     if (current.selection?.startsWith("note:")) params.set("note", current.selection);
+    const here = new URLSearchParams(window.location.search);
+    for (const key of ["receipt", "case_error"]) {
+      const value = here.get(key);
+      if (value !== null) params.set(key, value);
+    }
     try {
       const response = await fetch(`/desk/state.json?${params}`, { headers: { accept: "application/json" } });
       if (!response.ok) return;
@@ -76,6 +90,36 @@ function App() {
     rev.current = "";
     void poll();
   }, [ui.day, ui.selection, poll]);
+
+  // Work: the record keeper is slow to ask, so it is read when the view opens, when the question changes, and every 15 seconds.
+  const workKey = JSON.stringify(ui.workQuery);
+  const loadWork = useCallback(async () => {
+    const q = latest.current.workQuery;
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(q)) if (value) params.set(key, value);
+    try {
+      const response = await fetch(`/desk/work.json?${params}`, { headers: { accept: "application/json" } });
+      if (response.ok) dispatch({ type: "work", work: (await response.json()) as WorkData });
+    } catch {
+      // The last Work screen stays; the next read tries again.
+    }
+  }, []);
+  useEffect(() => {
+    if (ui.view !== "work") return;
+    void loadWork();
+    const timer = window.setInterval(() => void loadWork(), 15_000);
+    return () => window.clearInterval(timer);
+  }, [ui.view, workKey, loadWork]);
+
+  // The first move is built only when the first-run path reaches it, because building it makes a frame.
+  const wantsFirstMove = ui.data?.home.onboarding.visible === true && ui.data.home.onboarding.steps.find((step) => !step.done)?.id === "move";
+  useEffect(() => {
+    if (!wantsFirstMove || latest.current.firstMove !== undefined) return;
+    void fetch("/desk/first-move.json")
+      .then((r) => r.json() as Promise<{ firstMove: FirstMove | null }>)
+      .then((body) => dispatch({ type: "first-move", move: body.firstMove }))
+      .catch(() => dispatch({ type: "first-move", move: null }));
+  }, [wantsFirstMove]);
 
   useEffect(() => {
     write(DRAFT_KEY, ui.composer.text);
@@ -111,7 +155,7 @@ function App() {
       const current = latest.current;
       const action = resolveKey(
         { key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, shiftKey: event.shiftKey, targetTag: target?.tagName.toLowerCase() ?? "", editable: target?.isContentEditable === true },
-        { decisionCard: false },
+        { decisionCard: current.view === "decide" && (current.data?.decide.cards.some((c) => c.held === null) ?? false) },
       );
       if (action === null) return;
       const items = itemsOf(current.view, current.data, current.results);
@@ -148,8 +192,14 @@ function App() {
         case "keys-help":
           dispatch({ type: "open-layer", kind: "keys" });
           break;
-        case "preview":
-          return;
+        case "preview": {
+          // A, R and H only open the preview of the card under the cursor. Nothing is decided until Confirm.
+          const waiting = current.data?.decide.cards.filter((c) => c.held === null) ?? [];
+          const card = waiting[Math.min(current.cursor, waiting.length - 1)];
+          if (!card) return;
+          dispatch({ type: "preview-open", cardId: card.id, choice: action.choice });
+          break;
+        }
       }
       event.preventDefault();
     };
@@ -158,6 +208,36 @@ function App() {
   }, []);
 
   const io: DeskIo = {
+    decide: async (input) => {
+      try {
+        const response = await fetch("/desk/decide", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+        const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+        rev.current = "";
+        void poll();
+        return { ok: response.ok && body.ok === true, message: body.message ?? (response.ok ? "Done." : "Horizon could not send that decision. Nothing was done.") };
+      } catch {
+        return { ok: false, message: "Horizon did not answer, so the decision may not have been sent. Check Decide before trying again." };
+      }
+    },
+    saveLabel: async (fields) => {
+      try {
+        const response = await fetch("/workspace/label", { method: "POST", headers: { accept: "application/json" }, body: new URLSearchParams({ ...fields, return: "" }) });
+        const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+        void loadWork();
+        return response.ok && body.ok === true ? { ok: true } : { ok: false, message: body.message ?? "The label was not saved." };
+      } catch {
+        return { ok: false, message: "Horizon did not answer, so the label was not saved." };
+      }
+    },
+    remote: {
+      load: async () => {
+        const response = await fetch("/desk/remote.json");
+        return response.ok ? ((await response.json()) as RemoteInfo) : null;
+      },
+      act: async (action) => {
+        await fetch(`/workspace/remote/${action}`, { method: "POST", redirect: "manual" });
+      },
+    },
     saveNote: async (input) => {
       try {
         const response = await fetch("/desk/note", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });

@@ -1,11 +1,13 @@
 /** @jsxImportSource react */
 /** The left column: four views and the Days, Cases and Tags lists (design 5.1). */
-import type { ReactNode } from "react";
-import type { Action, UiState } from "./attention.ts";
+import { useState, type ReactNode } from "react";
+import { interruptionsOf, type Action, type UiState } from "./attention.ts";
 import { VIEWS, dayLabel, type DeskState } from "./model.ts";
 
 export function Nav({ ui, data, dispatch }: { readonly ui: UiState; readonly data: DeskState | null; readonly dispatch: (action: Action) => void }): ReactNode {
-  const waiting = data?.status.waiting ?? 0;
+  const counts = interruptionsOf(data).counts;
+  // On a phone the Days, Cases and Tags lists fold away so the composer stays within reach.
+  const [open, setOpen] = useState(false);
   return (
     <nav className="nav" aria-label="Views and lists">
       <ul className="views">
@@ -13,11 +15,15 @@ export function Nav({ ui, data, dispatch }: { readonly ui: UiState; readonly dat
           <li key={view.id}>
             <button type="button" aria-current={ui.view === view.id ? "page" : undefined} data-view={view.id} title={`${view.asks} (Ctrl+${index + 1})`} onClick={() => dispatch({ type: "view", view: view.id })}>
               {view.label}
-              {view.id === "decide" && waiting > 0 ? <span className="count"> ({waiting})</span> : null}
+              {counts[view.id] > 0 ? <span className="count" data-count={view.id}> ({counts[view.id]})</span> : null}
             </button>
           </li>
         ))}
       </ul>
+      <button type="button" className="nav-toggle" aria-expanded={open} aria-controls="nav-lists" onClick={() => setOpen(!open)}>
+        {open ? "Hide days, cases and tags" : "Days, cases and tags"}
+      </button>
+      <div id="nav-lists" className="nav-lists" data-open={open ? "true" : "false"}>
       <h2>Days</h2>
       {data === null || data.days.length === 0 ? (
         <p className="empty">No days yet. Write a note in the box below to start today.</p>
@@ -61,6 +67,7 @@ export function Nav({ ui, data, dispatch }: { readonly ui: UiState; readonly dat
         </ul>
       )}
       {data !== null && ui.day !== null && ui.day !== data.today ? <p className="muted">Showing {dayLabel(ui.day)}.</p> : null}
+      </div>
     </nav>
   );
 }
