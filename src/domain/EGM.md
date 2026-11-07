@@ -16,8 +16,8 @@ The module set keeps the architecture's distinctions separate rather than mergin
 - **intent** — `intent.ts` (typed `CommitIntentInput`, stale-frame and duplicate guard).
 - **expectation / settlement** — `expectation.ts` (frozen expected outcome, verifier templates,
   window, discrimination, three-valued evidence classification, epistemic status).
-- **approval inbox** — `approval-inbox.ts` (validates SEA-Forge's `authority_approvals` rows, groups
-  them, and says which decisions may be offered; it never decides). The desk shows them as decision
+- **approval inbox** — `approval-inbox.ts` (receives the rows the Cognate SDK client validated, counts the
+  excluded ones, groups them, and says which decisions may be offered; it never decides). The desk shows them as decision
   cards (`src/ui/desk/decide-build.ts`).
 - **payment** — `payment.ts` (currency vector, declared bounds, capacity ledger, the payment gate).
 - **debugger** — `debugger.ts` (seven read-only questions, each value labelled with its class).

@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { seaForgeActorOf } from "../src/adapters/sea-forge-approvals.ts";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { seaForgeActorOf } from "../src/adapters/sea-forge-config.ts";
+import { existsSync, symlinkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { userInfo, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -24,6 +24,8 @@ import {
   excludeReason,
   renderPlanTsv,
   resolveLayout,
+  resetStageDir,
+  STAGE_MARKER,
   stageRuntime,
   statusRecord,
   unitFiles,
@@ -287,6 +289,12 @@ describe("unit files", () => {
   const gw = units[UNIT_GATEWAY]!;
   const rt = units[UNIT_RUNTIME]!;
 
+  test("the gateway unit kills its whole control group on stop, within a bounded time (sea-rs#86)", () => {
+    expect(gw).toContain("\nKillMode=control-group\n");
+    expect(gw).toContain("\nTimeoutStopSec=30\n");
+    expect(rt).not.toContain("KillMode=");
+  });
+
   test("the gateway unit runs as the configured account with the hardening set", () => {
     expect(gw).toContain(`User=${FAKE.HORIZON_GATEWAY_ACCOUNT}`);
     expect(gw).toContain("NoNewPrivileges=yes");
@@ -296,6 +304,18 @@ describe("unit files", () => {
     expect(gw).toContain(`ExecStart=${layout.binPath}`);
     expect(gw).toContain(`ReadWritePaths=${layout.gatewayStateDir} ${layout.socketDir}`);
     expect(gw).toContain(`ReadOnlyPaths=${layout.gatewayStateDir}/server.yaml ${layout.gatewayStateDir}/policy.yaml`);
+  });
+
+  test("the gateway unit recreates its socket directory before each start, matching the plan's dir row", () => {
+    // /run is emptied at boot; without this the sandbox cannot be set up and the gateway never starts again.
+    const dirRow = buildPlan(layout).find((r) => r[0] === "dir" && r[4]?.endsWith(layout.socketDir));
+    expect(dirRow).toBeDefined();
+    const [, owner, group, mode] = dirRow!;
+    const pre = `ExecStartPre=+/usr/bin/install -d -o ${owner} -g ${group} -m ${mode} ${layout.socketDir}`;
+    expect(gw).toContain(pre);
+    expect(gw.indexOf(pre)).toBeLessThan(gw.indexOf(`ExecStart=${layout.binPath}`));
+    // Only the directory step runs unsandboxed; the server's own ExecStart carries no privilege prefix.
+    expect(gw).not.toMatch(/^ExecStart=[+!]/m);
   });
 
   test("the runtime unit runs as the runtime account, requires the gateway, and is governed", () => {
@@ -388,6 +408,7 @@ describe("installer (shell) against a temporary root", () => {
   const bunSha = createHash("sha256").update(readFileSync(bunBin)).digest("hex");
   const env = { ...process.env, HORIZON_GATEWAY_ROOT: root, ...FAKE, HORIZON_OPERATOR_ACCOUNT: "" };
 
+  const seamEnv = { ...env, INSTALLER_TEST_MODE: "1", INSTALLER_TEST_PLAN_TABLE: join(stage, "plan.tsv") }; // fake accounts and a temp root are not in the fixed table
   const run = async (args: string[], e: Record<string, string | undefined> = env) => {
     const p = Bun.spawn(["bash", resolve(repoRoot, "scripts/install-sea-forge-gateway.sh"), ...args], {
       env: e as Record<string, string>,
@@ -409,7 +430,7 @@ describe("installer (shell) against a temporary root", () => {
     const tsDigest = /bundle digest: ([0-9a-f]{64})/.exec(stdout)?.[1];
     expect(tsDigest).toBeDefined();
 
-    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", sha, "--bun", bunBin, "--bun-sha256", bunSha]);
+    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", sha, "--bun", bunBin, "--bun-sha256", bunSha], seamEnv);
     expect(dry.code).toBe(0);
     expect(dry.out).toContain(`stage digest: ${tsDigest}`);
     expect(dry.out).toContain("no changes made");
@@ -430,7 +451,7 @@ describe("installer (shell) against a temporary root", () => {
 
   test("checksum mismatch is refused in dry-run and in authorized mode", async () => {
     const wrong = "0".repeat(64);
-    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", wrong]);
+    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", wrong], seamEnv);
     expect(dry.code).toBe(1);
     expect(dry.err).toContain("not copied");
     const apply = await run(["--authorize-privileged", "--stage", stage, "--binary", bin, "--sha256", wrong, "--expect-stage-sha256", "x"]);
@@ -439,7 +460,7 @@ describe("installer (shell) against a temporary root", () => {
   });
 
   test("a bun checksum mismatch is refused before anything is copied", async () => {
-    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", sha, "--bun", bunBin, "--bun-sha256", "0".repeat(64)]);
+    const dry = await run(["--dry-run", "--stage", stage, "--binary", bin, "--sha256", sha, "--bun", bunBin, "--bun-sha256", "0".repeat(64)], seamEnv);
     expect(dry.code).toBe(1);
     expect(dry.err).toContain("bun");
     expect(dry.err).toContain("not copied");
@@ -457,7 +478,7 @@ describe("installer (shell) against a temporary root", () => {
     const copy = join(tempDir("tamper"), "bundle");
     rmSync(copy, { recursive: true, force: true });
     mkdirSync(copy, { recursive: true });
-    for (const f of ["plan.tsv", "runtime-manifest.sha256", "status.json"]) writeFileSync(join(copy, f), readFileSync(join(stage, f)));
+    for (const f of ["plan.tsv", "runtime-manifest.sha256", "runtime-symlinks.tsv", "status.json"]) writeFileSync(join(copy, f), readFileSync(join(stage, f)));
     mkdirSync(join(copy, "units"));
     for (const f of readdirSync(join(stage, "units"))) writeFileSync(join(copy, "units", f), readFileSync(join(stage, "units", f)));
     mkdirSync(join(copy, "config"));
@@ -563,6 +584,26 @@ describe("server.yaml and policy.yaml (rendered from the runtime account's uid, 
     expect(() => renderPolicyYaml('bad"id')).toThrow();
   });
 
+  test("external settlement declarations escalate to an operator before the plain allow, and local ones are not gated", async () => {
+    const policy = renderPolicyYaml(await navigationCommitId());
+    // Rules are first-match in file order: each gate must come before the ungated fallback.
+    const plain = policy.indexOf("name: settlement, verdict: allow");
+    expect(plain).toBeGreaterThan(-1);
+    expect(policy.indexOf("name: settlement-external-approval\n")).toBeGreaterThan(-1);
+    expect(policy.indexOf("name: settlement-external-approval\n")).toBeLessThan(plain);
+    expect(policy.indexOf("name: settlement-external-approval-operator")).toBeLessThan(plain);
+    // Each gate matches only external declarations and requires approval.
+    const gated = policy.split("  - name: settlement-external-approval").slice(1);
+    expect(gated).toHaveLength(2);
+    for (const block of gated) {
+      expect(block).toContain("requires_approval: true");
+      expect(block).toContain("operation_kind: settlement_declaration");
+      expect(block).toContain("settlement_authority_class: [external]");
+    }
+    // The fallback allow carries no class constraint, so it still covers local declarations.
+    expect(policy.split("\n").find((line) => line.includes("name: settlement, verdict: allow"))).not.toMatch(/boundary|external/);
+  });
+
   test("the plan renders server.yaml and policy.yaml from templates and copies the worlds, with gateway-owned realitytrace homes", () => {
     const rows = buildPlan(layout);
     const cfg = rows.filter((r) => r[0] === "config-file");
@@ -592,5 +633,42 @@ describe("server.yaml and policy.yaml (rendered from the runtime account's uid, 
     const dev = layoutFor(root, {}, true);
     expect(renderServerYaml(serverConfig(dev, files, 4242))).toBe(render(4242));
     expect(statusRecord(dev).environment).toBe("development");
+  });
+});
+
+describe("stage ownership and pinned directories", () => {
+  test("the stager lists every runtime directory as a dir line", () => {
+    const repo = tempDir("dirs-repo");
+    mkdirSync(join(repo, "src", "deep"), { recursive: true });
+    writeFileSync(join(repo, "src", "deep", "a.ts"), "x\n");
+    const { symlinkManifest } = stageRuntime(repo, join(tempDir("dirs-out"), "runtime"), ["src"]);
+    expect(symlinkManifest).toBe("dir\tsrc\ndir\tsrc/deep\n");
+  });
+
+  test("resetStageDir empties a stage (has plan.tsv), creates a missing dir, and refuses a non-stage", () => {
+    const old = tempDir("reset-old");
+    writeFileSync(join(old, STAGE_MARKER), "horizon gateway stage v1\n");
+    writeFileSync(join(old, "stray.bak"), "x\n");
+    resetStageDir(old);
+    expect(readdirSync(old)).toEqual([]);
+    const fresh = join(tempDir("reset-new"), "stage");
+    resetStageDir(fresh);
+    expect(existsSync(fresh)).toBe(true);
+    const notStage = tempDir("reset-notstage");
+    writeFileSync(join(notStage, "precious.txt"), "x\n");
+    expect(() => resetStageDir(notStage)).toThrow(/does not look like a stage/);
+    expect(existsSync(join(notStage, "precious.txt"))).toBe(true);
+    const planOnly = tempDir("reset-planonly");
+    writeFileSync(join(planOnly, "plan.tsv"), "x\n");
+    expect(() => resetStageDir(planOnly)).toThrow(/does not look like a stage/); // a plan.tsv alone is not enough
+    const symPlan = tempDir("reset-symplan");
+    writeFileSync(join(symPlan, "real"), "horizon gateway stage v1\n");
+    symlinkSync(join(symPlan, "real"), join(symPlan, STAGE_MARKER));
+    expect(() => resetStageDir(symPlan)).toThrow(/does not look like a stage/);
+    expect(existsSync(join(symPlan, "real"))).toBe(true);
+    const target = tempDir("reset-target");
+    const link = join(tempDir("reset-link"), "l");
+    symlinkSync(target, link);
+    expect(() => resetStageDir(link)).toThrow(/symlink/);
   });
 });

@@ -13,7 +13,8 @@
  * A preview code is the `RecordDigest[]` a card was built from. Digests are read from the case keeper, never computed here
  * (docs/reference/sfwp-protocol-reference.md section 5.2).
  */
-import { seaForgeCall, type SeaForgeActor } from "./sea-forge-approvals.ts";
+import { seaForgeCall } from "./sea-forge-wire.ts";
+import type { SeaForgeActor } from "./sea-forge-config.ts";
 import { redact } from "./redact.ts";
 
 /** The policy file the cell writes (ignite) and the case keeper must be told to read; its own default name is different. */

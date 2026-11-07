@@ -5,7 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ApprovalAuthority } from "../src/adapters/sea-forge-approvals.ts";
+import type { ApprovalAuthority } from "../src/adapters/sea-forge-config.ts";
 import { latestDay } from "../src/adapters/ledger-day.ts";
 import { START, deskReducer, type UiState } from "../src/ui/desk/attention.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";

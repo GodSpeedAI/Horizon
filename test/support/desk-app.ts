@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApplication, type HorizonApplication } from "../../src/app.ts";
 import type { RecordReader, EconomicsSource } from "../../src/adapters/realitytrace-economics.ts";
-import type { ApprovalAuthority } from "../../src/adapters/sea-forge-approvals.ts";
+import type { ApprovalAuthority } from "../../src/adapters/sea-forge-config.ts";
 import type { Access } from "../../src/adapters/workshop.ts";
 import { horizonDocument, writeConfig } from "./config.ts";
 

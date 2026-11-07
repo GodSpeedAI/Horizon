@@ -24,7 +24,7 @@ import { SANDBOX_REPO, argValue, readMarker, setupMapping, setupTenant, type Set
 import { configFromDocument, operatorPrincipal } from "../src/config/load.ts";
 import { DEFAULT_WORKSHOP_TIMEOUT_MS, workshopAccess, workshopFailure, type Access } from "../src/adapters/workshop.ts";
 import { RealityTraceObligation, type DeclaredThreshold } from "../src/adapters/realitytrace-obligation.ts";
-import { seaForgeCall } from "../src/adapters/sea-forge-approvals.ts";
+import { seaForgeCall } from "../src/adapters/sea-forge-wire.ts";
 import { reasonOf } from "../src/adapters/sea-forge-case.ts";
 import { runChild } from "../src/adapters/run-child.ts";
 import { saveNote, search, type Who } from "../src/capabilities/notes.ts";

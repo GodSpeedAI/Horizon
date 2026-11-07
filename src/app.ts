@@ -2,13 +2,13 @@ import { reconcilePending } from "./capabilities/pending-reconcile.ts";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createIdentityService, type IdentityService } from "@godspeed/identity";
-import { delegatingAuthority, delegationSender } from "./adapters/delegating-authority.ts";
+import { delegatingAuthority } from "./adapters/delegating-authority.ts";
 import { identityStoreOf } from "./remote/identity-store.ts";
 import { OperatorActors, resolveOperatorsConfig, validateOperatorActors } from "./remote/operators.ts";
 import { statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type { Caller } from "@godspeedai/cognate-runtime-api";
-import { governanceFromEnv, type GovernanceOptions } from "@godspeedai/cognate-runtime-bun";
+import { governanceFromEnv, SeaForgeAuthority, type GovernanceOptions } from "@godspeedai/cognate-runtime-bun";
 import { loadWorld, type LoadedWorld } from "./adapters/semantic.ts";
 import { observeResearch, requireResearch, type ResearchStatus } from "./adapters/research.ts";
 import { economicsFromEnv, loadConfig } from "./config/load.ts";
@@ -32,7 +32,7 @@ import type { CandidateOperation } from "./domain/navigation.ts";
 import type { ObservedPayment } from "./domain/payment.ts";
 import { structuralObservationAgent, healthAgent, HEALTH_AGENT, type StructuralObservationRequest } from "./agents/health.ts";
 import { navigationCommitAgent, NAVIGATION_COMMIT_AGENT, type NavigationCommitOutput } from "./agents/navigation-commit.ts";
-import { approvalAuthorityFromEnv, listApprovals, resolveApproval, seaForgeCall, type ApprovalAuthority } from "./adapters/sea-forge-approvals.ts";
+import { approvalAuthorityFromEnv, type ApprovalAuthority } from "./adapters/sea-forge-config.ts";
 import { buildInbox, type InboxReadout } from "./domain/approval-inbox.ts";
 import { authorityOf, defaultRealityTraceRepo, observationOutbox, realityTraceFromEnv, RealityTraceEvidence, type GovernedInvocation, type RealityTraceConfig, type SettlementAuthority } from "./adapters/settlement.ts";
 import { appendSettlement, latestSettlement, type ExecutionRecord, type NavigationSettlement, type RealityTraceObservation, type SettlementReference } from "./capabilities/navigation-settlement.ts";
@@ -112,6 +112,35 @@ import { remoteSettings } from "./remote/settings.ts";
 import { qrSvg, remotePanelPage } from "./remote/panel.ts";
 
 type HttpServer = Server<unknown>;
+
+/** The decision was recorded by SEA-Forge, but a step after it (polling, settling the commit) failed. Same message as the original error. */
+export class ApprovalFollowUpError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApprovalFollowUpError";
+  }
+}
+
+/** Run the steps that follow a decision SEA-Forge has already recorded; any failure but a refused commit becomes an ApprovalFollowUpError. */
+export async function afterRecordedDecision<T>(steps: () => Promise<T>): Promise<T> {
+  try {
+    return await steps();
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("INTENT: governed commit refused")) throw error;
+    throw new ApprovalFollowUpError(error instanceof Error ? error.message : String(error));
+  }
+}
+
+/** The fixed outcome codes a refused or failed decision maps to. The caller owns the copy; no error text travels in a URL. */
+export type InboxErrorCode = "refused" | "not_pending" | "invalid" | "unavailable" | "followup_failed" | "unknown";
+
+export function approvalErrorCode(error: unknown): InboxErrorCode {
+  if (error instanceof ApprovalFollowUpError) return "followup_failed";
+  const message = error instanceof Error ? error.message : "";
+  if (/already decided|no governed commit waits|does not belong/.test(message)) return "not_pending";
+  if (/^APPROVAL: /.test(message)) return "refused";
+  return "unavailable";
+}
 
 /** The frame this application most recently issued and the gates assessed on it. */
 /**
@@ -321,8 +350,8 @@ export async function createApplication(
      * session's SEA-Forge actor. Absent in both: the single-operator development default.
      */
     readonly operators?: OperatorsConfig;
-    /** The wire to SEA-Forge for delegated (`on_behalf_of`) commits. Injected by tests; defaults to the Unix socket. */
-    readonly delegationSend?: (request: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    /** The client for delegated (`on_behalf_of`) commits. Injected by tests; defaults to the gateway client. */
+    readonly delegationClient?: Pick<SeaForgeAuthority, "decide">;
     /** Stage 4: how work is handed to a workshop agent. Injected by tests; defaults to the workshop named in the config and its key file. */
     readonly workshop?: () => Access;
   } = {},
@@ -342,6 +371,11 @@ export async function createApplication(
   let operatorActors: OperatorActors | null = null;
   const serviceActor = approvals?.service ?? { actor_id: process.env.COGNATE_SEA_FORGE_ACTOR?.trim() || "cognate-service", role: "service" };
   const delegationSocket = options.seaForgeSocket ?? approvals?.socketPath ?? process.env.COGNATE_SEA_FORGE_SOCKET?.trim() ?? "";
+  // One gateway client serves delegation, resolution, the inbox listing and closure: the Cognate SDK owns the wire.
+  const seaForge =
+    approvals !== undefined || (configured.mode === "sea-forge" && configured.authority !== undefined)
+      ? new SeaForgeAuthority({ socketPath: delegationSocket, actor: serviceActor, requestIdPrefix: "horizon", ...(approvals?.timeoutMs === undefined ? {} : { timeoutMs: approvals.timeoutMs }) })
+      : undefined;
   const governance: GovernanceOptions =
     configured.mode === "sea-forge"
       ? {
@@ -354,7 +388,7 @@ export async function createApplication(
                   service: serviceActor,
                   actors: () => operatorActors,
                   serverPrincipalId: caller.actor.id,
-                  send: options.delegationSend ?? delegationSender(delegationSocket),
+                  client: options.delegationClient ?? seaForge!,
                 }),
               }),
         }
@@ -422,7 +456,7 @@ export async function createApplication(
   let issued: FrameView | null = null;
   let boundChoices: readonly StructuralChoice[] = [];
   const windowTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  const closureSocket = options.seaForgeSocket ?? approvals?.socketPath ?? process.env.COGNATE_SEA_FORGE_SOCKET?.trim() ?? "";
+  const closureSocket = delegationSocket;
 
   /**
    * Bound operations as frame choices. At frame time no expectation exists, so settlement readiness is assessed
@@ -572,9 +606,13 @@ export async function createApplication(
       if (terminal(run.status) && run.status !== "completed") return settleCommitRun(intent, run);
       throw new Error(`APPROVAL: ${request.approvalId} was already decided (run ${run.status})`);
     }
-    await resolveApproval(authority, request);
-    await runtime.runtime.pollApprovals();
-    return settleCommitRun(intent, await runOutcome(run.runId, terminal));
+    const resolved = await seaForge!.resolveApproval({ approvalId: request.approvalId, resolution: request.resolution, onBehalfOf: authority.operator });
+    if (!resolved.ok) throw new Error(`APPROVAL: SEA-Forge refused the resolution: ${resolved.error === "no detail" ? resolved.errorClass : resolved.error}`);
+    // SEA-Forge has recorded the decision. A failure from here on must not read as "not recorded".
+    return afterRecordedDecision(async () => {
+      await runtime.runtime.pollApprovals();
+      return settleCommitRun(intent, await runOutcome(run.runId, terminal));
+    });
   }
 
   /** Append a settlement record for an executed intent, keeping the RealityTrace observation already recorded. */
@@ -600,14 +638,14 @@ export async function createApplication(
 
   /** The execution trace, as RealityTrace recorded it, submitted to SEA-Forge: SEA-Forge's execution floor. */
   async function submitExecutionEvidence(intentId: string, invocation: GovernedInvocation, authority: NonNullable<ReturnType<typeof authorityOf>>): Promise<void> {
-    const seaForge = governance.authority as Partial<SettlementAuthority> | undefined;
-    if (!evidence || typeof seaForge?.submitEvidence !== "function") throw new Error("RealityTrace and SEA-Forge evidence submission are both required");
+    const settlementAuthority = governance.authority as Partial<SettlementAuthority> | undefined;
+    if (!evidence || typeof settlementAuthority?.submitEvidence !== "function") throw new Error("RealityTrace and SEA-Forge evidence submission are both required");
     const prior = await latestSettlement(runtime.runtime.store, caller.tenant, intentId);
     if (prior?.realitytrace_observation) return;
     const targetRef = await evidence.observe(invocation);
     const derived = await evidence.evidenceFor(targetRef);
     const packet = await evidence.packet(authority.worldRef, authority, derived);
-    const receipt = await seaForge.submitEvidence(packet);
+    const receipt = await settlementAuthority.submitEvidence(packet);
     if (!receipt.ok) throw new Error(`SEA-Forge refused the execution evidence: ${receipt.errorClass}: ${receipt.error}`);
     await recordSettlementFor(
       intentId,
@@ -653,8 +691,8 @@ export async function createApplication(
     const authority = invocation ? authorityOf(invocation) : undefined;
     if (!invocation || !authority) return unavailable("the commit carries no recorded SEA-Forge decision");
     execution = { ...execution, invocation_event_id: invocation.eventId, operation_id: authority.operationId };
-    const seaForge = governance.authority as Partial<SettlementAuthority> | undefined;
-    if (typeof seaForge?.submitEvidence !== "function" || typeof seaForge.settle !== "function") return unavailable("the configured authority cannot settle");
+    const settlementAuthority = governance.authority as Partial<SettlementAuthority> | undefined;
+    if (typeof settlementAuthority?.submitEvidence !== "function" || typeof settlementAuthority.settle !== "function") return unavailable("the configured authority cannot settle");
     if (!evidence) return unavailable("RealityTrace is not configured (COGNATE_REALITYTRACE_BIN)");
 
     // Ruling before observation is refused without writing a record: nothing was observed, so nothing is settled.
@@ -664,7 +702,7 @@ export async function createApplication(
         const targetRef = await evidence.observe(invocation);
         const derived = await evidence.evidenceFor(targetRef);
         const packet = await evidence.packet(authority.worldRef, authority, derived);
-        const receipt = await seaForge.submitEvidence(packet);
+        const receipt = await settlementAuthority.submitEvidence(packet);
         if (!receipt.ok) return refused(`SEA-Forge refused the evidence: ${receipt.errorClass}: ${receipt.error}`);
         observation = { target_ref: targetRef, sxr_observation_id: derived.sxrObservationId, evidence_id: derived.evidenceId, evidence_packet_id: receipt.envelopeId, evidence_ledger_entry: receipt.ledgerEntry };
       } catch (error) {
@@ -673,7 +711,7 @@ export async function createApplication(
     }
     // The observation step stops here: SEA-Forge has the evidence but has not ruled on it yet.
     if (phase === "observe") return record({ status: "pending", final: false, envelope_id: null, ledger_entry: null, reason: "RealityTrace observed the commit; SEA-Forge has not ruled yet" });
-    const settled = await seaForge.settle(authority.operationId, authority.worldRef);
+    const settled = await settlementAuthority.settle(authority.operationId, authority.worldRef);
     if (!settled.ok) {
       return settled.errorClass === "unreachable" ? unavailable(`SEA-Forge: ${settled.error}`) : refused(`SEA-Forge refused the settlement: ${settled.errorClass}: ${settled.error}`);
     }
@@ -812,20 +850,20 @@ export async function createApplication(
       pending = await closeWindow(obligationDeps, pending, {
         closure: async (operationId, discrimination, verifications) => {
           if (!closureSocket || !approvals) throw new Error("no SEA-Forge socket is configured for authority_closure");
-          const response = await seaForgeCall(closureSocket, { verb: "authority_closure", operation_id: operationId, discrimination_observation_id: discrimination, verification_observation_ids: verifications, request_id: `horizon:closure:${operationId}`, actor: approvals.service }, 30_000);
-          if (response.ok !== true) throw new Error(`SEA-Forge refused the closure: ${String(response.error ?? response.error_class)}`);
-          return { b: Number(response.b), c: Number(response.c), committed_at: String(response.committed_at), on_time: response.on_time === true };
+          const closed = await seaForge!.authorityClosure({ operationId, discriminationObservationId: discrimination, verificationObservationIds: verifications, timeoutMs: 30_000 });
+          if (!closed.ok) throw new Error(`SEA-Forge refused the closure: ${closed.error === "no detail" ? closed.errorClass : closed.error}`);
+          return { b: closed.b, c: closed.c, committed_at: closed.committed_at, on_time: closed.on_time };
         },
       });
     } catch (error) {
       // Without a recorded closure SEA-Forge still settles once deadline + grace passed: unresolved, rejected.
       await recordSettlementFor(intentId, { status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason: `closure: ${error instanceof Error ? error.message : String(error)}` });
     }
-    const seaForge = governance.authority as Partial<SettlementAuthority> | undefined;
+    const settlementAuthority = governance.authority as Partial<SettlementAuthority> | undefined;
     const worldRef = (await governedInvocationOf(intentId).then((inv) => (inv ? authorityOf(inv)?.worldRef : undefined))) ?? world.cognateWorldRef;
-    if (typeof seaForge?.settle !== "function") return recordSettlementFor(intentId, { status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason: "the configured authority cannot settle" });
+    if (typeof settlementAuthority?.settle !== "function") return recordSettlementFor(intentId, { status: "unavailable", final: false, envelope_id: null, ledger_entry: null, reason: "the configured authority cannot settle" });
     // "Settlement is pending" means SEA-Forge has not recorded the closure yet: wait for it (bounded by window close + grace), never refuse.
-    const settle = seaForge.settle.bind(seaForge);
+    const settle = settlementAuthority.settle.bind(settlementAuthority);
     const deadlineAt = Date.parse(pending.window!.closes_at) +(obligationDeps.settlement?.close_grace_s ?? 0) * 1000;
     const settled = await settleAwaitingClosure(() => settle(pending.operation_id!, worldRef), { deadlineAt });
     if (!settled.ok) {
@@ -1047,9 +1085,9 @@ export async function createApplication(
         .map((c) => (c.condition as { approvalId?: unknown } | null)?.approvalId)
         .filter((id): id is string => typeof id === "string"),
     );
-    const listed = await seaForgeCall(closureSocket, { verb: "authority_approvals", actor: approvals.service }, 15_000);
-    if (listed.ok !== true || !Array.isArray(listed.approvals)) return null;
-    const decided = (listed.approvals as { approval_id?: unknown; resolved_by?: unknown }[]).filter((a) => typeof a.approval_id === "string" && waited.has(a.approval_id) && a.resolved_by !== null && a.resolved_by !== undefined);
+    const listed = await seaForge!.listApprovals({ timeoutMs: 15_000 });
+    if (!listed.ok) return null;
+    const decided = listed.approvals.filter((a) => waited.has(a.approval_id) && a.resolved_by !== null);
     const unit = bindingFor((run.input as { intent: { operation_ref: string } }).intent.operation_ref)?.payment.find((entry) => entry.currency === "steering_attention" && entry.basis === "declared_bound")?.unit ?? "decisions";
     return { currency: "steering_attention", unit, amount: decided.length, source_ref: "sea-forge:authority_approvals" };
   }
@@ -1207,9 +1245,10 @@ export async function createApplication(
   async function approvalInbox(now: Date = new Date()): Promise<InboxReadout> {
     if (!approvals) return { state: "not_configured" };
     try {
-      const rows = await listApprovals(approvals);
+      const listed = await seaForge!.listApprovals({ timeoutMs: approvals.timeoutMs ?? 15_000 });
+      if (!listed.ok) return { state: "unreachable", message: `${listed.errorClass}: ${listed.error}` };
       const waiting = new Set((await readIntentAttempts(runtime.runtime.store)).flatMap((entry) => (entry.outcome === "awaiting_authority" && entry.approvalId ? [entry.approvalId] : [])));
-      return { state: "listed", inbox: buildInbox(rows, { now, waitingApprovalIds: waiting, operatorRef: caller.actor.id }) };
+      return { state: "listed", inbox: buildInbox(listed.approvals, listed.excluded, { now, waitingApprovalIds: waiting, operatorRef: caller.actor.id }) };
     } catch (error) {
       return { state: "unreachable", message: error instanceof Error ? error.message : String(error) };
     }

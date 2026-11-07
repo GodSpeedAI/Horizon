@@ -6,7 +6,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { seaForgeCall } from "../src/adapters/sea-forge-approvals.ts";
+import { seaForgeCall } from "../src/adapters/sea-forge-wire.ts";
 import { keyState } from "../src/adapters/workshop.ts";
 import { configFromDocument } from "../src/config/load.ts";
 import { SETUP_NAMES, argValue, setupMapping, type SetupMapping, type SetupName } from "../src/config/setup.ts";

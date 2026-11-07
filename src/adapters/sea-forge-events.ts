@@ -10,7 +10,7 @@
  *
  * The stage 4 GitHub connector reuses this follower.
  */
-import { seaForgeCall } from "./sea-forge-approvals.ts";
+import { seaForgeCall } from "./sea-forge-wire.ts";
 
 export interface EventFrame {
   readonly cursor: string;

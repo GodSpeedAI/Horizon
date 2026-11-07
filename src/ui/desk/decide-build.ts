@@ -264,7 +264,7 @@ export function buildDecide(input: DecideInput): DecideState {
   if (input.inbox.state === "not_configured") notices.push("No approver is set up, so decisions that need an approver cannot be answered here.");
   else if (input.inbox.state === "unreachable") notices.push(plainWords(`The case keeper did not list the decisions waiting for you, so some may be missing. ${input.inbox.message}`));
   else {
-    if (input.inbox.inbox.malformed > 0) notices.push(`${input.inbox.inbox.malformed} entries from the case keeper could not be read and are not shown.`);
+    if (input.inbox.inbox.excluded > 0) notices.push(`${input.inbox.inbox.excluded} entries from the case keeper could not be read and are not shown.`);
     for (const item of input.inbox.inbox.waiting) cards.push(escalationCard(item, moveOfApproval.get(item.approval_id)));
   }
   if (input.caseApprovals.kind === "notice") notices.push(plainWords(input.caseApprovals.words));

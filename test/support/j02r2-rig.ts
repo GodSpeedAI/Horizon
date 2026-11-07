@@ -10,7 +10,8 @@ import { dirname, join, relative } from "node:path";
 import { governanceFromEnv } from "@godspeedai/cognate-runtime-bun";
 import { createApplication, type HorizonApplication } from "../../src/app.ts";
 import { loadWorld } from "../../src/adapters/semantic.ts";
-import { approvalAuthority, seaForgeCall } from "../../src/adapters/sea-forge-approvals.ts";
+import { seaForgeCall } from "./sea-forge-raw.ts";
+import { approvalAuthority } from "../../src/adapters/sea-forge-config.ts";
 import { NAVIGATION_INTENT_COMMIT } from "../../src/capabilities/navigation-intent.ts";
 import { readPending } from "../../src/capabilities/pending-intent.ts";
 import { CURRENCIES, type Currency } from "../../src/domain/payment.ts";
@@ -158,7 +159,7 @@ export async function cell(commit: "allow" | "deny" | "escalate", options: { com
   const open = async () => {
     // The tenant is per host; resolve it from a first app so the verifier template names the real one.
     const configPath = await writeConfig(join(root, "horizon.toml"), JSON.parse(JSON.stringify(doc).replaceAll(TENANT_PLACEHOLDER, tenantOf())));
-    const app = await createApplication({ configPath, governance, approvals: approvalAuthority({ socketPath: socket, operatorId: "operator" }), realityTrace: rt, seaForgeSocket: socket });
+    const app = await createApplication({ configPath, governance, approvals: approvalAuthority({ socketPath: socket, operatorId: "actor:operator" }), realityTrace: rt, seaForgeSocket: socket });
     cleanups.push(() => void app.close());
     return app;
   };

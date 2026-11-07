@@ -139,7 +139,41 @@ function enforceDirection(): void {
   }
 }
 
+/**
+ * INV2 detection: src/ never speaks the SEA-Forge wire itself. The Cognate SDK client (`SeaForgeAuthority`)
+ * is the only socket client. Plain regexes over every .ts/.tsx file under src/, so comments match too
+ * (that errs toward failing). test/, scripts/, markdown and node_modules are not scanned.
+ */
+const WIRE_TEETH: readonly { name: string; pattern: RegExp }[] = [
+  { name: "socket construction", pattern: /\bBun\.connect\s*\(/ },
+  { name: "Unix-socket address", pattern: /\bunix\s*:/ },
+  { name: "hand-written SFWP message", pattern: /\bverb\s*:\s*["'](authority_|system\.)/ },
+];
+
+/**
+ * The two files that may open the SEA-Forge socket themselves: the desk's case-keeper call and its event
+ * follower. The SDK client has no `case_*` verbs and no event stream, so these are not governance verbs; every
+ * authority verb (decide, approvals, closure, settle) still goes through the SDK client, and the teeth below
+ * still reject a socket anywhere else under src/.
+ */
+const WIRE_ALLOWED: ReadonlySet<string> = new Set(["src/adapters/sea-forge-wire.ts", "src/adapters/sea-forge-events.ts"]);
+
+function rejectHandWrittenWire(): void {
+  let scanned = 0;
+  walk(join(root, "src"), (path) => {
+    if (!/\.tsx?$/.test(path)) return;
+    scanned += 1;
+    if (WIRE_ALLOWED.has(relative(root, path).split("\\").join("/"))) return;
+    const text = readFileSync(path, "utf8");
+    for (const tooth of WIRE_TEETH) {
+      if (tooth.pattern.test(text)) fail(`BOUNDARY: ${tooth.name} in ${relative(root, path)} (${tooth.pattern}); use the Cognate SDK SeaForgeAuthority client`);
+    }
+  });
+  if (scanned === 0) fail("BOUNDARY: the wire scan read no files under src/; it would pass vacuously");
+}
+
 requireCognatePackages();
+rejectHandWrittenWire();
 rejectCompetingModel();
 rejectDuplicateSemanticAuthority();
 requireCanonicalDomainLink();

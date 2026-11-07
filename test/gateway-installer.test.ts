@@ -1,0 +1,519 @@
+// The installer installs only what the stage digest and hashes bind (M1-M3 of the PR #18 review).
+// Runs the real script with --verify-only (snapshot + digest + tree checks; no root, no install steps) on a small stage.
+import { afterAll, describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { buildPlan, resolveLayout, stageDigest, stageRuntime } from "../scripts/gateway-setup.ts";
+
+const SCRIPT = resolve(import.meta.dir, "../scripts/install-sea-forge-gateway.sh");
+const dirs: string[] = [];
+const tmp = (p: string) => {
+  const d = mkdtempSync(join(tmpdir(), `gwi-${p}-`));
+  dirs.push(d);
+  return d;
+};
+afterAll(() => {
+  for (const d of dirs) rmSync(d, { recursive: true, force: true });
+});
+const sha = (b: string | Buffer) => createHash("sha256").update(b).digest("hex");
+
+/** The installer's fixed PLAN_TABLE, copied here on purpose: the table is a required set, so a stage must carry every row once, in order. */
+const PLAN_ROWS = [
+      "account\tgodspeed-sea-forge\tgateway",
+      "account\tgodspeed-horizon\truntime",
+      "group\tgodspeed-sock",
+      "member\tgodspeed-sea-forge\tgodspeed-sock",
+      "member\tgodspeed-horizon\tgodspeed-sock",
+      "dir\troot\troot\t0755\t/usr/local/lib/godspeed-sea-forge",
+      "dir\troot\troot\t0755\t/usr/local/lib/godspeed-sea-forge/bin",
+      "dir\troot\troot\t0755\t/usr/local/lib/godspeed-horizon/bin",
+      "dir\tgodspeed-sea-forge\tgodspeed-sock\t0750\t/run/godspeed-sea-forge",
+      "dir\tgodspeed-sea-forge\tgodspeed-sea-forge\t711\t/var/lib/godspeed-sea-forge",
+      "dir\tgodspeed-sea-forge\tgodspeed-sea-forge\t0700\t/var/lib/godspeed-sea-forge/realitytrace/data",
+      "dir\tgodspeed-sea-forge\tgodspeed-sea-forge\t0700\t/var/lib/godspeed-sea-forge/realitytrace/state",
+      "worlds\troot\tgodspeed-sock\t/var/lib/godspeed-sea-forge/worlds\truntime/domain",
+      "dir\tgodspeed-horizon\tgodspeed-horizon\t0700\t/var/lib/godspeed-horizon",
+      "place-bun\troot\troot\t0755\t/usr/local/lib/godspeed-horizon/bin/bun",
+      "optional-exec\t/usr/local/lib/godspeed-horizon/bin/realitytrace",
+      "place-binary\troot\troot\t0755\t/usr/local/lib/godspeed-sea-forge/bin/sea-forge-server",
+      "deploy-tree\troot\troot\t/opt/godspeed-horizon",
+      "config-file\troot\tgodspeed-sock\t0640\t/var/lib/godspeed-sea-forge/server.yaml\tconfig/server.yaml.in",
+      "config-file\troot\tgodspeed-sock\t0640\t/var/lib/godspeed-sea-forge/policy.yaml\tconfig/policy.yaml",
+      "generated\troot\tgodspeed-sock\t0640\tstatus.json\t/var/lib/godspeed-sea-forge/status.json",
+      "generated\troot\troot\t0644\tunits/godspeed-sea-forge.service\t/etc/systemd/system/godspeed-sea-forge.service",
+      "generated\troot\troot\t0644\tunits/godspeed-horizon.service\t/etc/systemd/system/godspeed-horizon.service",
+      "socket\t/run/godspeed-sea-forge/sea-forge.sock",
+];
+
+/** A minimal stage with the same shape `gateway-setup.ts stage` writes. */
+function makeStage(): string {
+  const repo = tmp("repo");
+  mkdirSync(join(repo, "src"), { recursive: true });
+  mkdirSync(join(repo, "node_modules", "pkg"), { recursive: true });
+  mkdirSync(join(repo, "node_modules", ".bin"), { recursive: true });
+  mkdirSync(join(repo, "domain"), { recursive: true });
+  writeFileSync(join(repo, "domain", "w.sea"), "world\n");
+  writeFileSync(join(repo, "src", "main.ts"), "export const a = 1;\n");
+  writeFileSync(join(repo, "node_modules", "pkg", "cli.js"), "console.log(1);\n");
+  symlinkSync("../pkg/cli.js", join(repo, "node_modules", ".bin", "pkg"));
+  const stage = join(tmp("stage"), "bundle");
+  mkdirSync(join(stage, "units"), { recursive: true });
+  mkdirSync(join(stage, "config"), { recursive: true });
+  const { manifest, symlinkManifest } = stageRuntime(repo, join(stage, "runtime"), ["src", "node_modules", "domain"]);
+  writeFileSync(join(stage, "runtime-manifest.sha256"), manifest);
+  writeFileSync(join(stage, "runtime-symlinks.tsv"), symlinkManifest);
+  writeFileSync(
+    join(stage, "plan.tsv"),
+    PLAN_ROWS.join("\n") + "\n",
+  );
+  writeFileSync(join(stage, "status.json"), "{}\n");
+  writeFileSync(join(stage, "units", "godspeed-sea-forge.service"), "[Service]\n");
+  writeFileSync(join(stage, "units", "godspeed-horizon.service"), "[Service]\n");
+  writeFileSync(join(stage, "config", "server.yaml.in"), "{}\n");
+  writeFileSync(join(stage, "config", "policy.yaml"), "{}\n");
+  return stage;
+}
+
+const bin = join(tmp("bin"), "server");
+writeFileSync(bin, "fake gateway\n");
+const bun = join(tmp("bun"), "bun");
+writeFileSync(bun, "fake bun\n");
+
+function verify(stage: string, opts: { digest?: string; extra?: string[]; env?: Record<string, string> } = {}) {
+  const digest = opts.digest ?? stageDigest(stage);
+  const r = Bun.spawnSync(
+    ["bash", SCRIPT, "--verify-only", "--stage", stage, "--binary", bin, "--sha256", sha(readFileSync(bin)), "--bun", bun, "--bun-sha256", sha(readFileSync(bun)), "--expect-stage-sha256", digest, ...(opts.extra ?? [])],
+    { env: { ...process.env, TMPDIR: tmpdir(), ...opts.env } },
+  );
+  return { code: r.exitCode, out: r.stdout.toString(), err: r.stderr.toString() };
+}
+
+/** The installer's PLAN_TABLE, parsed from the script itself so no copy can drift from it. */
+function installerTable(): string[] {
+  const text = readFileSync(SCRIPT, "utf8");
+  const body = /PLAN_TABLE=\(\n([\s\S]*?)\n\)/.exec(text)?.[1] ?? "";
+  return [...body.matchAll(/\$'([^']*)'/g)].map((m) => m[1]!.replace(/\\t/g, "\t"));
+}
+
+describe("the stager and the installer agree on the plan", () => {
+  test("buildPlan of the production layout equals the installer's PLAN_TABLE, row for row", () => {
+    const layout = resolveLayout({}, { development: false, world: { pinned: "w@sha256:0", cognate: "w" }, operatorRef: "actor:operator" });
+    const rows = buildPlan(layout).map((r) => r.join("\t"));
+    expect(rows).toEqual(installerTable());
+  });
+  test("the test's hand-copied stage table equals the installer's", () => {
+    expect(PLAN_ROWS).toEqual(installerTable());
+  });
+});
+
+describe("installer verifies a snapshot of the stage", () => {
+  test("g. a clean stage passes, and the shell digest equals the TypeScript digest", () => {
+    const stage = makeStage();
+    const r = verify(stage);
+    expect(r.err).toBe("");
+    expect(r.code).toBe(0);
+    expect(r.out).toContain(`digest ${stageDigest(stage)}`);
+  });
+
+  test("a. a digest mismatch refuses", () => {
+    const r = verify(makeStage(), { digest: "0".repeat(64) });
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("does not match the staged bundle digest");
+  });
+
+  test("b. an extra unlisted file in runtime/ refuses", () => {
+    const stage = makeStage();
+    writeFileSync(join(stage, "runtime", "src", "extra.ts"), "evil\n");
+    const r = verify(stage);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("differ from the manifest");
+    expect(r.err).toContain("src/extra.ts");
+  });
+
+  test("c. an extra symlink refuses", () => {
+    const stage = makeStage();
+    symlinkSync("main.ts", join(stage, "runtime", "src", "alias.ts"));
+    const r = verify(stage);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("symlinks differ");
+  });
+
+  test("d. a changed symlink target refuses", () => {
+    const stage = makeStage();
+    const link = join(stage, "runtime", "node_modules", ".bin", "pkg");
+    rmSync(link);
+    symlinkSync("../../src/main.ts", link); // still inside the tree, but not the approved target
+    const r = verify(stage);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("symlinks differ");
+  });
+
+  test("e. an absolute or escaping symlink refuses even when the list names it", () => {
+    for (const target of ["/etc/passwd", "../../../outside"]) {
+      const stage = makeStage();
+      symlinkSync(target, join(stage, "runtime", "src", "bad"));
+      appendFileSync(join(stage, "runtime-symlinks.tsv"), `symlink\t${target}\tsrc/bad\n`);
+      const r = verify(stage, { digest: stageDigest(stage) }); // digest approved, so only the tree rule can refuse
+      expect(r.code).toBe(1);
+      expect(r.err).toMatch(/absolute symlink|escapes the runtime tree/);
+    }
+  });
+
+  test("f. a staged file modified after the digest refuses (runtime file, unit, config, plan)", () => {
+    for (const file of ["runtime/src/main.ts", "units/godspeed-horizon.service", "config/policy.yaml", "plan.tsv", "runtime-symlinks.tsv"]) {
+      const stage = makeStage();
+      const digest = stageDigest(stage);
+      appendFileSync(join(stage, file), "tamper\n");
+      const r = verify(stage, { digest });
+      expect(r.code).toBe(1);
+      // staged files fail the digest; a runtime file is bound by its manifest hash
+      expect(r.err).toMatch(file.startsWith("runtime/") ? /differs from its manifest hash/ : /does not match the staged bundle digest/);
+    }
+  });
+
+  test("an extra file or symlink outside runtime/ changes the digest, and a fifo or symlink there refuses", () => {
+    const stage = makeStage();
+    const digest = stageDigest(stage);
+    writeFileSync(join(stage, "config", "other.yaml"), "x\n");
+    expect(verify(stage, { digest }).code).toBe(1);
+    expect(stageDigest(stage)).not.toBe(digest);
+    rmSync(join(stage, "config", "other.yaml"));
+    symlinkSync("policy.yaml", join(stage, "config", "link.yaml"));
+    const r = verify(stage, { digest });
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("non-regular entry in the stage");
+  });
+
+  test("a fifo in runtime/ refuses", () => {
+    const stage = makeStage();
+    expect(Bun.spawnSync(["mkfifo", join(stage, "runtime", "src", "pipe")]).exitCode).toBe(0);
+    const r = verify(stage);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("non-regular entry");
+  });
+
+  test("a symlinked --binary is refused (pass the resolved path)", () => {
+    const stage = makeStage();
+    const link = join(tmp("lnk"), "server");
+    symlinkSync(bin, link);
+    const r = Bun.spawnSync(["bash", SCRIPT, "--verify-only", "--stage", stage, "--binary", link, "--sha256", sha(readFileSync(bin)), "--expect-stage-sha256", stageDigest(stage)]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr.toString()).toContain("is a symlink");
+  });
+
+  test("h. changes to the original stage and binary after the snapshot do not affect what is verified", () => {
+    const stage = makeStage();
+    const b = join(tmp("race"), "server");
+    writeFileSync(b, "approved\n");
+    const hook = join(tmp("hook"), "hook.sh");
+    // Runs right after the snapshot: the "agent" corrupts the original runtime file, the plan and the binary.
+    writeFileSync(hook, `echo evil >> "${stage}/runtime/src/main.ts"\necho evil >> "${stage}/plan.tsv"\necho evil >> "${b}"\ntouch "${stage}/runtime/src/new.ts"\n`);
+    const digest = stageDigest(stage);
+    const r = Bun.spawnSync(
+      ["bash", SCRIPT, "--verify-only", "--stage", stage, "--binary", b, "--sha256", sha("approved\n"), "--expect-stage-sha256", digest],
+      { env: { ...process.env, INSTALLER_TEST_MODE: "1", INSTALLER_TEST_HOOK_AFTER_SNAPSHOT: hook } },
+    );
+    expect(r.stderr.toString()).toBe("");
+    expect(r.exitCode).toBe(0);
+    expect(readFileSync(join(stage, "plan.tsv"), "utf8")).toContain("evil"); // the hook really ran
+    expect(readFileSync(b, "utf8")).toContain("evil");
+    // and a fresh run (no snapshot race) now refuses, so the pass above came from the snapshot
+    expect(verify(stage, { digest }).code).toBe(1);
+  });
+
+  test("the test hook is ignored without INSTALLER_TEST_MODE", () => {
+    const stage = makeStage();
+    const hook = join(tmp("hook2"), "hook.sh");
+    writeFileSync(hook, `echo evil >> "${stage}/plan.tsv"\n`);
+    const r = verify(stage, { env: { INSTALLER_TEST_HOOK_AFTER_SNAPSHOT: hook } });
+    expect(r.code).toBe(0);
+    expect(readFileSync(join(stage, "plan.tsv"), "utf8")).not.toContain("evil");
+  });
+
+  test("the snapshot directory is removed on exit, also on refusal", () => {
+    const t = tmp("snaptmp");
+    verify(makeStage(), { env: { TMPDIR: t } });
+    verify(makeStage(), { digest: "0".repeat(64), env: { TMPDIR: t } });
+    expect(readdirSync(t)).toEqual([]);
+  });
+
+  test("a symlink in the stage outside runtime/ is refused, not followed", () => {
+    const stage = makeStage();
+    const digest = stageDigest(stage);
+    symlinkSync("/etc/hostname", join(stage, "units", "x.service"));
+    expect(verify(stage, { digest }).err).toContain("non-regular entry in the stage");
+  });
+  // ---- round 2 -------------------------------------------------------------------------------------
+  test("an extra directory in runtime/ refuses, and so does a missing one", () => {
+    const stage = makeStage();
+    mkdirSync(join(stage, "runtime", "src", "extra-dir"));
+    let r = verify(stage);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("directories differ");
+    expect(r.err).toContain("extra-dir");
+    const stage2 = makeStage();
+    mkdirSync(join(stage2, "runtime", "empty"));
+    appendFileSync(join(stage2, "runtime-symlinks.tsv"), "dir\tempty\n");
+    const digest = stageDigest(stage2);
+    rmSync(join(stage2, "runtime", "empty"), { recursive: true });
+    r = verify(stage2, { digest });
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("directories differ");
+  });
+
+  test("a tab or newline in a runtime path or in a link target refuses", () => {
+    for (const name of ["a\tb", "a\nb", "a\\b"]) {
+      const stage = makeStage();
+      writeFileSync(join(stage, "runtime", "src", name), "x\n");
+      const r = verify(stage);
+      expect(r.code).toBe(1);
+      expect(r.err).toContain("newline, carriage return, tab or backslash");
+      const stage2 = makeStage();
+      mkdirSync(join(stage2, "runtime", "src", name));
+      expect(verify(stage2).err).toContain("newline, carriage return, tab or backslash");
+    }
+    for (const target of ["main.ts\textra", "main.ts\nextra", "ma\\in.ts"]) {
+      const stage = makeStage();
+      symlinkSync(target, join(stage, "runtime", "src", "lnk"));
+      const r = verify(stage);
+      expect(r.code).toBe(1);
+      expect(r.err).toContain("newline, carriage return, tab or backslash");
+    }
+  });
+
+  test("a missing config/policy.yaml (or any plan source) makes --verify-only refuse", () => {
+    for (const f of ["config/policy.yaml", "config/server.yaml.in", "status.json", "units/godspeed-horizon.service"]) {
+      const stage = makeStage();
+      rmSync(join(stage, f));
+      const r = verify(stage); // the digest is recomputed over the truncated bundle, so only the plan check can refuse
+      expect(r.code).toBe(1);
+      // units and status.json are also caught by the early "is it staged" check; the config files only by the plan check
+      expect(r.err).toMatch(new RegExp(`staged ${f.replace(/\./g, "\\.")} is missing or not a regular file|no staged bundle`));
+    }
+    const stage = makeStage();
+    rmSync(join(stage, "runtime", "domain"), { recursive: true });
+    // the manifest and list still name it, so this refuses on the tree; either way it must not pass
+    expect(verify(stage).code).toBe(1);
+  });
+
+  test("a plan row with an unknown step or a plan source outside the stage refuses", () => {
+    const stage = makeStage();
+    appendFileSync(join(stage, "plan.tsv"), "generated\troot\troot\t0644\t../escape\t/x/e\n");
+    expect(verify(stage).err).toContain("fixed table");
+    const stage2 = makeStage();
+    appendFileSync(join(stage2, "plan.tsv"), "frobnicate\tx\n");
+    expect(verify(stage2).err).toContain("fixed table");
+  });
+
+  test("plan rows may only select from the installer's fixed table (owner, mode, destination)", () => {
+    const crafted = [
+      "deploy-tree\tagent\tagent\t/opt/godspeed-horizon",
+      "place-binary\troot\troot\t4755\t/usr/local/lib/godspeed-sea-forge/bin/sea-forge-server",
+      "worlds\troot\tgodspeed-sock\t/etc\truntime/domain",
+      "deploy-tree\troot\troot\t/etc",
+      "dir\troot\troot\t0755\t/etc/cron.d",
+    ];
+    for (const row of crafted) {
+      const stage = makeStage();
+      appendFileSync(join(stage, "plan.tsv"), `${row}\n`);
+      const r = verify(stage); // digest recomputed, so only the table check can refuse
+      expect(r.code).toBe(1);
+      expect(r.err).toContain("fixed table");
+    }
+  });
+
+  test("the table is a required set: a dropped, duplicated or reordered row is refused under --verify-only", () => {
+    const edit = (f: (rows: string[]) => string[]) => {
+      const stage = makeStage();
+      writeFileSync(join(stage, "plan.tsv"), f([...PLAN_ROWS]).join("\n") + "\n");
+      return verify(stage); // digest recomputed, so only the plan check can refuse
+    };
+    const dropped = edit((r) => r.filter((_, i) => i !== 5));
+    expect(dropped.code).toBe(1);
+    expect(dropped.err).toContain("requires exactly");
+    const duplicated = edit((r) => [...r, r[3]!]);
+    expect(duplicated.code).toBe(1);
+    expect(duplicated.err).toContain("requires exactly");
+    const swapped = edit((r) => { [r[2], r[3]] = [r[3]!, r[2]!]; return r; }); // same count, same rows, wrong order
+    expect(swapped.code).toBe(1);
+    expect(swapped.err).toContain("missing, duplicated or reordered");
+    const replaced = edit((r) => { r[4] = r[3]!; return r; }); // same count, one row duplicated in place of another
+    expect(replaced.code).toBe(1);
+    expect(replaced.err).toContain("missing, duplicated or reordered");
+    expect(edit((r) => r).code).toBe(0);
+  });
+
+  test("a malformed plan.tsv is refused: unterminated last line, pipes for tabs, CRLF, NUL", () => {
+    const edit = (f: (plan: string) => string | Buffer) => {
+      const stage = makeStage();
+      const plan = readFileSync(join(stage, "plan.tsv"), "utf8");
+      writeFileSync(join(stage, "plan.tsv"), f(plan));
+      return verify(stage);
+    };
+    let r = edit((p) => `${p}account\tevil-runtime\truntime`); // substituted account row, no final newline
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/does not end with a newline|fixed table/);
+    r = edit((p) => p.replace("account\tgodspeed-sea-forge\tgateway", "account|godspeed-sea-forge|gateway"));
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("'|'");
+    r = edit((p) => p.replace(/\n/g, "\r\n"));
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("carriage return");
+    r = edit((p) => p.slice(0, -1)); // unterminated final line that is itself a valid table row
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("does not end with a newline");
+    r = edit((p) => Buffer.from(`${p}\0`));
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("NUL");
+  });
+
+  test("static: plan.tsv is opened in exactly one place and no awk or grep reads it", () => {
+    const text = readFileSync(SCRIPT, "utf8");
+    expect(text.split('"$STAGE/plan.tsv"').length - 1).toBe(1);
+    expect(text).not.toMatch(/awk[^\n]*plan\.tsv|grep[^\n]*plan\.tsv|3<\s*"\$STAGE/);
+  });
+
+  test("a *.sea entry that is a symlink or directory is refused up front", () => {
+    const stage = makeStage();
+    mkdirSync(join(stage, "runtime", "domain", "d.sea"));
+    appendFileSync(join(stage, "runtime-symlinks.tsv"), "dir\tdomain/d.sea\n");
+    const r = verify(stage);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("directory or symlink");
+  });
+
+  test("the dry-run plan is labelled display-only", () => {
+    const r = Bun.spawnSync(["bash", SCRIPT, "--dry-run", "--stage", makeStage()], { env: { ...process.env, TMPDIR: tmpdir() } });
+    expect(r.stdout.toString()).toContain("display only; root re-verifies");
+  });
+
+  test("a symlinked stage root is refused", () => {
+    const stage = makeStage();
+    const link = join(tmp("stagelnk"), "link");
+    symlinkSync(stage, link);
+    const r = verify(link, { digest: stageDigest(stage) });
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("symlinked stage root is refused");
+    expect(verify(link + "/", { digest: stageDigest(stage) }).code).toBe(1); // a trailing slash does not hide it
+  });
+
+  test("a fifo given as --binary is refused without hanging", () => {
+    const stage = makeStage();
+    const fifo = join(tmp("fifo"), "server");
+    expect(Bun.spawnSync(["mkfifo", fifo]).exitCode).toBe(0);
+    const r = Bun.spawnSync(["bash", SCRIPT, "--verify-only", "--stage", stage, "--binary", fifo, "--sha256", "0".repeat(64), "--expect-stage-sha256", stageDigest(stage)], { timeout: 15000 });
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr.toString()).toContain("is not a regular file");
+  });
+
+  test("a binary hash mismatch does not print the actual hash", () => {
+    const stage = makeStage();
+    const r = Bun.spawnSync(["bash", SCRIPT, "--verify-only", "--stage", stage, "--binary", bin, "--sha256", "0".repeat(64), "--expect-stage-sha256", stageDigest(stage)]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr.toString()).toContain("does not match the approved sha256");
+    expect(r.stderr.toString()).not.toContain(sha(readFileSync(bin)));
+  });
+
+  test("--verify-only with --authorize-privileged is refused", () => {
+    const r = verify(makeStage(), { extra: ["--authorize-privileged"] });
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("--verify-only cannot be combined with --authorize-privileged");
+  });
+
+  test("the test seam is refused when INSTALLER_TEST_MODE is set with --authorize-privileged", () => {
+    const stage = makeStage();
+    const hook = join(tmp("hook3"), "hook.sh");
+    writeFileSync(hook, `echo evil >> "${stage}/plan.tsv"\n`);
+    const r = Bun.spawnSync(["bash", SCRIPT, "--authorize-privileged", "--stage", stage, "--expect-stage-sha256", stageDigest(stage)], {
+      env: { ...process.env, INSTALLER_TEST_MODE: "1", INSTALLER_TEST_HOOK_AFTER_SNAPSHOT: hook },
+    });
+    expect(r.exitCode).toBe(2);
+    expect(r.stderr.toString()).toContain("INSTALLER_TEST_MODE cannot be combined with --authorize-privileged");
+    expect(readFileSync(join(stage, "plan.tsv"), "utf8")).not.toContain("evil");
+  });
+
+  test("the hook receives only the original stage path, with TMPDIR unset and SNAP not exported", () => {
+    const stage = makeStage();
+    const out = join(tmp("hookout"), "seen");
+    const hook = join(tmp("hook4"), "hook.sh");
+    writeFileSync(hook, `printf '%s|%s|%s' "$1" "\${TMPDIR-unset}" "\${SNAP-unset}" > "${out}"\n`);
+    const r = Bun.spawnSync(["bash", SCRIPT, "--verify-only", "--stage", stage, "--expect-stage-sha256", stageDigest(stage)], {
+      env: { ...process.env, TMPDIR: tmpdir(), SNAP: "x", INSTALLER_TEST_MODE: "1", INSTALLER_TEST_HOOK_AFTER_SNAPSHOT: hook },
+    });
+    expect(r.exitCode).toBe(0);
+    expect(readFileSync(out, "utf8")).toBe(`${stage}|unset|unset`);
+  });
+
+  test("root refuses HORIZON_GATEWAY_* and requires --stage (static: not testable without root)", () => {
+    const text = readFileSync(SCRIPT, "utf8");
+    expect(text).toContain("compgen -e | grep -q '^HORIZON_GATEWAY_'");
+    expect(text).toContain("pass --stage DIR explicitly when running as root");
+  });
+
+  test("static: STAGE_SRC, BINARY_SRC and BUN_SRC never appear in an install step after the snapshot", () => {
+    const lines = readFileSync(SCRIPT, "utf8").split("\n");
+    const end = lines.findIndex((l) => l.startsWith("# SNAPSHOT-END"));
+    expect(end).toBeGreaterThan(0);
+    const message = /^\s*(say|refuse|echo|printf|qarg)\b|\brefuse "|_NOTE=|^\s*#|^\s*local /;
+    for (const [i, l] of lines.entries()) {
+      if (i <= end || !/\b(STAGE_SRC|BINARY_SRC|BUN_SRC)\b/.test(l)) continue;
+      expect({ line: i + 1, text: l, ok: message.test(l) || /^\s+--(bun|stage|binary)/.test(l) }).toMatchObject({ ok: true });
+    }
+  });
+
+  test("the sudo command is shell-quoted", () => {
+    const stage = join(tmp("q"), "st $(touch pwned) age");
+    const real = makeStage();
+    Bun.spawnSync(["cp", "-a", real, stage]);
+    const r = Bun.spawnSync(["bash", SCRIPT, "--dry-run", "--stage", stage], { env: { ...process.env, TMPDIR: tmpdir() } });
+    expect(r.exitCode).toBe(0);
+    const out = r.stdout.toString();
+    expect(out).toContain("st\\ \\$\\(touch\\ pwned\\)\\ age");
+    expect(out).not.toMatch(/--stage \/\S*st \$\(touch/);
+  });
+});
+
+describe("deployed copy is verified again after the copy", () => {
+  const deploy = (stage: string, dst: string, path?: string) =>
+    Bun.spawnSync(["bash", SCRIPT, "--verify-only", "--stage", stage, "--expect-stage-sha256", stageDigest(stage)], {
+      env: { ...process.env, TMPDIR: tmpdir(), INSTALLER_TEST_MODE: "1", INSTALLER_TEST_DEPLOY_DST: dst, ...(path ? { PATH: path } : {}) },
+    });
+
+  test("a clean copy is deployed and matches", () => {
+    const dst = join(tmp("dst"), "tree");
+    const r = deploy(makeStage(), dst);
+    expect(r.stderr.toString()).toContain("");
+    expect(r.exitCode).toBe(0);
+    expect(existsSync(join(dst, "src", "main.ts"))).toBe(true);
+    expect(existsSync(`${dst}.manifest.sha256`)).toBe(true);
+  });
+
+  test("the deployed copy carries no xattrs", () => {
+    const stage = makeStage();
+    const f = join(stage, "runtime", "src", "main.ts");
+    if (Bun.spawnSync(["which", "setfattr"]).exitCode !== 0 || Bun.spawnSync(["setfattr", "-n", "user.t", "-v", "1", f]).exitCode !== 0) {
+      console.log("skipped: setfattr missing or user xattrs unsupported on this filesystem");
+      return;
+    }
+    const dst = join(tmp("dstx"), "tree");
+    expect(deploy(stage, dst).exitCode).toBe(0);
+    expect(Bun.spawnSync(["getfattr", "-d", join(dst, "src", "main.ts")]).stdout.toString()).not.toContain("user.t");
+  });
+
+  test("a copy that differs from the manifest after cp is refused and removed", () => {
+    // a cp wrapper that corrupts the new tree after the real copy: only the post-copy verify_tree can catch it
+    const wrap = tmp("wrap");
+    const cp = Bun.spawnSync(["which", "cp"]).stdout.toString().trim();
+    for (const [i, inject] of [`touch "$last/src/injected.ts"`, `mkdir "$last/src/injected-dir"`].entries()) {
+      writeFileSync(join(wrap, "cp"), `#!/bin/bash\n${cp} "$@" || exit $?\nlast="\${@: -1}"\ncase "$last" in *.new-*) ${inject} ;; esac\n`, { mode: 0o755 });
+      const dst = join(tmp(`dst${i}`), "tree");
+      const r = deploy(makeStage(), dst, `${wrap}:${process.env.PATH}`);
+      expect(r.exitCode).toBe(1);
+      expect(r.stderr.toString()).toContain("copied runtime tree does not match the manifest");
+      expect(existsSync(dst)).toBe(false);
+      expect(readdirSync(join(dst, "..")).filter((n) => n.includes(".new-"))).toEqual([]);
+    }
+  });
+});

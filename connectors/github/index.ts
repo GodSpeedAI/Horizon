@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { join } from "node:path";
 import type { DurableStore } from "@godspeedai/cognate-events";
 import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
-import { seaForgeActorOf } from "../../src/adapters/sea-forge-approvals.ts";
+import { seaForgeActorOf } from "../../src/adapters/sea-forge-config.ts";
 import { argValue, parseSetup, setupMapping } from "../../src/config/setup.ts";
 import { ensureBoard, placeIssue, type Board } from "./board.ts";
 import { loadCursor, saveCursor } from "./cursor.ts";

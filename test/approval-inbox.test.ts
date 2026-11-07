@@ -2,16 +2,17 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { listApprovals, type ApprovalAuthority } from "../src/adapters/sea-forge-approvals.ts";
-import { buildInbox, parseApproval } from "../src/domain/approval-inbox.ts";
+import { SeaForgeAuthority, type ApprovalStanding } from "@godspeedai/cognate-runtime-bun";
+import type { ApprovalAuthority } from "../src/adapters/sea-forge-config.ts";
+import { buildInbox } from "../src/domain/approval-inbox.ts";
 import { buildDecide } from "../src/ui/desk/decide-build.ts";
-import { createApplication, selfApprovalRefusal } from "../src/app.ts";
+import { ApprovalFollowUpError, afterRecordedDecision, approvalErrorCode, createApplication, selfApprovalRefusal } from "../src/app.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 
 const NOW = new Date("2026-11-02T12:00:00Z");
 const OPERATOR = "actor:operator";
 
-function row(over: Record<string, unknown> = {}): Record<string, unknown> {
+function row(over: Partial<ApprovalStanding> = {}): ApprovalStanding {
   return {
     approval_id: "apr-cep:op-1",
     state: "pending",
@@ -28,69 +29,47 @@ function row(over: Record<string, unknown> = {}): Record<string, unknown> {
   };
 }
 
-describe("parseApproval", () => {
-  test("accepts a well-formed SEA-Forge row", () => {
-    expect(parseApproval(row())?.approval_id).toBe("apr-cep:op-1");
-  });
-  test("refuses rows that do not match the shape, and never coerces them", () => {
-    expect(parseApproval(null)).toBeNull();
-    expect(parseApproval([])).toBeNull();
-    expect(parseApproval(row({ state: "maybe" }))).toBeNull();
-    expect(parseApproval(row({ approval_id: "has space" }))).toBeNull();
-    expect(parseApproval(row({ expires_at: "not a time" }))).toBeNull();
-    expect(parseApproval(row({ requester: "" }))).toBeNull();
-    expect(parseApproval(row({ resolved_by: 7 }))).toBeNull();
-    const { requester: _omitted, ...missing } = row();
-    expect(parseApproval(missing)).toBeNull();
-  });
-});
-
 describe("buildInbox", () => {
   test("only a pending approval that a Horizon commit waits on is decidable here", () => {
-    const inbox = buildInbox([row({ approval_id: "apr-a" }), row({ approval_id: "apr-b" })], { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR });
+    const inbox = buildInbox([row({ approval_id: "apr-a" }), row({ approval_id: "apr-b" })], 0, { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR });
     const byId = Object.fromEntries(inbox.waiting.map((item) => [item.approval_id, item.decision.kind]));
     expect(byId).toEqual({ "apr-a": "decidable", "apr-b": "not_decidable_here" });
   });
   test("a clock-expired pending approval is never offered, even if a commit waits on it", () => {
-    const inbox = buildInbox([row({ expires_at: "2026-11-02T11:00:00Z" })], { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
+    const inbox = buildInbox([row({ expires_at: "2026-11-02T11:00:00Z" })], 0, { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
     expect(inbox.waiting[0]?.decision).toEqual({ kind: "not_decidable_here", reason: "past its expiry time" });
     expect(inbox.waiting[0]?.past_expiry).toBe(true);
   });
   test("a decided approval is listed as decided, with who resolved it, and offers nothing", () => {
-    const inbox = buildInbox([row({ state: "approved", resolved_by: "actor:operator" })], { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
+    const inbox = buildInbox([row({ state: "approved", resolved_by: "actor:operator" })], 0, { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
     expect(inbox.waiting).toHaveLength(0);
     expect(inbox.decided[0]?.resolved_by).toBe("actor:operator");
     expect(inbox.decided[0]?.decision).toEqual({ kind: "not_decidable_here", reason: "already approved" });
   });
   test("a request the operator made is not decidable by the operator", () => {
-    const inbox = buildInbox([row({ requester: OPERATOR })], { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
+    const inbox = buildInbox([row({ requester: OPERATOR })], 0, { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
     expect(inbox.waiting[0]?.decision.kind).toBe("not_decidable_here");
   });
-  test("malformed rows are counted and never shown", () => {
-    const inbox = buildInbox([row(), { state: "approved" }, "junk"], { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR });
-    expect(inbox.malformed).toBe(2);
+  test("rows the client excluded are reported and never shown", () => {
+    const inbox = buildInbox([row()], 2, { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR });
+    expect(inbox.excluded).toBe(2);
     expect(inbox.waiting).toHaveLength(1);
-  });
-  test("a non-array listing shows nothing and reports no fabricated approvals", () => {
-    const inbox = buildInbox({ approvals: [row()] }, { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR });
-    expect(inbox.waiting).toHaveLength(0);
-    expect(inbox.decided).toHaveLength(0);
   });
   test("waiting items are ordered soonest expiry first", () => {
     const inbox = buildInbox(
       [row({ approval_id: "apr-late", expires_at: "2026-11-02T15:00:00Z" }), row({ approval_id: "apr-soon", expires_at: "2026-11-02T13:00:00Z" })],
+      0,
       { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR },
     );
     expect(inbox.waiting.map((item) => item.approval_id)).toEqual(["apr-soon", "apr-late"]);
   });
 });
-
 describe("the inbox as decision cards (Decide)", () => {
   const cards = (inbox: ReturnType<typeof buildInbox> | null, readout: Parameters<typeof buildDecide>[0]["inbox"] | null = null) =>
     buildDecide({ inbox: readout ?? { state: "listed", inbox: inbox! }, moves: [], caseApprovals: { kind: "none" }, holds: new Map() });
 
   test("offers accept and reject only for a decidable item", () => {
-    const inbox = buildInbox([row({ approval_id: "apr-a" }), row({ approval_id: "apr-b" })], { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR });
+    const inbox = buildInbox([row({ approval_id: "apr-a" }), row({ approval_id: "apr-b" })], 0, { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR });
     const { cards: found } = cards(inbox);
     const a = found.find((c) => c.id === "approval:apr-a")!;
     const b = found.find((c) => c.id === "approval:apr-b")!;
@@ -103,14 +82,14 @@ describe("the inbox as decision cards (Decide)", () => {
   });
 
   test("the preview code changes when anything the preview shows changes", () => {
-    const make = (over: Record<string, unknown>) => cards(buildInbox([row({ approval_id: "apr-a", ...over })], { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR })).cards[0]!.preview.code;
+    const make = (over: Record<string, unknown>) => cards(buildInbox([row({ approval_id: "apr-a", ...over })], 0, { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR })).cards[0]!.preview.code;
     expect(make({})).toBe(make({}));
     expect(make({})).not.toBe(make({ resource_id: "res-8" }));
     expect(make({})).not.toBe(make({ expires_at: "2026-11-02T14:00:00Z" }));
   });
 
   test("keeps SEA-Forge-supplied text as text (the markup layer escapes it)", () => {
-    const inbox = buildInbox([row({ operation_name: "<script>x</script>" })], { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR });
+    const inbox = buildInbox([row({ operation_name: "<script>x</script>" })], 0, { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR });
     const [card] = cards(inbox).cards;
     expect(card!.title).toContain("<script>x</script>");
     expect(card!.blocked).not.toBeNull();
@@ -129,15 +108,44 @@ describe("the inbox as decision cards (Decide)", () => {
     expect(found.notices.join(" ")).toContain("No approver is set up");
   });
 
-  test("rows that do not fit the shape are counted in a notice and never shown as decisions", () => {
-    const inbox = buildInbox([row(), { nonsense: true }], { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
+  test("rows the client excluded are counted in a notice and never shown as decisions", () => {
+    const inbox = buildInbox([row()], 1, { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
     const found = cards(inbox);
     expect(found.cards).toHaveLength(1);
     expect(found.notices.join(" ")).toContain("1 entries from the case keeper could not be read");
   });
 });
 
-describe("listApprovals over the SEA-Forge socket", () => {
+describe("a decision SEA-Forge recorded, then a failing follow-up", () => {
+  test("resolve succeeds, then the follow-up throws: the failure is a follow-up failure, not a failed resolve", async () => {
+    let resolved = false;
+    const stub = { resolveApproval: async () => { resolved = true; return { ok: true as const }; }, pollApprovals: async () => { throw new Error("poll: socket closed"); } };
+    const run = async () => {
+      const result = await stub.resolveApproval();
+      if (!result.ok) throw new Error("APPROVAL: SEA-Forge refused the resolution");
+      return afterRecordedDecision(async () => { await stub.pollApprovals(); return "settled"; });
+    };
+    const error = await run().catch((e: unknown) => e);
+    expect(resolved).toBe(true);
+    expect(error).toBeInstanceOf(ApprovalFollowUpError);
+    expect((error as Error).message).toBe("poll: socket closed");
+    expect(approvalErrorCode(error)).toBe("followup_failed");
+    // A refused commit after a recorded decision keeps its own message and is not reclassified.
+    const refused = await afterRecordedDecision(async () => { throw new Error("INTENT: governed commit refused: rejected"); }).catch((e: unknown) => e);
+    expect(refused).not.toBeInstanceOf(ApprovalFollowUpError);
+  });
+  test("approvalErrorCode maps failures to the fixed set", () => {
+    expect(approvalErrorCode(new ApprovalFollowUpError("boom"))).toBe("followup_failed");
+    expect(approvalErrorCode(new Error("APPROVAL: abc was already decided (run failed)"))).toBe("not_pending");
+    expect(approvalErrorCode(new Error("APPROVAL: no governed commit waits on abc"))).toBe("not_pending");
+    expect(approvalErrorCode(new Error("APPROVAL: SEA-Forge refused the resolution: x"))).toBe("refused");
+    expect(approvalErrorCode(new Error("APPROVAL: the requester cannot approve its own escalation"))).toBe("refused");
+    expect(approvalErrorCode(new Error("socket closed"))).toBe("unavailable");
+    expect(approvalErrorCode("x")).toBe("unavailable");
+  });
+});
+
+describe("the SDK client listing over the SEA-Forge socket", () => {
   const dir = mkdtempSync(join(tmpdir(), "inbox-sock-"));
   const socketPath = join(dir, "sea-forge.sock");
   const received: Record<string, unknown>[] = [];
@@ -157,23 +165,19 @@ describe("listApprovals over the SEA-Forge socket", () => {
     server.stop(true);
     rmSync(dir, { recursive: true, force: true });
   });
-  const authority: ApprovalAuthority = {
-    socketPath,
-    service: { actor_id: "cognate-service", role: "service" },
-    operator: { actor_id: OPERATOR, role: "operator" },
-    timeoutMs: 2_000,
-  };
+  const client = new SeaForgeAuthority({ socketPath, actor: { actor_id: "cognate-service", role: "service" }, timeoutMs: 2_000 });
 
   test("sends the read-only verb as the service actor and returns the rows", async () => {
     reply = { ok: true, approvals: [row()] };
-    const rows = await listApprovals(authority);
-    expect(rows).toHaveLength(1);
+    const listed = await client.listApprovals();
+    expect(listed.ok && listed.approvals).toHaveLength(1);
     expect(received.at(-1)).toEqual({ verb: "authority_approvals", actor: { actor_id: "cognate-service", role: "service" } });
   });
 
   test("a refusal from SEA-Forge is an error, never an empty list", async () => {
     reply = { ok: false, error_class: "identity_authentication_refused" };
-    await expect(listApprovals(authority)).rejects.toThrow("did not list approvals");
+    const listed = await client.listApprovals();
+    expect(listed).toMatchObject({ ok: false, errorClass: "identity_authentication_refused" });
   });
 });
 

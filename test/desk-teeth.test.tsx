@@ -65,7 +65,7 @@ describe("desk teeth", () => {
       request_ref: "env", expires_at: "2099-01-01T00:00:00Z", resolved_by: null,
     };
     const decide = buildDecide({
-      inbox: { state: "listed", inbox: { waiting: [{ ...row, state: "pending", decision: { kind: "decidable" }, past_expiry: false }] as never, decided: [], malformed: 0 } },
+      inbox: { state: "listed", inbox: { waiting: [{ ...row, state: "pending", decision: { kind: "decidable" }, past_expiry: false }] as never, decided: [], excluded: 0 } },
       moves: [],
       caseApprovals: { kind: "none" },
       holds: new Map(),

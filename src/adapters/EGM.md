@@ -59,13 +59,16 @@ Two shapes are used consistently. Read adapters return a closed, typed observati
   `[research.ts:ResearchStatus]`; `requireResearch(status)` throws `ResearchUnavailableError` on any
   non-healthy observation `[research.ts:requireResearch]`; `researchHealth` is an alias of
   `observeResearch` `[research.ts:researchHealth]`.
-- `sea-forge-approvals.ts`: `approvalAuthorityFromEnv(env)` / `approvalAuthority(options)` building
-  `ApprovalAuthority { socketPath, service, operator }` `[sea-forge-approvals.ts:approvalAuthority]`;
-  `resolveApproval(authority, { approvalId, resolution })` where resolution is `"approved"` or
-  `"rejected"` `[sea-forge-approvals.ts:resolveApproval]`; `listApprovals(authority)` for the read-only
-  `authority_approvals` listing `[sea-forge-approvals.ts:listApprovals]`; `seaForgeCall(socketPath, request,
-  timeoutMs = 5_000)` for one NDJSON request over the Unix socket `[sea-forge-approvals.ts:seaForgeCall]`;
-  env var name `COGNATE_SEA_FORGE_OPERATOR` `[sea-forge-approvals.ts:ENV_OPERATOR]`.
+- `sea-forge-config.ts` (socket-free): `approvalAuthorityFromEnv(env, operatorRef)` / `approvalAuthority(options)` building
+  `ApprovalAuthority { socketPath, service, operator, timeoutMs? }` `[sea-forge-config.ts:approvalAuthority]`;
+  `seaForgeActorOf(principalRef)` `[sea-forge-config.ts:seaForgeActorOf]`; env var name
+  `COGNATE_SEA_FORGE_OPERATOR` `[sea-forge-config.ts:ENV_OPERATOR]`. The wire (resolve, list, closure,
+  delegated decide) is the Cognate SDK client `SeaForgeAuthority`, built once in `createApplication`;
+  `src/` constructs no sockets (`scripts/check-boundaries.ts`).
+- `sea-forge-wire.ts`: `seaForgeCall(socketPath, request, timeoutMs = 5_000)` for one NDJSON request over the
+  Unix socket `[sea-forge-wire.ts:seaForgeCall]`. Only for the verbs the SDK client does not carry (the case
+  keeper's `case_*`/`human_task_*`, the ledger reads, the event follower in `sea-forge-events.ts`); governance verbs
+  never use it. `scripts/check-boundaries.ts` lets exactly these two files open the socket.
 - `settlement.ts`: `realityTraceFromEnv(env, repoDir)`, `defaultRealityTraceRepo(storePath)`,
   `observationOutbox(capability)`, `RealityTraceEvidence` (`observe`, `evidenceFor`, `packet`),
   `authorityOf(invocation)`, and `SettlementAuthority = Pick<SeaForgeAuthority, "submitEvidence" |
@@ -113,7 +116,7 @@ Two shapes are used consistently. Read adapters return a closed, typed observati
   `[research.ts:parseHealth]`.
 - Approval authority is refused rather than guessed: `COGNATE_SEA_FORGE_OPERATOR` set without
   `COGNATE_GOVERNANCE === "sea-forge"` throws, and an operator equal to the service actor throws
-  ("a requester cannot approve its own escalation") `[sea-forge-approvals.ts:approvalAuthority]`.
+  ("a requester cannot approve its own escalation") `[sea-forge-config.ts:approvalAuthority]`.
 - RealityTrace configuration is all-or-nothing across the three env vars
   `[settlement.ts:realityTraceFromEnv]`; evidence packets are built only from rows RealityTrace's
   ledger actually holds `[settlement.ts:RealityTraceEvidence.packet]`. Execution success is not
@@ -133,15 +136,14 @@ Two shapes are used consistently. Read adapters return a closed, typed observati
 - Temporary files: `mkdtempSync(join(tmpdir(), "horizon-rt-"))` plus `writeFileSync` and `rmSync`
   for question/threshold payloads `[realitytrace-obligation.ts:withFile]`; `mkdirSync(repoDir,
   { recursive: true })` `[realitytrace-obligation.ts:repo]`.
-- Network / IPC: Unix-socket connect to SEA-Forge via `Bun.connect({ unix: socketPath, … })`
-  `[sea-forge-approvals.ts:seaForgeCall]`; RealityTrace CLI invocations in
+- Network / IPC: SEA-Forge is reached only through the Cognate SDK client (`SeaForgeAuthority`); RealityTrace CLI invocations in
   `RealityTraceEvidence` (`Bun.spawn([bin, "ledger", "export", …])`)
   `[settlement.ts:RealityTraceEvidence.observationAt]`.
 - Environment reads: `process.env` spread into the Context Kernel child
   `[context-kernel.ts:spawnTransport]`; `process.env.PATH` / `HOME` defaults in the economics reader
   `[realitytrace-economics.ts:realityTraceEconomics]`; `XDG_DATA_HOME` / `XDG_STATE_HOME` for
   RealityTrace `[realitytrace-obligation.ts:sxr]`; the governance and approval env vars
-  `[sea-forge-approvals.ts:approvalAuthorityFromEnv]`.
+  `[sea-forge-config.ts:approvalAuthorityFromEnv]`.
 - Durable observation writes: `ObservationDelivery` drains the outbox and records RealityTrace's
   observation in the Cognate store `[settlement.ts:RealityTraceEvidence.observe]`; `Bun.sleep(50)`
   polling loop up to `timeoutMs` (default 20 000) `[settlement.ts:RealityTraceEvidence.observe]`.

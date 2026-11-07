@@ -8,7 +8,7 @@
 // authority claims (GodSpeedAI/Cognate#65); without them SEA-Forge records no obligation and this gate fails.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
-import { seaForgeCall } from "../src/adapters/sea-forge-approvals.ts";
+import { SeaForgeAuthority } from "@godspeedai/cognate-runtime-bun";
 import { readLedger } from "../src/capabilities/capacity-ledger.ts";
 import { INTENT_INDEX_COLLECTION, readIntentRecords } from "../src/capabilities/navigation-intent.ts";
 import { readPending } from "../src/capabilities/pending-intent.ts";
@@ -125,8 +125,9 @@ describe("J02 revision 2 (live)", () => {
     expect(waiting?.approvalId).toMatch(/^apr-/);
     const committed = await c.app.resolveNavigationApproval({ approvalId: waiting!.approvalId!, resolution: "approved" });
     // SEA-Forge's own record of human authority decisions for that approval.
-    const listed = await seaForgeCall(c.socket, { verb: "authority_approvals", actor: { actor_id: "cognate-service", role: "service" } }, 15_000);
-    const decided = (listed.approvals as { approval_id: string; resolved_by: unknown }[]).filter((a) => a.approval_id === waiting!.approvalId && a.resolved_by);
+    const listed = await new SeaForgeAuthority({ socketPath: c.socket, actor: { actor_id: "cognate-service", role: "service" } }).listApprovals({ timeoutMs: 15_000 });
+    if (!listed.ok) throw new Error(`${listed.errorClass}: ${listed.error}`);
+    const decided = listed.approvals.filter((a) => a.approval_id === waiting!.approvalId && a.resolved_by);
     expect(decided).toHaveLength(1);
     const observed = (await readPending(c.app.runtime.runtime.store, c.app.caller.tenant, committed.intent.intent_id))!.pending.observed;
     expect(observed).toEqual([{ currency: "steering_attention", unit: "decisions", amount: decided.length, source_ref: "sea-forge:authority_approvals" }]);

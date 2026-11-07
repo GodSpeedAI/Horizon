@@ -8,7 +8,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ApprovalAuthority } from "../src/adapters/sea-forge-approvals.ts";
+import type { ApprovalAuthority } from "../src/adapters/sea-forge-config.ts";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
 import { START, deskReducer, type UiState } from "../src/ui/desk/attention.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";
