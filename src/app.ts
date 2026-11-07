@@ -1,5 +1,5 @@
 import { reconcilePending } from "./capabilities/pending-reconcile.ts";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createIdentityService, type IdentityService } from "@godspeed/identity";
 import { delegatingAuthority } from "./adapters/delegating-authority.ts";
@@ -19,6 +19,7 @@ import { appendIntentAttempt, appendIntentRecord, createFrameRegister, NAVIGATIO
 import { checkPurpose, latestCase, onboardingSkipped, openCase, setOnboardingSkipped } from "./capabilities/workspace-records.ts";
 import { CONTRACT_VERSION, contractVersionOf } from "./capabilities/capacity-ledger.ts";
 import { activateContract } from "./capabilities/contract-upgrade.ts";
+import { decideLesson, listLessons, proposeLesson } from "./capabilities/lessons.ts";
 import { RealityTraceObligation } from "./adapters/realitytrace-obligation.ts";
 import { realityTraceEconomics, type EconomicsSource } from "./adapters/realitytrace-economics.ts";
 import { listPending, readPending, terminate, updatePending, type PendingIntent } from "./capabilities/pending-intent.ts";
@@ -77,13 +78,39 @@ import { debuggerView, inspect, missingRetrieval } from "./ui/workspace/inspect.
 import type { ContextKernelAdapter, ContextReferenceAnswer } from "./adapters/context-kernel.ts";
 import { CONTEXT_REFERENCE } from "./capabilities/context.ts";
 import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type DebuggerOperation, type DebuggerSources } from "./domain/debugger.ts";
-import { renderWorkspacePage } from "./ui/workspace/render.tsx";
-import { renderEconomicsPage } from "./ui/workspace/economics.tsx";
-import { parseInboxErrorCode, renderApprovalInboxPage, type InboxErrorCode, type InboxNotice } from "./ui/workspace/approval-inbox.tsx";
+import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare.tsx";
+import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
+import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
+import { answerRowOf, appendRow, discardRow, listConversation, panelRowOf, settleDraftRow, updateRow } from "./capabilities/conversation.ts";
+import { answerEcho, cleanAgentName, WAITING_FOR_AGENT, type RowSource } from "./ui/desk/conversation-model.ts";
+import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
+import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
+import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
+import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
+import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
+import { acceptanceBlocked, answerFor, listAnswers, recordAnswer, routeAnswer, stopWaiting, checkValue, OUTCOMES, WAITING_WORDS, type PanelAnswer } from "./capabilities/panel-answers.ts";
+import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
+import { NO_PANELS, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
+import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
+import { readableTitle } from "./ui/desk/banned-words.ts";
+import { caseTitle, matches, partsOf, plainWords, sourcesOf, type DeskCase, type DecideState, type DecisionCardData, type PanelsData, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
+import { confirmedDecision, failedDecision } from "./ui/desk/decision-words.ts";
+import { buildDecide, waitingCount, type CaseApprovals, type HumanStepInput } from "./ui/desk/decide-build.ts";
+import { addItem, advance as caseAdvance, detailsOf, entryOptions, approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
+import { activeHolds, checkReason, putHold, recordDecision } from "./capabilities/decisions.ts";
+import { caseItems, costSource, orderWork, sessionItems, type AcceptedKnowledge, type WorkData } from "./ui/desk/work-build.ts";
+import { readLedgerDay } from "./adapters/ledger-day.ts";
+import { recordReader, type RecordReader } from "./adapters/realitytrace-economics.ts";
+import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
+import { setupMapping } from "./config/setup.ts";
+import type { RecordSource } from "./config/types.ts";
+import { existsSync as fileExists, mkdirSync as makeDir, readFileSync as readFileText, writeFileSync as writeFileText } from "node:fs";
+import { dirname as dirOf, join as joinPath } from "node:path";
+import { tmpdir as tmpDir } from "node:os";
 import type { Server } from "bun";
 import { RemoteController, type RemoteStatus } from "./remote/server.ts";
 import { remoteSettings } from "./remote/settings.ts";
-import { remotePanelPage } from "./remote/panel.ts";
+import { qrSvg, remotePanelPage } from "./remote/panel.ts";
 
 type HttpServer = Server<unknown>;
 
@@ -105,7 +132,9 @@ export async function afterRecordedDecision<T>(steps: () => Promise<T>): Promise
   }
 }
 
-/** The fixed outcome codes the inbox redirect may carry. The page owns the copy; no error text travels in the URL. */
+/** The fixed outcome codes a refused or failed decision maps to. The caller owns the copy; no error text travels in a URL. */
+export type InboxErrorCode = "refused" | "not_pending" | "invalid" | "unavailable" | "followup_failed" | "unknown";
+
 export function approvalErrorCode(error: unknown): InboxErrorCode {
   if (error instanceof ApprovalFollowUpError) return "followup_failed";
   const message = error instanceof Error ? error.message : "";
@@ -203,6 +232,8 @@ export interface HorizonApplication {
   /** The validated operator-to-SEA-Forge-actor mapping. */
   readonly operatorActors: OperatorActors;
   /** The commit the phone makes, run as a session's Caller with its mapped SEA-Forge actor. Refuses any Caller that is not a mapped operator session. */
+  /** Stage 4: an agent's panel tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`). */
+  applyAgentOp(op: AgentOp): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }>;
   commitForSession(actionId: string, intentId: string, who: Caller): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }>;
   /** Healthy, or a typed degraded observation; never a startup prerequisite. */
   readonly research: ResearchStatus;
@@ -307,6 +338,12 @@ export async function createApplication(
      * `[economics]` config table / `HORIZON_ECONOMICS_REALITYTRACE_BIN`; unset, the view says it is not configured.
      */
     readonly economics?: EconomicsSource;
+    /** Stage 1: how a `[[records.sources]]` entry is read for the comparison view. Tests inject a fake; default runs `realitytrace`. */
+    readonly recordReader?: (source: RecordSource) => RecordReader;
+    /** Stage 1: folder for the comparison cache, exports and the Presenting key. Defaults to the setup root, else beside the store. */
+    readonly deskRoot?: string;
+    /** Stage 1: the clock for "today" and export names. */
+    readonly now?: () => Date;
     /** The SEA-Forge socket for `authority_closure`. Defaults to the approvals socket or `COGNATE_SEA_FORGE_SOCKET`. */
     readonly seaForgeSocket?: string;
     /**
@@ -316,6 +353,8 @@ export async function createApplication(
     readonly operators?: OperatorsConfig;
     /** The client for delegated (`on_behalf_of`) commits. Injected by tests; defaults to the gateway client. */
     readonly delegationClient?: Pick<SeaForgeAuthority, "decide">;
+    /** Stage 4: how work is handed to a workshop agent. Injected by tests; defaults to the workshop named in the config and its key file. */
+    readonly workshop?: () => Access;
   } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath);
@@ -366,11 +405,14 @@ export async function createApplication(
         : (options.realityTrace ?? realityTraceFromEnv(process.env, defaultRealityTraceRepo(options.storePath ?? process.env.HORIZON_STORE ?? loaded.config.runtime_store)));
   // HORIZON-001 1.1.0: bound operations, capacity and the obligation flow (SPEC-CR-002).
   const bindingFor = (operationRef: string) => loaded.config.operations.find((binding) => binding.operation_ref === operationRef);
+  // The rulebook is Horizon's DomainForge model; RealityTrace snapshots it so records carry its edition.
+  const obligationRt = realityTrace ? new RealityTraceObligation({ bin: realityTrace.bin, dataHome: realityTrace.dataHome, stateHome: realityTrace.stateHome, repoDir: `${realityTrace.repoDir}-obligations`, rulebookEntry: resolve("domain", "interaction-model.sea") }) : null;
+  void obligationRt?.snapshot();
   const obligationDeps: ObligationDeps = {
     store: () => runtime.runtime.store,
     tenant: caller.tenant,
     // Its own repository in the same RealityTrace home, so SEA-Forge reads both through one data home.
-    realityTrace: realityTrace ? new RealityTraceObligation({ bin: realityTrace.bin, dataHome: realityTrace.dataHome, stateHome: realityTrace.stateHome, repoDir: `${realityTrace.repoDir}-obligations` }) : null,
+    realityTrace: obligationRt,
     settlement: loaded.config.settlement ?? null,
     // The verifier reads a read-only snapshot of the store, never the live WAL database (see settlement/snapshot.ts).
     get snapshot() {
@@ -1213,18 +1255,6 @@ export async function createApplication(
     }
   }
 
-  /** The banner the inbox shows after a click, read from the query it was redirected with. Display only; the listing is what it is checked against. */
-  function inboxNotice(params: URLSearchParams): InboxNotice | undefined {
-    const approval = params.get("approval") ?? params.get("resolved");
-    const approvalId = approval === null ? null : approval.slice(0, 200);
-    const resolved = params.get("resolved");
-    const decision = params.get("decision");
-    if (resolved && (decision === "approve" || decision === "reject")) return { kind: "resolved", approvalId: resolved.slice(0, 200), decision };
-    const error = params.get("error");
-    if (error !== null) return { kind: "error", approvalId, code: parseInboxErrorCode(error) };
-    return undefined;
-  }
-
   /** The approval an escalated commit waits on, and the intent it belongs to; null when nothing waits on it. */
   async function intentIdForApproval(approvalId: string): Promise<string | null> {
     const waiting = (await readIntentAttempts(runtime.runtime.store)).filter((entry) => entry.outcome === "awaiting_authority" && entry.approvalId === approvalId);
@@ -1290,6 +1320,880 @@ export async function createApplication(
     return { ok: true };
   }
 
+
+  // ---- Stage 1: the comparison view, labels, Presenting and exports. Reads go through the allow-listed RealityTrace reader. ----
+  const setupName = loaded.setup;
+  const deskMapping = setupName === undefined ? undefined : setupMapping(setupName);
+  const deskRoot = options.deskRoot ?? deskMapping?.root ?? joinPath(dirOf(loaded.config.runtime_store), "desk");
+  const presentingKeyPath = deskMapping && options.deskRoot === undefined ? deskMapping.presentingKey : joinPath(deskRoot, "secrets", "presenting.key");
+  const cacheDir = joinPath(deskRoot, "cache");
+  const exportsDir = joinPath(deskRoot, "exports");
+  const clock = options.now ?? (() => new Date());
+  /** The case keeper as a client: present when a socket is named. Reads go as the service; writes also name the operator. */
+  const caseKeeper: CaseKeeper | null =
+    delegationSocket === ""
+      ? null
+      : { socketPath: delegationSocket, service: serviceActor, ...(approvals ? { operator: approvals.operator } : {}), ...(approvals?.timeoutMs ? { timeoutMs: approvals.timeoutMs } : {}) };
+  const economicsConfig = economicsFromEnv(process.env, loaded.config.economics);
+  const rtBin = economicsConfig?.realitytrace_bin ?? "realitytrace";
+  const recordSources: readonly RecordSource[] =
+    loaded.config.records?.sources ?? (economicsConfig ? [{ name: "default", kind: "personal", ...(economicsConfig.data_home ? { data_home: economicsConfig.data_home } : {}), ...(economicsConfig.state_home ? { state_home: economicsConfig.state_home } : {}) }] : []);
+  const readerFor = options.recordReader ?? ((source: RecordSource) => recordReader(source, rtBin));
+  const deskTimeZone = loaded.config.ui?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  /** The Presenting key: created once (32 random bytes, mode 0600) if the setup script has not made it. Never printed. */
+  function presentingKey(): Buffer {
+    if (!fileExists(presentingKeyPath)) {
+      makeDir(dirOf(presentingKeyPath), { recursive: true });
+      writeFileText(presentingKeyPath, randomBytes(32), { mode: 0o600, flag: "wx" });
+    }
+    return readFileText(presentingKeyPath);
+  }
+
+  function dayOf(param: string | null): string {
+    if (param && /^\d{4}-\d{2}-\d{2}$/.test(param)) return param;
+    return new Intl.DateTimeFormat("en-CA", { timeZone: deskTimeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(clock());
+  }
+
+  async function compareData(params: URLSearchParams): Promise<{ props: ComparePageProps; view: CompareView | null; repoNames: string[]; labels: RunLabel[] }> {
+    const sourceName = params.get("source") ?? recordSources[0]?.name ?? null;
+    const source = recordSources.find((candidate) => candidate.name === sourceName) ?? null;
+    const allRepos: { repo_id: string; path: string | null }[] = [];
+    for (const each of recordSources) {
+      const listed = readerFor(each).repos();
+      if (listed.ok) allRepos.push(...listed.repos);
+    }
+    const labels = await listLabels(runtime.runtime.store, caller.tenant);
+    const presenting = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
+    const day = dayOf(params.get("day"));
+    const only = params.get("only") === "contradicted" ? ("contradicted" as const) : null;
+    let repos: { repo_id: string; path: string | null; temporary?: boolean }[] = [];
+    let lastDay: string | null = null;
+    let notice: string | null = null;
+    let repoId: string | null = params.get("repo");
+    let view: CompareView | null = null;
+    let sessions: ComparePageProps["sessions"] = [];
+    const labelOf = (sessionId: string, eventId: string): RunLabel | null => labels.find((l) => l.session_id === sessionId && l.event_id === eventId) ?? null;
+    const sessionId = params.get("session");
+    if (source === null) {
+      notice = "No record source is configured, so there is nothing to compare. Add a [[records.sources]] table to the config.";
+    } else {
+      const reader = readerFor(source);
+      const listed = reader.repos();
+      if (!listed.ok) notice = `The record could not be listed: ${listed.message}`;
+      else {
+        repos = listed.repos.map((r) => ({ ...r, temporary: r.path !== null && (r.path.startsWith(`${tmpDir().replace(/\/$/, "")}/`) || r.path.startsWith("/tmp/")) }));
+        repoId = repoId ?? repos[0]?.repo_id ?? null;
+        if (repoId === null) notice = "This record source holds no repositories yet, so there is nothing to compare.";
+        else {
+          const read = readLedgerDay(reader, { repoId, day, timeZone: deskTimeZone, cacheDir });
+          if (!read.ok) notice = `The record could not be read: ${read.message}`;
+          else {
+            lastDay = read.last_day;
+            const all = listSessions(read.rows);
+            const shown = only === "contradicted" ? onlyContradicted(all) : all;
+            sessions = shown.map((summary) => ({ ...summary, label: labelOf(summary.session_id, summary.event_id) }));
+            if (shown.length === 0) notice = `${only ? "No contradicted session on this day." : "No sessions are recorded on this day."}${read.last_day === null ? " The record holds no sessions on any day." : read.last_day === day ? "" : ` Last recorded session: ${read.last_day}.`}`;
+            if (sessionId !== null) {
+              view = compareSession({ rows: read.rows, sessionId, ...(loaded.config.workshop ? { workshopUrl: loaded.config.workshop.url } : {}), intact: { intact: read.intact, records: read.records, divergence: read.divergence } });
+              if (view === null) notice = "That session is not in the record for this day.";
+            }
+          }
+        }
+      }
+    }
+    const props: ComparePageProps = {
+      presenting,
+      selection: { source: sourceName, repo: repoId, day, session: sessionId, only },
+      sources: recordSources.map((each) => each.name),
+      repos,
+      lastDay,
+      sessions,
+      view,
+      label: view ? labelOf(view.session.session_id, view.session.event_id) : null,
+      notice,
+      labelError: params.get("label_error"),
+    };
+    return { props, view, repoNames: namesOfRepos(allRepos), labels };
+  }
+
+
+  // ---- Stage 2: the notebook and the live desk. Notes are the operator's own writing and are not sent to the record keeper. ----
+  const deskWho: Who = { tenant: caller.tenant, operator: caller.actor.id };
+  const deskDist = joinPath(import.meta.dir, "..", "dist", "desk");
+  let repoNameCache: { at: number; names: string[] } = { at: 0, names: [] };
+
+  /** Repository names to hide while Presenting is on. The record keeper is asked at most once a minute. */
+  function deskRepoNames(): string[] {
+    if (clock().getTime() - repoNameCache.at < 60_000 && repoNameCache.at !== 0) return repoNameCache.names;
+    const all: { repo_id: string; path: string | null }[] = [];
+    for (const each of recordSources) {
+      try {
+        const listed = readerFor(each).repos();
+        if (listed.ok) all.push(...listed.repos);
+      } catch {
+        // A record keeper that cannot be asked contributes no names; the desk still hides the ones it knows.
+      }
+    }
+    repoNameCache = { at: clock().getTime(), names: namesOfRepos(all) };
+    return repoNameCache.names;
+  }
+
+  /** The case keeper's cases, asked at most every two seconds so one poll and one view agree. */
+  let keeperCaseCache: { at: number; value: Awaited<ReturnType<typeof listCases>> } | null = null;
+  async function keeperCases(): Promise<Awaited<ReturnType<typeof listCases>> | null> {
+    if (caseKeeper === null) return null;
+    if (keeperCaseCache !== null && Date.now() - keeperCaseCache.at < 2_000) return keeperCaseCache.value;
+    const value = await listCases(caseKeeper);
+    keeperCaseCache = { at: Date.now(), value };
+    return value;
+  }
+  // A case is named by what its template says it is for. The template of a case never changes, so it is read once per case; a template's
+  // description is read once per template (and again, at most every 30 s, while some template is still unknown).
+  const caseTemplate = new Map<string, string | null>();
+  const templateWords = new Map<string, string | null>();
+  let templatesAt = 0;
+  async function titleOf(c: CaseLine): Promise<string> {
+    const fallback = caseTitle(c.summary, c.created_at);
+    if (caseKeeper === null) return fallback;
+    if (!caseTemplate.has(c.case_id)) {
+      const overview = await caseDigest(caseKeeper, c.case_id);
+      if (overview.kind !== "ok") return fallback;
+      caseTemplate.set(c.case_id, overview.value.template_ref);
+    }
+    const ref = caseTemplate.get(c.case_id) ?? null;
+    if (ref === null) return fallback;
+    if (!templateWords.has(ref) && Date.now() - templatesAt > 30_000) {
+      templatesAt = Date.now();
+      const options = await entryOptions(caseKeeper);
+      if (options.kind === "ok") for (const t of options.value.templates) templateWords.set(t.template_ref, t.description);
+    }
+    const description = templateWords.get(ref);
+    return readableTitle(description, ref) ?? fallback;
+  }
+  const isOpenCase = (c: CaseLine): boolean => c.case_state === "active" || c.case_state === "awaiting_approval";
+  const CASE_STATE_PLAIN: Record<string, string> = { active: "Running", awaiting_approval: "Waiting for your approval", completed: "Done", terminated: "Stopped" };
+
+  /** Horizon's own cases and the case keeper's, newest first. The status bar, the left list, Explore and Work all read this one list. */
+  async function deskCases(): Promise<DeskCase[]> {
+    const rows = await runtime.runtime.store.listRecords(CASE_COLLECTION, { tenant: caller.tenant });
+    const own = rows.map((row): DeskCase => ({ case_ref: String(row.value.case_ref), purpose: String(row.value.purpose), opened_at: String(row.value.opened_at), source: "horizon" }));
+    const listed = await keeperCases();
+    const theirs = listed?.kind === "ok" ? await Promise.all(listed.value.cases.map(async (c): Promise<DeskCase> => ({ case_ref: `case:${c.case_id}`, purpose: await titleOf(c), opened_at: c.created_at, source: "case keeper", state: CASE_STATE_PLAIN[c.case_state] ?? "Unknown state" }))) : [];
+    return [...own, ...theirs].sort((a, b) => (a.opened_at < b.opened_at ? 1 : -1));
+  }
+
+  async function deskState(params: URLSearchParams): Promise<DeskState> {
+    const store = runtime.runtime.store;
+    const now = clock();
+    const today = dayOf(null);
+    const day = dayOf(params.get("day"));
+    const status = cockpitStatus();
+    const openCaseNow = await latestCase(store, caller.tenant);
+    const casesNow = await deskCases();
+    // With no case opened in Horizon, the newest case still running at the case keeper is the open case.
+    const keeperOpen = casesNow.find((c) => c.source === "case keeper" && (c.state === "Running" || c.state === "Waiting for your approval")) ?? null;
+    const presenting = await presentingOn(store, caller.tenant, caller.actor.id);
+    const workshop = loaded.config.workshop ? keyState(loaded.config.workshop, now) : ({ state: "missing", days_left: null } as const);
+    const health = partsOf({ rules: world.worldRef !== "", cases: status.governed, records: recordSources.length > 0 || status.realitytrace, workshop: { state: workshop.state, days_left: "days_left" in workshop ? workshop.days_left : null } });
+    const sources = sourcesOf({ cases: status.governed, agentWork: workshop.state === "ok" || workshop.state === "expiring", records: recordSources.length > 0 || status.realitytrace });
+    const allMoves = await recentMoves();
+    const moves = status.governed ? allMoves : [];
+    const decide = await decideState(allMoves);
+    const noteId = params.get("note");
+    const selectedNote = noteId ? await getNote(store, deskWho, noteId) : null;
+    const base: Omit<DeskState, "rev"> = {
+      today,
+      day,
+      timezone: deskTimeZone,
+      status: {
+        org: caller.tenant,
+        setup: loaded.setup ?? null,
+        rules: world.worldRef === "" ? "" : statusOf({ worldRef: world.worldRef, governed: status.governed, realitytrace: status.realitytrace, approvals: status.approvals, operator: caller.actor.id }).world,
+        openCase: openCaseNow ? { case_ref: openCaseNow.case_ref, purpose: openCaseNow.purpose } : keeperOpen ? { case_ref: keeperOpen.case_ref, purpose: keeperOpen.purpose } : null,
+        waiting: waitingCount(decide),
+        parts: health.parts,
+        keyWarning: health.keyWarning,
+        presenting,
+        rulebookWarning: obligationRt !== null && obligationRt.rulebookConnected() === false ? "Rulebook not connected for records: new records are made without a rulebook edition." : null,
+      },
+      days: await listDays(store, deskWho),
+      cases: casesNow,
+      tags: await listTags(store, deskWho),
+      notes: await listDay(store, deskWho, day),
+      caseNotes: openCaseNow ?? keeperOpen ? await listCase(store, deskWho, (openCaseNow?.case_ref ?? keeperOpen!.case_ref)) : [],
+      activity: moves
+        .filter((move) => move.at !== null && new Intl.DateTimeFormat("en-CA", { timeZone: deskTimeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(move.at)) === day)
+        .map((move) => ({ id: `move:${move.intent_id}`, at: move.at as string, source: "Cases" as const, text: `${move.operation_ref}: ${move.decided.text}` }))
+        .sort((a, b) => (a.at < b.at ? -1 : 1)),
+      sources,
+      selected: selectedNote ? { note: selectedNote, history: await noteHistory(store, deskWho, selectedNote.note_id) } : null,
+      decide,
+      home: await homeState(params, openCaseNow !== null || keeperOpen !== null, allMoves),
+      panels: await panelsData(),
+    };
+    const shown = presenting ? applyStandIns(base, presentingKey(), deskRepoNames()) : base;
+    return { ...shown, rev: createHash("sha256").update(JSON.stringify(shown)).digest("hex").slice(0, 16) };
+  }
+
+  async function deskSearch(params: URLSearchParams): Promise<SearchResult> {
+    const store = runtime.runtime.store;
+    const q = (params.get("q") ?? "").trim();
+    const day = params.get("day") || null;
+    const tag = params.get("tag") || null;
+    const filtered = day !== null || tag !== null;
+    const notes = await searchNotes(store, deskWho, { q, ...(day ? { day } : {}), ...(tag ? { tag } : {}) });
+    const records = sourcesOf({ cases: true, agentWork: false, records: recordSources.length > 0 || cockpitStatus().realitytrace })[2]!;
+    const result: SearchResult = {
+      q,
+      day,
+      tag,
+      notes,
+      cases: filtered ? [] : (await deskCases()).filter((c) => matches(c.purpose, q)),
+      days: filtered ? [] : (await listDays(store, deskWho)).filter((d) => matches(d.day, q)),
+      tags: filtered ? [] : (await listTags(store, deskWho)).filter((t) => matches(t.name, q)),
+      records,
+    };
+    return (await presentingOn(store, caller.tenant, caller.actor.id)) ? applyStandIns(result, presentingKey(), deskRepoNames()) : result;
+  }
+
+  // ---- Stage 3: Decide, Work, and the home panels that used to live on the old workspace page ----
+  async function decideState(moves: readonly WorkspaceMove[]): Promise<DecideState> {
+    const inbox = await approvalInbox(clock());
+    let caseApprovals: CaseApprovals = { kind: "none" };
+    if (caseKeeper !== null && approvals !== undefined) {
+      const listed = await approvalList(caseKeeper);
+      caseApprovals = listed.kind === "ok" ? { kind: "listed", approvals: listed.value.approvals, unreadable: listed.value.unreadable } : listed.kind === "stale" ? { kind: "none" } : { kind: "notice", words: listed.words };
+    }
+    const holds = await activeHolds(runtime.runtime.store, caller.tenant);
+    const human = await humanSteps();
+    const proposedLessons = await listLessons(runtime.runtime.store, caller.tenant, "proposed");
+    const built = buildDecide({ inbox, moves, caseApprovals, holds, humanSteps: human.steps, extraNotices: human.notices, lessons: proposedLessons });
+    // Accepting a step is blocked while an answer the operator gave an agent about it has had no reply.
+    const answers = (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.step !== null);
+    if (answers.length === 0) return built;
+    const stepOf = (card: DecisionCardData): string | null => {
+      if (card.kind === "human_step") return /^human:[^:]+:(.+)$/.exec(card.id)?.[1] ?? null;
+      if (card.kind === "case_task" && caseApprovals.kind === "listed") return caseApprovals.approvals.find((row) => `case-task:${row.approval_id}` === card.id)?.plan_item_id ?? null;
+      return null;
+    };
+    return {
+      ...built,
+      cards: built.cards.map((card) => {
+        const step = stepOf(card);
+        return step !== null && acceptanceBlocked(answers, step) ? { ...card, blocked: card.blocked ?? WAITING_WORDS, preview: { ...card.preview, accept: null } } : card;
+      }),
+    };
+  }
+
+  /** Every human step that is running and not settled, in every open case at the case keeper. Each one waits for a person. */
+  async function humanSteps(): Promise<{ readonly steps: HumanStepInput[]; readonly notices: string[] }> {
+    const steps: HumanStepInput[] = [];
+    const notices: string[] = [];
+    if (caseKeeper === null) return { steps, notices };
+    const listed = await keeperCases();
+    if (listed === null) return { steps, notices };
+    if (listed.kind !== "ok") return { steps, notices: [`Steps waiting for you cannot be listed. ${listed.kind === "stale" ? REFUSED_OLD : listed.words}`] };
+    for (const c of listed.value.cases.filter(isOpenCase).slice(0, 20)) {
+      const horizon = await caseSteps(caseKeeper, c.case_id);
+      if (horizon.kind !== "ok") {
+        notices.push(`The steps of ${await titleOf(c)} could not be read, so one waiting for you may be missing. ${horizon.kind === "stale" ? REFUSED_OLD : horizon.words}`);
+        continue;
+      }
+      const waiting = horizon.value.steps.filter((s) => /^human_?task$/i.test(s.item_kind) && s.execution === "active" && s.settlement === "unsettled");
+      if (waiting.length === 0) continue;
+      const overview = await caseDigest(caseKeeper, c.case_id);
+      for (const step of waiting) steps.push({ case_id: c.case_id, case_title: await titleOf(c), plan_item_id: step.plan_item_id, name: step.name, last_event_at: step.last_event_at, digest: overview.kind === "ok" ? overview.value.digest : null });
+    }
+    return { steps, notices };
+  }
+
+  async function homeState(params: URLSearchParams, caseOpen: boolean, moves: readonly WorkspaceMove[]): Promise<HomeState> {
+    const store = runtime.runtime.store;
+    const status = cockpitStatus();
+    const committed = (await readIntentRecords(store)).some((entry) => entry.event.tenant === caller.tenant);
+    const skipped = await onboardingSkipped(store, caller.tenant, caller.actor.id);
+    const caseParam = params.get("case_error");
+    const receiptId = params.get("receipt");
+    const receipt = receiptId ? await receiptFor(receiptId) : null;
+    return {
+      onboarding: onboardingOf({ governed: status.governed, realitytrace: status.realitytrace, caseOpen, committed, skipped }),
+      caseError: caseParam === "empty" || caseParam === "too_long" ? caseParam : null,
+      moves,
+      receipt: receipt === null ? null : { intent_id: receipt.intent_id, found: receipt.found, move: receipt.move },
+      assurance: approvalAssuranceOf(process.env.HORIZON_APPROVAL_ASSURANCE),
+    };
+  }
+
+  const REFUSED_OLD = "That decision changed or is no longer waiting. Look at the new version and decide again.";
+
+  /** One decision from a card. The preview code the operator looked at must still be the card's, or nothing is done. */
+  /** A finding from a review, proposed as a lesson. It waits in Decide; only a person's accept makes it active. */
+  async function deskProposeLesson(request: Request): Promise<Response> {
+    const headers = { "cache-control": "no-store" };
+    let body: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(await request.text());
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("not an object");
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return Response.json({ ok: false, message: "That lesson could not be read. Nothing was recorded." }, { status: 400, headers });
+    }
+    const proposed = await proposeLesson(runtime.runtime.store, { tenant: caller.tenant, text: typeof body.text === "string" ? body.text : "", source: typeof body.source === "string" && body.source !== "" ? body.source.slice(0, 200) : null, proposed_by: typeof body.proposed_by === "string" && body.proposed_by.trim() !== "" ? body.proposed_by.trim().slice(0, 100) : "a review", now: clock() });
+    if (!proposed.ok) return Response.json({ ok: false, message: proposed.message }, { status: 400, headers });
+    return Response.json({ ok: true, message: "Lesson proposed. It waits in Decide until you accept it.", lesson_id: proposed.lesson.lesson_id, status: proposed.lesson.status }, { headers });
+  }
+
+  /** Mark done, approve, reject, hold: the same operation as before, and one conversation row for what came of it. */
+  async function deskDecide(request: Request): Promise<Response> {
+    let sent: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = JSON.parse(await request.clone().text());
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) sent = parsed as Record<string, unknown>;
+    } catch {
+      // The core answers an unreadable request in words.
+    }
+    const cardId = typeof sent.card_id === "string" ? sent.card_id : "";
+    const card = cardId === "" ? undefined : (await decideState(await recentMoves()).catch(() => null))?.cards.find((c) => c.id === cardId);
+    const response = await deskDecideCore(request);
+    if (card === undefined || (response.status === 400 && !response.ok)) return response;
+    const done = (await response.clone().json().catch(() => null)) as { ok?: boolean; message?: string; receipt?: string | null } | null;
+    const verb = sent.choice === "hold" ? "Held" : sent.choice === "release" ? "Released" : sent.choice === "reject" ? "Rejected" : card.kind === "human_step" ? "Marked done" : "Accepted";
+    const human = /^human:([^:]+):(.+)$/.exec(card.id);
+    await logRow({ source: "you", kind: "decision", words: `${verb}: ${card.title}`, outcome: done?.message ?? "", status: done?.ok === true ? "done" : "refused", refs: { ...(human ? { case_id: human[1]!, step_id: human[2]! } : {}), ...(typeof done?.receipt === "string" ? { intent_id: done.receipt } : {}) } });
+    return response;
+  }
+
+  async function deskDecideCore(request: Request): Promise<Response> {
+    const fail = (status: number, outcome: string, message: string, details: string | null = null): Response => Response.json({ ok: false, outcome, message, ...(details === null ? {} : { details }) }, { status, headers: { "cache-control": "no-store" } });
+    let body: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(await request.text());
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("not an object");
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return fail(400, "unreadable", "That decision could not be read. Nothing was done.");
+    }
+    const cardId = typeof body.card_id === "string" ? body.card_id : "";
+    const choice = body.choice;
+    const previewCode = typeof body.preview_code === "string" ? body.preview_code : "";
+    if (cardId === "" || (choice !== "accept" && choice !== "reject" && choice !== "hold" && choice !== "release")) return fail(400, "unreadable", "Choose accept, reject or hold on a card. Nothing was done.");
+    const store = runtime.runtime.store;
+    const now = clock();
+    const state = await decideState(await recentMoves());
+    const card = state.cards.find((candidate) => candidate.id === cardId);
+    if (card === undefined) return fail(404, "gone", "That decision is no longer waiting. It may have been answered somewhere else. Nothing was done.");
+    if (choice === "release") {
+      if (card.held === null) return fail(409, "not_held", "That card is not on hold.");
+      await putHold(store, { tenant: caller.tenant, card_id: card.id, reason: card.held.reason, released: true, now });
+      return Response.json({ ok: true, message: "Released. The card is back under Needs you." }, { headers: { "cache-control": "no-store" } });
+    }
+    if (card.held !== null) return fail(409, "held", "This one is on hold. Release the hold first.");
+    const sentRecords = Array.isArray(body.records) ? (body.records as unknown[]).flatMap((r) => (typeof r === "object" && r !== null && typeof (r as { ref?: unknown }).ref === "string" && typeof (r as { expected_digest?: unknown }).expected_digest === "string" ? [{ ref: (r as { ref: string }).ref, expected_digest: (r as { expected_digest: string }).expected_digest }] : [])) : [];
+    const sameRecords = JSON.stringify(sentRecords) === JSON.stringify(card.preview.records);
+    // The case keeper judges its own versions: for its approvals, what the operator saw is what gets sent to it.
+    const keeperJudges = card.kind === "case_task" && (choice === "accept" || choice === "reject");
+    if (previewCode !== card.preview.code && !(keeperJudges && !sameRecords)) return fail(409, "preview_out_of_date", "Preview out of date. What this decision shows changed while you were looking. Nothing was done. Look at the new preview and decide again.");
+    const needsReason = choice === "hold" || (choice === "accept" && card.reason_for_accept);
+    const reasonCheck = checkReason(body.reason);
+    if (needsReason && !reasonCheck.ok) return fail(400, "reason_needed", reasonCheck.message);
+    const reason = reasonCheck.ok ? reasonCheck.reason : null;
+    const audit = async (outcome: string): Promise<void> => {
+      try {
+        await recordDecision(store, { tenant: caller.tenant, operator: caller.actor.id, card_id: card.id, choice, reason, preview_code: previewCode, outcome, now });
+      } catch {
+        // The decision itself is already recorded where it counts; a missing audit row is not hidden by failing the answer.
+      }
+    };
+    if (choice === "hold") {
+      await putHold(store, { tenant: caller.tenant, card_id: card.id, reason: reason as string, released: false, now });
+      await audit("held");
+      return Response.json({ ok: true, message: "On hold. Nothing changed; the step keeps waiting. Release the hold to bring it back." }, { headers: { "cache-control": "no-store" } });
+    }
+    if (card.blocked !== null) return fail(409, "blocked", card.blocked);
+
+    if (card.kind === "escalation") {
+      const approvalId = card.id.slice("approval:".length);
+      let failure: unknown = null;
+      try {
+        await resolveNavigationApproval({ approvalId, resolution: choice === "accept" ? "approved" : "rejected" });
+      } catch (error) {
+        // A rejected commit fails by design and is audited; anything else is refused here.
+        if (!(error instanceof Error && error.message.startsWith("INTENT: governed commit refused"))) failure = error;
+      }
+      // What was decided and what happened is read back from the case keeper's own list, never from the click.
+      const readout = await approvalInbox(clock());
+      const listedItem = readout.state === "listed" ? [...readout.inbox.waiting, ...readout.inbox.decided].find((entry) => entry.approval_id === approvalId) : undefined;
+      const standing = listedItem === undefined ? null : { state: listedItem.state, resolved_by: listedItem.resolved_by };
+      if (failure !== null) {
+        const code = approvalErrorCode(failure);
+        // A later step failed after the decision was recorded: the decision itself still counts.
+        await audit(code === "followup_failed" ? (choice === "accept" ? "approved" : "rejected") : "refused");
+        return fail(409, code, failedDecision(code, standing), failure instanceof Error ? failure.message : String(failure));
+      }
+      await audit(choice === "accept" ? "approved" : "rejected");
+      const intentId = await intentIdForApproval(approvalId);
+      const confirmed = confirmedDecision(choice, standing);
+      return Response.json({ ok: confirmed.ok, ...(confirmed.ok ? {} : { outcome: "unconfirmed" }), message: confirmed.message, receipt: intentId }, { headers: { "cache-control": "no-store" } });
+    }
+
+    if (card.kind === "lesson") {
+      const decided = await decideLesson(store, { lesson_id: card.id, choice: choice === "accept" ? "accept" : "reject", person: caller.actor.id, now });
+      if (!decided.ok) {
+        await audit("refused");
+        return fail(409, "refused", decided.message);
+      }
+      await audit(choice === "accept" ? "lesson_active" : "lesson_rejected");
+      return Response.json({ ok: true, message: choice === "accept" ? "Lesson accepted. It is now active, recorded with your name and the time." : "Lesson rejected. It will not become active." }, { headers: { "cache-control": "no-store" } });
+    }
+
+    if (card.kind === "case_task") {
+      if (caseKeeper === null) return fail(503, "unreachable", "The case keeper is not set up, so this cannot be decided.");
+      const approvalId = card.id.slice("case-task:".length);
+      const listed = await approvalList(caseKeeper);
+      const row = listed.kind === "ok" ? listed.value.approvals.find((candidate) => candidate.approval_id === approvalId) : undefined;
+      if (listed.kind !== "ok") return fail(502, "unreachable", listed.kind === "stale" ? REFUSED_OLD : listed.words, detailsOf(listed));
+      if (row === undefined) return fail(404, "gone", "That decision is no longer waiting. Nothing was done.");
+      if (sentRecords.length === 0) return fail(400, "unreadable", "This decision did not carry the version you looked at, so it was not sent. Nothing was done.");
+      const decideBase = `horizon:decide:${approvalId}:${choice}`;
+      const decideId = await requestIdFor(store, caller.tenant, decideBase);
+      const result = await caseKeeperDecide(caseKeeper, {
+        case_id: row.case_id,
+        approval_id: approvalId,
+        decision: choice === "accept" ? "approve" : "reject",
+        ...(reason ? { note: reason } : {}),
+        request_id: decideId,
+        preconditions: { records: sentRecords },
+      });
+      if (result.kind === "stale" || result.kind === "refused") await attemptRefused(store, caller.tenant, decideBase, decideId);
+      if (result.kind === "ok") {
+        await audit(choice === "accept" ? "approved" : "rejected");
+        return Response.json({ ok: true, message: choice === "accept" ? "Approved. The case keeper recorded your decision." : "Rejected. The case keeper recorded your decision." }, { headers: { "cache-control": "no-store" } });
+      }
+      await audit(result.kind === "stale" ? "refused_as_stale" : result.kind);
+      if (result.kind === "stale") return fail(409, "stale", `The case keeper refused this: ${result.words}`);
+      return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words, detailsOf(result));
+    }
+
+    if (card.kind === "human_step") {
+      if (caseKeeper === null) return fail(503, "unreachable", "The case keeper is not set up, so this cannot be done.");
+      const [, caseId, itemId] = /^human:([^:]+):(.+)$/.exec(card.id) ?? [];
+      if (caseId === undefined || itemId === undefined) return fail(400, "unreadable", "That step is not one Horizon knows. Nothing was done.");
+      if (reason === null) return fail(400, "reason_needed", "Type a reason first. It is kept with the decision.");
+      // `human_task_complete` takes no preconditions, so the case keeper cannot refuse a stale request itself. Horizon reads the
+      // case's version again right now and refuses locally if it is not the one the card pinned.
+      const pinned = card.preview.records[0];
+      const fresh = await caseDigest(caseKeeper, caseId);
+      if (fresh.kind !== "ok") return fail(fresh.kind === "stale" ? 409 : fresh.kind === "refused" ? 409 : 502, fresh.kind, fresh.kind === "stale" ? REFUSED_OLD : fresh.words, detailsOf(fresh));
+      if (pinned === undefined || fresh.value.digest === null || fresh.value.digest.expected_digest !== pinned.expected_digest) return fail(409, "preview_out_of_date", "Preview out of date. This case changed after you looked at it. Nothing was done. Look at the new preview and decide again.");
+      const humanBase = `horizon:human:${caseId}:${itemId}`;
+      const humanId = await requestIdFor(store, caller.tenant, humanBase);
+      const result = await humanTaskComplete(caseKeeper, { case_id: caseId, item_id: itemId, justification: reason, request_id: humanId });
+      if (result.kind === "stale" || result.kind === "refused") await attemptRefused(store, caller.tenant, humanBase, humanId);
+      if (result.kind === "ok") {
+        await audit("marked_done");
+        return Response.json({ ok: true, message: "Marked done. The case keeper recorded your reason." }, { headers: { "cache-control": "no-store" } });
+      }
+      await audit(result.kind);
+      if (result.kind === "stale") return fail(409, "stale", `The case keeper refused this: ${result.words}`);
+      return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words, detailsOf(result));
+    }
+
+    // acceptance: the observe and rule steps of a committed move
+    const cut = card.id.lastIndexOf(":");
+    const phase = card.id.slice(cut + 1);
+    const intentId = card.id.slice("settle:".length, cut);
+    if (phase !== "observe" && phase !== "rule") return fail(400, "unreadable", "That check is not one Horizon knows. Nothing was done.");
+    try {
+      await settleNavigationIntent(intentId, phase);
+    } catch (error) {
+      await audit("refused");
+      return fail(409, "refused", error instanceof Error ? error.message : String(error));
+    }
+    await audit(phase === "rule" ? "signed_off" : "observed");
+    return Response.json({ ok: true, message: phase === "rule" ? "Signed off. The case keeper ruled on the evidence and the answer is recorded." : "Checked. The record keeper observed the move and sent the evidence on.", receipt: intentId }, { headers: { "cache-control": "no-store" } });
+  }
+
+  async function deskWork(params: URLSearchParams): Promise<WorkData> {
+    const data = await compareData(params);
+    const presenting = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
+    let cases: WorkData["cases"] = { connected: false, words: "Cases are not connected, so running work cannot be shown.", items: [], unreadable: 0 };
+    let knowledge: AcceptedKnowledge = { kind: "unknown", why: "Cases are not connected, so no outcome can be counted as accepted." };
+    if (caseKeeper !== null) {
+      const listed = await listCases(caseKeeper);
+      if (listed.kind === "ok") {
+        const waitingMap = await waitingToStart(listed.value.cases);
+        cases = { connected: true, words: listed.value.cases.length === 0 ? "No cases yet." : `${listed.value.cases.length} ${listed.value.cases.length === 1 ? "case" : "cases"}.`, items: await Promise.all(listed.value.cases.map(async (c) => ({ ...c, title: await titleOf(c), waiting: (waitingMap.get(c.case_id) ?? []) as { plan_item_id: string; name: string }[] }))), unreadable: listed.value.unreadable.length };
+        knowledge = listed.value.unreadable.length > 0 ? { kind: "unknown", why: "some cases could not be read, so the count of accepted outcomes cannot be trusted." } : { kind: "known", completed: listed.value.cases.filter((c) => c.case_state === "completed").map((c) => c.case_id) };
+      } else {
+        const words = listed.kind === "stale" ? REFUSED_OLD : listed.words;
+        cases = { connected: false, words, items: [], unreadable: 0 };
+        knowledge = { kind: "unknown", why: words };
+      }
+    }
+    const work: WorkData = {
+      compare: data.props,
+      items: orderWork([...sessionItems(data.props.sessions), ...caseItems(cases.items)]),
+      cases,
+      cost: costSource(economics.read(), knowledge),
+    };
+    return presenting ? applyStandIns(work, presentingKey(), data.repoNames) : work;
+  }
+
+  const DESK_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon desk</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/desk/app.css"></head><body><div id="root"></div><noscript>The desk needs JavaScript to show live updates. Turn it on for this page.</noscript><script type="module" src="/desk/app.js"></script></body></html>`;
+  const SETUP_GUIDE_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon setup guide</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:1rem auto;padding:0 1rem}code{overflow-wrap:anywhere}</style></head><body><p><a href="/workspace">Back to the desk</a></p><h1>Setup guide</h1><h2>Start Horizon with the case keeper and record keeper</h2><p>Start the whole set with <code>bun run ignite</code> (see docs/IGNITION.md).</p><h2>Record what agent work costs</h2><ol><li>Install the agent tap with the record keeper: <code>te-agents install --with-realitytrace</code></li><li>Enroll each repository you want measured: <code>te-agents rt enroll &lt;repo&gt;</code></li><li>Point Horizon at the record keeper and the tap's store: set <code>HORIZON_ECONOMICS_REALITYTRACE_BIN</code> (and, if the tap does not use the default location, <code>HORIZON_ECONOMICS_DATA_HOME</code> and <code>HORIZON_ECONOMICS_STATE_HOME</code>), or add an <code>[economics]</code> table with <code>realitytrace_bin</code> to the Horizon config.</li></ol></body></html>`;
+  const deskPage = (): Response => new Response(DESK_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": DESK_CSP, "x-content-type-options": "nosniff" } });
+  const DESK_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+
+  async function deskAsset(name: "app.js" | "app.css"): Promise<Response> {
+    const path = joinPath(deskDist, name);
+    if (!fileExists(path)) return new Response("The desk has not been built yet. Run: bun run build:desk", { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } });
+    return new Response(Bun.file(path), { headers: { "content-type": name === "app.js" ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8", "cache-control": "no-cache", "x-content-type-options": "nosniff" } });
+  }
+
+  // ---- Stage 4: panels from agents. The open panels are held here; the person's answers are kept in `horizon-panel-answers`. ----
+  let panelBoard: PanelsBoard = NO_PANELS;
+
+  /** The question's own words and the open-question test for one panel, from the board. */
+  const askOf = (panelId: string, askId: string): { readonly question: string } | null => {
+    const q = panelBoard.open.find((p) => p.id === panelId)?.blocks.find((b) => b.kind === "question" && b.id === askId) as { question?: string } | undefined;
+    return q === undefined ? null : { question: q.question ?? "" };
+  };
+  const stillAsking = (panelId: string): boolean => (panelBoard.open.find((p) => p.id === panelId)?.blocks ?? []).some((b) => { const q = b as unknown as { kind?: string; answered?: unknown; withdrawn?: unknown }; return q.kind === "question" && q.answered == null && q.withdrawn == null; });
+  /** The panel's own conversation entry follows the panel: "Waiting for you" only while a question is open. */
+  async function settlePanelRow(panelId: string, outcome: string): Promise<void> {
+    try {
+      const row = await panelRowOf(runtime.runtime.store, deskWho, panelId);
+      if (row === undefined) return;
+      await updateRow(runtime.runtime.store, deskWho, row.row_id, stillAsking(panelId) ? { status: "waiting", outcome: "An agent asks you a question." } : { status: "done", outcome });
+    } catch {
+      // The record is a read model.
+    }
+  }
+
+  /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`, `ask.withdraw`, `answer.route`). To choose parts well an agent reads `GET /desk/panels/catalogue`. A reply on a panel clears the wait on the answers given there. */
+  async function applyAgentOp(op: AgentOp, agentName?: string): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
+    if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied) };
+    // Only the agent saying where an answer went closes it; nothing else counts as a reply.
+    if (op.tool === "answer.route") {
+      const routed = await routeAnswer(runtime.runtime.store, caller.tenant, op.panel_id, op.ask_id, op.routed_as);
+      if (!routed.ok) return { ok: false, code: "SCHEMA", message: routed.message };
+    }
+    const question = op.tool === "answer.route" || op.tool === "ask.withdraw" ? askOf(op.panel_id, op.ask_id)?.question ?? null : null;
+    const { state, result } = reduceAgent(panelBoard, op);
+    if (!result.ok) return result;
+    panelBoard = state;
+    const by = agentName === undefined ? {} : { agent_name: agentName };
+    if (op.tool === "answer.route") {
+      const where = `The agent took it to: ${op.routed_as.trim()}`;
+      // One entry per answer: the one made when you answered is finished in place.
+      const mine = await answerRowOf(runtime.runtime.store, deskWho, op.panel_id, op.ask_id);
+      await logRow({ source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id } });
+      await settlePanelRow(op.panel_id, "You answered. The agent has taken it on.");
+    }
+    if (op.tool === "ask.withdraw") {
+      const why = `The agent withdrew this question: ${op.reason.trim()}`;
+      const mine = await answerRowOf(runtime.runtime.store, deskWho, op.panel_id, op.ask_id);
+      if (mine !== undefined) await logRow({ source: "you", kind: "answer", words: mine.words, outcome: why, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id } });
+      await settlePanelRow(op.panel_id, why);
+    }
+    if (result.panel !== null && (op.tool === "show_surface" || op.tool === "ask_human")) {
+      const panel = panelBoard.open.find((p) => p.id === result.panel);
+      const asking = stillAsking(result.panel);
+      await logRow({ source: "agent", ...by, kind: "panel", words: panel?.title ?? result.panel, outcome: asking ? "An agent asks you a question." : "An agent put this up.", status: asking ? "waiting" : "done", refs: { panel_id: result.panel, ...(panel?.step ? { step_id: panel.step } : {}) } });
+    }
+    return result;
+  }
+
+  /**
+   * The agents' door for panels: `POST /agent/panels` (one AgentOp), `GET /agent/panels/answers`, `GET /agent/panels/catalogue`.
+   * It needs `Authorization: Bearer <the agent key>`: a key Horizon keeps (mode 0600) in the setup's secrets folder as agent.key, the same across restarts.
+   * The page-agent header is not a key and is refused here. Only agent tools pass; the person's operations never do.
+   */
+  const AGENT_TOOLS = ["show_surface", "ask_human", "arrange", "annotate", "read_responses", "ask.withdraw", "answer.route"] as const;
+  async function agentDoor(request: Request, pathname: string): Promise<Response> {
+    const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
+    const refuse = (status: number, message: string): Response => Response.json({ ok: false, message }, { status, headers });
+    const given = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
+    const a = Buffer.from(given);
+    const b = Buffer.from(loaded.agentKey);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return refuse(401, "This door needs the agent key. Send it as: Authorization: Bearer <key>. The key is in the setup's secrets folder, in agent.key.");
+    if (pageAgentOf(request) !== null) return refuse(403, "An agent on the page cannot use this door.");
+    const name = cleanAgentName(request.headers.get("x-horizon-agent-name"));
+    if (pathname === "/agent/panels/catalogue" && request.method === "GET") return Response.json({ schema: SURFACE_SCHEMA, vocabulary: vocabulary(), blocks: CATALOGUE }, { headers });
+    if (pathname === "/agent/panels/answers" && request.method === "GET") {
+      const done = await applyAgentOp({ tool: "read_responses" }, name);
+      return Response.json({ ok: true, responses: done.ok ? done.responses ?? [] : [] }, { headers });
+    }
+    if (pathname !== "/agent/panels" || request.method !== "POST") return refuse(404, "There is nothing at this address. Use POST /agent/panels, GET /agent/panels/answers or GET /agent/panels/catalogue.");
+    const text = await request.text();
+    if (text.length > 500_000) return refuse(413, "That is too large. Send a smaller panel.");
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return refuse(400, "That could not be read as JSON. Nothing was changed.");
+    }
+    const op = body as Record<string, unknown> | null;
+    if (op === null || typeof op !== "object" || Array.isArray(op)) return refuse(400, "Send one object with a \"tool\" field. Nothing was changed.");
+    if (typeof op.op === "string" && op.op.startsWith("human.")) return refuse(403, "Only the person can do that. An agent cannot answer, pin, close or open a panel for them.");
+    if (typeof op.tool !== "string" || !(AGENT_TOOLS as readonly string[]).includes(op.tool)) return refuse(400, `Say which tool: ${AGENT_TOOLS.join(", ")}. Nothing was changed.`);
+    const done = await applyAgentOp(op as unknown as AgentOp, name);
+    return done.ok ? Response.json(done, { headers }) : Response.json(done, { status: done.code === "NOT_FOUND" ? 404 : 400, headers });
+  }
+
+  /** The person's operations on panels: answer, pin, close, open, and stop waiting for an agent's reply. */
+  async function deskPanelOp(request: Request): Promise<Response> {
+    const headers = { "cache-control": "no-store" };
+    const fail = (status: number, message: string): Response => Response.json({ ok: false, message }, { status, headers });
+    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    if (body === null || typeof body !== "object" || typeof body.op !== "string") return fail(400, "That could not be read. Nothing was changed.");
+    const store = runtime.runtime.store;
+    if (body.op === "human.stop_waiting") {
+      if (typeof body.step !== "string" || body.step === "") return fail(400, "Say which step to stop waiting for.");
+      const n = await stopWaiting(store, caller.tenant, body.step);
+      return Response.json({ ok: true, message: n === 0 ? "Nothing was waiting." : "Stopped waiting. The step can be accepted now." }, { headers });
+    }
+    if (body.op === "human.answer") {
+      const outcome = body.outcome;
+      const value = checkValue(body.value);
+      if (typeof body.panel !== "string" || typeof body.ask !== "string" || !(OUTCOMES as readonly unknown[]).includes(outcome) || !value.ok) return fail(400, "That answer could not be read. Nothing was sent.");
+      if (outcome === "answered" && (value.value === null || value.value === "")) return fail(400, "Pick an answer first, or choose Not now.");
+      const note = typeof body.note === "string" && body.note.trim() !== "" ? body.note.trim().slice(0, 600) : null;
+      const before = panelBoard;
+      const step = before.open.find((p) => p.id === body.panel)?.step ?? null;
+      const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note });
+      if (!result.ok) return fail(409, result.message);
+      // Store what the question accepted (a text answer is trimmed), not the raw body.
+      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string }[] } | undefined;
+      const checked = outcome === "answered" && askBlock !== undefined ? answerFor({ input: askBlock.input ?? "select", options: askBlock.options }, value.value) : null;
+      if (checked !== null && !checked.ok) return fail(400, checked.message);
+      const stored = checked !== null && checked.ok ? checked.value : value.value;
+      try {
+        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, now: clock() });
+      } catch {
+        return fail(500, "Your answer was not saved. Nothing was sent. Try again.");
+      }
+      panelBoard = state;
+      const sentWords = outcome === "answered" ? "Sent. Waiting for the agent to say where it went." : outcome === "deferred" ? "Put off. Waiting for the agent to say where it went." : "Cancelled. Waiting for the agent to say where it went.";
+      await logRow({ source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: WAITING_FOR_AGENT, status: "waiting", refs: { panel_id: body.panel, ask_id: body.ask, ...(step ? { step_id: step } : {}) } });
+      await settlePanelRow(body.panel, "You answered. Waiting for the agent to say where it went.");
+      return Response.json({ ok: true, message: sentWords }, { headers });
+    }
+    const op: HumanOp | null =
+      body.op === "human.pin" && typeof body.id === "string" && typeof body.pinned === "boolean" ? { op: "human.pin", id: body.id, pinned: body.pinned }
+      : body.op === "human.close" && typeof body.id === "string" ? { op: "human.close", id: body.id }
+      : body.op === "human.open" && typeof body.template === "string" ? { op: "human.open", template: body.template, ...(typeof body.title === "string" ? { title: body.title } : {}) }
+      : null;
+    if (op === null) return fail(400, "That is not something a panel can do. Nothing was changed.");
+    const { state, result } = reduceHuman(panelBoard, op);
+    if (!result.ok) return fail(409, result.message);
+    panelBoard = state;
+    return Response.json({ ok: true, message: "Done." }, { headers });
+  }
+
+  async function panelsData(): Promise<PanelsData> {
+    const waiting = new Map<string, string>();
+    for (const a of await listAnswers(runtime.runtime.store, caller.tenant)) if (!a.replied && a.step !== null && !waiting.has(a.step)) waiting.set(a.step, a.panel_id);
+    return { ...panelBoard, waiting: [...waiting].map(([step, panel]) => ({ step, panel })) };
+  }
+
+  /** Starts the waiting steps of a case (`case_advance`). The id names one attempt; a refusal moves it on, a timeout keeps it. */
+  async function startCase(caseId: string, base: string): Promise<{ readonly ok: boolean; readonly words: string }> {
+    if (caseKeeper === null) return { ok: false, words: "Cases are not connected." };
+    const store = runtime.runtime.store;
+    const id = await requestIdFor(store, caller.tenant, base);
+    const result = await caseAdvance(caseKeeper, caseId, id);
+    if (result.kind === "ok") return { ok: true, words: "Started." };
+    if (result.kind === "stale" || result.kind === "refused") await attemptRefused(store, caller.tenant, base, id);
+    return { ok: false, words: result.kind === "stale" ? REFUSED_OLD : result.words };
+  }
+
+  /** Steps that were added but have not started, per open case. They are listed under Work as "Waiting to start". */
+  async function waitingToStart(cases: readonly CaseLine[]): Promise<Map<string, { plan_item_id: string; name: string }[]>> {
+    const out = new Map<string, { plan_item_id: string; name: string }[]>();
+    if (caseKeeper === null) return out;
+    for (const c of cases.filter(isOpenCase).slice(0, 20)) {
+      const horizon = await caseSteps(caseKeeper, c.case_id);
+      if (horizon.kind !== "ok") continue;
+      const pending = horizon.value.steps.filter((st) => st.execution === "pending").map((st) => ({ plan_item_id: st.plan_item_id, name: st.name }));
+      if (pending.length > 0) out.set(c.case_id, pending);
+    }
+    return out;
+  }
+
+  async function deskStart(request: Request): Promise<Response> {
+    const headers = { "cache-control": "no-store" };
+    const body = (await request.json().catch(() => null)) as { case_id?: unknown } | null;
+    if (caseKeeper === null) return Response.json({ ok: false, message: "Cases are not connected, so nothing can be started." }, { status: 503, headers });
+    const caseId = typeof body?.case_id === "string" ? body.case_id.replace(/^case:/, "") : "";
+    const listed = await listCases(caseKeeper);
+    if (listed.kind !== "ok") return Response.json({ ok: false, message: listed.kind === "stale" ? REFUSED_OLD : listed.words }, { status: 502, headers });
+    const target = listed.value.cases.find((c) => c.case_id === caseId && isOpenCase(c));
+    if (target === undefined) return Response.json({ ok: false, message: "That case is not running, so nothing can be started." }, { status: 409, headers });
+    const waiting = (await waitingToStart([target])).get(caseId) ?? [];
+    if (waiting.length === 0) return Response.json({ ok: false, message: "Nothing is waiting to start in that case." }, { status: 409, headers });
+    // The id names this set of waiting steps: a later, different set is a different request.
+    const digest = createHash("sha256").update(waiting.map((w) => w.plan_item_id).sort().join("\n")).digest("hex").slice(0, 12);
+    const result = await startCase(caseId, `advance:start:${caseId}:${digest}`);
+    keeperCaseCache = null;
+    return Response.json(result.ok ? { ok: true, message: "Started. The waiting steps are under way." } : { ok: false, message: `It did not start: ${result.words}` }, { status: result.ok ? 200 : 502, headers });
+  }
+
+  /** A hand off answer that shows case and step names: while Presenting is on, repository names in it get their stand-ins. */
+  async function presentedJson(body: unknown, headers: Record<string, string>): Promise<Response> {
+    const on = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
+    return Response.json(on ? applyStandIns(body, presentingKey(), deskRepoNames()) : body, { headers });
+  }
+
+  /** Hand off (stage 4): `POST /desk/handoff/preview` shows the step that would be added; `POST /desk/handoff` adds it. */
+  async function deskHandoff(request: Request, phase: "preview" | "send", page: PageAgent | null = null): Promise<Response> {
+    let sent: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = JSON.parse(await request.clone().text());
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) sent = parsed as Record<string, unknown>;
+    } catch {
+      // The core answers an unreadable request in words.
+    }
+    const words = typeof sent.text === "string" ? sent.text.trim() : "";
+    const draftId = typeof sent.draft_id === "string" ? sent.draft_id : "";
+    const source: RowSource = page ? "page-agent" : "you";
+    const named = page?.name === undefined ? {} : { agent_name: page.name };
+    const response = await deskHandoffCore(request, phase, true);
+    // The answer goes out with stand-ins when Presenting is on; the row keeps the real words and shows them the same way.
+    const body = (await response.clone().json().catch(() => null)) as Record<string, any> | null;
+    const outcomeWords = typeof body?.message === "string" ? body.message : "That did not work.";
+    if (phase === "preview") {
+      if (response.ok && body?.preview) await logRow({ source, ...named, kind: page ? "handoff-proposal" : "handoff", words, outcome: page ? "An agent suggests this. Nothing is sent until you confirm." : "Preview ready. Nothing is sent until you confirm.", status: "waiting", refs: { case_id: String(body.preview.case_id), step_id: String(body.preview.step_id), draft_id: draftId } });
+      else if (!page && words !== "" && response.status !== 400) await logRow({ source, kind: "handoff", words, outcome: outcomeWords, status: "refused", refs: { draft_id: draftId } });
+    } else if (words !== "" && draftId !== "" && !(response.status === 400)) {
+      const ok = response.ok;
+      try {
+        await settleDraftRow(runtime.runtime.store, deskWho, draftId, ok ? "done" : "refused", outcomeWords, { source: "you", kind: "handoff", words, outcome: outcomeWords, status: ok ? "done" : "refused", refs: { ...(ok && typeof body?.step_id === "string" ? { step_id: body.step_id } : {}) } }, clock());
+      } catch {
+        // The hand off already happened; a missing row is not hidden by failing the answer.
+      }
+    }
+    return response.ok && body !== null ? presentedJson(body, { "cache-control": "no-store" }) : response;
+  }
+
+  async function deskHandoffCore(request: Request, phase: "preview" | "send", raw = false): Promise<Response> {
+    const headers = { "cache-control": "no-store" };
+    const out = (body: unknown, h: Record<string, string>): Promise<Response> | Response => (raw ? Response.json(body, { headers: h }) : presentedJson(body, h));
+    const fail = (status: number, outcome: string, message: string, details: string | null = null): Response => Response.json({ ok: false, outcome, message, ...(details === null ? {} : { details }) }, { status, headers });
+    if (caseKeeper === null) return fail(503, "unreachable", "Cases are not connected, so work cannot be handed off.");
+    let body: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(await request.text());
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("not an object");
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return fail(400, "unreadable", "That hand off could not be read. Nothing was sent.");
+    }
+    const draftId = body.draft_id;
+    const text = typeof body.text === "string" ? body.text : "";
+    if (!validDraftId(draftId)) return fail(400, "unreadable", "That hand off has no draft number. Nothing was sent.");
+    if (stepNameOf(text) === "") return fail(400, "empty", "Type what you want done first.");
+    if (text.length > DRAFT_TEXT_MAX) return fail(400, "too_long", `That is too long for one step (limit ${DRAFT_TEXT_MAX} characters). Split it into smaller steps.`);
+    const store = runtime.runtime.store;
+    // The case to add to: the one named, else the newest case that is still running.
+    const listed = await listCases(caseKeeper);
+    if (listed.kind !== "ok") return fail(502, listed.kind, listed.kind === "stale" ? REFUSED_OLD : listed.words, detailsOf(listed));
+    const open = listed.value.cases.filter(isOpenCase).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    const wanted = typeof body.case_id === "string" && body.case_id !== "" ? body.case_id.replace(/^case:/, "") : (open[0]?.case_id ?? "");
+    const target = open.find((c) => c.case_id === wanted);
+    if (target === undefined) return fail(409, "no_case", wanted === "" ? "There is no running case to add a step to. Start a case first." : "That case is not running, so a step cannot be added to it.");
+    const caseTitleNow = await titleOf(target);
+    // Run a review: the new step is marked as a review, and it points at a finished step whose agent work it checks.
+    const reviewAsked = typeof body.review === "object" && body.review !== null && !Array.isArray(body.review);
+    const reviewStepId = reviewAsked && typeof (body.review as { step_id?: unknown }).step_id === "string" ? ((body.review as { step_id: string }).step_id) : "";
+    let reviewable: { step_id: string; name: string }[] = [];
+    if (reviewAsked) {
+      const horizon = await caseSteps(caseKeeper, target.case_id);
+      if (horizon.kind !== "ok") return fail(horizon.kind === "refused" || horizon.kind === "stale" ? 409 : 502, horizon.kind, horizon.kind === "stale" ? REFUSED_OLD : horizon.words, detailsOf(horizon));
+      reviewable = horizon.value.steps.filter((st) => st.execution === "completed").map((st) => ({ step_id: st.plan_item_id, name: st.name }));
+      if (reviewStepId === "" && phase === "send") return fail(400, "no_review_target", "Choose which finished work to review first. Nothing was sent.");
+      if (reviewStepId !== "" && !reviewable.some((st) => st.step_id === reviewStepId)) return fail(409, "not_finished", "That step has no finished work to review. Nothing was sent.");
+    }
+    const item = handoffItem(draftId, text, reviewAsked);
+    const agent = deskAgent();
+    if (phase === "preview") {
+      await saveDraft(store, caller.tenant, caller.actor.id, { draftId, text, mode: "handoff" });
+      const dry = await addItem(caseKeeper, { case_id: target.case_id, item, dry_run: true });
+      if (dry.kind !== "ok") return fail(dry.kind === "refused" ? 409 : dry.kind === "stale" ? 409 : 502, dry.kind, dry.kind === "stale" ? REFUSED_OLD : dry.words, detailsOf(dry));
+      if (dry.value.plan_precondition === null) return fail(502, "unreadable", "The case keeper did not give a version code for this case, so the hand off cannot be tied to what you see. Try again in a moment.");
+      return out({ ok: true, preview: { draft_id: draftId, case_id: target.case_id, case_title: caseTitleNow, step_name: item.name, step_id: dry.value.plan_item_id, check: "The case keeper checked this step against the case and it fits.", plan_precondition: dry.value.plan_precondition, agent, review: reviewAsked ? { reviewable } : null } }, headers);
+    }
+    const pre = body.plan_precondition;
+    if (typeof pre !== "object" || pre === null || typeof (pre as { ref?: unknown }).ref !== "string" || typeof (pre as { expected_digest?: unknown }).expected_digest !== "string") {
+      return fail(400, "unreadable", "This hand off did not carry the version you looked at, so it was not sent. Nothing was done.");
+    }
+    const wantsAgent = body.assign === true;
+    if (wantsAgent && !agent.offered) return fail(409, "not_connected", `${agent.words} Nothing was sent.`);
+    const sentId = await requestIdFor(store, caller.tenant, handoffRequestId(draftId));
+    const sent = await addItem(caseKeeper, {
+      case_id: target.case_id,
+      item,
+      request_id: sentId,
+      dry_run: false,
+      preconditions: { records: [{ ref: (pre as { ref: string }).ref, expected_digest: (pre as { expected_digest: string }).expected_digest }] },
+    });
+    // A refusal is remembered by the case keeper under this id, so the next try gets a new one. A timeout keeps the id.
+    if (sent.kind === "stale" || sent.kind === "refused") await attemptRefused(store, caller.tenant, handoffRequestId(draftId), sentId);
+    if (sent.kind === "stale") return fail(409, "preview_out_of_date", "Preview out of date. This case changed after you looked at it. Nothing was sent. Look at the new preview and decide again.");
+    if (sent.kind !== "ok") return fail(sent.kind === "refused" ? 409 : 502, sent.kind, sent.words, detailsOf(sent));
+    // A step that was added stays waiting until the case is advanced. If starting fails, the step is still there.
+    const started = await startCase(target.case_id, `advance:${sentId}`);
+    let assigned: { readonly done: boolean; readonly words: string } | null = null;
+    if (wantsAgent) {
+      const access = options.workshop?.() ?? workshopAccess(loaded.config.workshop, caller, clock());
+      const result = await assignToAgent(access, { caseId: target.case_id, stepId: sent.value.plan_item_id, expertId: loaded.config.workshop?.expert_id ?? "", workspaceId: loaded.config.workshop?.workspace_id ?? "", message: text, ...(reviewAsked ? { reviews: assignmentId(target.case_id, reviewStepId) } : {}) });
+      assigned = result.kind === "ok" ? { done: true, words: "Given to an agent." } : { done: false, words: result.words };
+    }
+    const next = await nextDraft(store, caller.tenant, caller.actor.id, draftId);
+    return out({ ok: true, message: `Handed off: "${item.name}" is now a step in "${caseTitleNow}".${started.ok ? " It has started." : ` It has not started yet: ${started.words} Use Start it under Work.`}${assigned === null ? "" : assigned.done ? " It was given to an agent." : ` It was not given to an agent: ${assigned.words}`}`, step_id: sent.value.plan_item_id, started, assigned, draft_id: next.draftId }, headers);
+  }
+
+  /** Whether a step can be given to an agent right now, in words. Nothing is offered that would fail silently. */
+  function deskAgent(): { readonly offered: boolean; readonly words: string } {
+    const access = options.workshop?.() ?? workshopAccess(loaded.config.workshop, caller, clock());
+    if (access.kind !== "ready") return { offered: false, words: access.words.replace(/^Agent work is not connected: /, "Agent work: Not connected. ") };
+    if (options.workshop === undefined && (!loaded.config.workshop?.expert_id || !loaded.config.workshop?.workspace_id)) return { offered: false, words: "Agent work: Not connected. No agent is chosen for handed-off steps yet." };
+    return { offered: true, words: "An agent can take this step." };
+  }
+
+  /** One conversation row. Never fails the move it describes: a row that could not be kept is only missing from the record. */
+  async function logRow(input: Parameters<typeof appendRow>[2]): Promise<void> {
+    try {
+      await appendRow(runtime.runtime.store, deskWho, input, clock());
+    } catch (error) {
+      // The operation itself is already done or refused; the record is a read model. A failed
+      // write is logged by its kind only, so the gap is visible to whoever runs the desk.
+      console.error(`conversation: a row could not be recorded (${error instanceof Error ? error.name : "unknown error"})`);
+    }
+  }
+
+  async function deskSaveNote(request: Request): Promise<Response> {
+    const text = await request.text();
+    if (text.length > 1_000_000) return Response.json({ ok: false, message: "That note is too large to save. Split it into smaller notes." }, { status: 413 });
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return Response.json({ ok: false, message: "That note could not be read. Try typing it again." }, { status: 400 });
+    }
+    try {
+      const note = await saveNote(runtime.runtime.store, { ...deskWho, input: body, now: clock(), timeZone: deskTimeZone });
+      await logRow({ source: "you", kind: "note", words: note.body, outcome: `Saved to ${note.day}.`, status: "done", refs: note.case_ref ? { case_id: note.case_ref } : {} });
+      return Response.json({ ok: true, note }, { headers: { "cache-control": "no-store" } });
+    } catch (error) {
+      if (error instanceof NoteRefused) await logRow({ source: "you", kind: "note", words: typeof (body as { body?: unknown } | null)?.body === "string" ? (body as { body: string }).body : "", outcome: error.message, status: "refused" });
+      if (error instanceof NoteRefused) return Response.json({ ok: false, message: error.message }, { status: 400 });
+      if (error instanceof Error && /conflict|expectedVersion|version/i.test(error.name + error.message)) return Response.json({ ok: false, message: "Another change to this note was saved at the same moment. Reload and try again." }, { status: 409 });
+      return Response.json({ ok: false, message: "The note was not saved. Nothing was changed. Try again." }, { status: 500 });
+    }
+  }
+
   const remote = new RemoteController(remoteSettings(), {
     store: runtime.runtime.store,
     tenant: caller.tenant,
@@ -1321,6 +2225,7 @@ export async function createApplication(
     identity,
     operatorActors: mappedActors,
     commitForSession,
+    applyAgentOp,
     research,
     frames,
     frame: () => issued,
@@ -1346,6 +2251,13 @@ export async function createApplication(
           // state-changing routes also check Origin and Sec-Fetch-Site (cross-site POSTs).
           const refused = crossSiteRefusal(request, server.port ?? port, request.method !== "POST");
           if (refused !== null) return refused;
+          if (url.pathname.startsWith("/agent/panels")) return agentDoor(request, url.pathname);
+          // An agent on the page may read, find, inspect and preview a hand off. Every other write is the person's alone.
+          const page = pageAgentOf(request);
+          if (page !== null) {
+            const blocked = pageAgentRefusal(request.method, url.pathname);
+            if (blocked !== null) return blocked;
+          }
           if (url.pathname === "/health") {
             const semantic = await runtime.runtime.service.invoke(caller, {
               capability: "horizon.semantics.world",
@@ -1425,43 +2337,90 @@ export async function createApplication(
               ? Response.json({ ok: true, intent: outcome.bound, committed: outcome.result })
               : Response.json({ ok: false, code: outcome.code, message: outcome.message }, { status: 409 });
           }
-          if (url.pathname === "/workspace" && request.method === "GET") {
-            const theme = themeOf(url.searchParams.get("theme"));
-            const evidenceRef = url.searchParams.get("evidence");
-            const data = await workspace({
-              ...(url.searchParams.get("focus") === null ? {} : { focusRef: url.searchParams.get("focus") as string }),
-              ...(evidenceRef === null ? {} : { evidenceRef }),
-              ...(theme === undefined ? {} : { theme }),
-            });
-            const caseParam = url.searchParams.get("case_error");
-            const chrome = await cockpitChrome({
-              caseError: caseParam === "empty" || caseParam === "too_long" ? caseParam : null,
-              receipt: url.searchParams.get("receipt"),
-            });
-            // An `operation=` on the page is answered server-side and rendered with the frame it
-            // was answered about, so the surface never shows an answer next to a different focus.
-            const inspectOperation = url.searchParams.get("operation");
-            const inspectQuery = url.searchParams.get("query");
-            const inspected = inspectOperation !== null && (DEBUGGER_OPERATIONS as readonly string[]).includes(inspectOperation)
-              ? await inspectFocus(inspectOperation, {
-                  ...(url.searchParams.get("focus") === null ? {} : { focusRef: url.searchParams.get("focus") as string }),
-                  ...(inspectQuery === null ? {} : { query: inspectQuery }),
-                })
-              : null;
-            const html = await renderWorkspacePage({
-              service: runtime.runtime.service,
-              caller,
-              frame: data.frame,
-              view: data.view,
-              current: data.current,
-              evidenceRef,
-              ...(theme === undefined ? {} : { theme }),
-              expectedObjects: data.objects.length,
-              debuggerAnswer: inspected?.debugger ?? null,
-              retrievalAnswer: inspected?.retrieval ?? null,
-              chrome,
-            });
-            return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+          if (url.pathname === "/desk" && request.method === "GET") return deskPage();
+          if (url.pathname === "/desk/app.js" && request.method === "GET") return deskAsset("app.js");
+          if (url.pathname === "/desk/app.css" && request.method === "GET") return deskAsset("app.css");
+          if (url.pathname === "/desk/state.json" && request.method === "GET") {
+            const state = await deskState(url.searchParams);
+            const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
+            if (url.searchParams.get("since") === state.rev) return Response.json({ unchanged: true, rev: state.rev }, { headers });
+            return Response.json(state, { headers });
+          }
+          if (url.pathname === "/desk/search" && request.method === "GET") {
+            const found = await deskSearch(url.searchParams);
+            const asked = (url.searchParams.get("q") ?? "").trim();
+            // Find as you type is not a move. A find is recorded when the page asks for it (`record=1`) or an agent on the page runs it.
+            if (asked !== "" && (url.searchParams.get("record") === "1" || page !== null)) {
+              await logRow({ source: page ? "page-agent" : "you", ...(page?.name === undefined ? {} : { agent_name: page.name }), kind: "find", words: `Find: ${asked}`, outcome: `${found.notes.length} notes, ${found.cases.length} cases, ${found.days.length} days, ${found.tags.length} tags.`, status: "done" });
+            }
+            return Response.json(found, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+          }
+          if (url.pathname === "/desk/conversation" && request.method === "GET") {
+            return presentedJson({ rows: await listConversation(runtime.runtime.store, deskWho) }, { "cache-control": "no-store", "x-content-type-options": "nosniff" });
+          }
+          if (url.pathname === "/desk/conversation/discard" && request.method === "POST") {
+            const asked = (await request.json().catch(() => null)) as { row_id?: unknown } | null;
+            if (asked === null || typeof asked.row_id !== "string" || asked.row_id === "") return Response.json({ ok: false, message: "Say which suggestion to discard." }, { status: 400, headers: { "cache-control": "no-store" } });
+            const discarded = await discardRow(runtime.runtime.store, deskWho, asked.row_id);
+            return discarded.ok ? presentedJson({ ok: true, row: discarded.row }, { "cache-control": "no-store" }) : Response.json({ ok: false, message: discarded.message }, { status: discarded.status, headers: { "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/desk/note" && request.method === "POST") return deskSaveNote(request);
+          if (url.pathname === "/desk/draft" && request.method === "GET") {
+            return Response.json({ ...(await currentDraft(runtime.runtime.store, caller.tenant, caller.actor.id)), agent: deskAgent() }, { headers: { "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/desk/draft" && request.method === "POST") {
+            const parsed = (await request.json().catch(() => null)) as { draft_id?: unknown; text?: unknown; mode?: unknown } | null;
+            if (parsed === null || !validDraftId(parsed.draft_id) || typeof parsed.text !== "string") return Response.json({ ok: false, message: "That draft could not be read." }, { status: 400 });
+            const kept = await saveDraft(runtime.runtime.store, caller.tenant, caller.actor.id, { draftId: parsed.draft_id, text: parsed.text, mode: parsed.mode === "handoff" ? "handoff" : "write" });
+            return Response.json({ ok: kept }, { status: kept ? 200 : 409, headers: { "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/desk/start" && request.method === "POST") return deskStart(request);
+          if (url.pathname === "/desk/panels/op" && request.method === "POST") return deskPanelOp(request);
+          // The parts catalogue, in plain words, for agents choosing how to build a panel. Read-only, so an agent on the page may call it.
+          if (url.pathname === "/desk/panels/catalogue" && request.method === "GET") return Response.json({ schema: SURFACE_SCHEMA, vocabulary: vocabulary(), blocks: CATALOGUE }, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+          if (url.pathname === "/desk/handoff/preview" && request.method === "POST") return deskHandoff(request, "preview", page);
+          if (url.pathname === "/desk/handoff" && request.method === "POST") return deskHandoff(request, "send");
+          if ((url.pathname === "/workspace" || url.pathname === "/workspace/approvals") && request.method === "GET") {
+            // The desk is the workspace: the page is a shell, and the browser bundle draws every view from /desk/*.json.
+            return deskPage();
+          }
+          if (url.pathname === "/desk/decide.json" && request.method === "GET") {
+            const state = await decideState(await recentMoves());
+            const shown = (await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id)) ? applyStandIns(state, presentingKey(), deskRepoNames()) : state;
+            return Response.json(shown, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+          }
+          if (url.pathname === "/desk/decide" && request.method === "POST") return deskDecide(request);
+          if (url.pathname === "/desk/lesson" && request.method === "POST") return deskProposeLesson(request);
+          if (url.pathname === "/desk/lessons.json" && request.method === "GET") return Response.json({ lessons: await listLessons(runtime.runtime.store, caller.tenant) }, { headers: { "cache-control": "no-store" } });
+          if (url.pathname === "/desk/work.json" && request.method === "GET") {
+            return Response.json(await deskWork(url.searchParams), { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+          }
+          if (url.pathname === "/desk/setup-guide" && request.method === "GET") {
+            // The one page that may name programs, files and settings: the runbook behind the desk's Settings.
+            return new Response(SETUP_GUIDE_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" } });
+          }
+          if (url.pathname === "/desk/next.json" && request.method === "GET") {
+            // The frame-based "next decision": read-only. It builds a frame, so the desk asks only when Decide is open.
+            const data = await workspace({});
+            const snap = data.snapshot;
+            return Response.json({ state: snap.state, state_message: snap.state_message, focus: snap.frame.focus_ref, choices: snap.choices, blocked: snap.blocked }, { headers: { "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/desk/first-move.json" && request.method === "GET") {
+            // The one move the first-run path offers. Computed only when asked for, because it builds a frame.
+            const data = await workspace({});
+            const submittable = data.snapshot.actions.filter((action) => action.submit);
+            const action = submittable.find((candidate) => candidate.operation === "horizon.health") ?? submittable[0] ?? null;
+            return Response.json(
+              action === null
+                ? { firstMove: null }
+                : { firstMove: { action_id: action.action_id, operation: action.operation, frame_id: data.frame.frame_id, frame_revision: String(data.frame.revision), focus: data.frame.focus_ref, label: action.label } },
+              { headers: { "cache-control": "no-store" } },
+            );
+          }
+          if (url.pathname === "/desk/remote.json" && request.method === "GET") {
+            await remote.checkReachable();
+            const link = remote.pairingLink();
+            return Response.json({ status: await remote.status(), link, qr: link === null ? null : qrSvg(link) }, { headers: { "cache-control": "no-store" } });
           }
           if (url.pathname === "/workspace.json" && request.method === "GET") {
             const theme = themeOf(url.searchParams.get("theme"));
@@ -1475,15 +2434,58 @@ export async function createApplication(
           }
           if (url.pathname === "/workspace/economics" && request.method === "GET") {
             // Read-only: RealityTrace is read through its CLI on every request; nothing is stored or written.
-            const readout = economics.read();
             if ((request.headers.get("accept") ?? "").includes("application/json")) {
-              return Response.json({ schema: ECONOMICS_SCHEMA, ...readout }, { headers: { "cache-control": "no-store" } });
+              return Response.json({ schema: ECONOMICS_SCHEMA, ...economics.read() }, { headers: { "cache-control": "no-store" } });
             }
-            return new Response(renderEconomicsPage(readout, themeOf(url.searchParams.get("theme"))), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+            return deskPage();
           }
-          if (url.pathname === "/workspace/approvals" && request.method === "GET") {
-            // Read-only listing. Decisions are POSTed to /workspace/approval, which SEA-Forge decides.
-            return new Response(renderApprovalInboxPage(await approvalInbox(), themeOf(url.searchParams.get("theme")), inboxNotice(url.searchParams)), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+          if (url.pathname === "/workspace/compare" && request.method === "GET") {
+            // Read-only: RealityTrace is read through its allow-listed CLI; labels and the Presenting switch are Horizon's own records.
+            const data = await compareData(url.searchParams);
+            const props = data.props.presenting ? applyStandIns(data.props, presentingKey(), data.repoNames) : data.props;
+            const theme = themeOf(url.searchParams.get("theme"));
+            return new Response(renderComparePage({ ...props, ...(theme === undefined ? {} : { theme }) }), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/workspace/label" && request.method === "POST") {
+            const form = await request.formData().catch(() => null);
+            if (form === null) return Response.json({ code: "invalid_argument", message: "LABEL: body is not a form" }, { status: 400 });
+            const back = safeReturn(form.get("return"));
+            try {
+              await putLabel(runtime.runtime.store, {
+                tenant: caller.tenant,
+                operator: caller.actor.id,
+                session_id: String(form.get("session") ?? ""),
+                event_id: String(form.get("event") ?? ""),
+                record_seq: form.get("record_seq") === null || form.get("record_seq") === "" ? null : Number(form.get("record_seq")),
+                verdict: form.get("verdict"),
+                first_failure: form.get("first_failure") ?? "",
+                now: clock(),
+              });
+            } catch (error) {
+              const code = error instanceof Error ? error.message.replace(/^LABEL: /, "") : "failed";
+              if ((request.headers.get("accept") ?? "").includes("application/json")) return Response.json({ ok: false, code, message: `The label was not saved: ${code}.` }, { status: 400 });
+              return Response.redirect(`/workspace/compare?${back}${back ? "&" : ""}label_error=${encodeURIComponent(code)}`, 303);
+            }
+            if ((request.headers.get("accept") ?? "").includes("application/json")) return Response.json({ ok: true });
+            return Response.redirect(`/workspace/compare?${back}`, 303);
+          }
+          if (url.pathname === "/workspace/presenting" && request.method === "POST") {
+            const form = await request.formData().catch(() => null);
+            if (form === null) return Response.json({ code: "invalid_argument", message: "PRESENTING: body is not a form" }, { status: 400 });
+            await setPresenting(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, on: form.get("on") === "1" });
+            return Response.redirect(`/workspace/compare?${safeReturn(form.get("return"))}`, 303);
+          }
+          if (url.pathname === "/workspace/export" && request.method === "GET") {
+            const kind = url.searchParams.get("kind");
+            if (kind !== "labels" && kind !== "comparison") return Response.json({ code: "invalid_argument", message: "EXPORT: kind must be labels or comparison" }, { status: 400 });
+            const presenting = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
+            const choice = chooseStandIns(presenting, url.searchParams.get("standins"));
+            if (!choice.ok) return Response.json({ code: "invalid_argument", message: choice.message }, { status: choice.status });
+            const data = await compareData(url.searchParams);
+            if (kind === "comparison" && data.view === null) return Response.json({ code: "not_found", message: "EXPORT: no such session in the record" }, { status: 404 });
+            const built = buildExport({ kind, labels: data.labels, comparison: data.view, standins: choice.standins, key: presentingKey(), names: data.repoNames, now: clock() });
+            writeExport(exportsDir, built);
+            return new Response(built.body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "content-disposition": `attachment; filename="${built.name}"` } });
           }
           if (url.pathname === "/workspace/inspect" && request.method === "GET") {
             // Read-only, deliberately: GET, no form, no commit. The operation is one of the seven
@@ -1580,51 +2582,6 @@ export async function createApplication(
             await setOnboardingSkipped(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, skipped: false, now: new Date() });
             return Response.redirect("/workspace#getting-started", 303);
           }
-          if (url.pathname === "/workspace/approval" && request.method === "POST") {
-            const form = await request.formData().catch(() => null);
-            const approvalId = form?.get("approval_id");
-            const decision = form?.get("decision");
-            // A click on the inbox page comes back to the inbox with its outcome or its refusal; any other caller keeps the JSON errors and the receipt redirect.
-            const fromInbox = form?.get("return_to") === "inbox";
-            const backToInbox = (params: Record<string, string>) => Response.redirect(`/workspace/approvals?${new URLSearchParams(params).toString()}`, 303);
-            if (typeof approvalId !== "string" || approvalId === "" || (decision !== "approve" && decision !== "reject")) {
-              if (fromInbox) return backToInbox({ error: "invalid" });
-              return Response.json({ code: "invalid_argument", message: "APPROVAL: approval_id and decision (approve or reject) are required" }, { status: 400 });
-            }
-            const intentId = await intentIdForApproval(approvalId);
-            if (intentId === null) {
-              if (fromInbox) return backToInbox({ error: "not_pending", approval: approvalId });
-              return Response.json({ code: "not_found", message: "APPROVAL: no escalated commit waits on this approval" }, { status: 404 });
-            }
-            try {
-              await resolveNavigationApproval({ approvalId, resolution: decision === "approve" ? "approved" : "rejected" });
-            } catch (error) {
-              // A rejected commit fails by design and is audited; its receipt says so. Anything else is refused here.
-              if (!(error instanceof Error && error.message.startsWith("INTENT: governed commit refused"))) {
-                if (fromInbox) return backToInbox({ error: approvalErrorCode(error), approval: approvalId });
-                return Response.json({ code: "approval_refused", message: error instanceof Error ? error.message : String(error) }, { status: 409 });
-              }
-            }
-            if (fromInbox) return backToInbox({ resolved: approvalId, decision });
-            return Response.redirect(`/workspace?receipt=${encodeURIComponent(intentId)}#receipt`, 303);
-          }
-          if (url.pathname === "/workspace/settle" && request.method === "POST") {
-            const form = await request.formData().catch(() => null);
-            const intentId = form?.get("intent_id");
-            if (typeof intentId !== "string" || intentId === "") {
-              return Response.json({ code: "invalid_argument", message: "SETTLEMENT: intent_id is required" }, { status: 400 });
-            }
-            const phase = form?.get("phase");
-            if (phase !== "observe" && phase !== "rule") {
-              return Response.json({ code: "invalid_argument", message: "SETTLEMENT: phase must be observe or rule" }, { status: 400 });
-            }
-            try {
-              await settleNavigationIntent(intentId, phase);
-            } catch (error) {
-              return Response.json({ code: "settlement_refused", message: error instanceof Error ? error.message : String(error) }, { status: 409 });
-            }
-            return Response.redirect(`/workspace?receipt=${encodeURIComponent(intentId)}#receipt`, 303);
-          }
           if (url.pathname === "/workspace/remote" && request.method === "GET") {
             await remote.checkReachable();
             const nonce = randomBytes(16).toString("base64");
@@ -1701,6 +2658,12 @@ function remoteRailOf(status: RemoteStatus): { readonly state: string; readonly 
   return { state: status.state, label: `Remote: ${label}` };
 }
 
+/** A `return` field is a query string for our own compare page, never a URL: no open redirect. */
+function safeReturn(value: FormDataEntryValue | null): string {
+  const text = typeof value === "string" ? value : "";
+  return /^[A-Za-z0-9_=&%.:\-+]*$/.test(text) ? text : "";
+}
+
 /** A theme is set only when the caller asked for one; otherwise the page follows the OS preference. */
 function themeOf(value: FormDataEntryValue | string | null): WorkspaceTheme | undefined {
   return value === "light" || value === "dark" ? value : undefined;
@@ -1711,6 +2674,28 @@ function themeOf(value: FormDataEntryValue | string | null): WorkspaceTheme | un
  * rebinding). Unless `hostOnly`, any Origin or Sec-Fetch-Site must also be same-origin (cross-site POSTs).
  * A request with neither Origin nor Sec-Fetch-Site (a CLI or test client) is allowed on the Host check alone.
  */
+export interface PageAgent {
+  readonly name?: string;
+}
+
+/** `x-horizon-source: page-agent` marks a call an agent made through the page; `x-horizon-agent-name` is its optional plain-text name (60 characters at most). */
+export function pageAgentOf(request: Request): PageAgent | null {
+  if (request.headers.get("x-horizon-source")?.trim().toLowerCase() !== "page-agent") return null;
+  const name = cleanAgentName(request.headers.get("x-horizon-agent-name"));
+  return name === undefined ? {} : { name };
+}
+
+export const AGENT_NOTE_WORDS = "An agent can suggest a note; you save it.";
+export const AGENT_REFUSAL_WORDS = "Only you can confirm this. The agent's suggestion is waiting in the conversation.";
+
+/** Null when an agent on the page may make the call. Reads and the hand off preview pass; every other write is refused with 403. */
+export function pageAgentRefusal(method: string, pathname: string): Response | null {
+  if (method === "GET" || method === "HEAD") return null;
+  if (method === "POST" && pathname === "/desk/handoff/preview") return null;
+  const message = pathname === "/desk/note" ? AGENT_NOTE_WORDS : AGENT_REFUSAL_WORDS;
+  return Response.json({ ok: false, outcome: "agent_refused", message }, { status: 403, headers: { "cache-control": "no-store" } });
+}
+
 function crossSiteRefusal(request: Request, port: number, hostOnly = false): Response | null {
   const hosts = [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`];
   const refuse = (message: string) => Response.json({ code: "forbidden_origin", message: `REQUEST: ${message}` }, { status: 403 });

@@ -21,6 +21,7 @@ const MUTANTS: readonly { id: string; source: string; file?: string }[] = [
   { id: "a Unix-socket address", source: 'export const address = { unix: "/tmp/x.sock" };\n' },
   { id: "a hand-written SFWP message", source: 'export const message = { verb: "authority_request", actor: {} };\n' },
   { id: "a raw Unix-socket call in a nested .tsx file", file: join("ui", "workspace", "deep", "planted-wire.tsx"), source: 'export const x = Bun.connect({ unix: "/tmp/x.sock", socket: {} });\nexport const View = () => null;\n' },
+  { id: "the allowed file name in the wrong directory (exceptions are exact paths)", file: join("ui", "sea-forge-wire.ts"), source: 'export const x = Bun.connect({ unix: "/tmp/x.sock", socket: {} });\n' },
 ];
 
 const failures: string[] = [];
@@ -37,7 +38,7 @@ try {
     mkdirSync(dirname(planted), { recursive: true });
     writeFileSync(planted, mutant.source);
     const result = scan(copy);
-    if (result.code === 0 || !result.stderr.includes("planted-wire.ts")) failures.push(`NOT CAUGHT: ${mutant.id} (exit ${result.code})`);
+    if (result.code === 0 || !result.stderr.includes(planted.slice(copy.length + 1))) failures.push(`NOT CAUGHT: ${mutant.id} (exit ${result.code})`);
     else console.log(`caught: ${mutant.id}`);
   }
 } finally {

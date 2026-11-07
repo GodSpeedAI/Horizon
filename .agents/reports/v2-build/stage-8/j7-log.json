@@ -1,0 +1,20 @@
+{
+  "rows_before": 28,
+  "rows_after": 28,
+  "same_rows": true,
+  "missing_after_reload": [],
+  "echo_before": [
+    "Which plan should I follow?You answered: Plan AThe agent took it to: step handoff_0a49 in Seed: triage inbox"
+  ],
+  "echo_after": [
+    "Which plan should I follow?You answered: Plan AThe agent took it to: step handoff_0a49 in Seed: triage inbox"
+  ],
+  "echo_same": true,
+  "fresh_context_has": {
+    "/Stage 8 proof: draft the weekly release summary.*You/": true,
+    "/Stage 8 proof: list open questions.*You/": true,
+    "/Stage 8 proof: agent suggests a changelog check.*Agent on this page.*Handed off/": true,
+    "/something you do not want.*Discarded by you\\. Nothing was sent\\./": true
+  },
+  "console_errors": []
+}

@@ -1,0 +1,33 @@
+{
+  "word_scan_real_conversation": [
+    {
+      "word": "/\\bdrafts?\\b/i",
+      "hits": [
+        "you confirm there. Done Stage 8 proof: draft the weekly release summary You 01:44 PM Han",
+        "u 01:44 PM Handed off: \"Stage 8 proof: draft the weekly release summary\" is now a step in"
+      ]
+    }
+  ],
+  "word_scan_with_15_parts": [
+    {
+      "word": "/\\bdrafts?\\b/i",
+      "hits": [
+        "you confirm there. Done Stage 8 proof: draft the weekly release summary You 01:44 PM Han",
+        "u 01:44 PM Handed off: \"Stage 8 proof: draft the weekly release summary\" is now a step in"
+      ]
+    }
+  ],
+  "word_scan_after_answer": [
+    {
+      "word": "/\\bdrafts?\\b/i",
+      "hits": [
+        "you confirm there. Done Stage 8 proof: draft the weekly release summary You 01:44 PM Han",
+        "u 01:44 PM Handed off: \"Stage 8 proof: draft the weekly release summary\" is now a step in"
+      ]
+    }
+  ],
+  "toggle_reads": "Presenting: on",
+  "presenting_was_on_server_side": true,
+  "toggle_after": "Presenting: off",
+  "console_errors": []
+}

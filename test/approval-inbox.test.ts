@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { SeaForgeAuthority, type ApprovalStanding } from "@godspeedai/cognate-runtime-bun";
 import type { ApprovalAuthority } from "../src/adapters/sea-forge-config.ts";
 import { buildInbox } from "../src/domain/approval-inbox.ts";
-import { parseInboxErrorCode, renderApprovalInboxPage } from "../src/ui/workspace/approval-inbox.tsx";
+import { buildDecide } from "../src/ui/desk/decide-build.ts";
 import { ApprovalFollowUpError, afterRecordedDecision, approvalErrorCode, createApplication, selfApprovalRefusal } from "../src/app.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 
@@ -64,111 +64,59 @@ describe("buildInbox", () => {
     expect(inbox.waiting.map((item) => item.approval_id)).toEqual(["apr-soon", "apr-late"]);
   });
 });
+describe("the inbox as decision cards (Decide)", () => {
+  const cards = (inbox: ReturnType<typeof buildInbox> | null, readout: Parameters<typeof buildDecide>[0]["inbox"] | null = null) =>
+    buildDecide({ inbox: readout ?? { state: "listed", inbox: inbox! }, moves: [], caseApprovals: { kind: "none" }, holds: new Map() });
 
-describe("renderApprovalInboxPage", () => {
-  test("offers the existing decision form only for a decidable item", () => {
+  test("offers accept and reject only for a decidable item", () => {
     const inbox = buildInbox([row({ approval_id: "apr-a" }), row({ approval_id: "apr-b" })], 0, { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR });
-    const html = renderApprovalInboxPage({ state: "listed", inbox });
-    expect(html.match(/action="\/workspace\/approval"/g)?.length).toBe(1);
-    expect(html).toContain('data-approval="apr-a" data-state="pending" data-decidable="yes"');
-    expect(html).toContain('data-approval="apr-b" data-state="pending" data-decidable="no"');
-    expect(html).toContain("no Horizon commit waits on it");
+    const { cards: found } = cards(inbox);
+    const a = found.find((c) => c.id === "approval:apr-a")!;
+    const b = found.find((c) => c.id === "approval:apr-b")!;
+    expect(a.preview.accept).not.toBeNull();
+    expect(a.preview.reject).not.toBeNull();
+    expect(a.blocked).toBeNull();
+    expect(b.preview.accept).toBeNull();
+    expect(b.preview.reject).toBeNull();
+    expect(b.blocked).toContain("no Horizon commit waits on it");
   });
-  test("escapes SEA-Forge-supplied text", () => {
+
+  test("the preview code changes when anything the preview shows changes", () => {
+    const make = (over: Record<string, unknown>) => cards(buildInbox([row({ approval_id: "apr-a", ...over })], 0, { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR })).cards[0]!.preview.code;
+    expect(make({})).toBe(make({}));
+    expect(make({})).not.toBe(make({ resource_id: "res-8" }));
+    expect(make({})).not.toBe(make({ expires_at: "2026-11-02T14:00:00Z" }));
+  });
+
+  test("keeps SEA-Forge-supplied text as text (the markup layer escapes it)", () => {
     const inbox = buildInbox([row({ operation_name: "<script>x</script>" })], 0, { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR });
-    const html = renderApprovalInboxPage({ state: "listed", inbox });
-    expect(html).not.toContain("<script>x</script>");
-    expect(html).toContain("&lt;script&gt;");
+    const [card] = cards(inbox).cards;
+    expect(card!.title).toContain("<script>x</script>");
+    expect(card!.blocked).not.toBeNull();
   });
-  test("an unreachable SEA-Forge is said plainly, not shown as an empty inbox", () => {
-    const html = renderApprovalInboxPage({ state: "unreachable", message: "SEA-Forge did not answer in time" });
-    expect(html).toContain("did not list approvals");
-    expect(html).not.toContain("Nothing is waiting");
-    expect(html).not.toContain('action="/workspace/approval"');
+
+  test("an unreachable SEA-Forge is a notice, not an empty list of decisions", () => {
+    const found = cards(null, { state: "unreachable", message: "SEA-Forge did not answer in time" });
+    expect(found.cards).toEqual([]);
+    expect(found.notices.join(" ")).toContain("did not list the decisions waiting for you");
+    expect(found.notices.join(" ")).toContain("The case keeper did not answer in time");
   });
-  test("an unconfigured approver shows no decision form", () => {
-    const html = renderApprovalInboxPage({ state: "not_configured" });
-    expect(html).toContain("No approver is configured");
-    expect(html).not.toContain('action="/workspace/approval"');
+
+  test("an unconfigured approver is said in a notice and offers no decision", () => {
+    const found = cards(null, { state: "not_configured" });
+    expect(found.cards).toEqual([]);
+    expect(found.notices.join(" ")).toContain("No approver is set up");
+  });
+
+  test("rows the client excluded are counted in a notice and never shown as decisions", () => {
+    const inbox = buildInbox([row()], 1, { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
+    const found = cards(inbox);
+    expect(found.cards).toHaveLength(1);
+    expect(found.notices.join(" ")).toContain("1 entries from the case keeper could not be read");
   });
 });
 
-describe("renderApprovalInboxPage clarity (issue #24)", () => {
-  const page = (rows: ApprovalStanding[], excluded = 0, waiting: string[] = [], notice?: Parameters<typeof renderApprovalInboxPage>[2]) =>
-    renderApprovalInboxPage({ state: "listed", inbox: buildInbox(rows, excluded, { now: NOW, waitingApprovalIds: new Set(waiting), operatorRef: OPERATOR }) }, undefined, notice);
-
-  test("a pending item says what is approved, who asked, when it expires, and what each button does", () => {
-    const html = page([row({ approval_id: "apr-a", operation_name: "navigation.commit", requester: "cognate-service" })], 0, ["apr-a"]);
-    expect(html).toContain("Waiting for a decision: navigation.commit, requested by cognate-service");
-    expect(html).toContain("2026-11-02T13:00:00Z");
-    expect(html).toContain("does not report when it was requested");
-    expect(html).toMatch(/<button[^>]*value="approve"[^>]*>Approve<\/button>/);
-    expect(html).toMatch(/<button[^>]*value="reject"[^>]*>Reject<\/button>/);
-    expect(html).toContain("SEA-Forge lets the waiting commit go ahead.");
-    expect(html).toContain("SEA-Forge refuses the waiting commit; it will not run.");
-    expect(html).toContain('name="return_to" value="inbox"');
-  });
-  test("a decided item shows who resolved it", () => {
-    const html = page([row({ approval_id: "apr-d", state: "approved", resolved_by: "actor:operator" })]);
-    expect(html).toContain("Approved by actor:operator: run.start, requested by cognate-service");
-  });
-  test("an empty inbox says so", () => {
-    const html = page([]);
-    expect(html).toContain("The inbox is empty");
-    expect(html).toContain("Nothing is waiting at SEA-Forge, so nothing needs your decision.");
-  });
-  test("excluded rows are a count with an explanation, also when nothing else is listed", () => {
-    const html = page([], 3);
-    expect(html).toContain('data-excluded="3"');
-    expect(html).toContain("3 approval record(s) excluded");
-    expect(html).toContain("so they are not hidden");
-    expect(html).not.toContain("The inbox is empty");
-  });
-  test("after a click the banner reports the listed state and resolver, not the click", () => {
-    const decided = page([row({ approval_id: "apr-a", state: "approved", resolved_by: "actor:operator" })], 0, [], { kind: "resolved", approvalId: "apr-a", decision: "approve" });
-    expect(decided).toContain('data-notice="resolved"');
-    expect(decided).toContain("resolved by");
-    expect(decided).toContain("actor:operator");
-    const rejected = page([row({ approval_id: "apr-a", state: "rejected", resolved_by: "actor:operator" })], 0, [], { kind: "resolved", approvalId: "apr-a", decision: "reject" });
-    expect(rejected).toContain("will not run");
-    // A link claiming success for an approval that is still pending is not believed.
-    const forged = page([row({ approval_id: "apr-a" })], 0, ["apr-a"], { kind: "resolved", approvalId: "apr-a", decision: "approve" });
-    expect(forged).toContain('data-notice="unconfirmed"');
-    expect(forged).not.toContain('data-notice="resolved"');
-    const missing = page([], 0, [], { kind: "resolved", approvalId: "apr-x", decision: "approve" });
-    expect(missing).toContain('data-notice="unconfirmed"');
-  });
-  test("a refusal is shown as an alert and says nothing was changed", () => {
-    const html = page([row()], 0, [], { kind: "error", approvalId: "apr-a", code: "refused" });
-    expect(html).toContain('role="alert"');
-    expect(html).toContain("That decision was not recorded.");
-    expect(html).toContain("refused the decision");
-    expect(html).toContain("Nothing was approved or rejected by this click.");
-  });
-  test("a refusal for an approval the listing shows resolved says so and never claims nothing changed", () => {
-    const html = page([row({ approval_id: "apr-a", state: "approved", resolved_by: "actor:other" })], 0, [], { kind: "error", approvalId: "apr-a", code: "refused" });
-    expect(html).toContain("SEA-Forge lists approval");
-    expect(html).toContain("actor:other");
-    expect(html).not.toContain("Nothing was approved");
-  });
-  test("follow-up failed: a listing that shows the approval resolved is stated, and nothing says nothing changed", () => {
-    const html = page([row({ approval_id: "apr-a", state: "approved", resolved_by: "actor:operator" })], 0, [], { kind: "error", approvalId: "apr-a", code: "followup_failed" });
-    expect(html).toContain('data-notice="followup_failed"');
-    expect(html).toContain("A follow-up step failed");
-    expect(html).toContain("SEA-Forge lists approval");
-    expect(html).toContain("actor:operator");
-    expect(html).not.toContain("Nothing was approved");
-    expect(html).not.toContain("not recorded");
-  });
-  test("follow-up failed: a forged link for an approval still pending, or absent, is Not confirmed and does not say the decision was recorded", () => {
-    for (const rows of [[row({ approval_id: "apr-a" })], []]) {
-      const html = page(rows, 0, [], { kind: "error", approvalId: "apr-a", code: "followup_failed" });
-      expect(html).toContain('data-notice="followup_unconfirmed"');
-      expect(html).toContain("Not confirmed");
-      expect(html).not.toContain("was recorded");
-      expect(html).not.toContain("Nothing was approved");
-    }
-  });
+describe("a decision SEA-Forge recorded, then a failing follow-up", () => {
   test("resolve succeeds, then the follow-up throws: the failure is a follow-up failure, not a failed resolve", async () => {
     let resolved = false;
     const stub = { resolveApproval: async () => { resolved = true; return { ok: true as const }; }, pollApprovals: async () => { throw new Error("poll: socket closed"); } };
@@ -185,32 +133,6 @@ describe("renderApprovalInboxPage clarity (issue #24)", () => {
     // A refused commit after a recorded decision keeps its own message and is not reclassified.
     const refused = await afterRecordedDecision(async () => { throw new Error("INTENT: governed commit refused: rejected"); }).catch((e: unknown) => e);
     expect(refused).not.toBeInstanceOf(ApprovalFollowUpError);
-  });
-  test("an unknown error code renders generic fixed copy", () => {
-    const html = page([row()], 0, [], { kind: "error", approvalId: null, code: parseInboxErrorCode("<script>alert(1)</script>") });
-    expect(html).toContain("Something went wrong with that decision.");
-    expect(html).not.toContain("<script>alert");
-    expect(html).not.toContain("Nothing was approved");
-  });
-  test("a claimed decision that disagrees with the listed state is not confirmed, and the listed state is shown", () => {
-    const html = page([row({ approval_id: "apr-b", state: "rejected", resolved_by: "actor:other" })], 0, [], { kind: "resolved", approvalId: "apr-b", decision: "approve" });
-    expect(html).toContain('data-notice="unconfirmed"');
-    expect(html).not.toContain('data-notice="resolved"');
-    expect(html).toContain("shows it as");
-    expect(html).toContain("rejected");
-    expect(html).toContain("The listed state is the truth.");
-  });
-  test("hostile text in every notice field and every row field is escaped", () => {
-    const evil = '"><script>alert(1)</script>';
-    const html = page(
-      [row({ approval_id: "apr-x", operation_name: evil, requester: evil, resource_id: evil, resolved_by: evil, state: "approved" })],
-      0,
-      [],
-      { kind: "resolved", approvalId: "apr-x", decision: "approve" },
-    );
-    expect(html).not.toContain("<script>alert");
-    const alert = page([], 0, [], { kind: "error", approvalId: evil, code: "refused" });
-    expect(html + alert).not.toContain("<script>alert");
   });
   test("approvalErrorCode maps failures to the fixed set", () => {
     expect(approvalErrorCode(new ApprovalFollowUpError("boom"))).toBe("followup_failed");
@@ -259,7 +181,7 @@ describe("the SDK client listing over the SEA-Forge socket", () => {
   });
 });
 
-describe("GET /workspace/approvals through the application", () => {
+describe("GET /desk/decide.json through the application", () => {
   const dir = mkdtempSync(join(tmpdir(), "inbox-app-"));
   const socketPath = join(dir, "sea-forge.sock");
   let listed: unknown[] = [row({ approval_id: "apr-live-1" })];
@@ -296,66 +218,26 @@ describe("GET /workspace/approvals through the application", () => {
     }
   }
 
-  test("with no approver configured the page says so and offers no decision", async () => {
+  test("with no approver configured it says so and offers no decision", async () => {
     await withApp(undefined, async (base) => {
-      const response = await fetch(new URL("/workspace/approvals", base));
-      const html = await response.text();
+      const response = await fetch(new URL("/desk/decide.json", base));
+      const state = (await response.json()) as { notices: string[]; cards: unknown[] };
       expect(response.status).toBe(200);
-      expect(html).toContain("No approver is configured");
-      expect(html).not.toContain('action="/workspace/approval"');
+      expect(state.notices.join(" ")).toContain("No approver is set up");
+      expect(state.cards).toEqual([]);
     });
   });
 
-  test("with SEA-Forge listing a pending approval, it shows as waiting and is not decidable without a commit", async () => {
+  test("with SEA-Forge listing a pending approval, it is not decidable without a commit waiting on it", async () => {
     listed = [row({ approval_id: "apr-live-1" })];
     await withApp({ socketPath, service: { actor_id: "cognate-service", role: "service" }, operator: { actor_id: OPERATOR, role: "operator" }, timeoutMs: 2_000 }, async (base) => {
-      const html = await (await fetch(new URL("/workspace/approvals", base))).text();
-      expect(html).toContain('data-approval="apr-live-1" data-state="pending" data-decidable="no"');
-      expect(html).toContain("Waiting for a decision (1)");
-      expect(html).not.toContain('action="/workspace/approval"');
+      const state = (await (await fetch(new URL("/desk/decide.json", base))).json()) as { cards: { id: string; blocked: string | null; preview: { accept: unknown } }[] };
+      const card = state.cards.find((c) => c.id === "approval:apr-live-1")!;
+      expect(card.preview.accept).toBeNull();
+      expect(card.blocked).toContain("This cannot be decided here");
+      // The old decision form posts nowhere any more: there is no way to decide without a preview.
+      expect((await fetch(new URL("/workspace/approval", base), { method: "POST", body: new URLSearchParams({ approval_id: "apr-live-1", decision: "approve" }) })).status).toBe(404);
     });
-  });
-});
-
-describe("POST /workspace/approval from the inbox returns to the inbox", () => {
-  test("a refusal comes back as a banner on the inbox, not as raw JSON", async () => {
-    const root = mkdtempSync(join(tmpdir(), "inbox-post-"));
-    try {
-      const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "inbox.sqlite"), secretPath: join(root, "launch.secret") }));
-      const application = await createApplication({ configPath });
-      const started = application.startServer(0);
-      try {
-        const base = new URL(started.url);
-        const body = new URLSearchParams({ approval_id: "apr-none", decision: "reject", return_to: "inbox" });
-        const post = await fetch(new URL("/workspace/approval", base), { method: "POST", body, redirect: "manual" });
-        expect(post.status).toBe(303);
-        const location = post.headers.get("location") ?? "";
-        expect(location).toContain("/workspace/approvals?");
-        expect(new URL(location, base).searchParams.get("error")).toBe("not_pending");
-        const html = await (await fetch(new URL(location, base))).text();
-        expect(html).toContain('data-notice="error"');
-        expect(html).toContain("That decision was not recorded.");
-        // Invalid arguments from the inbox come back as a fixed code, not as JSON and not as text.
-        const bad = await fetch(new URL("/workspace/approval", base), { method: "POST", body: new URLSearchParams({ approval_id: "apr-x", decision: "maybe", return_to: "inbox" }), redirect: "manual" });
-        expect(bad.status).toBe(303);
-        expect(new URL(bad.headers.get("location") ?? "", base).searchParams.get("error")).toBe("invalid");
-        const badPlain = await fetch(new URL("/workspace/approval", base), { method: "POST", body: new URLSearchParams({ approval_id: "apr-x", decision: "maybe" }), redirect: "manual" });
-        expect(badPlain.status).toBe(400);
-        // Hostile query parameters never reach the page as markup or as text.
-        const evil = encodeURIComponent('"><script>alert(1)</script>');
-        const hostile = await (await fetch(new URL(`/workspace/approvals?resolved=${evil}&decision=${evil}&error=${evil}&approval=${evil}`, base))).text();
-        expect(hostile).not.toContain("<script>alert");
-        expect(hostile).not.toContain("alert(1)");
-        // Without return_to the older JSON answer is unchanged.
-        const plain = await fetch(new URL("/workspace/approval", base), { method: "POST", body: new URLSearchParams({ approval_id: "apr-none", decision: "reject" }), redirect: "manual" });
-        expect(plain.status).toBe(404);
-      } finally {
-        started.stop(true);
-        await application.close();
-      }
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
   });
 });
 

@@ -150,11 +150,20 @@ const WIRE_TEETH: readonly { name: string; pattern: RegExp }[] = [
   { name: "hand-written SFWP message", pattern: /\bverb\s*:\s*["'](authority_|system\.)/ },
 ];
 
+/**
+ * Two named exceptions, decided by the operator. These two files make raw socket calls only for case steps,
+ * human tasks and the event stream, which the Cognate SDK does not offer yet. Move them to the SDK once it does.
+ * Every approval and governance call goes through the SDK client, and any other file under src/ that opens
+ * the socket still fails this check (proved by scripts/teeth-inv2-mutation.ts).
+ */
+const WIRE_ALLOWED: ReadonlySet<string> = new Set(["src/adapters/sea-forge-wire.ts", "src/adapters/sea-forge-events.ts"]);
+
 function rejectHandWrittenWire(): void {
   let scanned = 0;
   walk(join(root, "src"), (path) => {
     if (!/\.tsx?$/.test(path)) return;
     scanned += 1;
+    if (WIRE_ALLOWED.has(relative(root, path).split("\\").join("/"))) return;
     const text = readFileSync(path, "utf8");
     for (const tooth of WIRE_TEETH) {
       if (tooth.pattern.test(text)) fail(`BOUNDARY: ${tooth.name} in ${relative(root, path)} (${tooth.pattern}); use the Cognate SDK SeaForgeAuthority client`);

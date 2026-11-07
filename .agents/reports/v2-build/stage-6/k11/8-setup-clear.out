@@ -1,0 +1,17 @@
+Folder (8 entries under /home/sprime01/.horizon/setups/testing, deleted with the folder):
+  /home/sprime01/.horizon/setups/testing/run
+  /home/sprime01/.horizon/setups/testing/workbench
+  /home/sprime01/.horizon/setups/testing/cell
+  /home/sprime01/.horizon/setups/testing/horizon.toml
+  /home/sprime01/.horizon/setups/testing/SETUP.json
+  /home/sprime01/.horizon/setups/testing/secrets
+  /home/sprime01/.horizon/setups/testing/secrets/presenting.key
+  /home/sprime01/.horizon/setups/testing/exports
+  /home/sprime01/.horizon/setups/testing
+Issues in GodSpeedAI/horizon-sandbox: 0
+Board "Horizon testing": 0
+The repository GodSpeedAI/horizon-sandbox itself is never deleted.
+Workshop database "horizon-testing" (pg0, outside the folder): dropped too, if it exists.
+Deleted /home/sprime01/.horizon/setups/testing
+Dropped the workshop database "horizon-testing".
+rc=0

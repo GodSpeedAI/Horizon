@@ -1,0 +1,35 @@
+// Live Hand off through the desk, keyboard only, then read the case keeper.
+import { chromium } from "/home/sprime01/projects/Horizon/node_modules/playwright-core/index.mjs";
+import { readdirSync } from "node:fs";
+const out = process.argv[2]!;
+const root = `${process.env.HOME}/.cache/ms-playwright`;
+const exe = `${root}/${readdirSync(root).find((d) => d.startsWith("chromium-"))}/chrome-linux64/chrome`;
+const browser = await chromium.launch({ executablePath: exe, headless: true });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const errors: string[] = [];
+page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+page.on("pageerror", (e) => errors.push(String(e)));
+await page.goto("http://127.0.0.1:4339/desk", { waitUntil: "networkidle" });
+await page.waitForTimeout(2500);
+await page.keyboard.press("Control+k");
+for (let i = 0; i < 3; i++) await page.keyboard.press("Tab");
+console.log("PLACEHOLDER:", await page.evaluate(() => document.activeElement?.getAttribute("placeholder")));
+await page.keyboard.press("Control+a"); await page.keyboard.press("Delete");
+await page.keyboard.type("Write a two-line summary of this step for the weekly notes");
+await page.keyboard.press("Enter");
+await page.waitForTimeout(3000);
+await page.screenshot({ path: `${out}-1-preview.png`, fullPage: true });
+const previewText = await page.innerText("body");
+console.log("PREVIEW:\n" + previewText.split("\n").filter((l) => /preview|step|case|confirm|hand off|out of date|would/i.test(l)).slice(0, 25).join("\n"));
+await page.screenshot({ path: `${out}-1b.png` });
+const agentBox = page.getByLabel("Also give this step to an agent");
+console.log("AGENT BOX:", await agentBox.count());
+if (await agentBox.count()) { await agentBox.focus(); if (!(await agentBox.isChecked())) await page.keyboard.press("Space"); }
+await page.screenshot({ path: `${out}-1c-agent-ticked.png` });
+const confirm = page.locator("[data-confirm-handoff]").first();
+if (await confirm.count()) { await confirm.focus(); await page.keyboard.press("Enter"); }
+await page.waitForTimeout(20000);
+await page.screenshot({ path: `${out}-2-after.png`, fullPage: true });
+console.log("AFTER:\n" + (await page.innerText("body")).split("\n").filter((l) => /hand|step|start|added|waiting|refus|could not/i.test(l)).slice(0, 25).join("\n"));
+console.log("ERRORS:", JSON.stringify(errors));
+await browser.close();

@@ -1,0 +1,655 @@
+Skip to the open view
+This computer: Yoga7i
+Setup: testing
+Rulebook edition 0a10c20d
+Case: Seed: triage inbox. One human step to look through what arrived.
+Needs you: 7
+Cases: connected
+Records: connected
+Agent work: connected
+Reference library: Not connected
+Presenting: on
+Settings
+Phone remote
+
+Loading… Check phone control
+
+Setup guide
+
+Today
+Explore
+Decide (7)
+Work
+DAYS
+2026-11-07 (2)
+2026-11-06 (1)
+2026-11-05 (1)
+2026-11-04 (1)
+2026-11-03 (1)
+CASES
+Seed: triage inbox. One human step to look through what arrived.
+Seed: weekly release. One human sign-off step that waits for the operator.
+TAGS
+planning (1)
+questions (1)
+release (1)
+retro (1)
+review (1)
+seed (6)
+today (1)
+triage (1)
+Work
+
+What is running, how it went, and what it cost. Problems come first.
+
+Needs a look first
+Seed: triage inbox. One human step to look through what arrived. Running
+Seed: weekly release. One human sign-off step that waits for the operator. Running
+Record
+personal
+workshop
+Project ISG4
+Repository
+Project 7REE
+Project MKAL
+Project 3QW4
+Project LZKM
+Project JUKB
+Project NHXS
+Project L2L7
+Project BB3A
+Project JBEU
+Project 4URN
+Project TMJB
+Project BSEG
+Project I5BW
+Project PHJ5
+Project JGVD
+Project 2QLT
+Project 3FQL
+Project W6RE
+Project G3TK
+Project QZ3H
+Project SEBG
+Project JCAC
+Project 54HO
+Project 54HO
+Project 54HO
+Project 54HO
+Project X3XJ
+Project HN6T
+Project PFJ6
+Project SEVY
+Project TEIN
+Project ZQFD
+Project TIAP
+Project GZRW
+Project N5OT
+Project AJMJ
+Project SBEX
+Project IDRE
+Project KDGG
+Project KWQ4
+Project NZ4U
+Project HPDW
+Project MUZH
+Project POVY
+Project XUGY
+Project LM5H
+Project 5JLR
+Project AXLX
+Project DRY6
+Project 5UOL
+Project K7RE
+Project AK3Z
+Project T37O
+Project 7IFH
+Project ECHX
+Project 3QKN
+Project OG7O
+Project ETJ4
+Project MF6U
+Project VCK5
+Project SEGI
+Project CWUL
+Project HWGU
+Project JTLZ
+Project N6EI
+Project YAK4
+Project RKWL
+Project B2YW
+Project SBVF
+Project H3WO
+Project ET62
+Project M24G
+Project W6JF
+Project AHVE
+Project O4TM
+Project U65N
+Project M2A5
+Project GB3B
+Project TQRR
+Project N27C
+Project PVGK
+Project CXOL
+Project ZMMS
+Project QBSE
+Project 752W
+Project S5VQ
+Project TRI3
+Project DUAR
+Project HZXT
+Project AJG4
+Project QNMP
+Project ULXX
+Project UTA5
+Project 3U3I
+Project AJWS
+Project RHDR
+Project CXSF
+Project FGAX
+Project FGBM
+Project A6UA
+Project UVXO
+Project CNDD
+Project E74S
+Project HPOC
+Project 7QRO
+Project BSJE
+Project R76J
+Project BFR5
+Project VTJ2
+Project ATR4
+Project ZV2E
+Project EJRW
+Project W3BB
+Project 3FJS
+Project 4ADM
+Project JSVI
+Project SONW
+Project 2YX2
+Project 7BUM
+Project CUEZ
+Project GIGB
+Project IUCU
+Project N7PS
+Project YXJP
+Project SATA
+Project PLBB
+Project G3CW
+Project 77RE
+Project QVSS
+Project I7QY
+Project MLHV
+Project HM6R
+Project 6DL7
+Project 54IG
+Project CWML
+Project 5WRM
+Project OVPI
+Project QNYT
+Project 5IJ3
+Project IFKD
+Project 3VX6
+Project MVWG
+Project TPUH
+Project WWXN
+Project YMAI
+Project GEZT
+Project GWXD
+Project EY7V
+Project COVP
+Project RTLH
+Project 5RTR
+Project 5Z57
+Project LRQR
+Project BZXY
+Project KNH4
+Project LX3Y
+Project SHXX
+Project 35XB
+Project RJNI
+Project RMFV
+Project EQ4M
+Project K6BH
+Project VWUO
+Project 5RXS
+Project Y7AE
+Project NNZ4
+Project 7YJJ
+Project AKVO
+Project UWJQ
+Project Q6HN
+Project MJ32
+Project XVS2
+Project K4EC
+Project Q5NI
+Project HQFL
+Project 7ZGR
+Project EEUC
+Project AHOO
+Project XKWY
+Project LWAM
+Project ZD5V
+Project HCXK
+Project NNV7
+Project 4O5W
+Project LKWT
+Project QJFC
+Project 7XSD
+Project 3EZH
+Project TVJY
+Project 3WES
+Project 5P3D
+Project NHUJ
+Project T7YZ
+Project KO5K
+Project KZDN
+Project XBIZ
+Project X6TN
+Project GTAH
+Project 2OZE
+Project FZWM
+Project BK4L
+Project 5PYZ
+Project UABR
+Project S2HK
+Project OBCO
+Project RJRI
+Project 3SX2
+Project UVAC
+Project GIRY
+Project 25TY
+Project QS5G
+Project 2K7M
+Project 6N6U
+Project GY5J
+Project 33ED
+Project VV3S
+Project RID6
+Project URQ3
+Project UBWT
+Project FEU2
+Project USMY
+Project UZNR
+Project IW6W
+Project 44D3
+Project ALXS
+Project LPVT
+Project XQCE
+Project LUMT
+Project XJLB
+Project NMJE
+Project AKE6
+Project H6PG
+Project GW2M
+Project NV6U
+Project GZYU
+Project FP25
+Project TUNV
+Project AS7A
+Project ZIRN
+Project YPAJ
+Project IT43
+Project DNCN
+Project MP5V
+Project C4VO
+Project 5RTP
+Project ETZS
+Project KFTE
+Project QZMI
+Project QVUG
+Project 36IC
+Project FQXZ
+Project JB4V
+Project H7OI
+Project SD5O
+Project 43KG
+Project JHGW
+Project AYPV
+Project BQPS
+Project BN6V
+Project P2UQ
+Project 3ZUY
+Project VH5F
+Project 7QCE
+Project JF5M
+Project FXCM
+Project K27M
+Project XTKW
+Project 7552
+Project 3CR4
+Project 3TRQ
+Project JACA
+Project AWRC
+Project VOEF
+Project VQ3O
+Project GBDK
+Project CPM4
+Project CN5Y
+Project FCVU
+Project QD5H
+Project 26OT
+Project LZ7C
+Project GRU3
+Project CX27
+Project TD7C
+Project YSGZ
+Project RDRL
+Project BB33
+Project QJZM
+Project GZED
+Project BC5Y
+Project JJQF
+Project WDTO
+Project T42C
+Project YAX5
+Project HXKF
+Project JOK6
+Project GAIW
+Project HVMH
+Project KPJP
+Project MQ3G
+Project 34V6
+Project NVE3
+Project D5WJ
+Project 2EY5
+Project DVZJ
+Project SBTY
+Project R6RL
+Project 3WCH
+Project XICR
+Project GY6Y
+Project AH2Z
+Project YPTF
+Project D42H
+Project DZVA
+Project JZQK
+Project 3S2T
+Project QSS6
+Project OJSV
+Project 7JFP
+Project XKAJ
+Project CZNK
+Project WK2L
+Project XAXR
+Project BLAW
+Project PAR3
+Project KBJD
+Project NTYR
+Project GPUY
+Project VM6O
+Project RC7T
+Project FK4L
+Project ZWY7
+Project HS7R
+Project EJRF
+Project 4MMD
+Project S2ZO
+Project FFTT
+Project O2JJ
+Project 76ZL
+Project MJVN
+Project WKAF
+Project AAZC
+Project IABP
+Project VYNT
+Project RVSB
+Project EB4P
+Project X4Y7
+Project Q5Q6
+Project YFMO
+Project KD6R
+Project 3W6H
+Project RBM3
+Project E4GC
+Project X7PS
+Project 6FBM
+Project NKUD
+Project JNZQ
+Project BR4M
+Project JCY4
+Project QXWX
+Project OUWP
+Project MMMJ
+Project MYV4
+Project JMZE
+Project PROV
+Project IALL
+Project 7OGZ
+Project B3DR
+Project PMAY
+Project TSB7
+Project DU52
+Project HORL
+Project JHJF
+Project D66G
+Project J6DR
+Project WEQB
+Project NJ7M
+Project IQMA
+Project JHUR
+Project Y2ZS
+Project TQKS
+Project OCMU
+Project JS3X
+Project VB7M
+Project 53NY
+Project IBZJ
+Project MMEX
+Project Y6GQ
+Project IXKQ
+Project YVHJ
+Project 4VLR
+Project ODKK
+Project XS4S
+Project DUM3
+Project QRII
+Project VIIV
+Project OGMU
+Project IFBB
+Project 547Q
+Project HRBH
+Project KFJM
+Project 3NCO
+Project GTIK
+Project 5X4M
+Project 5VQK
+Project 7UBK
+Project PLUI
+Project FTCX
+Project 3XCC
+Project UE7J
+Project VNQM
+Project SMJI
+Project QZJR
+Project 4GFL
+Project EVL4
+Project 626K
+Project O26L
+Project BQJE
+Project JD6S
+Project LA5L
+Project MIWM
+Project TF5Y
+Project QYYI
+Project KWPM
+Project H6XN
+Project SEGQ
+Project FNT4
+Project OZ56
+Project AYT6
+Project P6LS
+Project 5SHE
+Project 74O6
+Project YUWI
+Project GF4W
+Project RCTH
+Project XNC6
+Project SF3X
+Project BMXT
+Project 77GQ
+Project YOK5
+Project BCUQ
+Project 7HSW
+Project 6PK4
+Project CJQU
+Project H25V
+Project OMYY
+Project TN2I
+Project 4KZB
+Project OK7L
+Project 4X24
+Project QPES
+Project TFZ4
+Project ZROU
+Project BABT
+Project SSCF
+Project ZPOB
+Project EMMJ
+Project Q4CY
+Project GYYA
+Project R4FF
+Project WWNB
+Project R73E
+Project LJW3
+Project HWSZ
+Project FAP3
+Project P4AT
+Project 37TK
+Project SZHZ
+Project JFKH
+Project WWD3
+Project Q7RY
+Project ZIIU
+Project LMQB
+Project DE5Z
+Project JWIF
+Project I4K5
+Project T3OV
+Project DXNA
+Project IVIR
+Project JEU2
+Project COFK
+Project BX43
+Project 55MW
+Project D6UW
+Project DWNO
+Project UUYH
+Project 5GKR
+Project BKJN
+Project WQI5
+Project LTYY
+Project ASGM
+Project XK22
+Project BCKH
+Project 6EHJ
+Project 3P4J
+Project SU3C
+Project WFAT
+Project TF4P
+Project 3DCT
+Project L6JW
+Project YUOV
+Project URHM
+Project LY7L
+Project LFTE
+Project DIHD
+Project KN4R
+Project I45K
+Project AK66
+Project AVVY
+Project CJAY
+Project PNHM
+Project QBTF
+Project LDVT
+Project G5MH
+Project LNSX
+Project 6CSB
+Project TLW4
+Project IAAH
+Project L77Y
+Project MP3Y
+Project BZBM
+Project NMOM
+Project ZI7F
+Project YJ4O
+Project Y52B
+Project 5CMI
+Project MOZF
+Project GH3R
+Project A75G
+Project RRRF
+Project GRF4
+Project UZDN
+Project 5DWK
+Project V226
+Project JRZL
+Project UKIF
+Project QB5C
+Project OIA5
+Project 2JX5
+Project UIAS
+Show test repositories (530)
+Day
+Show
+all sessions
+only contradicted
+Show
+
+No sessions are recorded on this day. The record holds no sessions on any day.
+
+Export: labels. Exports use stand-ins for project names by default.
+
+Cases
+Seed: triage inbox. One human step to look through what arrived. Running
+Seed: weekly release. One human sign-off step that waits for the operator. Running
+What agent work cost
+
+A read-only view of what the record keeper recorded about agent sessions. It never gates or allows anything.
+
+Cost is not recorded yet
+
+The session recorder is not sending costs to Horizon. Cost per accepted outcome: Not recorded, because there is no source for it. The setup steps are in the setup guide.
+
+Figures come from the record keeper's record. "Observed" is recorded usage; "estimate" is never added to it.
+
+Try
+Call the supplier about the invoice
+Ideas for the Friday meeting
+Remember to renew the licence
+
+Ready
+WRITE
+
+Write ▾
+Today · Seed: triage inbox. One human step to look through what arrived.
+Write
+
+Saves a note on today (2026-11-07) and on the case "Seed: triage inbox. One human step to look through what arrived.". Enter saves, Shift+Enter adds a line, @ adds a link. Tab changes the mode. Esc leaves the box.
+
+testing · Seed: triage inbox. One human step to look through what arrived. · Work
+Enter send · Shift+Enter new line · Tab mode · Esc leave
+INSPECTOR
+
+Nothing is selected. Press J or K to move through the list, then Enter to look at an item here.
+
+ASK ABOUT THE FOCUS
+
+Choose a question about what is in focus. The answer is shown as facts, each with where it came from.
+
+Question
+Why is it this way?
+What does it affect?
+What changed?
+What happened, in order?
+What if it were different?
+What can reach it?
+Replay what happened
+Look up in the reference library (optional)
+
+The reference library is Not connected, so nothing can be looked up. Questions are still answered from what is recorded.
+
+Ask
+
+Saturday, 7 November 2026. 7 waiting for you.

@@ -1,0 +1,213 @@
+bun run scripts/teeth-t05-boundaries.ts
+ok   NE-B0 real tree passes (192 files, 7 in the authority)
+ok   NE-B1 second schema version outside the authority
+ok   NE-B2 second block vocabulary outside the authority
+ok   NE-B2c a block-kind record is a vocabulary copy
+ok   NE-B2d a record keyed by the block-kind type is the claim; keyed by string is not
+ok   NE-B2b one or two named kinds are still a selection, not a scrape
+ok   NE-B3 second source-expression pattern outside the authority
+ok   NE-B4 route importing the binder directly
+ok   NE-B5 authority importing Cognate
+ok   NE-B6 authority emitting dynamic code
+ok   NE-B7 renderer outside the authority
+ok   NE-B8 competing authority store
+ok   NE-B9 prose in comments and messages is not flagged
+ok   NE-B9b a real sink beside prose is still caught
+ok   NE-B10 NOTICE absent is rejected, not assumed present
+ok   NE-B11 a donor dropped from NOTICE is drift
+ok   NE-B12 an extra donor in NOTICE is drift
+ok   NE-B13 a donor section without a license is not a record
+ok   NE-B14 NOTICE describing Horizon without its declared license is rejected
+ok   NE-B15 a declared license with no LICENSE file is rejected
+ok   NE-B16 a manifest with no license field is not a silent pass
+teeth-t05: ok (21 checks)
+bun run scripts/teeth-t05-equivalence.ts
+ok   PE-04 GUI text/plain body is byte-identical to CLI `surface` output
+ok   PE-04 GUI json is a horizon.surface/2 frame carrying one horizon.gui-view/1 projection
+ok   PE-01 an invented role is refused (400), never downgraded to the default
+ok   PE-06 MCP publishes 11 operation tools + 1 view tool, derived from the closed union
+ok   NE-09 GUI (409), MCP (409) and CLI (exit 1) all refuse an unoffered intent
+ok   NE-10 the live /surface route serves no executable markup under either accept header
+teeth-t05-equivalence: ok (6 comparisons)
+bun run scripts/teeth-t05-prereg-coverage.ts
+  ok   PE-06: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-07: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-08: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  FAIL PE-01: test 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' does not name the prereg attack — missing [.strict()]. Either assert those attacks in that test or retitle it (a title is a claim about what the test proves).
+  FAIL PE-02: test 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown horizon: source, and records no agent op as human (falsifier PE-02)' does not name the prereg attack — missing [semantic:<ref>, agent-supplied]. Either assert those attacks in that test or retitle it (a title is a claim about what the test proves).
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>]
+  FAIL NE-02: test 'NE-02 rejects an agent-supplied value dressed as a boundary fact' does not name the prereg attack — missing [iframe, jsx, onclick]. Either assert those attacks in that test or retitle it (a title is a claim about what the test proves).
+  ok   NE-03: covered by 'NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  ok   NE-09: covered by 'NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)' (no literal anchors to re-check)
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   PE-06: covered by 'NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   PE-07: proven by 'just gate-t05' (target exists)
+  ok   PE-07: proven by 'just verify' (target exists)
+  ok   PE-08: proven by 'just check-t05', which invokes [check-t05-boundaries.ts]
+  ok   NE-C1 the shipped NE-02 mislabel is caught when reintroduced
+  ok   PE-06: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-07: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-08: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-01: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon.surface/2, .strict()]
+  ok   PE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon:<source>, semantic:<ref>, file:<allowed root>/..., agent:<ref>, agent-supplied]
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>]
+  ok   NE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [iframe, jsx, onclick]
+  FAIL NE-03: no test or tooth names this id
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  ok   NE-09: covered by 'NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)' (no literal anchors to re-check)
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   PE-06: covered by 'NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   PE-07: proven by 'just gate-t05' (target exists)
+  ok   PE-07: proven by 'just verify' (target exists)
+  ok   PE-08: proven by 'just check-t05', which invokes [check-t05-boundaries.ts]
+  ok   NE-C2 a preregistered id with no test is rejected
+  ok   PE-06: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-07: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-08: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-01: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon.surface/2, .strict()]
+  ok   PE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon:<source>, semantic:<ref>, file:<allowed root>/..., agent:<ref>, agent-supplied]
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>]
+  ok   NE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [iframe, jsx, onclick]
+  ok   NE-03: covered by 'NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  FAIL NE-09: no test or tooth names this id
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   PE-06: covered by 'NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   PE-07: proven by 'just gate-t05' (target exists)
+  ok   PE-07: proven by 'just verify' (target exists)
+  ok   PE-08: proven by 'just check-t05', which invokes [check-t05-boundaries.ts]
+  ok   NE-C3 renaming an id so it names no expectation is rejected
+  ok   PE-06: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-07: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-08: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-01: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon.surface/2, .strict()]
+  ok   PE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon:<source>, semantic:<ref>, file:<allowed root>/..., agent:<ref>, agent-supplied]
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>]
+  ok   NE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [iframe, jsx, onclick]
+  ok   NE-03: covered by 'NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  ok   NE-09: covered by 'NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)' (no literal anchors to re-check)
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   PE-06: covered by 'NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  FAIL PE-07: gate target 'gate-t05' is not defined in the justfile
+  ok   PE-07: proven by 'just verify' (target exists)
+  ok   PE-08: proven by 'just check-t05', which invokes [check-t05-boundaries.ts]
+  ok   NE-C4 a renamed gate target is rejected
+  FAIL .agents/prereg/horizon/T05.prereg.yaml: PE-06 appears as text but is not a registered member of positive_expectations/negative_expectations, and .agents/prereg/horizon/T05.prereg.interpretation.yaml does not exist. A YAML parser cannot see it, so it is not covered by this check.
+  FAIL .agents/prereg/horizon/T05.prereg.yaml: PE-07 appears as text but is not a registered member of positive_expectations/negative_expectations, and .agents/prereg/horizon/T05.prereg.interpretation.yaml does not exist. A YAML parser cannot see it, so it is not covered by this check.
+  FAIL .agents/prereg/horizon/T05.prereg.yaml: PE-08 appears as text but is not a registered member of positive_expectations/negative_expectations, and .agents/prereg/horizon/T05.prereg.interpretation.yaml does not exist. A YAML parser cannot see it, so it is not covered by this check.
+  ok   PE-01: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon.surface/2, .strict()]
+  ok   PE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon:<source>, semantic:<ref>, file:<allowed root>/..., agent:<ref>, agent-supplied]
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>]
+  ok   NE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [iframe, jsx, onclick]
+  ok   NE-03: covered by 'NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  ok   NE-09: covered by 'NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)' (no literal anchors to re-check)
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   NE-C6 an expectation swallowed by a folded scalar is reported, not counted
+  FAIL .agents/prereg/horizon/T05.prereg.yaml: PE-06 appears as text but is not a registered member of positive_expectations/negative_expectations, and .agents/prereg/horizon/T05.prereg.interpretation.yaml interprets sha256 0, but the frozen file is ff36d65b578531687f8165950ba38c438dd98a71671c230d59ae48d02bd73019. A YAML parser cannot see it, so it is not covered by this check.
+  FAIL .agents/prereg/horizon/T05.prereg.yaml: PE-07 appears as text but is not a registered member of positive_expectations/negative_expectations, and .agents/prereg/horizon/T05.prereg.interpretation.yaml interprets sha256 0, but the frozen file is ff36d65b578531687f8165950ba38c438dd98a71671c230d59ae48d02bd73019. A YAML parser cannot see it, so it is not covered by this check.
+  FAIL .agents/prereg/horizon/T05.prereg.yaml: PE-08 appears as text but is not a registered member of positive_expectations/negative_expectations, and .agents/prereg/horizon/T05.prereg.interpretation.yaml interprets sha256 0, but the frozen file is ff36d65b578531687f8165950ba38c438dd98a71671c230d59ae48d02bd73019. A YAML parser cannot see it, so it is not covered by this check.
+  ok   PE-01: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon.surface/2, .strict()]
+  ok   PE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon:<source>, semantic:<ref>, file:<allowed root>/..., agent:<ref>, agent-supplied]
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>]
+  ok   NE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [iframe, jsx, onclick]
+  ok   NE-03: covered by 'NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  ok   NE-09: covered by 'NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)' (no literal anchors to re-check)
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   NE-C7 an interpretation quoting a stale frozen hash is refused
+  ok   PE-06: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  FAIL .agents/prereg/horizon/T05.prereg.yaml: PE-07 appears as text but is not a registered member of positive_expectations/negative_expectations, and .agents/prereg/horizon/T05.prereg.interpretation.yaml lists it without member: false, so it claims to be structural. A YAML parser cannot see it, so it is not covered by this check.
+  ok   PE-08: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-01: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon.surface/2, .strict()]
+  ok   PE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon:<source>, semantic:<ref>, file:<allowed root>/..., agent:<ref>, agent-supplied]
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>]
+  ok   NE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [iframe, jsx, onclick]
+  ok   NE-03: covered by 'NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  ok   NE-09: covered by 'NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)' (no literal anchors to re-check)
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   PE-06: covered by 'NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   PE-08: proven by 'just check-t05', which invokes [check-t05-boundaries.ts]
+  ok   NE-C8 an interpretation claiming a swallowed id is structural is refused
+  ok   PE-06: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-07: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-08: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-01: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon.surface/2, .strict()]
+  ok   PE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon:<source>, semantic:<ref>, file:<allowed root>/..., agent:<ref>, agent-supplied]
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>]
+  ok   NE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [iframe, jsx, onclick]
+  ok   NE-03: covered by 'NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  ok   NE-09: covered by 'NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)' (no literal anchors to re-check)
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   PE-06: covered by 'NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   PE-07: proven by 'just gate-t05' (target exists)
+  ok   PE-07: proven by 'just verify' (target exists)
+  ok   PE-08: proven by 'just check-t05', which invokes [check-t05-boundaries.ts]
+  ok   NE-C0 the repository's real test map is accepted
+teeth-t05-coverage: ok (8 teeth)
+bun run scripts/teeth-t05-mutation.ts
+  ok   M1 the closed union accepts a sixteenth block type → caught by the NE-02 test
+  ok   M2 the rejection keeps its pointer but names nothing → caught by the NE-02 test
+  ok   M3 a callout silently drops smuggled keys instead of refusing them → caught by the NE-02 test
+teeth-t05-mutation: ok (3 mutants, each caught by the test that claims the property)
+teeth-t05 rc=0

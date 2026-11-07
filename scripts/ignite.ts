@@ -18,7 +18,9 @@ import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, sta
 import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
+import { CELL_POLICY } from "../src/adapters/sea-forge-case.ts";
 import { loadWorld } from "../src/adapters/semantic.ts";
+import { DEFAULT_OPERATOR_REF } from "../src/config/load.ts";
 import { NAVIGATION_INTENT_COMMIT } from "../src/capabilities/navigation-intent.ts";
 import {
   UNISOLATED_MODE,
@@ -104,7 +106,7 @@ for (const f of files) {
   writeFileSync(join(cell, "worlds", f), readFileSync(join(domain, f)));
 }
 
-const policyPath = join(cell, "policy.yaml");
+const policyPath = join(cell, CELL_POLICY);
 if (!existsSync(policyPath)) {
   const approve = args.includes("--approve-commits");
   writeFileSync(
@@ -121,6 +123,10 @@ ${approve ? "    requires_approval: true\n" : ""}    actor_role: service
   - { name: horizon-capabilities, verdict: allow, actor_role: service, operation_kind: cognate_capability }
   - { name: horizon-actions, verdict: allow, actor_role: service, operation_kind: cognate_action }
   - { name: operator-approves, verdict: allow, actor_role: operator, operation_kind: approval_resolution }
+  # proposed steps still need a person to finish them
+  - { name: operator-adds-steps, verdict: allow, actor_role: operator, operation_kind: discretionary_task_add }
+  - { name: agents-propose-steps, verdict: allow, actor_role: service, operation_kind: discretionary_task_add }
+  - { name: operator-finishes-steps, verdict: allow, actor_role: operator, operation_kind: human_task_completion }
   - { name: evidence, verdict: allow, actor_role: service, operation_kind: evidence_mutation }
   - { name: settlement, verdict: allow, actor_role: service, operation_kind: settlement_declaration }
 `,
@@ -192,7 +198,7 @@ if (verdict.insecure) {
       gateway: { uid, actor: "cognate-service", delegable_actors: ["operator"] },
       cep_authority: {
         enabled: true,
-        policy: "policy.yaml",
+        policy: CELL_POLICY,
         worlds: [{ name: "horizon", base: "worlds", entry: "interaction-model.sea", files }],
         realitytrace: { bin: rt, data_home: rtData, state_home: rtState, require_corroboration: true },
       },
@@ -249,7 +255,10 @@ if (verdict.insecure) {
 
 // Read world_ref without loadConfig, which would also write a launch secret.
 const configPath = resolve(repo, process.env.HORIZON_CONFIG ?? "config/horizon.toml");
-const world = loadWorld((Bun.TOML.parse(readFileSync(configPath, "utf8")) as { world_ref: string }).world_ref);
+const configDoc = Bun.TOML.parse(readFileSync(configPath, "utf8")) as { world_ref: string; identity?: { operator_ref?: string } };
+const world = loadWorld(configDoc.world_ref);
+// The SEA-Forge approver must be the same identity Horizon is configured with (one identity, not two).
+const operatorRef = process.env.HORIZON_OPERATOR_REF?.trim() || configDoc.identity?.operator_ref || DEFAULT_OPERATOR_REF;
 console.log(`ignite: cell ${cell}`);
 console.log(`ignite: SEA-Forge ${server ?? "(run by the gateway service account)"} (log ${logPath})`);
 console.log(`ignite: RealityTrace ${rt}`);
@@ -268,7 +277,7 @@ const cockpit = spawn("bun", ["run", "src/main.ts"], {
     COGNATE_GOVERNANCE: "sea-forge",
     COGNATE_SEA_FORGE_SOCKET: socket,
     COGNATE_WORLD_REF: world.cognateWorldRef,
-    COGNATE_SEA_FORGE_OPERATOR: "operator", // logical actor id, a single-operator development default
+    COGNATE_SEA_FORGE_OPERATOR: operatorRef,
     HORIZON_APPROVAL_ASSURANCE: status.approvals,
     COGNATE_REALITYTRACE_BIN: rt,
     COGNATE_REALITYTRACE_DATA_HOME: rtData,

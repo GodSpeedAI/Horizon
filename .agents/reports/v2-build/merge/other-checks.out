@@ -1,0 +1,9 @@
+== just check-t05
+exit=0
+        proven separately by `bun run scripts/teeth-t05-mutation.ts`.
+== just teeth-t05
+exit=0
+teeth-t05-mutation: ok (3 mutants, each caught by the test that claims the property)
+== bun run build:desk
+exit=0
+built /home/sprime01/projects/Horizon-merge/dist/desk/app.js and /home/sprime01/projects/Horizon-merge/dist/desk/app.css

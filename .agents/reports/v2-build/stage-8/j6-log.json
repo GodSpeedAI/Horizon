@@ -1,0 +1,828 @@
+{
+  "candidates": 51,
+  "passed_grammar": [
+    "metric: huge number",
+    "metric: tiny number",
+    "callout: right-to-left text",
+    "callout: emoji run",
+    "table: no rows",
+    "table: row missing a column",
+    "table: extra keys and null values",
+    "table: 12 columns, 50 rows",
+    "tree: parent that does not exist",
+    "tree: two nodes that are each other's parent",
+    "tree: node its own parent",
+    "tree: duplicate refs",
+    "tree: 60 levels deep",
+    "timeline: far future and far past",
+    "graph: edge to itself",
+    "graph: edge to a node not listed",
+    "graph: one node, 100 duplicate edges",
+    "graph: 80 nodes",
+    "chart: one point",
+    "chart: all points equal",
+    "chart: all zero",
+    "chart: negative and huge",
+    "chart: no points",
+    "chart: bar with one point",
+    "chart: 8 series of different length",
+    "chart: huge decimals",
+    "compare: no dimensions",
+    "entity: unknown kind of reference",
+    "progress: no figure",
+    "form: 20 fields"
+  ],
+  "refused_by_grammar_never_drawn": [
+    {
+      "name": "metric: very long label and unit",
+      "shown_as": []
+    },
+    {
+      "name": "metric: markup in text",
+      "shown_as": []
+    },
+    {
+      "name": "callout: 2500 characters, no spaces",
+      "shown_as": []
+    },
+    {
+      "name": "callout: markup",
+      "shown_as": []
+    },
+    {
+      "name": "table: object as a cell",
+      "shown_as": []
+    },
+    {
+      "name": "tree: empty",
+      "shown_as": [
+        "This part cannot be shown here"
+      ]
+    },
+    {
+      "name": "timeline: time not a date",
+      "shown_as": [
+        "This part cannot be shown here"
+      ]
+    },
+    {
+      "name": "timeline: empty",
+      "shown_as": [
+        "This part cannot be shown here"
+      ]
+    },
+    {
+      "name": "graph: no nodes",
+      "shown_as": [
+        "This part cannot be shown here"
+      ]
+    },
+    {
+      "name": "chart: no series",
+      "shown_as": [
+        "This part cannot be shown here"
+      ]
+    },
+    {
+      "name": "compare: same on both sides, long text",
+      "shown_as": [
+        "This part cannot be shown here"
+      ]
+    },
+    {
+      "name": "media: pins outside 0 to 1",
+      "shown_as": [
+        "This part cannot be shown here"
+      ]
+    },
+    {
+      "name": "media: no items",
+      "shown_as": [
+        "This part cannot be shown here"
+      ]
+    },
+    {
+      "name": "media: web address as source",
+      "shown_as": [
+        "This part cannot be shown here"
+      ]
+    },
+    {
+      "name": "document: empty excerpt",
+      "shown_as": []
+    },
+    {
+      "name": "document: 2500-character excerpt",
+      "shown_as": []
+    },
+    {
+      "name": "entity: empty label",
+      "shown_as": [
+        "This part cannot be shown here"
+      ]
+    },
+    {
+      "name": "preflight: ready with no blocker",
+      "shown_as": [
+        "This part cannot be shown here"
+      ]
+    },
+    {
+      "name": "preflight: blocker 2500 characters",
+      "shown_as": [
+        "This part cannot be shown here"
+      ]
+    },
+    {
+      "name": "form: no fields",
+      "shown_as": [
+        "This part cannot be shown here"
+      ]
+    },
+    {
+      "name": "ask: option labels 2500 characters",
+      "shown_as": []
+    }
+  ],
+  "drawer_failed_and_contained": [],
+  "rest_of_panel_always_drawn": true,
+  "any_console_errors": [],
+  "any_page_hscroll": [],
+  "results": [
+    {
+      "name": "metric: huge number",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "metric",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "metric: tiny number",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "metric",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "metric: very long label and unit",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "callout",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "metric: markup in text",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "callout",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "callout: 2500 characters, no spaces",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "callout",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "callout: right-to-left text",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "callout",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "callout: emoji run",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "callout",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "callout: markup",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "callout",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "table: no rows",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "table",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "table: row missing a column",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "table",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "table: extra keys and null values",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "table",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "table: object as a cell",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "table",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "table: 12 columns, 50 rows",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "table",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "tree: parent that does not exist",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "tree",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "tree: two nodes that are each other's parent",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "tree",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "tree: node its own parent",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "tree",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "tree: duplicate refs",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "tree",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "tree: empty",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [
+        "This part cannot be shown here"
+      ],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "tree: 60 levels deep",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "tree",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "timeline: time not a date",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [
+        "This part cannot be shown here"
+      ],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "timeline: empty",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [
+        "This part cannot be shown here"
+      ],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "timeline: far future and far past",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "timeline",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "graph: edge to itself",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "graph",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "graph: no nodes",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [
+        "This part cannot be shown here"
+      ],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "graph: edge to a node not listed",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "graph",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "graph: one node, 100 duplicate edges",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "graph",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "graph: 80 nodes",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "graph",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "chart: one point",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "chart",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "chart: all points equal",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "chart",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "chart: all zero",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "chart",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "chart: negative and huge",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "chart",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "chart: no points",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "chart",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "chart: no series",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [
+        "This part cannot be shown here"
+      ],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "chart: bar with one point",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "chart",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "chart: 8 series of different length",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "chart",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "chart: huge decimals",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "chart",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "compare: no dimensions",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "compare",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "compare: same on both sides, long text",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [
+        "This part cannot be shown here"
+      ],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "media: pins outside 0 to 1",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [
+        "This part cannot be shown here"
+      ],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "media: no items",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [
+        "This part cannot be shown here"
+      ],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "media: web address as source",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [
+        "This part cannot be shown here"
+      ],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "document: empty excerpt",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "callout",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "document: 2500-character excerpt",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "callout",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "entity: unknown kind of reference",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "entity",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "entity: empty label",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [
+        "This part cannot be shown here"
+      ],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "preflight: ready with no blocker",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [
+        "This part cannot be shown here"
+      ],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "preflight: blocker 2500 characters",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [
+        "This part cannot be shown here"
+      ],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "progress: no figure",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "progress",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "form: no fields",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [
+        "This part cannot be shown here"
+      ],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "form: 20 fields",
+      "accepted_by_panel": true,
+      "passed_grammar": true,
+      "drawn_types": [
+        "form",
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    },
+    {
+      "name": "ask: option labels 2500 characters",
+      "accepted_by_panel": true,
+      "passed_grammar": false,
+      "drawn_types": [
+        "ask"
+      ],
+      "fallback_lines": [],
+      "rest_of_panel_still_drawn": true,
+      "new_console_errors": [],
+      "page_hscroll": false
+    }
+  ]
+}

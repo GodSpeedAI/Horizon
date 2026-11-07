@@ -1,0 +1,128 @@
+Skip to the open view
+This computer: Yoga7i
+Setup: testing
+Rulebook edition 0a10c20d
+Case: Seed: triage inbox. One human step to look through what arrived.
+Needs you: 7
+Cases: connected
+Records: connected
+Agent work: connected
+Reference library: Not connected
+Presenting: on
+Settings
+Phone remote
+
+Loading… Check phone control
+
+Setup guide
+
+Today
+Explore
+Decide (7)
+Work
+DAYS
+2026-11-07 (2)
+2026-11-06 (1)
+2026-11-05 (1)
+2026-11-04 (1)
+2026-11-03 (1)
+CASES
+Seed: triage inbox. One human step to look through what arrived.
+Seed: weekly release. One human sign-off step that waits for the operator.
+TAGS
+planning (1)
+questions (1)
+release (1)
+retro (1)
+review (1)
+seed (6)
+today (1)
+triage (1)
+Today
+
+Saturday, 7 November 2026 (America/New_York)
+
+Getting started
+Skip setup
+
+Step 1 of 3 Connect the case keeper and the record keeper Done
+
+The case keeper decides and the record keeper watches.
+
+Step 2 of 3 Open a case Done
+
+Say what you are trying to move forward. The case frames this workspace and is stored.
+
+Step 3 of 3 Make your first checked move To do
+
+The case keeper decides whether the move goes ahead, and the record keeper writes down what happened.
+
+Check that the rules and records are connected
+Notes
+
+12:59 · first version
+
+Seed note: today
+
+Plan for today: sign off the release notes, then look at the contradicted session. See yesterday.
+
+Tag: seed
+Tag: today
+
+12:59 · first version · on a case
+
+Seed note: questions for the agent
+
+Ask: which checks did you run before saying done? Link the answer to the sign-off step.
+
+Tag: seed
+Tag: questions
+Activity
+
+No activity on this day.
+
+Recent moves
+
+Who is allowed to approve is not yet checked for this setup.
+
+Moves you make and the refusals you get appear here, with what decided, recorded and observed each one. Next step: finish Getting started above, or hand work off.
+
+Try
+Call the supplier about the invoice
+Ideas for the Friday meeting
+Remember to renew the licence
+
+Ready
+WRITE
+
+Write ▾
+Today · Seed: triage inbox. One human step to look through what arrived.
+Write
+
+Saves a note on today (2026-11-07) and on the case "Seed: triage inbox. One human step to look through what arrived.". Enter saves, Shift+Enter adds a line, @ adds a link. Tab changes the mode. Esc leaves the box.
+
+testing · Seed: triage inbox. One human step to look through what arrived. · Today
+Enter send · Shift+Enter new line · Tab mode · Esc leave
+INSPECTOR
+
+Nothing is selected. Press J or K to move through the list, then Enter to look at an item here.
+
+ASK ABOUT THE FOCUS
+
+Choose a question about what is in focus. The answer is shown as facts, each with where it came from.
+
+Question
+Why is it this way?
+What does it affect?
+What changed?
+What happened, in order?
+What if it were different?
+What can reach it?
+Replay what happened
+Look up in the reference library (optional)
+
+The reference library is Not connected, so nothing can be looked up. Questions are still answered from what is recorded.
+
+Ask
+
+Saturday, 7 November 2026. 7 waiting for you.

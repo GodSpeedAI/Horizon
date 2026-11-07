@@ -1,0 +1,5 @@
+day view: median 9 ms, p95 13.1 ms, within 1000 ms
+record lookup: median 2.6 ms, p95 3.7 ms, within 1000 ms
+comparison view: median 611.6 ms, p95 756.2 ms, within 1000 ms
+event-to-record delay: median 0 ms, p95 0 ms over 9 events (threshold 2000 ms)
+wrote timings.json and delay.json in .agents/reports/v2-build/stage-6/k9

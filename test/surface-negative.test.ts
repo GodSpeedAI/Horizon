@@ -348,9 +348,11 @@ describe("T05 negative evidence (NE-01…NE-10)", () => {
 
   test("PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)", () => {
     const surface = composed();
-    for (const wrong of ["horizon.surface/1", "horizon.surface/3", "horizon.surface", ""]) {
+    for (const wrong of ["horizon.surface/1", "horizon.surface/4", "horizon.surface", ""]) {
       expect(parseSurface({ ...surface, schema: wrong }).ok).toBe(false);
     }
+    // The previous version is still read (an ask in it is a select ask); see test/surface-ask-3.test.ts.
+    expect(parseSurface({ ...surface, schema: "horizon.surface/2" }).ok).toBe(true);
     // An unknown block type has no union member: the vocabulary is closed at fifteen.
     // (The `iframe` form of this attack is asserted by NE-02; this test keeps to the schema
     // identity so the two cannot drift into claiming the same thing.)

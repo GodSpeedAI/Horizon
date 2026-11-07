@@ -1,5 +1,5 @@
 /**
- * `horizon.surface/2` — the single closed surface grammar (REQ-UI-001, REQ-UI-002).
+ * `horizon.surface/3` — the single closed surface grammar (REQ-UI-001, REQ-UI-002).
  *
  * There is exactly one schema object in Horizon that can describe a surface. The GUI
  * projection, the CLI projection and the machine (MCP) projection all read their
@@ -24,7 +24,9 @@
  */
 import { z } from "zod";
 
-export const SURFACE_SCHEMA = "horizon.surface/2" as const;
+export const SURFACE_SCHEMA = "horizon.surface/3" as const;
+/** Documents written for the previous version are still read. An ask in one is a plain select ask. */
+export const SURFACE_SCHEMA_PREVIOUS = "horizon.surface/2" as const;
 
 // ---------------------------------------------------------------------------
 // Vocabulary shared by every route
@@ -567,17 +569,47 @@ const Preflight = z
   })
   .strict();
 
-/** An agent may ask; it may never pre-fill an affirmative answer. */
+export const ASK_INPUTS = ["select", "confirm", "multiselect", "text"] as const;
+export type AskInput = (typeof ASK_INPUTS)[number];
+export const MAX_TEXT_ANSWER = 500;
+export const MAX_CONSEQUENCE = 200;
+
+/**
+ * An agent may ask; it may never pre-fill an affirmative answer. `input` says how the person answers: pick one (`select`, the
+ * default and the only kind a /2 document has), yes or no (`confirm`), pick several (`multiselect`), or one line of words (`text`,
+ * at most 500 characters). `select` and `multiselect` list 2 to 8 options; `confirm` and `text` list none. An option may say in
+ * one plain sentence what choosing it would lead to. `resolves` names the step or decision the answer settles.
+ */
 const Ask = z
   .object({
     ...basis,
     type: z.literal("ask"),
     question: DisplayText,
     why_needed: DisplayText,
+    input: z.enum(ASK_INPUTS).optional(),
     options: z
-      .array(z.object({ option_id: z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/), label: DisplayText }).strict())
-      .min(2)
-      .max(8),
+      .array(
+        z
+          .object({
+            option_id: z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/),
+            label: DisplayText,
+            consequence: z
+              .string()
+              .min(1)
+              .max(MAX_CONSEQUENCE)
+              .refine((value) => !MARKUP.test(value), { message: "display text MUST NOT contain markup ('<' or '>')" })
+              .optional(),
+          })
+          .strict(),
+      )
+      .max(8)
+      .optional(),
+    resolves: z
+      .string()
+      .min(1)
+      .max(128)
+      .refine((value) => !MARKUP.test(value), { message: "display text MUST NOT contain markup ('<' or '>')" })
+      .optional(),
   })
   .strict();
 
@@ -678,7 +710,7 @@ export type SurfaceAction = z.infer<typeof SurfaceAction>;
  */
 export const SurfaceV2 = z
   .object({
-    schema: z.literal(SURFACE_SCHEMA),
+    schema: z.union([z.literal(SURFACE_SCHEMA), z.literal(SURFACE_SCHEMA_PREVIOUS)]),
     surface_id: z.string().regex(/^[a-z][a-z0-9_.-]{0,63}$/),
     title: DisplayText,
     responsibility: z.enum(RESPONSIBILITIES),
@@ -736,6 +768,20 @@ export const SurfaceV2 = z
           path: ["blocks", index, "submit_operation"],
           message: "a form MUST submit a consequential operation; use an action for read-only operations",
         });
+      }
+      // Ask: the options must fit the input kind, and the new fields belong to the new version only.
+      if (block.type === "ask") {
+        const kind = block.input ?? "select";
+        const count = block.options?.length ?? 0;
+        if ((kind === "select" || kind === "multiselect") && (count < 2 || count > 8)) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["blocks", index, "options"], message: `a ${kind} ask MUST list 2 to 8 options` });
+        }
+        if ((kind === "confirm" || kind === "text") && count > 0) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["blocks", index, "options"], message: `a ${kind} ask MUST NOT list options` });
+        }
+        if (value.schema === SURFACE_SCHEMA_PREVIOUS && (block.input !== undefined || block.resolves !== undefined || block.options?.some((o) => o.consequence !== undefined))) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["blocks", index], message: "input, resolves and consequence need schema horizon.surface/3" });
+        }
       }
       // A tree must be internally consistent: an orphan or self-parented node cannot be
       // laid out, and a renderer that tried would silently drop a row the observer needs.

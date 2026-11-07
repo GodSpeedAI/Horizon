@@ -1,0 +1,593 @@
+{
+  "opened_by_nav": true,
+  "left_conversation_with_ctrl1": true,
+  "opened_by_ctrl5": true,
+  "wide": {
+    "rows": [
+      {
+        "kind": "note",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "08:41 AM",
+        "outcome": "Saved to today.",
+        "text": "Done Remember to ask the team about the checkout wording. You 08:41 AM Saved to today."
+      },
+      {
+        "kind": "handoff",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "09:41 AM",
+        "outcome": "Added to Seed: triage inbox. It has started.",
+        "text": "Done Seed hand off: collect this week's release numbers You 09:41 AM Added to Seed: triage inbox. It has started."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "10:41 AM",
+        "outcome": "2 notes, 1 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout You 10:41 AM 2 notes, 1 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "waiting",
+        "dot": true,
+        "dot_status": "waiting",
+        "badge": "Agent on this page · Demo agent",
+        "time": "12:41 PM",
+        "outcome": "An agent suggests this. Nothing is sent until you confirm.",
+        "text": "Waiting for you Seed proposal: add a rollback note to the release Agent on this page · Demo agent 12:41 PM An agent suggests this. Nothing is sent until you confirm. AN AGENT SUGGESTS Hand off this work? Seed proposal: add a rollback note to the release An agent suggests this. Nothing is sent until you confirm. Confirm Discard Confirm shows you exactly what will happen first. Nothing is sent until you confirm there."
+      },
+      {
+        "kind": "handoff",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "01:44 PM",
+        "outcome": "Handed off: \"Stage 8 proof: draft the weekly release summary\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: draft the weekly release summary You 01:44 PM Handed off: \"Stage 8 proof: draft the weekly release summary\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "handoff",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "01:44 PM",
+        "outcome": "Handed off: \"Stage 8 proof: list open questions for the review\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: list open questions for the review You 01:44 PM Handed off: \"Stage 8 proof: list open questions for the review\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:45 PM",
+        "outcome": "0 notes, 0 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout Agent on this page 01:45 PM 0 notes, 0 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:45 PM",
+        "outcome": "Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: agent suggests a changelog check Agent on this page 01:45 PM Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "refused",
+        "dot": true,
+        "dot_status": "refused",
+        "badge": "Agent on this page",
+        "time": "01:45 PM",
+        "outcome": "Discarded by you. Nothing was sent.",
+        "text": "Refused Stage 8 proof: agent suggests something you do not want Agent on this page 01:45 PM Discarded by you. Nothing was sent."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "refused",
+        "dot": true,
+        "dot_status": "refused",
+        "badge": "Agent on this page",
+        "time": "01:45 PM",
+        "outcome": "Discarded by you. Nothing was sent.",
+        "text": "Refused Stage 8 probe: discard me Agent on this page 01:45 PM Discarded by you. Nothing was sent."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:46 PM",
+        "outcome": "Handed off: \"Stage 8 probe: confirm me\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 probe: confirm me Agent on this page 01:46 PM Handed off: \"Stage 8 probe: confirm me\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:46 PM",
+        "outcome": "0 notes, 0 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout Agent on this page 01:46 PM 0 notes, 0 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:46 PM",
+        "outcome": "Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: agent suggests a changelog check Agent on this page 01:46 PM Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "refused",
+        "dot": true,
+        "dot_status": "refused",
+        "badge": "Agent on this page",
+        "time": "01:46 PM",
+        "outcome": "Discarded by you. Nothing was sent.",
+        "text": "Refused Stage 8 proof: agent suggests something you do not want Agent on this page 01:46 PM Discarded by you. Nothing was sent."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:47 PM",
+        "outcome": "0 notes, 0 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout Agent on this page 01:47 PM 0 notes, 0 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:47 PM",
+        "outcome": "Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: agent suggests a changelog check Agent on this page 01:47 PM Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "refused",
+        "dot": true,
+        "dot_status": "refused",
+        "badge": "Agent on this page",
+        "time": "01:47 PM",
+        "outcome": "Discarded by you. Nothing was sent.",
+        "text": "Refused Stage 8 proof: agent suggests something you do not want Agent on this page 01:47 PM Discarded by you. Nothing was sent."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:47 PM",
+        "outcome": "0 notes, 0 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout Agent on this page 01:47 PM 0 notes, 0 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:48 PM",
+        "outcome": "0 notes, 0 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout Agent on this page 01:48 PM 0 notes, 0 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:48 PM",
+        "outcome": "Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: agent suggests a changelog check Agent on this page 01:48 PM Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "refused",
+        "dot": true,
+        "dot_status": "refused",
+        "badge": "Agent on this page",
+        "time": "01:48 PM",
+        "outcome": "Discarded by you. Nothing was sent.",
+        "text": "Refused Stage 8 proof: agent suggests something you do not want Agent on this page 01:48 PM Discarded by you. Nothing was sent."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:49 PM",
+        "outcome": "0 notes, 0 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout Agent on this page 01:49 PM 0 notes, 0 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:49 PM",
+        "outcome": "Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: agent suggests a changelog check Agent on this page 01:49 PM Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "refused",
+        "dot": true,
+        "dot_status": "refused",
+        "badge": "Agent on this page",
+        "time": "01:49 PM",
+        "outcome": "Discarded by you. Nothing was sent.",
+        "text": "Refused Stage 8 proof: agent suggests something you do not want Agent on this page 01:49 PM Discarded by you. Nothing was sent."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "waiting",
+        "dot": true,
+        "dot_status": "waiting",
+        "badge": "Agent on this page · Proof agent",
+        "time": "01:49 PM",
+        "outcome": "An agent suggests this. Nothing is sent until you confirm.",
+        "text": "Waiting for you Stage 8 proof: preview allowed for agent Agent on this page · Proof agent 01:49 PM An agent suggests this. Nothing is sent until you confirm. AN AGENT SUGGESTS Hand off this work? Stage 8 proof: preview allowed for agent An agent suggests this. Nothing is sent until you confirm. Confirm Discard Confirm shows you exactly what will happen first. Nothing is sent until you confirm there."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "02:01 PM",
+        "outcome": "3 notes, 1 cases, 0 days, 1 tags.",
+        "text": "Done Find: release You 02:01 PM 3 notes, 1 cases, 0 days, 1 tags."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "02:02 PM",
+        "outcome": "3 notes, 1 cases, 0 days, 1 tags.",
+        "text": "Done Find: release You 02:02 PM 3 notes, 1 cases, 0 days, 1 tags."
+      }
+    ],
+    "console_errors": [],
+    "hscroll": false
+  },
+  "phone": {
+    "rows": [
+      {
+        "kind": "note",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "08:41 AM",
+        "outcome": "Saved to today.",
+        "text": "Done Remember to ask the team about the checkout wording. You 08:41 AM Saved to today."
+      },
+      {
+        "kind": "handoff",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "09:41 AM",
+        "outcome": "Added to Seed: triage inbox. It has started.",
+        "text": "Done Seed hand off: collect this week's release numbers You 09:41 AM Added to Seed: triage inbox. It has started."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "10:41 AM",
+        "outcome": "2 notes, 1 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout You 10:41 AM 2 notes, 1 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "waiting",
+        "dot": true,
+        "dot_status": "waiting",
+        "badge": "Agent on this page · Demo agent",
+        "time": "12:41 PM",
+        "outcome": "An agent suggests this. Nothing is sent until you confirm.",
+        "text": "Waiting for you Seed proposal: add a rollback note to the release Agent on this page · Demo agent 12:41 PM An agent suggests this. Nothing is sent until you confirm. AN AGENT SUGGESTS Hand off this work? Seed proposal: add a rollback note to the release An agent suggests this. Nothing is sent until you confirm. Confirm Discard Confirm shows you exactly what will happen first. Nothing is sent until you confirm there."
+      },
+      {
+        "kind": "handoff",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "01:44 PM",
+        "outcome": "Handed off: \"Stage 8 proof: draft the weekly release summary\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: draft the weekly release summary You 01:44 PM Handed off: \"Stage 8 proof: draft the weekly release summary\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "handoff",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "01:44 PM",
+        "outcome": "Handed off: \"Stage 8 proof: list open questions for the review\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: list open questions for the review You 01:44 PM Handed off: \"Stage 8 proof: list open questions for the review\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:45 PM",
+        "outcome": "0 notes, 0 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout Agent on this page 01:45 PM 0 notes, 0 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:45 PM",
+        "outcome": "Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: agent suggests a changelog check Agent on this page 01:45 PM Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "refused",
+        "dot": true,
+        "dot_status": "refused",
+        "badge": "Agent on this page",
+        "time": "01:45 PM",
+        "outcome": "Discarded by you. Nothing was sent.",
+        "text": "Refused Stage 8 proof: agent suggests something you do not want Agent on this page 01:45 PM Discarded by you. Nothing was sent."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "refused",
+        "dot": true,
+        "dot_status": "refused",
+        "badge": "Agent on this page",
+        "time": "01:45 PM",
+        "outcome": "Discarded by you. Nothing was sent.",
+        "text": "Refused Stage 8 probe: discard me Agent on this page 01:45 PM Discarded by you. Nothing was sent."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:46 PM",
+        "outcome": "Handed off: \"Stage 8 probe: confirm me\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 probe: confirm me Agent on this page 01:46 PM Handed off: \"Stage 8 probe: confirm me\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:46 PM",
+        "outcome": "0 notes, 0 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout Agent on this page 01:46 PM 0 notes, 0 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:46 PM",
+        "outcome": "Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: agent suggests a changelog check Agent on this page 01:46 PM Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "refused",
+        "dot": true,
+        "dot_status": "refused",
+        "badge": "Agent on this page",
+        "time": "01:46 PM",
+        "outcome": "Discarded by you. Nothing was sent.",
+        "text": "Refused Stage 8 proof: agent suggests something you do not want Agent on this page 01:46 PM Discarded by you. Nothing was sent."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:47 PM",
+        "outcome": "0 notes, 0 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout Agent on this page 01:47 PM 0 notes, 0 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:47 PM",
+        "outcome": "Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: agent suggests a changelog check Agent on this page 01:47 PM Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "refused",
+        "dot": true,
+        "dot_status": "refused",
+        "badge": "Agent on this page",
+        "time": "01:47 PM",
+        "outcome": "Discarded by you. Nothing was sent.",
+        "text": "Refused Stage 8 proof: agent suggests something you do not want Agent on this page 01:47 PM Discarded by you. Nothing was sent."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:47 PM",
+        "outcome": "0 notes, 0 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout Agent on this page 01:47 PM 0 notes, 0 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:48 PM",
+        "outcome": "0 notes, 0 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout Agent on this page 01:48 PM 0 notes, 0 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:48 PM",
+        "outcome": "Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: agent suggests a changelog check Agent on this page 01:48 PM Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "refused",
+        "dot": true,
+        "dot_status": "refused",
+        "badge": "Agent on this page",
+        "time": "01:48 PM",
+        "outcome": "Discarded by you. Nothing was sent.",
+        "text": "Refused Stage 8 proof: agent suggests something you do not want Agent on this page 01:48 PM Discarded by you. Nothing was sent."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:49 PM",
+        "outcome": "0 notes, 0 cases, 0 days, 0 tags.",
+        "text": "Done Find: checkout Agent on this page 01:49 PM 0 notes, 0 cases, 0 days, 0 tags."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "Agent on this page",
+        "time": "01:49 PM",
+        "outcome": "Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started.",
+        "text": "Done Stage 8 proof: agent suggests a changelog check Agent on this page 01:49 PM Handed off: \"Stage 8 proof: agent suggests a changelog check\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "refused",
+        "dot": true,
+        "dot_status": "refused",
+        "badge": "Agent on this page",
+        "time": "01:49 PM",
+        "outcome": "Discarded by you. Nothing was sent.",
+        "text": "Refused Stage 8 proof: agent suggests something you do not want Agent on this page 01:49 PM Discarded by you. Nothing was sent."
+      },
+      {
+        "kind": "handoff-proposal",
+        "status": "waiting",
+        "dot": true,
+        "dot_status": "waiting",
+        "badge": "Agent on this page · Proof agent",
+        "time": "01:49 PM",
+        "outcome": "An agent suggests this. Nothing is sent until you confirm.",
+        "text": "Waiting for you Stage 8 proof: preview allowed for agent Agent on this page · Proof agent 01:49 PM An agent suggests this. Nothing is sent until you confirm. AN AGENT SUGGESTS Hand off this work? Stage 8 proof: preview allowed for agent An agent suggests this. Nothing is sent until you confirm. Confirm Discard Confirm shows you exactly what will happen first. Nothing is sent until you confirm there."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "02:01 PM",
+        "outcome": "3 notes, 1 cases, 0 days, 1 tags.",
+        "text": "Done Find: release You 02:01 PM 3 notes, 1 cases, 0 days, 1 tags."
+      },
+      {
+        "kind": "find",
+        "status": "done",
+        "dot": true,
+        "dot_status": "done",
+        "badge": "You",
+        "time": "02:02 PM",
+        "outcome": "3 notes, 1 cases, 0 days, 1 tags.",
+        "text": "Done Find: release You 02:02 PM 3 notes, 1 cases, 0 days, 1 tags."
+      }
+    ],
+    "console_errors": [],
+    "hscroll": false
+  },
+  "checks": {
+    "four_seeded_rows": true,
+    "every_row_has_dot": true,
+    "every_row_has_badge": true,
+    "every_row_has_time": true,
+    "badges": [
+      "You",
+      "You",
+      "You",
+      "Agent on this page · Demo agent",
+      "You",
+      "You",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page",
+      "Agent on this page · Proof agent",
+      "You",
+      "You"
+    ],
+    "waiting_proposal_card": true
+  }
+}

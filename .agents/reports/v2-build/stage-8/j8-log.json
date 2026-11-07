@@ -1,0 +1,39 @@
+{
+  "hint_list": [
+    "/find <words>\nLook through your notes, days, tags and cases",
+    "/handoff <words>\nTurn your words into a step in a case, after a preview",
+    "/note <words>\nSave a note on today",
+    "/done <step>\nOpen the preview for marking a waiting step done",
+    "/hold <step>\nOpen the preview for holding a waiting step"
+  ],
+  "hint_list_after_fi": [
+    "/find <words>\nLook through your notes, days, tags and cases"
+  ],
+  "find_entries_before": 8,
+  "find_entries_after": 9,
+  "find_added_exactly_one": true,
+  "find_row": [
+    "Done Find: release You 02:02 PM 3 notes, 1 cases, 0 days, 1 tags."
+  ],
+  "nope_notice": [
+    "No command called /nope. Try /find, /handoff, /note, /done or /hold.\nWRITE"
+  ],
+  "nope_exact": true,
+  "done_preview_open": true,
+  "done_preview_text": "Preview: not real yet Mark done Kind Changes things What it touches The step \"Seed: sign off the weekly release notes\" in the case \"Seed: weekly release. One human sign-off step that waits for the operator.\" What will happen The case keeper records that you finished this step, with the reason you type. (certain) The next steps that were waiting for it can start. (follows from the rules) Who may do this You. This step is waiting for a person, and only a person can mark it done. Stops if The case changes after you looked at it. Then nothing is sent and you are told so. Limits This one step only. How to undo it A finished step cannot be un-finished here. Add a new step to redo the work. What it makes possible next The case moves on to what comes after this step. Your reason (typed, and kept with the decision) Cancel (Esc) Confirm: Mark done Type a reason for this decision, then Confirm. It is kept with the decision.",
+  "confirm_button_present": true,
+  "state_before": {
+    "decide": 15,
+    "conversation": 27
+  },
+  "state_after_preview_without_confirm": {
+    "decide": 15,
+    "conversation": 27
+  },
+  "nothing_changed": true,
+  "preview_closed_by_esc": true,
+  "nothing_changed_after_esc": true,
+  "hold_preview_open": true,
+  "nothing_changed_after_hold_preview": true,
+  "console_errors": []
+}

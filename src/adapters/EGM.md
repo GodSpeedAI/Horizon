@@ -46,7 +46,7 @@ Two shapes are used consistently. Read adapters return a closed, typed observati
 - `realitytrace-economics.ts`: `realityTraceEconomics(config, run?, pathExists?)` returning
   `EconomicsSource { read(): EconomicsReadout }` where `EconomicsReadout.state` is one of
   `"not_configured" | "unavailable" | "empty" | "ok"` `[realitytrace-economics.ts:EconomicsReadout]`;
-  `READ_ONLY_COMMANDS` = `[["repo","list"],["ledger","export"],["projections","export"]]`
+  `READ_ONLY_COMMANDS` = `[["repo","list"],["ledger","export"],["projections","export"],["ledger","verify"]]`
   `[realitytrace-economics.ts:READ_ONLY_COMMANDS]`.
 - `realitytrace-obligation.ts`: `RealityTraceObligation` class with `repo()`, `declare(intentId,
   expectation): DeclaredThreshold` and `run(threshold, argv, launcher, timeoutS): VerifierRun`
@@ -65,6 +65,13 @@ Two shapes are used consistently. Read adapters return a closed, typed observati
   `COGNATE_SEA_FORGE_OPERATOR` `[sea-forge-config.ts:ENV_OPERATOR]`. The wire (resolve, list, closure,
   delegated decide) is the Cognate SDK client `SeaForgeAuthority`, built once in `createApplication`;
   `src/` constructs no sockets (`scripts/check-boundaries.ts`).
+- `sea-forge-wire.ts`: `seaForgeCall(socketPath, request, timeoutMs = 5_000)` for one NDJSON request over the
+  Unix socket `[sea-forge-wire.ts:seaForgeCall]`. Only for the verbs the SDK client does not carry (the case
+  keeper's `case_*`/`human_task_*`, the ledger reads, the event follower in `sea-forge-events.ts`); governance verbs
+  never use it. `scripts/check-boundaries.ts` lets exactly these two files open the socket.
+  These two (`sea-forge-wire.ts`, `sea-forge-events.ts`) make raw calls only for case steps, human tasks and the
+  event stream, which the Cognate SDK does not offer yet; move them to the SDK once it does. Every approval and
+  governance call goes through the SDK.
 - `settlement.ts`: `realityTraceFromEnv(env, repoDir)`, `defaultRealityTraceRepo(storePath)`,
   `observationOutbox(capability)`, `RealityTraceEvidence` (`observe`, `evidenceFor`, `packet`),
   `authorityOf(invocation)`, and `SettlementAuthority = Pick<SeaForgeAuthority, "submitEvidence" |

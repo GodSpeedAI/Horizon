@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark" />
+<title>GodSpeed Terminal — Work, Evidence &amp; Interactive Views</title>
+<!-- A single HTML file. Brand font families load from Google Fonts when online; local system fallbacks remain usable offline. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;450;500;600&family=IBM+Plex+Sans:wght@400;450;500;600&family=Josefin+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root {
+  color-scheme: dark;
+  --canvas:#05070A; --sidebar:#070B10; --surface:#09121B; --surface-deep:#070D13; --surface-hover:#102132;
+  --prussian:#003153; --prussian-soft:#0B263B; --line:#203344; --line-soft:#142431;
+  --white:#FFFFFF; --ivory:#F7F3EA; --text:#E3E9EB; --secondary:#A5B3BD; --muted:#788C99; --dim:#526774;
+  --gold:#D7A84A; --gold-soft:#2C2417; --sage:#91BCA9; --danger:#DB918B; --blue:#9CB9CB;
+  --brand:'Josefin Sans','Avenir Next',sans-serif;
+  --ui:'IBM Plex Sans','Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+  --density: 1;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;height:100%;min-height:550px;background:var(--canvas);color:var(--text);font-family:var(--ui);font-size:14px;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit} button{cursor:pointer} button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+button{border:0;background:none;color:inherit} a{color:inherit} ::selection{background:#365873;color:#fff}
+.shell{display:grid;grid-template-columns:226px minmax(0,1fr) 266px;grid-template-rows:63px minmax(0,1fr);height:100vh;min-height:550px;max-width:2400px;margin:auto;overflow:hidden}
+/* HEADER */
+.topbar{grid-column:1/-1;grid-row:1;display:flex;align-items:center;border-bottom:1px solid var(--line);background:var(--canvas);z-index:4;padding:0 23px;gap:0;min-width:0}
+.logo{width:24px;height:27px;flex-shrink:0;margin-right:13px}
+.wordmark{font:400 20px/1 var(--brand);letter-spacing:.27em;color:var(--ivory);white-space:nowrap;padding-top:4px}
+.brand-divider{height:19px;width:1px;background:var(--line);margin:0 19px 0 16px}
+.product-name{font:500 10px/1 var(--ui);letter-spacing:.22em;color:var(--muted);white-space:nowrap}
+.topnav{display:flex;align-items:center;gap:3px;height:100%;margin-left:65px;overflow:hidden}
+.topnav button{height:100%;font-size:12px;color:var(--muted);padding:2px 17px 0;position:relative;white-space:nowrap}
+.topnav button:hover{color:var(--white)} .topnav button[aria-selected="true"]{color:var(--text)}
+.topnav button[aria-selected="true"]::after{position:absolute;content:"";bottom:-1px;height:2px;left:17px;right:17px;background:var(--blue)}
+.top-right{display:flex;align-items:center;gap:17px;margin-left:auto;padding-left:16px;white-space:nowrap}
+.preview-label{font:500 10px var(--mono);letter-spacing:.09em;color:var(--muted);display:flex;align-items:center;gap:8px}
+.preview-label::before{content:"";display:inline-block;width:6px;height:6px;background:var(--blue);border-radius:50%}
+.shortcut{font:400 11px var(--mono);color:var(--dim)}
+.icon-button{border:1px solid transparent;color:var(--secondary);width:31px;height:31px;display:grid;place-items:center;border-radius:5px;transition:background .2s,border-color .2s}
+.icon-button:hover,.icon-button[aria-pressed="true"]{background:var(--prussian-soft);border-color:var(--line);color:var(--white)}
+.icon-button svg{width:16px;height:16px;stroke-width:1.6}
+/* SIDEBAR */
+.sidebar{grid-column:1;grid-row:2;background:var(--sidebar);border-right:1px solid var(--line-soft);padding:29px 13px 15px;display:flex;flex-direction:column;overflow:auto;min-height:0}
+.rail-label{font:500 10px var(--brand);letter-spacing:.2em;color:#8296A2;margin:0 12px 12px;text-transform:uppercase}
+.workspace{margin:0 6px 30px;padding:13px 11px 13px;display:flex;align-items:center;gap:11px;border:1px solid var(--line);background:var(--surface-deep);border-radius:5px;text-align:left}
+.workspace-icon{border:1px solid #345368;width:28px;height:28px;display:grid;place-items:center;color:#B8CAD5;font:500 11px var(--mono);flex-shrink:0}
+.workspace-info{min-width:0;flex:1}.workspace-title{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.workspace-meta{font:400 10px var(--mono);color:var(--muted);margin-top:4px}
+.workspace svg{width:13px;height:13px;color:var(--muted)}
+.rail-section{margin-bottom:27px}.rail-item{width:100%;min-height:37px;text-align:left;border-radius:4px;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;padding:0 12px;position:relative;margin:2px 0}
+.rail-item:hover{background:#101B25;color:var(--text)}.rail-item.selected{background:var(--prussian-soft);color:var(--ivory)}.rail-item.selected::before{position:absolute;left:0;top:8px;bottom:8px;width:2px;background:var(--blue);content:""}
+.rail-item svg{width:14px;height:14px;opacity:.85}.rail-item .count{margin-left:auto;font:400 10px var(--mono);color:var(--dim)}
+.session-name{display:inline-flex;align-items:center;gap:8px}.session-dot{width:6px;height:6px;border:1px solid var(--muted);border-radius:50%;flex-shrink:0}.rail-item.selected .session-dot{background:var(--blue);border-color:var(--blue)}
+.sidebar-bottom{margin-top:auto;padding:15px 12px 2px;border-top:1px solid var(--line-soft)}.small-signal{font:400 10px var(--mono);color:var(--muted);display:flex;align-items:center;gap:8px}.small-signal span{background:var(--sage);width:6px;height:6px;border-radius:50%}.quiet-copy{font:400 10px/1.7 var(--ui);color:var(--dim);margin-top:10px}
+/* MAIN */
+.main{grid-column:2;grid-row:2;min-width:0;min-height:0;display:flex;flex-direction:column;position:relative;background:var(--canvas)}
+.session-heading{border-bottom:1px solid var(--line-soft);padding:25px 45px 20px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-shrink:0}
+.overline{font:500 10px var(--brand);letter-spacing:.19em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+h1{font:400 30px/1.13 var(--brand);letter-spacing:.006em;color:var(--ivory);margin:0;padding-top:5px}
+.subhead{display:flex;align-items:center;gap:9px;font:400 11px var(--mono);color:var(--muted);margin-top:10px;white-space:nowrap}.subhead .slash{color:var(--dim)}
+.heading-controls{display:flex;align-items:center;gap:7px}
+.mode-control{display:flex;align-items:center;gap:7px;font:400 11px var(--mono);color:var(--secondary);padding:8px 10px;border:1px solid var(--line);border-radius:4px;white-space:nowrap}
+.mode-control:hover{background:var(--surface-hover)}.mode-control .mode-dot{height:6px;width:6px;background:var(--sage);border-radius:50%}
+.feed{overflow:auto;flex:1;min-height:0;scrollbar-width:thin;scrollbar-color:#203445 transparent;overscroll-behavior:contain}
+.feed-inner{max-width:895px;margin:0 auto;padding:26px 46px 35px}
+.date-divider{display:flex;align-items:center;gap:17px;margin:0 0 32px;font:500 10px var(--mono);letter-spacing:.04em;color:var(--dim)}
+.date-divider::after{content:"";height:1px;background:var(--line-soft);flex:1}
+.event{margin-bottom:calc(27px * var(--density));position:relative;animation:arrive .28s ease-out both}
+@keyframes arrive{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.event-line{display:flex;align-items:baseline;gap:12px;line-height:1.6}
+.bullet{font:500 14px var(--mono);color:var(--secondary);display:block;flex:0 0 14px;text-align:center;line-height:1.5}
+.bullet.green{color:var(--sage)}.bullet.gold{color:var(--gold)}.bullet.blue{color:var(--blue)}
+.event-body{flex:1;min-width:0}.event-prose{font:400 13.5px/1.77 var(--ui);color:#D9E1E5;letter-spacing:.003em}.event-prose strong{font-weight:600;color:var(--white)}
+.event-meta{font:400 11px/1.6 var(--mono);color:var(--muted)}
+.event-meta b{font-weight:500;color:var(--text)}.event-meta .meta-muted{color:var(--dim)}
+.user-message{padding-left:25px;border-left:2px solid #324C60;margin-bottom:34px}.user-message .label{font:500 10px var(--brand);letter-spacing:.15em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}.user-message p{font:400 14px/1.7 var(--ui);color:var(--ivory);margin:0}
+.event-nested{margin:9px 0 0 26px}
+.event-nested .subtle{font:400 11px/1.8 var(--mono);color:var(--muted)}
+.expandable{border-left:1px solid var(--line-soft);padding-left:13px;max-width:100%}
+.expandable summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;font:400 11.5px/1.7 var(--mono);color:var(--muted);user-select:none;padding:4px 0}
+.expandable summary::-webkit-details-marker{display:none}.expandable summary:hover{color:var(--text)}
+.chevron{display:inline-flex;align-items:center;justify-content:center;width:10px;transition:transform .2s;color:var(--dim)}details[open] .chevron{transform:rotate(90deg)}
+.expansion{padding:11px 0 5px 18px;font:400 11px/1.9 var(--mono);color:var(--secondary)}
+.expansion pre{margin:8px 0 8px;padding:13px 15px;background:var(--surface-deep);border:1px solid var(--line-soft);white-space:pre-wrap;overflow-wrap:anywhere;font:400 11px/1.75 var(--mono);color:var(--secondary)}
+.path{color:var(--blue)}.plain-link{font:500 11px var(--mono);color:var(--blue);border-bottom:1px dotted #54738B;padding:0 0 2px}
+.plain-link:hover{color:var(--ivory)}
+.statement{margin-top:10px;font:400 12px/1.7 var(--mono);color:var(--secondary)}
+.file-stat{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 0}.file-stat em{font-style:normal;color:var(--muted)}
+.inline-check{display:inline-flex;align-items:center;gap:7px;color:var(--sage);font:500 10px var(--mono);margin-left:7px;white-space:nowrap}
+.live-marker{width:14px;height:14px;display:inline-grid;place-items:center;flex-shrink:0;color:var(--blue);font:400 15px var(--mono);animation:gentle-spin 2s linear infinite}
+@keyframes gentle-spin{to{transform:rotate(360deg)}}
+/* approval request is the sole gold focal point */
+.approval{margin:34px 0 33px 26px;max-width:635px;border:1px solid #5B4828;border-left:2px solid var(--gold);background:#100F0D;padding:19px 21px 16px}
+.approval-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px}.approval-title{font:500 10px var(--brand);letter-spacing:.19em;color:var(--gold);text-transform:uppercase}
+.approval-ref{font:400 10px var(--mono);color:#B39B72}
+.approval h3{font:500 15px/1.5 var(--ui);margin:0 0 6px;color:var(--ivory)}.approval p{font:400 12px/1.7 var(--ui);color:#B5A991;margin:0 0 16px}
+.approval-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.approve-btn{border:1px solid var(--gold);padding:9px 14px;background:var(--gold);color:#101112;font:600 11px var(--ui);border-radius:3px}.approve-btn:hover{background:#F0C677}.secondary-btn{border:1px solid #4E4436;padding:9px 14px;font:500 11px var(--ui);color:#D5C8AC;border-radius:3px}.secondary-btn:hover{background:#272014}
+.approval-resolved{border-color:var(--line);border-left-color:var(--sage);background:var(--surface-deep)}.approval-resolved .approval-title{color:var(--sage)}.approval-resolved p{margin:0;color:var(--muted)}
+/* composer */
+.composer-zone{background:var(--canvas);border-top:1px solid var(--line-soft);padding:15px 38px 13px;flex-shrink:0}
+.live-status{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:805px;margin:0 auto 11px;min-height:18px;font:400 11px var(--mono);color:var(--secondary)}
+.live-left{display:flex;align-items:center;gap:10px;min-width:0}.live-left strong{color:var(--ivory);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status-spinner{display:inline-block;flex-shrink:0;width:17px;height:17px;line-height:17px;text-align:center;font-size:17px;color:var(--blue);animation:gentle-spin 2.2s linear infinite}.live-status .timer{color:var(--dim);white-space:nowrap}
+.composer{display:flex;align-items:center;gap:11px;border:1px solid #506276;background:var(--surface-deep);border-radius:5px;min-height:52px;max-width:805px;margin:0 auto;padding:4px 6px 4px 15px;transition:border-color .2s}.composer:focus-within{border-color:#839EB0}
+.command-prefix{font:500 19px var(--mono);color:var(--ivory);align-self:center}
+.composer textarea{background:transparent;border:0;resize:none;outline:none;flex:1;min-width:0;max-height:140px;min-height:22px;color:var(--ivory);font:400 12px/1.65 var(--mono);padding:8px 0;overflow:auto}
+.composer textarea::placeholder{color:#647989}.send-btn{align-self:end;display:flex;align-items:center;justify-content:center;width:36px;height:34px;background:#15334A;border:1px solid #33536B;border-radius:3px;color:#D6E5EF;margin-bottom:4px}.send-btn:hover{background:var(--prussian)}.send-btn svg{width:15px;height:15px}
+.composer-footer{max-width:805px;margin:11px auto 0;display:flex;align-items:center;justify-content:space-between;gap:12px;font:400 10px var(--mono);color:var(--dim)}
+.composer-footer kbd{border:1px solid #294052;color:#93A6B3;border-radius:2px;padding:1px 4px;font:400 10px var(--mono)}
+.composer-footer .left{display:flex;gap:15px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.composer-footer .right{display:flex;align-items:center;gap:10px;white-space:nowrap}
+/* INSPECTOR */
+.inspector{grid-column:3;grid-row:2;min-height:0;overflow:auto;border-left:1px solid var(--line-soft);background:var(--sidebar);padding:28px 20px 20px;display:flex;flex-direction:column;gap:24px}
+.inspector-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.inspector-title{font:500 10px var(--brand);letter-spacing:.18em;color:var(--secondary)}
+.inspector-kicker{font:400 10px/1.6 var(--mono);color:var(--muted);margin-bottom:14px}
+.progress-track{height:2px;background:#203544;width:100%;margin:10px 0 12px;overflow:hidden}.progress-fill{height:100%;background:var(--blue);width:72%;transition:width .6s}
+.summary-name{font:500 14px/1.5 var(--ui);color:var(--ivory);margin-bottom:7px}.summary-desc{font:400 11px/1.75 var(--ui);color:var(--secondary)}
+.inspector-section{border-top:1px solid var(--line-soft);padding-top:22px}.inspector h4{font:500 10px var(--brand);letter-spacing:.18em;color:var(--muted);margin:0 0 16px}
+.kv{display:flex;justify-content:space-between;align-items:flex-start;gap:7px;font:400 11px/1.75 var(--mono);padding:4px 0;color:var(--muted)}.kv .value{color:var(--secondary);text-align:right}.kv .value.ok{color:var(--sage)}.kv .value.wait{color:var(--gold)}
+.task{display:flex;align-items:flex-start;gap:10px;padding:8px 0 11px}.task-dot{margin-top:5px;flex:0 0 7px;height:7px;border:1px solid var(--dim);border-radius:50%}.task-dot.done{background:var(--sage);border-color:var(--sage)}.task-dot.busy{background:var(--blue);border-color:var(--blue);box-shadow:0 0 0 3px #173343}.task-dot.wait{border-color:var(--gold)}
+.task-main{font:400 11px/1.6 var(--ui);color:#CED8DF}.task-sub{font:400 10px/1.6 var(--mono);color:var(--dim);margin-top:2px}
+.rail-note{margin-top:auto;border-top:1px solid var(--line-soft);padding-top:17px;font:400 10px/1.7 var(--ui);color:var(--dim)}
+/* generic notifications */
+.toast{position:fixed;right:24px;bottom:25px;padding:12px 17px;background:#102130;border:1px solid #456079;box-shadow:0 10px 32px #0008;color:var(--ivory);font:400 11px var(--mono);z-index:20;opacity:0;transform:translateY(7px);pointer-events:none;transition:opacity .22s,transform .22s}.toast.visible{opacity:1;transform:translateY(0)}
+.hidden{display:none!important}.compact{--density:.65}
+button[data-title]{position:relative}
+@media(max-width:1250px){.shell{grid-template-columns:205px minmax(0,1fr) 235px}.topnav{margin-left:22px}.session-heading{padding-left:30px;padding-right:25px}.feed-inner{padding-left:30px;padding-right:30px}.composer-zone{padding-left:26px;padding-right:26px}.inspector{padding:25px 15px}}
+@media(max-width:1030px){.shell{grid-template-columns:205px minmax(0,1fr)}.inspector{position:fixed;right:0;top:63px;bottom:0;z-index:9;width:280px;box-shadow:-12px 0 35px #0008;transform:translateX(110%);transition:transform .22s}.shell.inspector-open .inspector{transform:translateX(0)}.topnav{margin-left:28px}.topnav button{padding:2px 12px 0}.topnav button[aria-selected="true"]::after{left:12px;right:12px}}
+@media(max-width:700px){html,body{min-height:470px}.shell{grid-template-columns:minmax(0,1fr);grid-template-rows:54px minmax(0,1fr)}.topbar{padding:0 15px}.wordmark{font-size:17px;letter-spacing:.21em}.brand-divider{margin:0 11px}.product-name{font-size:9px}.topnav{display:none}.top-right{gap:8px}.shortcut{display:none}.sidebar{position:fixed;z-index:10;top:54px;bottom:0;left:0;width:250px;transform:translateX(-110%);transition:transform .2s;box-shadow:12px 0 30px #0007}.shell.menu-open .sidebar{transform:translateX(0)}.main{grid-column:1;grid-row:2}.inspector{top:54px}.session-heading{padding:22px 20px 16px}h1{font-size:27px}.feed-inner{padding:24px 22px}.composer-zone{padding:12px 13px 11px}.composer-footer .right{display:none}.mode-control{font-size:10px;padding:6px 7px}.preview-label{font-size:9px}.user-message{margin-bottom:25px}.approval{margin-left:0}.event{margin-bottom:22px}}
+@media(max-width:430px){.logo{width:19px;margin-right:7px}.wordmark{font-size:15px;letter-spacing:.16em}.brand-divider{height:16px}.product-name{font-size:8px;letter-spacing:.09em}.top-right{gap:2px}.preview-label{display:none}.session-heading{gap:8px}.subhead{font-size:10px}.feed-inner{padding-left:16px;padding-right:15px}.approval{padding:15px}.composer-footer .left{gap:7px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+
+/* V2 · inline file peeks and interactive feed components */
+.file-ref{display:inline-flex;align-items:center;gap:3px;max-width:100%;vertical-align:baseline}
+.file-ref .file-toggle,.file-ref .file-name{background:transparent;border:0;color:var(--blue);font:500 11px/1.5 var(--mono);padding:2px 3px;border-radius:3px}
+.file-ref .file-toggle{display:inline-grid;place-items:center;width:21px;height:21px;font-size:14px;border:1px solid #2d4354;color:#9bafbd;transition:background .2s,transform .2s}
+.file-ref .file-toggle:hover,.file-ref .file-name:hover{background:var(--prussian-soft);color:var(--ivory)}
+.file-ref .file-toggle[aria-expanded="true"]{background:#18354a;transform:rotate(90deg);color:var(--ivory)}
+.file-ref .file-name{min-width:0;overflow-wrap:anywhere;text-align:left}
+.file-ref .file-name:hover{text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
+.file-drawer{margin:8px 0 13px 0;max-height:0;opacity:0;overflow:hidden;border:0 solid transparent;transition:max-height .3s cubic-bezier(.2,.75,.25,1),opacity .2s,border-width .2s;transform-origin:top}
+.file-drawer.is-open{max-height:270px;opacity:1;border:1px solid #284153;background:#08131d}
+.drawer-top{display:flex;align-items:center;gap:12px;justify-content:space-between;border-bottom:1px solid var(--line-soft);padding:9px 12px;min-width:0}
+.drawer-title{font:500 10px var(--mono);color:#c6d9e4;overflow-wrap:anywhere}
+.drawer-kicker{font:400 10px var(--mono);color:var(--muted);white-space:nowrap}
+.drawer-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.drawer-actions button{padding:4px 7px;color:#a4c5d9;border:1px solid #2d485b;background:#0b2536;border-radius:3px;font:500 10px var(--mono)}
+.drawer-actions button:hover{background:#16435b;color:white}
+.drawer-scroll{overflow:auto;max-height:172px;cursor:pointer;scrollbar-width:thin}
+.code-line{display:grid;grid-template-columns:39px minmax(0,1fr);align-items:start;gap:11px;min-width:0;font:400 11px/1.65 var(--mono);color:#b4c5cb;padding:0 11px 0 0;white-space:pre;cursor:default}
+.code-line .line-num{color:#547184;user-select:none;text-align:right;padding:0 8px 0 5px;border-right:1px solid #1b3040}
+.code-line code{font:inherit;color:inherit;overflow:visible}
+.code-line.problem-line{background:#25301f}
+.code-line.problem-line .line-num{color:#d4b784}
+.code-line:hover,.code-line.chosen{background:#1b3547}
+.drawer-note{font:400 10px var(--mono);color:var(--dim);padding:7px 11px;border-top:1px solid var(--line-soft)}
+.artifact-card{margin:12px 0 27px 26px;border:1px solid #304454;background:linear-gradient(150deg,#0b1823 0%,#08121b 100%);border-radius:6px;overflow:hidden;box-shadow:0 15px 40px rgba(0,0,0,.1)}
+.artifact-toolbar{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:13px 16px 12px;border-bottom:1px solid #243744}
+.artifact-label{font:500 10px var(--brand);letter-spacing:.18em;color:#9ebbd0;text-transform:uppercase}
+.artifact-origin{font:400 10px var(--mono);color:#647e8f}
+.artifact-heading{font:500 16px/1.5 var(--ui);color:var(--ivory);margin:15px 17px 4px}
+.artifact-lede{font:400 11.5px/1.7 var(--ui);color:var(--secondary);margin:0 17px 16px}
+.artifact-view{padding:0 17px 17px}
+.artifact-tabs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:15px}
+.artifact-tabs button,.artifact-footer button{border:1px solid #314b5e;border-radius:3px;color:#a1b8c6;background:#0b1b27;padding:7px 10px;font:500 10.5px var(--mono)}
+.artifact-tabs button[aria-pressed="true"]{background:#1d3f56;border-color:#5681a0;color:#f3f6f5}
+.artifact-tabs button:hover,.artifact-footer button:hover{border-color:#7391a8;color:#fff}
+.flow-visual{display:grid;grid-template-columns:minmax(70px,1fr) 28px minmax(70px,1fr) 28px minmax(70px,1fr);align-items:center;gap:6px;padding:14px 12px;background:#080f16;border:1px solid var(--line-soft);border-radius:4px}
+.flow-node{font:500 11px var(--mono);color:#d5e4ea;text-align:center;padding:13px 4px;border:1px solid #345269;background:#102334;border-radius:3px}
+.flow-arr{font:600 14px var(--mono);color:#81aac4;text-align:center}
+.flow-node.warn{border-color:#ad776a;background:#2a1d20;color:#e7b3aa}
+.artifact-insight{font:400 12px/1.8 var(--ui);color:#cbd7db;padding:11px 12px;border-left:2px solid #526e86;background:#0d1e2b;margin-top:12px}
+.artifact-numbers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:11px}
+.artifact-number{padding:10px;background:#08131c;border:1px solid var(--line-soft)}
+.artifact-number .val{font:500 19px var(--mono);color:#f1f5f4;line-height:1.4}
+.artifact-number .desc{font:400 10px var(--ui);color:#7792a0;margin-top:3px}
+.artifact-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;border-top:1px solid var(--line-soft);margin:0 17px;padding:12px 0}
+.artifact-footer span{color:var(--dim);font:400 10px var(--mono)}
+.bar-row{display:grid;grid-template-columns:85px minmax(0,1fr) 38px;gap:10px;align-items:center;font:400 11px var(--mono);color:var(--secondary);margin:13px 0}
+.bar-track{height:8px;background:#172c3c;border-radius:2px;overflow:hidden}
+.bar-fill{height:100%;background:#8db3c8;border-radius:2px;transition:width .45s}
+.bar-row.missing .bar-fill{background:var(--danger)}
+.bar-value{text-align:right;color:var(--ivory)}
+.check-row{display:flex;align-items:flex-start;gap:9px;padding:11px 0;border-bottom:1px solid #203340;font:400 12px/1.5 var(--ui);color:var(--secondary)}
+.check-row input{margin:3px 0 0;accent-color:#79a7c2;width:14px;height:14px;flex-shrink:0}
+.check-row strong{color:var(--ivory);font-weight:500}
+.check-row small{display:block;font:400 10px/1.6 var(--mono);color:var(--dim);margin-top:3px}
+.check-summary{padding:12px 0 0;font:400 11px var(--mono);color:var(--secondary)}
+.request-hint{font:400 10px/1.7 var(--mono);color:var(--dim);margin:0 0 20px 26px}
+.request-hint code{font:inherit;color:#93b5c7}
+.reader-overlay{position:fixed;inset:0;background:rgba(1,5,9,.78);backdrop-filter:blur(5px);display:grid;place-items:center;z-index:40;padding:25px}
+.reader-overlay[hidden]{display:none}
+.reader-panel{width:min(990px,96vw);max-height:86vh;display:flex;flex-direction:column;background:#09131c;border:1px solid #466479;box-shadow:0 22px 85px #000d;border-radius:7px;overflow:hidden}
+.reader-head{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.reader-head h2{font:500 16px var(--mono);margin:0;color:var(--ivory);overflow-wrap:anywhere}
+.reader-sub{font:400 10px var(--mono);color:var(--muted);margin-top:5px}
+.reader-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.reader-toolbar button{font:500 10px var(--mono);padding:8px 10px;border-radius:3px;border:1px solid #345265;color:#b2cedf}
+.reader-toolbar button:hover{background:#17364a}
+.reader-body{overflow:auto;padding:19px 22px 25px;scrollbar-color:#254155 transparent;scrollbar-width:thin}
+.reader-body .code-line{font-size:12px;line-height:1.9;grid-template-columns:54px minmax(0,1fr)}
+.reader-body .code-line code{white-space:pre}
+.reader-body .code-line.problem-line{background:#22332c}
+.reader-body .code-line:hover{cursor:pointer}
+.reader-foot{border-top:1px solid var(--line-soft);padding:11px 20px;font:400 10px var(--mono);color:var(--muted)}
+@media(max-width:700px){.artifact-card,.request-hint{margin-left:0}.artifact-numbers{grid-template-columns:repeat(3,minmax(0,1fr))}.flow-visual{grid-template-columns:1fr 15px 1fr 15px 1fr;gap:3px;padding:8px}.flow-node{font-size:9px;padding:10px 2px}.artifact-toolbar{padding:12px}.artifact-view{padding:0 12px 13px}.artifact-heading{margin-left:12px;margin-right:12px}.artifact-lede{margin-left:12px;margin-right:12px}.artifact-footer{margin:0 12px}.reader-overlay{padding:9px}.reader-panel{max-height:94vh}.reader-head{padding:10px 13px}.reader-body{padding:11px}.reader-toolbar button{padding:6px}.file-stat .file-ref .file-name{font-size:10px}}
+
+
+/* V3 · Source-aware, decision-centered, typed interactive views */
+:root { --screen-border:#253a4b; --quiet-ink:#b3c4ce; }
+.proof-strip{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0 0 29px 26px;border:1px solid #253a4b;background:#08121b;border-radius:5px;overflow:hidden}
+.proof-side{min-width:0;padding:17px 18px 15px}.proof-side:first-child{border-right:1px solid #243647}.proof-kicker{font:500 9px/1.4 var(--mono);letter-spacing:.055em;color:#a0b5c2;display:flex;gap:7px;align-items:center;margin-bottom:10px}.proof-dot{height:7px;width:7px;display:inline-block;border-radius:50%}.proof-dot.good{background:var(--sage)}.proof-dot.unknown{border:1.5px solid var(--gold)}.proof-side strong{display:block;color:var(--ivory);font:500 12px/1.6 var(--ui)}.proof-side p{font:400 11px/1.65 var(--ui);color:var(--secondary);margin:6px 0 9px}.proof-side button{font:500 10px var(--mono);color:#b2cde0;padding:4px 0}.proof-side button:hover{text-decoration:underline}.proof-caption{font:400 10px var(--mono);color:#d5b574}
+.decision-panel{max-width:none;margin:31px 0 32px 26px;padding:0;background:linear-gradient(150deg,#101723 0%,#0b131c 68%);border:1px solid #5b4b35;border-left:2px solid var(--gold);border-radius:5px;overflow:hidden}
+.decision-top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 19px 5px}.decision-overline{font:500 10px var(--brand);letter-spacing:.16em;color:#edc47e}.decision-spark{font:400 15px var(--mono);vertical-align:-1px;margin-right:7px}.decision-ref{font:400 10px var(--mono);color:#8b9fac;white-space:nowrap}.decision-ref span{color:#586d7b;margin:0 5px}
+.decision-panel h3{font:500 20px/1.35 var(--brand);letter-spacing:0;color:var(--ivory);margin:11px 19px 7px}.decision-panel .decision-summary{font:400 12.5px/1.72 var(--ui);color:#c1cfd6;margin:0 19px 17px;max-width:660px}
+.decision-evidence{display:grid;grid-template-columns:1fr 1fr;margin:0 19px 17px;border:1px solid #263c4b;background:#08131d;border-radius:4px;overflow:hidden}.decision-evidence>div{display:flex;gap:10px;padding:13px 12px;align-items:flex-start;min-width:0}.decision-evidence>div+div{border-left:1px solid #263c4b}.decision-evidence strong{font:500 11.5px/1.4 var(--ui);color:#e0e7e7;display:block}.decision-evidence small{display:block;margin-top:5px;font:400 10px/1.5 var(--mono);color:#91a8b8}.evidence-symbol{flex:0 0 20px;width:20px;height:20px;display:grid;place-items:center;font:500 12px var(--mono);border-radius:50%}.evidence-symbol.good{border:1px solid #5d9880;color:#a4d3bd}.evidence-symbol.unknown{border:1px solid #9c814c;color:#e2c589}
+.decision-next{margin:0 19px 14px;padding:12px 14px;border:1px solid #354552;background:#102231}.decision-next>span{font:500 9px var(--mono);letter-spacing:.1em;color:#b4cfe1}.decision-next p{font:500 12px/1.55 var(--ui);margin:8px 0 6px;color:#eef2ed}.decision-sub{font:400 10.5px/1.6 var(--ui);color:#9cabb9}
+.decision-actions{display:flex;flex-wrap:wrap;gap:8px;padding:0 19px 17px}.decision-actions button{border-radius:3px;padding:10px 12px;font:500 11px var(--ui);transition:background .14s,border-color .14s}.decision-primary{background:#d3a454;color:#12161a;border:1px solid #e0b96a}.decision-primary:hover{background:#e4ba6f}.decision-primary span{margin-left:5px}.decision-secondary{border:1px solid #4b6273;color:#d7e2e8;background:#173047}.decision-secondary:hover{background:#22445e}.decision-tertiary{border:1px solid #31485a;color:#a4b9c9}.decision-tertiary:hover{background:#193042}
+.decision-bottom{font:400 10px/1.55 var(--mono);color:#a7b7c0;background:#08111a;border-top:1px solid #203340;padding:10px 19px}.decision-bottom span:last-child{color:#6e8593}.review-lock{color:#d3a454;margin-right:7px}
+.decision-panel.decision-complete{border-color:#416151;border-left-color:#7cb29a}.decision-complete .decision-overline{color:#9fc9b1}.decision-complete .decision-next{background:#0c1c19;border-color:#2e5445}
+.drawer-note{display:flex;align-items:center;justify-content:space-between;gap:8px}.drawer-note:before{content:'SOURCE';font-weight:600;color:#7e9eb1}.source-stale{border-color:#b08e52!important}.source-stale .drawer-note{color:#e3bd7e}.reader-source-stale .reader-foot{color:#f0c684}
+.chip-inline{font:500 9px/1.5 var(--mono);color:#b4cedd;border:1px solid #3a596c;border-radius:2px;padding:2px 5px;margin-left:7px;white-space:nowrap}.chip-inline.interpret{border-color:#536173;color:#a3afbc}
+.test-plan-card,.exception-card{margin-left:26px;border-color:#476075}.test-plan-card .artifact-toolbar,.exception-card .artifact-toolbar{background:#0a1e2d}.contract-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:15px}.contract-cell{padding:10px 12px;background:#08151f;border:1px solid #253b4a}.contract-cell>span{font:500 9px var(--mono);letter-spacing:.05em;color:#7897a9;display:block;margin-bottom:6px}.contract-cell>strong{font:500 11px/1.5 var(--ui);color:#edf0eb;display:block}.contract-steps{counter-reset:step;list-style:none;padding:0;margin:0}.contract-steps li{display:grid;grid-template-columns:21px minmax(0,1fr);gap:10px;font:400 11.5px/1.6 var(--ui);color:#c7d3db;margin:0;padding:9px 0;border-bottom:1px solid #243747}.contract-steps li:before{counter-increment:step;content:counter(step);height:19px;width:19px;display:grid;place-items:center;background:#173349;border:1px solid #3e6178;color:#bad3e3;font:500 10px var(--mono);border-radius:3px}.contract-steps strong{color:#f1f1eb}.outcome-plain{display:flex;gap:9px;align-items:flex-start;margin:12px 0 0;padding:11px 12px;background:#101d24;border:1px solid #354650;font:400 11px/1.7 var(--ui);color:#b5c6d0}.outcome-plain b{color:#f0e3c2}.test-plan-card .artifact-footer button.primary-foot{background:#d3a454;color:#0d151b;border-color:#dfb96b}.test-plan-card .artifact-footer button.primary-foot:hover{background:#edbe6f}
+.exception-card label{display:block;font:500 10px var(--ui);color:#c9d7df;margin:10px 0}.exception-card input,.exception-card textarea,.exception-card select{margin-top:5px;width:100%;border:1px solid #385367;border-radius:3px;background:#09141e;color:var(--ivory);padding:9px 10px;font:400 11px var(--mono)}.exception-card textarea{min-height:63px;resize:vertical}.exception-card .exc-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.exception-card .exc-check{display:flex;align-items:flex-start;gap:9px;font:400 10px/1.6 var(--ui);color:#b8cbd5}.exception-card .exc-check input{width:auto;margin:4px 0 0}.exception-card .artifact-footer button:disabled{opacity:.45;cursor:not-allowed}
+.note-bar{display:flex;gap:9px;align-items:start;padding:9px 12px;background:#0b1822;border:1px solid #294156;border-radius:3px;color:#a8bac6;font:400 11px/1.6 var(--ui);margin:9px 0}.note-bar strong{color:#ebede7}
+.status-pair{display:flex;align-items:center;gap:6px;margin-top:9px;font:400 10px var(--mono);color:#849bad}
+@media(max-width:700px){.proof-strip,.test-plan-card,.exception-card,.decision-panel{margin-left:0}.proof-strip,.decision-evidence,.contract-grid{grid-template-columns:1fr}.proof-side:first-child,.decision-evidence>div+div{border-right:0;border-left:0;border-bottom:1px solid #263c4b}.decision-evidence>div+div{border-top:1px solid #263c4b;border-bottom:0}.decision-panel h3{font-size:19px}.decision-top{padding:13px 13px 5px}.decision-panel h3,.decision-panel .decision-summary{margin-left:13px;margin-right:13px}.decision-evidence,.decision-next{margin-left:13px;margin-right:13px}.decision-actions{padding:0 13px 13px}.decision-bottom{padding:10px 13px}.exception-card .exc-grid{grid-template-columns:1fr}}
+
+</style>
+</head>
+<body>
+<div class="shell" id="shell">
+  <header class="topbar">
+    <button class="icon-button hidden" id="menuBtn" aria-label="Open sidebar" title="Open sidebar" style="margin-right:7px" onclick="toggleSidebar()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    <svg class="logo" viewBox="0 0 32 35" aria-hidden="true"><path d="M16 2L29.5 31H2.5L16 2Z" fill="none" stroke="#E8EDEB" stroke-width="1.55"/><circle cx="16" cy="21" r="7.1" stroke="#D7A84A" stroke-width="1.4" fill="none"/><path d="M17.5 11.4L12.4 21.4H17L14.7 29.3L21 18.9H16.9L19.4 14.4" stroke="#F7F3EA" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter" fill="none"/></svg>
+    <div class="wordmark">GODSPEED</div>
+    <span class="brand-divider"></span>
+    <span class="product-name">TERMINAL</span>
+    <nav class="topnav" aria-label="Main views"><button type="button" aria-selected="true" data-view="activity">Activity</button><button type="button" aria-selected="false" data-view="terminal">Terminal</button><button type="button" aria-selected="false" data-view="files">Files</button></nav>
+    <div class="top-right"><span class="preview-label">DESIGN PREVIEW</span><span class="shortcut">⌘ / Ctrl + K</span>
+      <button id="densityBtn" class="icon-button" aria-label="Toggle compact view" title="Toggle compact view" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <button id="inspectorBtn" class="icon-button" aria-label="Show or hide session details" title="Show or hide details" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
+    </div>
+  </header>
+  <aside class="sidebar" aria-label="Sidebar">
+    <p class="rail-label">WORKSPACE</p>
+    <button class="workspace" id="workspaceBtn"><span class="workspace-icon">AC</span><span class="workspace-info"><span class="workspace-title">Aster Commerce</span><span class="workspace-meta">~/projects/aster</span></span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="m4 6 4 4 4-4"/></svg></button>
+    <section class="rail-section"><p class="rail-label">VIEWS</p>
+      <button class="rail-item selected" data-view="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4v16M4 5h10l3 4-3 4H4M8 17h12"/></svg>Activity <span class="count">08</span></button>
+      <button class="rail-item" data-view="terminal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3m5 0h5"/></svg>Terminal</button>
+      <button class="rail-item" data-view="files"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>Files</button>
+    </section>
+    <section class="rail-section"><p class="rail-label">RECENT SESSIONS</p>
+      <button class="rail-item selected" data-session="release"><span class="session-name"><span class="session-dot"></span>Release review</span></button>
+      <button class="rail-item" data-session="tests"><span class="session-name"><span class="session-dot"></span>Test run</span></button>
+      <button class="rail-item" data-session="notes"><span class="session-name"><span class="session-dot"></span>Quick notes</span></button>
+      <button class="rail-item" id="newSessionBtn" style="color:var(--secondary)"><span style="font:400 18px var(--mono);line-height:1;margin-top:-2px">+</span> New session</button>
+    </section>
+    <div class="sidebar-bottom"><div class="small-signal"><span></span>LOCAL SESSION</div><div class="quiet-copy">Sample data only.<br>No commands or changes are sent anywhere.</div></div>
+  </aside>
+  <main class="main">
+    <div class="session-heading">
+      <div><div class="overline" id="sectionOverline">SESSION / 01</div><h1 id="sessionTitle">Release review</h1><div class="subhead"><span id="projectLabel">aster-commerce</span><span class="slash">/</span><span id="branchLabel">feat/checkout-retry</span></div></div>
+      <div class="heading-controls"><button class="mode-control" id="modeBtn"><span class="mode-dot"></span><span id="modeText">Preview mode</span></button></div>
+    </div>
+    <section class="feed" id="feed" aria-label="Session activity"><div class="feed-inner" id="feedInner">
+      <div class="date-divider">TODAY <span style="opacity:.5">·</span> EXAMPLE SESSION</div>
+      <div class="event user-message"><div class="label">YOU <span style="font:400 10px var(--mono);letter-spacing:0;color:var(--dim);margin-left:7px">14:32</span></div><p>Review the checkout changes, run the relevant tests, and tell me what still needs attention before release.</p></div>
+      <div class="event"><div class="event-line"><span class="bullet">●</span><div class="event-body"><div class="event-prose">I’ll look at the changed files first, run the checkout tests, and review the open checks. I won’t publish or merge anything without your approval.</div></div></div></div>
+      <div class="event"><div class="event-line"><span class="bullet blue">◦</span><div class="event-body"><div class="event-meta"><b>Inspected 6 files</b> <span class="meta-muted">· 2 commands · 3.2s</span></div></div></div>
+        <div class="event-nested"><details class="expandable"><summary><span class="chevron">›</span> Show inspected files and commands</summary><div class="expansion"><div class="file-stat"><span class="file-ref" data-file="src/checkout/retry.ts"><button type="button" class="file-toggle" aria-label="Preview src/checkout/retry.ts" aria-expanded="false" title="Preview file">›</button><button type="button" class="file-name" title="Open file reader">src/checkout/retry.ts</button></span><em>modified</em></div><div class="file-stat"><span class="file-ref" data-file="src/checkout/summary.tsx"><button type="button" class="file-toggle" aria-label="Preview src/checkout/summary.tsx" aria-expanded="false" title="Preview file">›</button><button type="button" class="file-name" title="Open file reader">src/checkout/summary.tsx</button></span><em>modified</em></div><div class="file-stat"><span class="file-ref" data-file="src/api/orders.ts"><button type="button" class="file-toggle" aria-label="Preview src/api/orders.ts" aria-expanded="false" title="Preview file">›</button><button type="button" class="file-name" title="Open file reader">src/api/orders.ts</button></span><em>unchanged</em></div><div class="file-stat"><span class="file-ref" data-file="test/checkout/retry.test.ts"><button type="button" class="file-toggle" aria-label="Preview test/checkout/retry.test.ts" aria-expanded="false" title="Preview file">›</button><button type="button" class="file-name" title="Open file reader">test/checkout/retry.test.ts</button></span><em>modified</em></div><div class="file-stat"><span class="file-ref" data-file="test/checkout/summary.test.tsx"><button type="button" class="file-toggle" aria-label="Preview test/checkout/summary.test.tsx" aria-expanded="false" title="Preview file">›</button><button type="button" class="file-name" title="Open file reader">test/checkout/summary.test.tsx</button></span><em>unchanged</em></div><div class="file-stat"><span class="file-ref" data-file="package.json"><button type="button" class="file-toggle" aria-label="Preview package.json" aria-expanded="false" title="Preview file">›</button><button type="button" class="file-name" title="Open file reader">package.json</button></span><em>unchanged</em></div><pre>git diff --stat origin/main...HEAD
+git diff -- src/checkout/retry.ts</pre><button class="plain-link" data-copy="git diff --stat origin/main...HEAD\ngit diff -- src/checkout/retry.ts">Copy commands</button></div></details></div>
+      </div>
+      <div class="event"><div class="event-line"><span class="bullet">●</span><div class="event-body"><div class="event-prose">The retry flow has one case worth checking. If the request times out after the server accepts it, the client may submit the order again.</div><div class="statement"><span class="file-ref" data-file="src/checkout/retry.ts"><button type="button" class="file-toggle" aria-label="Preview src/checkout/retry.ts" aria-expanded="false" title="Preview file">›</button><button type="button" class="file-name" title="Open file reader">src/checkout/retry.ts:84</button></span> <span style="color:var(--dim)">· possible duplicate submission</span></div></div></div></div>
+      <div class="event"><div class="event-line"><span class="bullet green">●</span><div class="event-body"><div class="event-meta"><b>Focused tests passed</b> <span class="meta-muted">· 48/48 in sample · 8.4s · not a release decision</span></div></div></div>
+        <div class="event-nested"><details class="expandable"><summary><span class="chevron">›</span> View test output</summary><div class="expansion"><pre>✓ test/checkout/retry.test.ts     18 passed
+✓ test/checkout/cart.test.ts      14 passed
+✓ test/checkout/summary.test.tsx  16 passed
+
+Test Files   3 passed (3)
+Tests       48 passed (48)
+Duration    8.4s</pre><div style="color:var(--dim)">Sample test output for this visual prototype.</div></div></details></div>
+      </div>
+      <section class="proof-strip" aria-label="What is known and unknown">
+        <div class="proof-side"><span class="proof-kicker"><span class="proof-dot good"></span>CHECKED IN THIS EXAMPLE</span><strong>48 focused tests passed</strong><p>The retry, cart, and summary suites reported no failures in the recorded example run.</p><button type="button" data-artifact-action="show-file" data-path="test/checkout/retry.test.ts">Inspect test file ↗</button></div>
+        <div class="proof-side"><span class="proof-kicker"><span class="proof-dot unknown"></span>NOT YET CHECKED</span><strong>Retry after a lost response</strong><p>We do not know whether a completed order would be created twice when its response disappears.</p><span class="proof-caption">Unknown is not the same as passed.</span></div>
+      </section>
+      <div class="event"><div class="event-line"><span class="bullet">●</span><div class="event-body"><div class="event-prose">The sample tests passed in the cases they cover. They do not test a lost response after an order is committed. That release risk remains unverified, so I recommend holding the merge and adding one targeted test.</div></div></div></div>
+      <div class="event"><div class="event-line"><span class="bullet">●</span><div class="event-body"><div class="event-prose">Here is a small way to explore the retry behavior. I also grouped the test results so you can inspect what was checked without leaving this conversation.</div></div></div></div>
+      <section class="artifact-card" data-artifact="retry" aria-label="Retry behavior interactive view"><div class="artifact-toolbar"><span class="artifact-label">INTERACTIVE VIEW / RETRY BEHAVIOR</span><span class="artifact-origin">EXAMPLE · GENERATED IN FEED</span></div><h3 class="artifact-heading">What happens when a request times out?</h3><p class="artifact-lede">Switch between scenarios to inspect the expected sequence. All values below are illustrative.</p><div class="artifact-view"><div class="artifact-tabs" role="group" aria-label="Retry scenario"><button data-scenario="normal" aria-pressed="false">Normal</button><button data-scenario="timeout" aria-pressed="true">Timeout</button><button data-scenario="late" aria-pressed="false">Late response</button></div><div class="flow-visual"><div class="flow-node" data-flow="client">Client</div><div class="flow-arr">→</div><div class="flow-node" data-flow="server">API</div><div class="flow-arr">→</div><div class="flow-node" data-flow="order">Order</div></div><div class="artifact-numbers"><div class="artifact-number"><div class="val" data-number="attempts">1</div><div class="desc">Requests sent</div></div><div class="artifact-number"><div class="val" data-number="orders">1</div><div class="desc">Possible orders</div></div><div class="artifact-number"><div class="val" data-number="result">OK</div><div class="desc">Client result</div></div></div><div class="artifact-insight" data-explanation>One request is accepted and the client receives its response.</div></div><div class="artifact-footer"><span>Simulation only · not a live order system</span><button type="button" data-artifact-action="show-file" data-path="src/checkout/retry.ts">Inspect retry code</button></div></section>
+      <section class="artifact-card" data-artifact="tests" aria-label="Interactive test results"><div class="artifact-toolbar"><span class="artifact-label">INTERACTIVE VIEW / TEST RESULTS</span><span class="artifact-origin">EXAMPLE · GENERATED IN FEED</span></div><h3 class="artifact-heading">48 tests passed. One case is missing.</h3><p class="artifact-lede">Select a category to see the tests included in this example run.</p><div class="artifact-view"><div class="artifact-tabs" role="group" aria-label="Test result filter"><button data-tests-filter="all" aria-pressed="true">All</button><button data-tests-filter="retry" aria-pressed="false">Retry</button><button data-tests-filter="cart" aria-pressed="false">Cart</button><button data-tests-filter="summary" aria-pressed="false">Summary</button></div><div class="test-bars" data-test-bars></div><div class="artifact-insight" data-test-insight>All 48 example tests pass. None checks a timeout after the server accepts an order.</div></div><div class="artifact-footer"><span>Sample test results · 0 live tests executed</span><button type="button" data-artifact-action="show-file" data-path="test/checkout/retry.test.ts">Open retry tests</button></div></section>
+      <div class="request-hint">Try <code>design missing test</code>, <code>show a release checklist</code>, <code>show retry behavior</code>, or <code>show test chart</code>.</div>
+      <section class="approval decision-panel" id="approval" aria-label="Release review and next step">
+        <div class="decision-top"><span class="decision-overline" id="approvalStatus"><span class="decision-spark">✦</span> REVIEW REQUIRED</span><span class="decision-ref">PR #128 <span>·</span> DEMONSTRATION</span></div>
+        <h3 id="approvalHeading">One issue needs verification.</h3>
+        <p class="decision-summary" id="approvalDescription">The tests that ran passed. A lost server response could still cause a duplicate order when the client retries.</p>
+        <div class="decision-evidence">
+          <div><span class="evidence-symbol good">✓</span><span><strong>48 existing tests passed</strong><small>Recorded sample result · 3 suites</small></span></div>
+          <div><span class="evidence-symbol unknown">?</span><span><strong>Duplicate-order recovery unverified</strong><small>The required failure case is absent</small></span></div>
+        </div>
+        <div class="decision-next"><span>NEXT RECOMMENDED ACTION</span><p>Write a test that loses the response after the server commits an order, then confirm that a retry creates exactly one order.</p><div class="decision-sub">Check concurrent requests and recovery after restart before releasing.</div></div>
+        <div class="decision-actions" id="approvalActions">
+          <button type="button" class="decision-primary" id="designTestBtn" data-decision="test">Design missing test <span aria-hidden="true">↗</span></button>
+          <button type="button" class="decision-secondary" id="holdBtn" data-decision="hold">Keep merge on hold</button>
+          <button type="button" class="decision-tertiary" id="exceptionBtn" data-decision="exception">Request an exception…</button>
+        </div>
+        <div class="decision-bottom"><span class="review-lock">◆</span> Merge remains on hold until verification or an authorized exception. <span>No action runs from this demo.</span></div>
+      </section>
+      <div class="event" id="initialLiveEvent"><div class="event-line"><span class="bullet green">●</span><div class="event-body"><div class="event-meta"><b>Review summary prepared</b> <span class="meta-muted">· sample session · awaiting your decision</span></div></div></div></div>
+    </div></section>
+    <section class="composer-zone" aria-label="Command composer"><div class="live-status"><div class="live-left"><span class="status-spinner" id="statusIcon">✓</span><strong id="statusPhrase">Ready for review</strong><span id="statusExtra" style="color:var(--dim)">example activity</span></div><span class="timer" id="elapsed">00:17</span></div>
+      <form class="composer" id="composerForm"><span class="command-prefix">›</span><textarea id="promptInput" rows="1" aria-label="Message or sample command" placeholder="Ask a question, or try: design missing test" spellcheck="false"></textarea><button type="submit" class="send-btn" aria-label="Send message" title="Send (Enter)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form>
+      <div class="composer-footer"><span class="left"><span>ASTER / MAIN</span><span>sample workspace</span><span id="viewFooter">activity view</span></span><span class="right"><span>Enter send</span><span><kbd>Shift</kbd> + <kbd>Enter</kbd> new line</span></span></div>
+    </section>
+  </main>
+  <aside class="inspector" aria-label="Session details" id="inspector">
+    <div><div class="inspector-top"><span class="inspector-title">SESSION DETAILS</span><button class="icon-button" id="closeInspectorBtn" aria-label="Close session details" title="Close session details" style="height:25px;width:25px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 5l14 14M19 5 5 19"/></svg></button></div><div class="inspector-kicker" style="margin-top:16px">This is a design preview, not a live workspace.</div></div>
+    <div><div class="overline" style="color:var(--blue)">CURRENT REQUEST</div><div class="summary-name">Review checkout changes</div><div class="summary-desc">Inspect files, check tests, and identify any remaining release risks.</div><div class="progress-track"><div class="progress-fill" id="progressFill"></div></div><div class="kv"><span>Checks</span><span class="value" id="checkProgress">2 of 3 reviewed</span></div></div>
+    <div class="inspector-section"><h4>WORK IN PROGRESS</h4><div class="task"><span class="task-dot done"></span><div><div class="task-main">Review changed files</div><div class="task-sub">Complete · 6 files</div></div></div><div class="task"><span class="task-dot done"></span><div><div class="task-main">Run focused tests</div><div class="task-sub">Complete · 48 passed</div></div></div><div class="task"><span class="task-dot busy" id="lastTaskDot"></span><div><div class="task-main" id="lastTaskLabel">Check release jobs</div><div class="task-sub" id="lastTaskSub">In progress · sample</div></div></div></div>
+    <div class="inspector-section"><h4>SESSION</h4><div class="kv"><span>Branch</span><span class="value">feat/checkout-retry</span></div><div class="kv"><span>Environment</span><span class="value">Local preview</span></div><div class="kv"><span>Changes</span><span class="value">2 files</span></div><div class="kv"><span>Review</span><span class="value wait" id="reviewState">Waiting</span></div></div>
+    <div class="rail-note">Only the approval decision uses gold. Other colors indicate activity, completion, or neutral information.</div>
+  </aside>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="reader-overlay" id="fileReader" hidden role="dialog" aria-modal="true" aria-label="File reader"><div class="reader-panel"><div class="reader-head"><div><h2 id="readerTitle">File</h2><div class="reader-sub">SAMPLE CONTENT · SELECT A LINE TO HIGHLIGHT IT</div></div><div class="reader-toolbar"><button type="button" id="copyFileBtn">Copy excerpt</button><button type="button" id="closeReaderBtn">Close <span aria-hidden="true">×</span></button></div></div><div class="reader-body" id="readerBody"></div><div class="reader-foot">File examples are for this design preview. They are not loaded from a workspace.</div></div></div>
+<script>
+(() => {
+  const $=q=>document.querySelector(q);
+  const $$=q=>[...document.querySelectorAll(q)];
+  const shell=$('#shell'),feed=$('#feed'),feedInner=$('#feedInner'),input=$('#promptInput');
+  let activeSession='release',activeView='activity',elapsed=17,isBusy=true,runCounter=0,toastTimeout;
+  const svgPaths={};
+  function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>t.classList.remove('visible'),2600)}
+  function safe(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  function clock(){return new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',hour12:false})}
+  function scrollEnd(){requestAnimationFrame(()=>feed.scrollTo({top:feed.scrollHeight,behavior:'smooth'}))}
+  function appendEvent(kind,text,extra=''){
+    const root=document.createElement('div');root.className='event';
+    if(kind==='user')root.classList.add('user-message');
+    if(kind==='user')root.innerHTML=`<div class="label">YOU <span style="font:400 10px var(--mono);color:var(--dim);margin-left:7px">${clock()}</span></div><p>${safe(text)}</p>`;
+    else {const cl=kind==='done'?'green':kind==='running'?'blue':kind==='warning'?'gold':'';
+      const sym=kind==='running'?'<span class="live-marker">✳</span>':'●';
+      root.innerHTML=`<div class="event-line"><span class="bullet ${cl}">${sym}</span><div class="event-body"><div class="${kind==='prose'?'event-prose':'event-meta'}">${safe(text)} ${extra?`<span class="meta-muted">· ${safe(extra)}</span>`:''}</div></div></div>`;
+    }
+    feedInner.append(root);scrollEnd();return root;
+  }
+  const routines={
+    'run tests':{start:'Running checkout tests',steps:['Starting test runner…','Checking checkout retry cases…'],end:'Checkout tests passed',meta:'48 passed · 0 failed · sample run'},
+    'review changes':{start:'Reading changed files',steps:['Comparing changes to main…','Looking at retry handling…'],end:'Review complete',meta:'2 modified files · 1 point to check'},
+    'check status':{start:'Checking release jobs',steps:['Reading CI checks…','Collecting job results…'],end:'Release jobs checked',meta:'2 passed · 1 pending'}
+  };
+  function setLive(text,live=true){isBusy=live;$('#statusPhrase').textContent=text;$('#statusIcon').textContent=live?'✳':'✓';$('#statusIcon').style.animation=live?'':'none';$('#statusIcon').style.color=live?'var(--blue)':'var(--sage)';$('#statusExtra').textContent=live?'example activity':'preview ready';if(!live)$('#elapsed').textContent='READY'}
+  function simulate(key){if(isBusy && runCounter){toast('Finish the current preview step first');return}
+    runCounter++;const r=routines[key]||{start:'Reviewing your request',steps:['Reading the sample session…','Preparing a response…'],end:'Preview updated',meta:'No command was executed'};
+    setLive(r.start+'…',true);elapsed=0;$('#elapsed').textContent='00:00';const e=appendEvent('running',r.start,'simulation');
+    setTimeout(()=>{if(!e.isConnected)return;e.querySelector('.event-meta').firstChild.textContent=r.steps[0];},700);
+    setTimeout(()=>{if(!e.isConnected)return;e.querySelector('.event-meta').firstChild.textContent=r.steps[1];},1550);
+    setTimeout(()=>{if(!e.isConnected)return;e.querySelector('.bullet').className='bullet green';e.querySelector('.bullet').textContent='●';e.querySelector('.event-meta').innerHTML='<b>'+safe(r.end)+'</b> <span class="meta-muted">· '+safe(r.meta)+'</span>';appendEvent('prose',key==='run tests'?'The sample test run is complete. This page did not execute the test suite.':key==='review changes'?'The retry handling remains the main thing to verify before release.':'This is a visual preview. No external systems were contacted.');setLive('Ready',false)},2650);
+  }
+  let currentSeed=feedInner.innerHTML;
+  function showView(view){if(activeView==='activity'&&view!=='activity')currentSeed=feedInner.innerHTML;activeView=view;$$('[data-view]').forEach(b=>{b.setAttribute('aria-selected',String(b.dataset.view===view));b.classList.toggle('selected',b.dataset.view===view)});$('#viewFooter').textContent=view+' view';
+    const title={activity:'Release review',terminal:'Terminal',files:'Project files'};
+    $('#sessionTitle').textContent=title[view];
+    if(view==='activity'){feedInner.innerHTML=currentSeed;setLive('Ready for review',false);$('#statusExtra').textContent='example activity';}
+    if(view==='terminal'){feedInner.innerHTML=`<div class="date-divider">LOCAL SHELL · VISUAL PREVIEW</div><div class="event"><div class="event-line"><span class="bullet blue">›</span><div class="event-body"><div class="event-meta"><b>~/projects/aster</b> <span class="meta-muted">· bash</span></div><pre style="font:400 12px/2 var(--mono);color:var(--secondary);margin:14px 0 0">$ git status --short\n M src/checkout/retry.ts\n M test/checkout/retry.test.ts\n\n$ bun test test/checkout\n 48 pass\n  0 fail\n\n$ <span style="color:var(--ivory)">▋</span></pre><div class="statement" style="color:var(--dim);margin-top:23px">Illustrative shell output. This page is not connected to a PTY.</div></div></div></div>`;setLive('Preview shell',false)}
+    if(view==='files'){feedInner.innerHTML=`<div class="date-divider">PROJECT FILES · EXAMPLE</div><div class="event" style="max-width:540px"><div class="event-prose" style="margin-bottom:15px">Browse the files mentioned in this review.</div><div class="expansion" style="font-size:12px"><div class="file-stat"><span class="path">▾ src/</span><em>folder</em></div><div class="file-stat" style="padding-left:20px"><span class="path">▾ checkout/</span><em>folder</em></div><div class="file-stat" style="padding-left:40px"><span>retry.ts</span><em>modified</em></div><div class="file-stat" style="padding-left:40px"><span>summary.tsx</span><em>modified</em></div><div class="file-stat" style="padding-left:20px"><span class="path">▸ api/</span><em>folder</em></div><div class="file-stat"><span class="path">▾ test/checkout/</span><em>folder</em></div><div class="file-stat" style="padding-left:20px"><span>retry.test.ts</span><em>modified</em></div><div class="file-stat" style="padding-left:20px"><span>summary.test.tsx</span><em>unchanged</em></div></div></div>`;setLive('Preview files',false)}
+    shell.classList.remove('menu-open');}
+  $$('[data-view]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
+  $$('#promptInput').forEach(el=>{el.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#composerForm').requestSubmit()}});el.addEventListener('input',()=>{el.style.height='22px';el.style.height=Math.min(el.scrollHeight,140)+'px'})});
+  $('#composerForm').addEventListener('submit',e=>{e.preventDefault();const text=input.value.trim();if(!text)return;if(activeView!=='activity')showView('activity');appendEvent('user',text);input.value='';input.style.height='22px';const v=text.toLowerCase();if(window.handleArtifactPrompt && window.handleArtifactPrompt(v)){setLive('Ready',false);return}if(v==='help'||v==='/help'){appendEvent('prose','Try: design missing test, request exception, run tests, show a release checklist, show retry behavior, show test chart, or open retry.ts. Everything is simulated.');setLive('Ready',false);return}if(v==='clear'||v==='/clear'){feedInner.innerHTML='<div class="date-divider">SESSION CLEARED · PREVIEW ONLY</div>';setLive('Ready',false);return}let key=v.includes('test')?'run tests':v.includes('review')||v.includes('change')?'review changes':v.includes('status')||v.includes('check')?'check status':'other';simulate(key)});
+  $('#modeBtn').addEventListener('click',()=>toast('Preview mode · no live commands or file changes'));
+  $('#workspaceBtn').addEventListener('click',()=>toast('Sample workspace: Aster Commerce'));
+  $('#densityBtn').addEventListener('click',()=>{document.body.classList.toggle('compact');const on=document.body.classList.contains('compact');$('#densityBtn').setAttribute('aria-pressed',String(on));toast(on?'Compact spacing':'Comfortable spacing')});
+  function inspectorToggle(force){const desktop=window.matchMedia('(min-width:1031px)').matches;const open=force===undefined?!shell.classList.contains('inspector-open'):force;shell.classList.toggle('inspector-open',open);$('#inspectorBtn').setAttribute('aria-pressed',String(open));if(desktop){$('#inspector').classList.toggle('hidden',!open);shell.style.gridTemplateColumns=open?'226px minmax(0,1fr) 266px':'226px minmax(0,1fr) 0px';}}
+  $('#inspectorBtn').addEventListener('click',()=>inspectorToggle());$('#closeInspectorBtn').addEventListener('click',()=>inspectorToggle(false));
+  window.toggleSidebar=()=>shell.classList.toggle('menu-open');
+  function navMenuResponsive(){const small=window.innerWidth<=700;$('#menuBtn').classList.toggle('hidden',!small);if(window.innerWidth<=1030){$('#inspector').classList.remove('hidden');shell.style.gridTemplateColumns='';}}
+  window.addEventListener('resize',navMenuResponsive);navMenuResponsive();
+  $('#newSessionBtn').addEventListener('click',()=>{showView('activity');feedInner.innerHTML='<div class="date-divider">NEW SAMPLE SESSION</div><div class="event"><div class="event-line"><span class="bullet">●</span><div class="event-body"><div class="event-prose">What would you like to check? Try <strong>run tests</strong>, <strong>review changes</strong>, or <strong>check status</strong>.</div></div></div></div>';$('#sessionTitle').textContent='New session';setLive('Ready',false);input.focus();shell.classList.remove('menu-open')});
+  $$('[data-session]').forEach(b=>b.addEventListener('click',()=>{const s=b.dataset.session;activeSession=s;$$('[data-session]').forEach(x=>x.classList.toggle('selected',x===b));showView('activity');if(s==='tests'){feedInner.innerHTML='<div class="date-divider">TEST RUN · SAMPLE SESSION</div>';appendEvent('done','Test run finished','48 passed · 0 failed · example only');appendEvent('prose','The focused checkout tests passed. Timeout recovery still needs a separate case.');$('#sessionTitle').textContent='Test run';setLive('Ready',false)}else if(s==='notes'){feedInner.innerHTML='<div class="date-divider">QUICK NOTES · SAMPLE SESSION</div>';appendEvent('prose','The main concern is whether a retry can submit the same order twice after a timeout.');$('#sessionTitle').textContent='Quick notes';setLive('Ready',false)}shell.classList.remove('menu-open')}));
+  document.addEventListener('click',e=>{const copy=e.target.closest('[data-copy]');if(copy){navigator.clipboard?.writeText(copy.dataset.copy.replaceAll('\\n','\n')).then(()=>toast('Commands copied')).catch(()=>toast('Copy unavailable in this browser'));}});
+  document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();input.focus()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='i'){e.preventDefault();inspectorToggle()}if(e.key==='Escape'){shell.classList.remove('menu-open');if(window.innerWidth<=1030)inspectorToggle(false)}});
+  setInterval(()=>{if(!isBusy)return;elapsed++;$('#elapsed').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(elapsed%60).padStart(2,'0')},1000);
+  if(window.innerWidth<=1030){shell.classList.remove('inspector-open');$('#inspectorBtn').setAttribute('aria-pressed','false')}else{shell.classList.add('inspector-open')}
+  setLive('Ready for review',false);
+  requestAnimationFrame(()=>{feed.scrollTop=feed.scrollHeight;});
+})();
+</script>
+
+<script>
+(() => {
+  const files = {
+    'src/checkout/retry.ts': {start:78, focus:84, lines:[
+      'export async function submitWithRetry(order: Order) {',
+      '  let attempts = 0',
+      '  while (attempts < 2) {',
+      '    attempts++',
+      '    try {',
+      '      return await api.post("/orders", order)',
+      '    } catch (error) {',
+      '      if (!isTimeout(error)) throw error',
+      '      // The server may have already accepted this order.',
+      '      // No idempotency key is sent on the retry.',
+      '    }',
+      '  }',
+      '  throw new Error("Unable to submit order")',
+      '}'
+    ]},
+    'src/checkout/summary.tsx': {start:26, lines:[
+      'export function CheckoutSummary({ order }: Props) {',
+      '  const [busy, setBusy] = useState(false)',
+      '  return (',
+      '    <section aria-label="Order summary">',
+      '      <OrderLines items={order.items} />',
+      '      <button disabled={busy} onClick={placeOrder}>',
+      '        Place order',
+      '      </button>',
+      '    </section>',
+      '  )',
+      '}'
+    ]},
+    'src/api/orders.ts': {start:11, lines:[
+      'export async function createOrder(input: NewOrder) {',
+      '  const result = await db.orders.insert(input)',
+      '  return { id: result.id, status: "created" }',
+      '}',
+      '// Add a request key to prevent accidental duplicates.'
+    ]},
+    'test/checkout/retry.test.ts': {start:31, lines:[
+      'describe("checkout retry", () => {',
+      '  it("retries transient network failures", async () => {',
+      '    transport.failOnce("ETIMEDOUT")',
+      '    expect(await submitWithRetry(order)).toBeDefined()',
+      '  })',
+      '  // Missing: response lost after successful server commit',
+      '  // Expect a single order after the client retries.',
+      '})'
+    ]},
+    'test/checkout/summary.test.tsx': {start:18, lines:[
+      'test("displays the order total", () => {',
+      '  render(<CheckoutSummary order={sampleOrder} />)',
+      '  expect(screen.getByText("$42.00")).toBeVisible()',
+      '})'
+    ]},
+    'package.json': {start:1, lines:[
+      '{',
+      '  "name": "aster-commerce",',
+      '  "private": true,',
+      '  "scripts": {',
+      '    "test": "vitest run",',
+      '    "check": "tsc --noEmit"',
+      '  }',
+      '}'
+    ]}
+  };
+  const safe=(s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fileLines = (path) => {
+    const f=files[path];if(!f)return '';
+    return f.lines.map((l,i)=>`<div class="code-line${f.focus===i+f.start?' problem-line':''}" tabindex="0" data-line="${i+f.start}"><span class="line-num">${i+f.start}</span><code>${safe(l)}</code></div>`).join('');
+  };
+  const fileRev='c37a91e'; let staleFiles=new Set(); let restoreFocus=null;
+  function readerClose(){const r=document.getElementById('fileReader');r.hidden=true;document.body.style.overflow='';if(restoreFocus?.isConnected)restoreFocus.focus()}
+  function readerOpen(path){if(!files[path])return;
+    restoreFocus=document.activeElement;
+    document.getElementById('readerTitle').textContent=path + (staleFiles.has(path)?' · Source changed':'');document.querySelector('.reader-foot').textContent=staleFiles.has(path)?'This source has changed since snapshot c37a91e. The displayed excerpt is stale until reloaded from the new revision.':'Sample content · source snapshot c37a91e · select a line to highlight it.';document.querySelector('.reader-foot').textContent=staleFiles.has(path)?'This source has changed since snapshot c37a91e. This excerpt is now stale; reopen an updated source in a real implementation.':'Sample content · source snapshot c37a91e · select a line to highlight it.';
+    document.getElementById('readerBody').innerHTML=fileLines(path);
+    const r=document.getElementById('fileReader');r.hidden=false;
+    document.getElementById('copyFileBtn').dataset.path=path;
+    document.getElementById('closeReaderBtn').focus();
+  }
+  function drawerToggle(ref){const path=ref.dataset.file;if(!files[path])return;
+    const parent=ref.closest('.file-stat')||ref.closest('.statement')||ref.parentElement;
+    if(!parent)return;
+    let drawer=parent.nextElementSibling;
+    if(!drawer || !drawer.classList?.contains('file-drawer') || drawer.dataset.file!==path){
+      drawer=document.createElement('div');drawer.className='file-drawer';drawer.dataset.file=path;
+      drawer.innerHTML=`<div class="drawer-top"><div style="min-width:0"><span class="drawer-title">${safe(path)}</span> <span class="drawer-kicker">· @ c37a91e</span></div><div class="drawer-actions"><button type="button" data-stale-toggle="${safe(path)}">Simulate file change</button><button type="button" data-reader="${safe(path)}">Open full view ↗</button></div></div><div class="drawer-scroll">${fileLines(path)}</div><div class="drawer-note"><span data-source-label>Snapshot c37a91e · simulated source</span></div>`;
+      parent.insertAdjacentElement('afterend',drawer);
+    }
+    const open=!drawer.classList.contains('is-open');drawer.classList.toggle('is-open',open);drawer.classList.toggle('source-stale',staleFiles.has(path));drawer.querySelector('[data-source-label]').textContent=staleFiles.has(path)?'Source changed · captured snapshot c37a91e is stale':'Snapshot c37a91e · simulated source';drawer.querySelector('[data-stale-toggle]').textContent=staleFiles.has(path)?'Reset preview state':'Simulate file change';
+    const button=ref.querySelector('.file-toggle');if(button)button.setAttribute('aria-expanded',String(open));
+  }
+  function scenario(card,name){
+    const cases={
+      normal:{attempts:'1',orders:'1',result:'OK',info:'The request is accepted once, and the client receives the response.',warning:false},
+      timeout:{attempts:'2',orders:'2?',result:'Unknown',info:'The first request may have created an order before its reply was lost. A retry without a stable request key may create a duplicate. The second order is a possibility, not a measured fact.',warning:true},
+      late:{attempts:'2',orders:'1–2',result:'Delayed',info:'The first reply arrives after the client starts a retry. A disabled button alone cannot protect against duplicate server-side work.',warning:true}
+    };
+    const t=cases[name]||cases.normal;
+    card.querySelectorAll('[data-scenario]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.scenario===name)));
+    card.querySelector('[data-number="attempts"]').textContent=t.attempts;
+    card.querySelector('[data-number="orders"]').textContent=t.orders;
+    card.querySelector('[data-number="result"]').textContent=t.result;
+    card.querySelector('[data-explanation]').textContent=t.info;
+    card.querySelector('[data-flow="order"]').classList.toggle('warn',t.warning);
+  }
+  function tests(card,category){
+    const sets=[['Retry',18,'retry'],['Cart',14,'cart'],['Summary',16,'summary'],['Missing case',0,'missing']];
+    let selected=sets.filter(x=>category==='all'||x[2]===category || (category==='retry'&&x[2]==='missing'));
+    card.querySelectorAll('[data-tests-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.testsFilter===category)));
+    card.querySelector('[data-test-bars]').innerHTML=selected.map(([name,n,slug])=>`<div class="bar-row ${slug==='missing'?'missing':''}"><span>${name}</span><div class="bar-track"><div class="bar-fill" style="width:${n/18*100}%"></div></div><div class="bar-value">${n}</div></div>`).join('');
+    const txt={all:'All 48 example tests pass. None checks a timeout after the server accepts an order.',retry:'The retry suite has 18 tests, but not the case where a reply is lost after the order is created.',cart:'14 cart tests pass in this sample run.',summary:'16 summary tests pass in this sample run.'};
+    card.querySelector('[data-test-insight]').textContent=txt[category]||txt.all;
+  }
+  function checklist(){return `<section class="artifact-card" data-artifact="checklist"><div class="artifact-toolbar"><span class="artifact-label">INTERACTIVE VIEW / RELEASE CHECKLIST</span><span class="artifact-origin">REQUESTED · GENERATED IN FEED</span></div><h3 class="artifact-heading">Ready to release?</h3><p class="artifact-lede">Two reported checks are shown below. Missing checks remain unavailable until test evidence exists. Review notes cannot make them pass.</p><div class="artifact-view"><label class="check-row"><input type="checkbox" checked data-ck><span><strong>Changed files reviewed</strong><small>6 files inspected in the example</small></span></label><label class="check-row"><input type="checkbox" checked data-ck><span><strong>Focused tests passing</strong><small>48 passing sample tests</small></span></label><label class="check-row"><input type="checkbox" data-ck disabled title="Requires actual test evidence"><span><strong>Timeout-after-accept test added</strong><small>Still missing from the example suite</small></span></label><label class="check-row"><input type="checkbox" data-ck disabled title="Requires actual release evidence"><span><strong>Release checks complete</strong><small>Review the final job before proceeding</small></span></label><div class="check-summary" data-ck-summary>2 reported checks · 2 unverified</div></div><div class="artifact-footer"><span>Local draft · no repository changes</span><button data-artifact-action="save-checklist">Save draft</button></div></section>`}
+  function artifactClone(type){
+    if(type==='checklist')return checklist();
+    const card=document.querySelector(`#feedInner [data-artifact="${type}"]`);
+    if(card)return card.outerHTML;
+    if(type==='retry')return `<section class="artifact-card" data-artifact="retry"><div class="artifact-toolbar"><span class="artifact-label">INTERACTIVE VIEW / RETRY BEHAVIOR</span><span class="artifact-origin">REQUESTED · GENERATED IN FEED</span></div><h3 class="artifact-heading">What happens when a request times out?</h3><p class="artifact-lede">Switch between scenarios. Values are illustrative.</p><div class="artifact-view"><div class="artifact-tabs"><button data-scenario="normal" aria-pressed="true">Normal</button><button data-scenario="timeout" aria-pressed="false">Timeout</button><button data-scenario="late" aria-pressed="false">Late response</button></div><div class="flow-visual"><div class="flow-node" data-flow="client">Client</div><div class="flow-arr">→</div><div class="flow-node" data-flow="server">API</div><div class="flow-arr">→</div><div class="flow-node" data-flow="order">Order</div></div><div class="artifact-numbers"><div class="artifact-number"><div class="val" data-number="attempts">1</div><div class="desc">Requests sent</div></div><div class="artifact-number"><div class="val" data-number="orders">1</div><div class="desc">Possible orders</div></div><div class="artifact-number"><div class="val" data-number="result">OK</div><div class="desc">Client result</div></div></div><div class="artifact-insight" data-explanation>One request is accepted and the client receives its response.</div></div><div class="artifact-footer"><span>Simulation · not a live system</span><button data-artifact-action="show-file" data-path="src/checkout/retry.ts">Inspect retry code</button></div></section>`;
+    if(type==='tests')return `<section class="artifact-card" data-artifact="tests"><div class="artifact-toolbar"><span class="artifact-label">INTERACTIVE VIEW / TEST RESULTS</span><span class="artifact-origin">REQUESTED · GENERATED IN FEED</span></div><h3 class="artifact-heading">48 tests passed. One case is missing.</h3><p class="artifact-lede">Select a category to see the tests included in this example run.</p><div class="artifact-view"><div class="artifact-tabs"><button data-tests-filter="all" aria-pressed="true">All</button><button data-tests-filter="retry" aria-pressed="false">Retry</button><button data-tests-filter="cart" aria-pressed="false">Cart</button><button data-tests-filter="summary" aria-pressed="false">Summary</button></div><div class="test-bars" data-test-bars></div><div class="artifact-insight" data-test-insight>All 48 example tests pass. None checks a timeout after the server accepts an order.</div></div><div class="artifact-footer"><span>Sample data · 0 live tests executed</span><button data-artifact-action="show-file" data-path="test/checkout/retry.test.ts">Open retry tests</button></div></section>`;
+    return '';
+  }
+  function insertArtifact(type){const feedInner=document.getElementById('feedInner');if(!feedInner)return;
+    const intro=document.createElement('div');intro.className='event';intro.innerHTML=`<div class="event-line"><span class="bullet">●</span><div class="event-body"><div class="event-prose">I added an interactive ${type==='retry'?'retry scenario view':type==='tests'?'test chart':'release checklist'} below. You can explore it here without opening another window.</div></div></div>`;
+    const wrap=document.createElement('div');wrap.innerHTML=artifactClone(type);
+    feedInner.append(intro,wrap.firstElementChild);
+    const card=feedInner.lastElementChild;
+    if(type==='retry')scenario(card,'timeout');if(type==='tests')tests(card,'all');
+    document.getElementById('feed').scrollTo({top:document.getElementById('feed').scrollHeight,behavior:'smooth'});
+  }
+  window.insertArtifact=insertArtifact;
+  window.handleArtifactPrompt=(v)=>{
+    if(/(checklist|to.?do list|release plan)/.test(v)){insertArtifact('checklist');return true}
+    if(/(chart|test results|test graph)/.test(v)){insertArtifact('tests');return true}
+    if(/(retry behavior|retry scenario|simulate retry|interactive retry)/.test(v)){insertArtifact('retry');return true}
+    if(/(open|view|show).*(retry\.ts|retry file|source file)/.test(v)){readerOpen('src/checkout/retry.ts');return true}
+    return false;
+  };
+  document.addEventListener('click',e=>{
+    const stale=e.target.closest('[data-stale-toggle]');if(stale){const path=stale.dataset.staleToggle;const on=!staleFiles.has(path);if(on)staleFiles.add(path);else staleFiles.delete(path);document.querySelectorAll('.file-drawer').forEach(d=>{if(d.dataset.file!==path)return;d.classList.toggle('source-stale',on);d.querySelector('[data-source-label]').textContent=on?'Source changed · captured snapshot c37a91e is stale':'Snapshot c37a91e · simulated source';d.querySelector('[data-stale-toggle]').textContent=on?'Reset preview state':'Simulate file change'});return}
+    const tog=e.target.closest('.file-toggle');if(tog){drawerToggle(tog.closest('.file-ref'));return}
+    const name=e.target.closest('.file-name');if(name){readerOpen(name.closest('.file-ref').dataset.file);return}
+    const read=e.target.closest('[data-reader]');if(read){readerOpen(read.dataset.reader);return}
+    const peek=e.target.closest('.file-drawer.is-open .code-line');if(peek){readerOpen(peek.closest('.file-drawer').dataset.file);return}
+    const s=e.target.closest('[data-scenario]');if(s){scenario(s.closest('[data-artifact]'),s.dataset.scenario);return}
+    const filter=e.target.closest('[data-tests-filter]');if(filter){tests(filter.closest('[data-artifact]'),filter.dataset.testsFilter);return}
+    const action=e.target.closest('[data-artifact-action]');if(action){
+      if(action.dataset.artifactAction==='show-file')readerOpen(action.dataset.path);
+      if(action.dataset.artifactAction==='save-checklist'){action.textContent='Noted for this preview';setTimeout(()=>{if(action.isConnected)action.textContent='Save draft'},1800)}
+      return;
+    }
+    if(e.target.closest('#closeReaderBtn')||e.target.id==='fileReader'){readerClose();return}
+    const line=e.target.closest('#readerBody .code-line');if(line){document.querySelectorAll('#readerBody .code-line').forEach(x=>x.classList.remove('chosen'));line.classList.add('chosen')}
+  });
+  document.addEventListener('change',e=>{
+    const ck=e.target.closest('[data-ck]');if(!ck)return;
+    const card=ck.closest('[data-artifact]');const all=[...card.querySelectorAll('[data-ck]')];
+    card.querySelector('[data-ck-summary]').textContent=`${all.filter(x=>x.checked).length} reviewed checks · 2 unverified`;
+  });
+  document.getElementById('copyFileBtn').addEventListener('click',async()=>{
+    const path=document.getElementById('copyFileBtn').dataset.path;
+    const f=files[path];if(!f)return;
+    try{await navigator.clipboard.writeText(f.lines.join('\n'));document.getElementById('copyFileBtn').textContent='Copied';setTimeout(()=>document.getElementById('copyFileBtn').textContent='Copy excerpt',1000)}
+    catch{document.getElementById('copyFileBtn').textContent='Copy unavailable'}
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('fileReader').hidden){e.preventDefault();readerClose()} });
+  function initCards(){document.querySelectorAll('[data-artifact="tests"]').forEach(x=>tests(x,'all'))}
+  initCards();
+  // When Activity view restores its seed, the bar chart needs to be redrawn.
+  const obs=new MutationObserver(muts=>{
+    if(muts.some(m=>[...m.addedNodes].some(n=>n.nodeType===1&&(n.matches?.('[data-artifact="tests"]')||n.querySelector?.('[data-artifact="tests"]'))))){
+      document.querySelectorAll('[data-artifact="tests"]').forEach(x=>{if(!x.querySelector('[data-test-bars]')?.children.length)tests(x,'all')})
+    }
+  });
+  obs.observe(document.getElementById('feedInner'),{childList:true,subtree:false});
+})();
+</script>
+
+<script>
+/* V3 enhancements use only the page's simulated event data. No external actions. */
+(() => {
+  const feed = document.getElementById('feed');
+  const inner = document.getElementById('feedInner');
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const scrollToLast = () => requestAnimationFrame(()=>feed.scrollTo({top:feed.scrollHeight,behavior:'smooth'}));
+  const toast = msg => {const t=document.getElementById('toast');t.textContent=msg;t.classList.add('visible');setTimeout(()=>t.classList.remove('visible'),2600)};
+  let requestN=1;
+  const seen = new Map();
+  const btn = (label, attr='', cls='') => `<button type="button" ${attr} class="${cls}">${label}</button>`;
+  function newCard(html, id){
+    const old = inner.querySelector('[data-v3-id="'+id+'"]');
+    if(old){old.scrollIntoView({behavior:'smooth',block:'center'});return old;}
+    const wrap=document.createElement('div');wrap.innerHTML=html;const el=wrap.firstElementChild; el.dataset.v3Id=id;inner.appendChild(el);scrollToLast();return el;
+  }
+  function addEvent(text,tone='neutral'){
+    const d=document.createElement('div');d.className='event';const cl=tone==='good'?'green':tone==='warn'?'gold':'blue';
+    d.innerHTML=`<div class="event-line"><span class="bullet ${cl}">●</span><div class="event-body"><div class="event-prose">${esc(text)}</div></div></div>`;
+    inner.appendChild(d);scrollToLast();return d;
+  }
+  function openReader(path){
+    const trigger=document.querySelector(`.file-ref[data-file="${path}"] .file-name`);
+    if(trigger){trigger.click();return}
+    // Open a standard file reference in the feed without requesting new permissions.
+    const d=document.createElement('div');d.className='statement';d.innerHTML=`<span class="file-ref" data-file="${esc(path)}"><button type="button" class="file-toggle" aria-expanded="false">›</button><button type="button" class="file-name">${esc(path)}</button></span>`;
+    inner.append(d);d.querySelector('.file-name').click();
+  }
+  const contract = () => `<section class="artifact-card test-plan-card" data-artifact="test-plan" aria-label="Proposed test for checkout retry">
+   <div class="artifact-toolbar"><span class="artifact-label">INTERACTIVE VIEW / TEST PLAN</span><span class="artifact-origin">AGENT PROPOSAL · NOT EXECUTED</span></div>
+   <h3 class="artifact-heading">Prove that a retry creates only one order.</h3>
+   <p class="artifact-lede">This is a proposed test. It does not change the code or claim the issue is fixed.</p>
+   <div class="artifact-view">
+     <div class="contract-grid">
+      <div class="contract-cell"><span>STARTING CONDITION</span><strong>A new checkout request with one stable request key</strong></div>
+      <div class="contract-cell"><span>PASS CONDITION</span><strong>Exactly one saved order; both attempts return the same order ID</strong></div>
+      <div class="contract-cell"><span>BOUNDARY CASE</span><strong>Server commits; its first response is deliberately lost</strong></div>
+      <div class="contract-cell"><span>ADDITIONAL CHECKS</span><strong>Concurrent retries, restart recovery, and conflicting inputs</strong></div>
+     </div>
+     <ol class="contract-steps"><li><span>Submit an order with a stable request key and let the server commit it.</span></li><li><span>Drop the response before it reaches the client.</span></li><li><span>Retry using the same key, then query the order store.</span></li><li><span><strong>Assert one order exists</strong>, both responses identify the same order, and mismatched input with the same key is rejected.</span></li></ol>
+     <div class="outcome-plain"><span style="color:#d7b374">◇</span><span><b>What this would establish:</b> server-side idempotency works for the tested conditions. It would not establish every possible network failure or authorize a release by itself.</span></div>
+     <div class="status-pair">◉ Proposed · No test written · No result recorded</div>
+   </div>
+   <div class="artifact-footer"><span>Built-in component · typed request · permission checked at execution</span>${btn('Inspect current retry test','data-v3-action="open-test"')}${btn('Queue work request','data-v3-action="queue-test"','primary-foot')}</div>
+  </section>`;
+  function exception(){return `<section class="artifact-card exception-card" data-artifact="exception" aria-label="Risk exception request">
+    <div class="artifact-toolbar"><span class="artifact-label">INTERACTIVE VIEW / RISK EXCEPTION</span><span class="artifact-origin">OWNER INPUT ONLY · NOT APPROVAL</span></div>
+    <h3 class="artifact-heading">Request a documented exception</h3>
+    <p class="artifact-lede">Only an authorized reviewer can accept the risk. This form creates a local example request; it does not approve, merge, or publish anything.</p>
+    <div class="artifact-view"><div class="note-bar"><span style="color:#d4b177">◇</span><span><strong>Known gap:</strong> the test suite does not verify whether a duplicate order can be created after a lost response.</span></div>
+      <div class="exc-grid"><label>Reviewer <input data-exc="reviewer" placeholder="Name or accountable role" autocomplete="off" /></label><label>Exception expires <input data-exc="expiry" type="date" /></label></div>
+      <label>Why proceed before verification? <textarea data-exc="reason" placeholder="Specific reason, not a general approval" spellcheck="true"></textarea></label>
+      <div class="exc-grid"><label>Monitoring / early warning <input data-exc="monitor" placeholder="How would we detect duplicate orders?"/></label><label>Rollback / recovery <input data-exc="recovery" placeholder="How would we reverse harm?"/></label></div>
+      <label class="exc-check"><input type="checkbox" data-exc="ack"/> <span>I understand this request does not mean the release is safe, and it requires independent authorization.</span></label>
+      <div class="status-pair" data-exc-feedback>Complete every field to record a request.</div>
+    </div><div class="artifact-footer"><span>Proposed request · never accepted automatically</span>${btn('Close','data-v3-action="cancel-exception"')}${btn('Record request','data-v3-action="submit-exception" disabled','primary-foot')}</div>
+   </section>`}
+  function checklist(){
+    // Compatibility with existing demo: selections are owner notes, not proof.
+    addEvent('The release checklist is only a working note. Checking a box will not change test evidence or unblock merging.');
+  }
+  function showTest(){const el=newCard(contract(),'test-plan');if(el)toast('Test plan displayed · proposed only')}
+  function showException(){const el=newCard(exception(),'exception');if(el)toast('Exception form opened · human input only')}
+  function hold(){const p=document.getElementById('approval');if(!p)return;
+    p.classList.add('decision-complete');const status=p.querySelector('#approvalStatus');if(status)status.innerHTML='<span class="decision-spark">✓</span> REVIEW NOTED';
+    p.querySelector('#approvalHeading').textContent='Merge remains on hold.';
+    p.querySelector('#approvalDescription').textContent='The missing verification still needs to be completed. This mockup has not changed the pull request or any release setting.';
+    p.querySelector('#approvalActions').innerHTML='<button type="button" class="decision-primary" data-decision="test">Design missing test ↗</button><button type="button" class="decision-tertiary" data-decision="exception">Request an exception…</button>';
+    const r=document.getElementById('reviewState');if(r){r.textContent='On hold · example';r.className='value wait'}
+    addEvent('Review preference recorded in this preview. Merge remains on hold; no repository operation was performed.','good');
+  }
+  function queueTest(card){
+    const id='R'+requestN++;
+    const p=document.createElement('section');p.className='artifact-card';p.dataset.requestId=id;
+    p.innerHTML=`<div class="artifact-toolbar"><span class="artifact-label">WORK REQUEST / ${id}</span><span class="artifact-origin">LOCAL DRAFT · QUEUED</span></div><h3 class="artifact-heading">Add the lost-response integration test</h3><p class="artifact-lede">This request is prepared for an agent, but there is no connected executor in this HTML preview. The code and test suite remain unchanged.</p><div class="artifact-view"><div class="note-bar"><span>◌</span><span><strong>Queued</strong> · no agent has acknowledged this request · approval still required before modifying protected systems</span></div><div class="contract-grid"><div class="contract-cell"><span>TEST FILE</span><strong>test/checkout/retry.test.ts</strong></div><div class="contract-cell"><span>EXPECTED RESULT</span><strong>Single order after duplicate requests</strong></div></div></div><div class="artifact-footer"><span>Proposed work only · not verified</span><button type="button" data-v3-action="copy-test-prompt">Copy request</button></div>`;
+    inner.appendChild(p);scrollToLast();
+    const f=document.getElementById('lastTaskLabel');if(f)f.textContent='Add lost-response test';const sb=document.getElementById('lastTaskSub');if(sb)sb.textContent='Queued in preview · not running';
+    const dot=document.getElementById('lastTaskDot');if(dot){dot.classList.remove('busy');dot.classList.add('wait')}
+    toast('Work request queued in preview');
+    const status=card.querySelector('.status-pair');if(status)status.textContent='◉ Proposed · Work request queued · Not executed';
+  }
+  function validateException(card){
+    const values=['reviewer','expiry','reason','monitor','recovery'].map(n=>card.querySelector(`[data-exc="${n}"]`)?.value.trim()||'');
+    const good=values.every(Boolean)&&card.querySelector('[data-exc="ack"]')?.checked;
+    const btn=card.querySelector('[data-v3-action="submit-exception"]');if(btn)btn.disabled=!good;
+    const f=card.querySelector('[data-exc-feedback]');if(f)f.textContent=good?'Ready to record a request. This will not approve the release.':'Complete every field and acknowledge the approval requirement.';
+  }
+  function submitException(card){
+    validateException(card);const btn=card.querySelector('[data-v3-action="submit-exception"]');if(btn.disabled)return;
+    const name=card.querySelector('[data-exc="reviewer"]').value.trim();const date=card.querySelector('[data-exc="expiry"]').value;
+    card.querySelector('.artifact-view').innerHTML=`<div class="note-bar"><span style="color:#d8b56f">◇</span><span><strong>Request recorded locally.</strong> Awaiting independent authorization. No exception was approved and no merge took place.</span></div><div class="contract-grid"><div class="contract-cell"><span>REVIEWER REQUESTED</span><strong>${esc(name)}</strong></div><div class="contract-cell"><span>EXPIRATION REQUESTED</span><strong>${esc(date)}</strong></div></div><div class="status-pair">○ Pending review · release still on hold</div>`;
+    card.querySelector('.artifact-origin').textContent='LOCAL REQUEST · NOT APPROVED';card.querySelector('.artifact-footer').innerHTML='<span>Recorded in this preview only · nothing sent</span>';
+    addEvent('Risk exception request recorded in the mockup. An independent reviewer would still need to decide; release remains on hold.','warn');
+  }
+  function openFile(path){openReader(path)}
+  document.addEventListener('click',e=>{
+    const d=e.target.closest('[data-decision]');if(d){const act=d.dataset.decision;if(act==='test')showTest();else if(act==='hold')hold();else if(act==='exception')showException();return;}
+    const a=e.target.closest('[data-v3-action]');if(!a)return;
+    const card=a.closest('[data-artifact]');
+    if(a.dataset.v3Action==='open-test')openFile('test/checkout/retry.test.ts');
+    if(a.dataset.v3Action==='queue-test')queueTest(card);
+    if(a.dataset.v3Action==='cancel-exception'){card.remove();toast('Draft closed · no changes made')}
+    if(a.dataset.v3Action==='submit-exception')submitException(card);
+    if(a.dataset.v3Action==='copy-test-prompt'){
+      const prompt='Add an integration test for checkout retry after a committed server response is lost. Use one stable idempotency key. Verify that both attempts reference the same order, the datastore holds exactly one order, concurrent retries are safe, restart recovery works, and conflicting payloads with the same key are rejected. Run tests and show results; do not merge.';
+      if(navigator.clipboard?.writeText)navigator.clipboard.writeText(prompt).then(()=>toast('Test request copied')).catch(()=>toast('Clipboard unavailable'));
+      else toast('Clipboard unavailable');
+    }
+  });
+  document.addEventListener('input',e=>{if(e.target.closest('[data-artifact="exception"]'))validateException(e.target.closest('[data-artifact="exception"]'))});
+  document.addEventListener('change',e=>{if(e.target.closest('[data-artifact="exception"]'))validateException(e.target.closest('[data-artifact="exception"]'))});
+  // Reuse the existing agent-request route. It is intentionally data-driven and simulates no remote effect.
+  const old=window.handleArtifactPrompt;
+  window.handleArtifactPrompt = v => {
+    if(/(design|write|add|plan).*(missing|timeout|idempotency|lost.response|test)/.test(v)){showTest();return true;}
+    if(/(risk exception|request exception|exception request)/.test(v)){showException();return true;}
+    if(/(keep|put).*(merge|release).*(hold|waiting)|hold.*merge/.test(v)){hold();return true;}
+    return old?old(v):false;
+  };
+  // Ensure the initial example focuses on the only unsettled scenario.
+  const initial=inner.querySelector('[data-artifact="retry"] [data-scenario="timeout"]');if(initial)initial.click();
+})();
+</script>
+
+</body>
+</html>

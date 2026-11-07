@@ -1,0 +1,689 @@
+[
+  {
+    "append_ordinal": 1,
+    "entry_hash": "sha256:6c754e4da3738767801838d844c7b441932edbb44695163e4c658dadc7421248",
+    "ledger_id": "01M6TXKBCGD0K3REMNE0RDYW29",
+    "payload": {
+      "boundary_record": {
+        "excluded_sections": [],
+        "included_sections": [],
+        "known_omissions": [],
+        "limitations": [
+          "sxr slice-1 runtime record"
+        ],
+        "unknowns": []
+      },
+      "cep_version": "0.1.0",
+      "completeness_status": "complete_for_declared_state",
+      "created_at": "2026-11-07T11:51:44.272902Z",
+      "created_by": "sxr 0.3.0",
+      "envelope_id": "01M6TXKBCG7K1Q1MKD7T1WW5XX",
+      "envelope_kind": "execution_trace",
+      "envelope_version": "1.0.0",
+      "lineage_refs": [],
+      "omission_status": "no_known_omissions",
+      "provenance_refs": [
+        "ledger:gen:1"
+      ],
+      "scope": {
+        "checkout_id": "01M6TXKBCG0WM48HDXV4YA675V",
+        "filesystem_path": "/tmp/claude-1000/-home-sprime01-projects-Horizon/153d70cd-d7e5-4657-8444-9a0c48bbc206/scratchpad/rt2/repo",
+        "git_commit": "08620c72d72101fc53423c43941ba704a6912cbd",
+        "repo_id": "01M6TXKBCGD0K3REMNE0RDYW29"
+      },
+      "states": [
+        {
+          "scope": "repo:01M6TXKBCGD0K3REMNE0RDYW29",
+          "state_id": "state:enroll",
+          "state_type": "repository"
+        }
+      ],
+      "transformations": [
+        {
+          "transformation_id": "tx:enroll",
+          "transformation_type": "enrollment"
+        }
+      ],
+      "validation_status": "validated"
+    },
+    "record_kind": "repo.enrolled"
+  },
+  {
+    "append_ordinal": 2,
+    "entry_hash": "sha256:fe9c8d18762c318d9a191ad2da8090232c7ef8be926cb82e4a23399ff18e140d",
+    "ledger_id": "01M6TXKBCGD0K3REMNE0RDYW29",
+    "payload": {
+      "boundary_record": {
+        "compression_notes": [],
+        "excluded_sections": [],
+        "included_sections": [
+          "representations",
+          "references",
+          "provenance"
+        ],
+        "known_omissions": [
+          "source_comments",
+          "source_formatting",
+          "source_line_positions"
+        ],
+        "limitations": [],
+        "out_of_scope_entities": [],
+        "redactions": [],
+        "scope": "interaction-model.sea",
+        "unknowns": []
+      },
+      "cep_version": "0.1.0",
+      "completeness_status": "complete_for_declared_state",
+      "created_at": "2026-11-07T11:51:44.720829Z",
+      "created_by": "domainforge 0.21.2",
+      "envelope_id": "01a1b5d9-af50-7972-95e9-4610ce5aaab7",
+      "envelope_kind": "semantic_snapshot",
+      "envelope_version": "1.0.0",
+      "extensions": {
+        "domainforge": {
+          "model_validation_status": "valid",
+          "semantics_version": "v2-independent-validity"
+        }
+      },
+      "lineage_refs": [],
+      "omission_status": "known_omissions_recorded",
+      "provenance": [
+        {
+          "created_at": "2026-11-07T11:51:44.720829Z",
+          "producer_refs": [
+            "domainforge 0.21.2"
+          ],
+          "production_method": "domainforge envelope --emit cep",
+          "provenance_id": "provenance:01a1b5d9-af50-7972-95e9-4610ce5aaab7",
+          "review_status": "unreviewed",
+          "source_system_refs": [
+            "source-set:sha256:cf48dd9ea8e3ab0edaae54d26eefe7e5ed9e0998a2c1b9b51d6dcc6276b6eb3b"
+          ],
+          "verification_status": "unverified"
+        }
+      ],
+      "provenance_refs": [
+        "source-set:sha256:cf48dd9ea8e3ab0edaae54d26eefe7e5ed9e0998a2c1b9b51d6dcc6276b6eb3b"
+      ],
+      "references": [
+        {
+          "availability_status": "available",
+          "integrity_status": "verifiable",
+          "ref_id": "source-set:cf48dd9ea8e3ab0edaae54d26eefe7e5ed9e0998a2c1b9b51d6dcc6276b6eb3b",
+          "ref_type": "source_set",
+          "scope": "interaction-model.sea",
+          "target_hash": "sha256:cf48dd9ea8e3ab0edaae54d26eefe7e5ed9e0998a2c1b9b51d6dcc6276b6eb3b",
+          "target_uri_or_id": "interaction-model.sea"
+        }
+      ],
+      "representations": [
+        {
+          "content_availability": "available",
+          "content_hash": "sha256:7a611a98db2b343180dd232927f1237c179a87b325aab4e0ad1c08ecaa554a96",
+          "content_ref": "cas://sha256:7a611a98db2b343180dd232927f1237c179a87b325aab4e0ad1c08ecaa554a96",
+          "media_type": "application/json",
+          "omission_record": {
+            "known_omissions": [
+              "source_comments",
+              "source_formatting",
+              "source_line_positions"
+            ],
+            "reason": "domainforge canonical envelope is formatting- and comment-independent by construction",
+            "recoverable_from": "the .sea sources at the recorded git blob hashes"
+          },
+          "preserved_distinctions": [
+            "declared_vs_observed",
+            "representation_vs_reality"
+          ],
+          "preserved_entities": [
+            "application:horizon.interaction.record.AssessAffordanceInput",
+            "application:horizon.interaction.record.AssessAffordanceOutput",
+            "application:horizon.interaction.record.CommitIntentInput",
+            "application:horizon.interaction.record.CommitIntentOutput",
+            "application:horizon.interaction.record.ProposeRevisionInput",
+            "application:horizon.interaction.record.ProposeRevisionOutput",
+            "application:horizon.interaction.enum.AffordanceStatus",
+            "application:horizon.interaction.enum.AuthorityOutcome",
+            "application:horizon.interaction.enum.CapacityPeriod",
+            "application:horizon.interaction.enum.Currency",
+            "application:horizon.interaction.enum.EpistemicStatus",
+            "application:horizon.interaction.enum.EvidenceClass",
+            "application:horizon.interaction.enum.ExecutionPath",
+            "application:horizon.interaction.enum.ExpectationModality",
+            "application:horizon.interaction.enum.GateKey",
+            "application:horizon.interaction.enum.JourneyStatus",
+            "application:horizon.interaction.enum.NavigationResponsibility",
+            "application:horizon.interaction.enum.PaymentBasis",
+            "application:horizon.interaction.enum.ReversibilityClass",
+            "application:horizon.interaction.enum.ReviewDisposition",
+            "application:horizon.interaction.enum.SettlementStage",
+            "application:horizon.interaction.enum.SurfaceIntent",
+            "application:horizon.interaction.enum.WorldStateKind",
+            "application:horizon.interaction.operation.assess_affordance",
+            "application:horizon.interaction.operation.commit_navigation_intent",
+            "application:horizon.interaction.operation.propose_semantic_revision",
+            "concept:052c345b-1120-5339-a526-04d5b3c6f96b",
+            "concept:0bd8d6d9-357a-5879-9d7d-0995fc2d6eae",
+            "concept:0de815e3-d82c-545a-8bdd-9c99a3c934ce",
+            "concept:0e83922d-8f5c-5d61-af65-c9bdd8402e42",
+            "concept:1d4eb574-371e-5c9a-9bb6-f650e49dec68",
+            "concept:32fe37cc-d60e-55c1-9939-1c5c46f7b1ed",
+            "concept:3a068986-bf37-5130-a3e8-89d2e9f58e64",
+            "concept:3bd1470f-0863-5e68-878c-704115e47b89",
+            "concept:47287350-aeb8-5837-abb9-239fb63057fe",
+            "concept:5bb58ae4-db6c-5304-b189-c96e3b877865",
+            "concept:5f7955e5-a118-5565-a339-3fbe6a6f980a",
+            "concept:5f9f3839-2a14-5179-82c4-228d72282a11",
+            "concept:638f6485-3d9e-5147-9d3c-03e3af18120a",
+            "concept:64833147-d62b-5f73-bcd6-373a35389c18",
+            "concept:6cb5d220-3a8c-5482-934d-73fda548ff1f",
+            "concept:79d5e71a-d111-51b4-96bc-ad7140498e86",
+            "concept:7c453940-e556-535b-8ce4-c8ed0706265e",
+            "concept:8087e500-67c7-56c8-a6d2-f75246e912ef",
+            "concept:81bdf556-fe28-56db-b455-3828452d6f8a",
+            "concept:82d9c37b-cbed-5c6e-ae00-e882795cfa0e",
+            "concept:853f3b11-e91f-53eb-8fb8-e26f8d79e2c1",
+            "concept:93a6a5ab-4524-5cba-920c-2ca605099161",
+            "concept:954473ab-67ca-5e5e-b0b9-7839bc860d6c",
+            "concept:98e156a5-644c-5d5b-a813-21f31eb6db5b",
+            "concept:9c60daa3-d58a-527f-9fd9-0ec6816d29a8",
+            "concept:a2bb52eb-e184-5654-8f39-d0ad19250a75",
+            "concept:a7829d50-b73a-5a0f-afaf-6ddbe57bb4a5",
+            "concept:a89f152f-6b52-50e0-8092-a56c15522347",
+            "concept:b9c70562-1091-56d8-81ad-3e3c00176de8",
+            "concept:bb095b7c-365a-5227-ab3c-b6b1d09037ef",
+            "concept:c564c23d-e9d7-5cd8-afe8-0bffc7bc1cd8",
+            "concept:ee34d0d2-026f-5695-9144-93cbfe195cfc",
+            "concept:ef50d24b-4ec9-562f-9b85-0727b6d1cfbf",
+            "concept:f3aacf3e-8ad6-5290-ab8d-3b8f1eaa3872",
+            "concept:f4c6a497-6419-5173-b0d5-fcfba0c451f6",
+            "concept:016547fd-1775-5049-8b53-3226c1881d85",
+            "concept:15a0cae5-a546-52f2-bce1-ca72f752cb12",
+            "concept:1606ec6f-dd4f-52c8-a573-da32eb9c57c9",
+            "concept:2a706cd4-e757-577f-a962-a3f8324e1bac",
+            "concept:2e7090e7-bb73-5e17-bd92-1ee486433b65",
+            "concept:349c0982-aae8-5aef-897d-a5c012775c14",
+            "concept:4ca6bc7f-8599-5d14-92d5-7129aac5d90c",
+            "concept:564d23df-17ff-586a-ab80-4b2c9bada301",
+            "concept:6ce33587-ea44-544d-94ce-127f939ad8d3",
+            "concept:81fbd016-64e9-5d04-a94c-dbd590d04e83",
+            "concept:9807e566-95ed-579d-8e8d-4c0e0db02128",
+            "concept:9c8af112-372c-5e5a-aa50-0ef1cc9381e7",
+            "concept:adbc4cb6-be56-5ae9-9867-5ba7e3bce229",
+            "concept:be328e6a-06f5-5e2c-86f1-f9194b6ef9dd",
+            "concept:dd47057d-ec71-542a-aa04-ca5a231ece83",
+            "concept:dea866b2-70c9-5156-9b57-6a0800beba0c",
+            "concept:eec239cf-e72e-595c-a632-2647e7ff46af",
+            "concept:f558fa37-1b25-551e-b0e3-b4a7853188bc",
+            "concept:f625aa70-e1a5-52f4-be0b-1e4b8fa0cea0",
+            "occurrence:flow:sha256:024b5a190d5ad801a94e14818870346679ff45c2df4619198ba37e4cf08c057f:0",
+            "occurrence:flow:sha256:08abe05e12005f0901fd77994fd790ff94ffa915075c6479261214815c66e18f:0",
+            "occurrence:flow:sha256:1bcf2e838f0b3d13a437e10a2badb2cfbe3051ddb2e83dfa73967a72f307ce89:0",
+            "occurrence:flow:sha256:1bcf2e838f0b3d13a437e10a2badb2cfbe3051ddb2e83dfa73967a72f307ce89:1",
+            "occurrence:flow:sha256:1bcf2e838f0b3d13a437e10a2badb2cfbe3051ddb2e83dfa73967a72f307ce89:2",
+            "occurrence:flow:sha256:1c883b0ffdd75964cc681daa6a4f924cccec1d1c6b36c416c060d3646ec1444a:0",
+            "occurrence:flow:sha256:2c0ff3e869648a1c1ff2fcdde18820000bd691eeb44d2c72f77c1fb93e9dfaed:0",
+            "occurrence:flow:sha256:5eda0445f0492393bde628bc869c9cfbece26a56be753d4f137db5f8d531d9b7:0",
+            "occurrence:flow:sha256:5eda0445f0492393bde628bc869c9cfbece26a56be753d4f137db5f8d531d9b7:1",
+            "occurrence:flow:sha256:7314e389eaf74953033c3f4134a13bb64011c5ed1d21b35982eba73d5ee91411:0",
+            "occurrence:flow:sha256:85a0768de1151c0aaa0b6af5f8720ebe56a30df7bcb3e7a3e1e13475a9d3ecd1:0",
+            "occurrence:flow:sha256:86910428513c00d6b659e90a98bce1aafdb2d03cd3c04577b8535ca930c7e998:0",
+            "occurrence:flow:sha256:9021e79e0a689ec8d51eb215c38df6a0a00aa209c02b4a828e56b8fb4600ab6c:0",
+            "occurrence:flow:sha256:c35e411fa99078e6f1e967f8744f9a6d7c2d2de6e10853fc9d98893b650d8022:0",
+            "occurrence:flow:sha256:d0a2b66f94ba86f876df5c75ab2012a23109906548367c5268dbed61d560a761:0",
+            "occurrence:flow:sha256:d0a2b66f94ba86f876df5c75ab2012a23109906548367c5268dbed61d560a761:1",
+            "occurrence:flow:sha256:d0a2b66f94ba86f876df5c75ab2012a23109906548367c5268dbed61d560a761:2",
+            "occurrence:flow:sha256:db4030dabdf50096806d58be680bd8546caed7780c99db7678a67d64195005f2:0",
+            "occurrence:flow:sha256:f073ae10c3c52048a3589fa56771b79553e7092bed7c9685a56ded66f4230a71:0",
+            "concept:1c3bbb62-180a-52ec-b3f8-7d831c140bbc",
+            "concept:1deb0fef-5ae8-5e64-97f0-0de691a8f500",
+            "concept:21ab6033-225c-5825-a7b7-8089fcce3219",
+            "concept:24a48c37-170e-50d4-b0f6-11403d3a74da",
+            "concept:24ec6d93-7019-56c0-99ca-a7e379c901c2",
+            "concept:b7bdaa20-a421-5f04-9cd0-cf07657ab500",
+            "concept:c7ed7723-3f6e-59e5-87de-74cdaabf268a",
+            "concept:c89ea614-73c4-5390-9148-b20f59192985",
+            "concept:cbc1f23c-fedb-531c-96ab-62465c817f69",
+            "concept:e0b3d410-e7a2-5824-9b34-f0469a10a7c9",
+            "concept:13ee2b2d-9090-589c-bfe7-82c1fcc4a5c6",
+            "concept:19d22409-934b-534a-bdfd-4d202fd1ad44",
+            "concept:4a54be58-f476-5d35-8b1d-eb76bb2a6c21",
+            "concept:b82f34e7-e0b2-5264-9b23-0bcfcb5fea11",
+            "concept:be00fcdf-af91-5bea-9205-c33a9d407d64",
+            "concept:c2ddcd04-5049-584b-bba0-0ae9beab62a6",
+            "concept:d94f26cb-10fd-5682-9ed1-d2f8a089d504",
+            "concept:e371158b-06cf-588f-bc3d-9ee971af44c9",
+            "concept:eafee93e-7816-5bb3-a34b-f38731fd625d",
+            "concept:fada043c-0a8e-597f-a6bc-30bb96764dbd",
+            "concept:052535b3-f93d-5e07-98d8-aa14ac353d5c",
+            "concept:0e530ad4-ce72-54c7-8364-9cf4ed65f4d5",
+            "concept:15ae4420-878e-5ef2-a5eb-24a6e7659176",
+            "concept:18f8a8ee-b319-5dc8-b5e2-b629630dfc55",
+            "concept:197ffcf9-6fd3-58aa-a4c1-ab32a6254b9b",
+            "concept:1b429843-c378-51e1-930c-1afb2be73cfe",
+            "concept:2efb8544-983b-5c37-a3ed-27e7e68520c0",
+            "concept:333e540f-502e-5cfd-b16e-db69d6b8f11e",
+            "concept:345ec648-91f3-5851-82c8-480eaf9198e2",
+            "concept:47614417-3ec6-5c72-805d-5d6fee254950",
+            "concept:4e028148-fb44-5d66-a165-d34bf8ae46e4",
+            "concept:4e9327a6-2870-5e9f-b5a7-4c4dec321b0c",
+            "concept:53014fda-a09f-593d-838d-4ec259c4a391",
+            "concept:5478add9-5b7b-56c9-b5e8-9ef162f12d19",
+            "concept:56c7a7e0-ec6c-5fec-80bd-a7c52e4a719f",
+            "concept:691a91fc-5582-5198-a1b7-408c31934c35",
+            "concept:83f67407-9604-5756-8fd8-eeec1ea63ba9",
+            "concept:90117af7-439e-562c-8541-f75dc3c93f6e",
+            "concept:95b64ef8-2bf7-5a51-8a99-4db76e14fd73",
+            "concept:9d3220cb-f843-51ca-a01a-6c997000eb89",
+            "concept:a5cf3fad-f6e6-5ac9-b720-a65e7ebaa893",
+            "concept:a5f7ee7b-53d2-5d4b-a84d-b52f5a3248b2",
+            "concept:a6d51f16-5dfa-5847-b4fb-fcae098d625b",
+            "concept:a722e93c-3c55-5907-86a3-ab94b6b73746",
+            "concept:b2bd1571-ef33-52ff-a200-207b8d62dece",
+            "concept:c010d114-a41f-58d1-8f41-f7f731ceefd2",
+            "concept:d9286312-8e35-5ed6-8b9b-e4357841d27c",
+            "concept:dad21b75-f4d2-52ac-bde1-57f4903c0209",
+            "concept:dbb63c9f-c91b-5277-8b20-4a8669adf759",
+            "concept:e7bd015d-a3de-57e6-9611-77e3d9948743",
+            "concept:f0a5f5f6-9504-5fc0-a4e2-93f5740ebe29",
+            "concept:3cdd4eda-e0c1-5495-b2f2-8dd95fbbf919",
+            "concept:58203194-45ea-56d5-844b-cba9cc791a56",
+            "concept:69a4d718-fc80-5dee-9752-d0678b688769",
+            "concept:9628927d-df5a-5e42-a19e-74e346bac1db",
+            "application:horizon.contracts.enum.IntegrationDisposition",
+            "application:horizon.contracts.enum.ProductTargetLevel",
+            "concept:0fb64f81-deff-5a68-90ac-3606a70d3136",
+            "concept:76a7ca50-4ea5-5de6-b499-dc56525eaf41",
+            "concept:fd25619c-35f7-5ec6-a947-2f6cbb0836c1",
+            "concept:24910b08-aced-5e3b-ab1b-d94366f84c2e",
+            "concept:278be27f-68a5-5c15-85de-e60a7a22768d",
+            "concept:bbf33ce8-d307-5d04-a6e9-50a31ffad040",
+            "concept:06b83863-b4f6-5639-b0f2-9dab9cc78d5d",
+            "concept:a6bbd578-68a8-5621-931a-0ad149f81429",
+            "concept:b36ffb74-9ab9-53e8-9fe5-25757e73786d",
+            "concept:042b3912-3b3e-581d-9fae-d4e995bd7c0d",
+            "concept:3e831e17-a500-5501-9114-8e5496cfc3fa",
+            "concept:dc579ee8-9b8e-5336-902d-010f0902e93b",
+            "application:horizon.research.artifacts.record.RunExperimentInput",
+            "application:horizon.research.artifacts.record.RunExperimentOutput",
+            "application:horizon.research.artifacts.enum.EstimatorState",
+            "application:horizon.research.artifacts.enum.ExperimentOutcome",
+            "application:horizon.research.artifacts.operation.run_preregistered_experiment",
+            "concept:07629260-edc7-5fba-a39e-92849fee658a",
+            "concept:0be4caeb-9660-518e-bfd0-92a48216731e",
+            "concept:2cb0e4f1-54f3-5ab4-8649-086b3bb76a84",
+            "concept:7ada385f-12b7-5cab-b6e9-8d110a8edd92",
+            "concept:bb7be19f-d369-5231-9a36-efaeef7213a1",
+            "concept:a1e8f733-0c07-57ac-9448-cabe5805cd9f",
+            "concept:1fbe7b13-779d-5826-add7-23914b9bbf3f",
+            "concept:696b3e81-1861-5b47-9da0-990d803136b3",
+            "concept:acb28b4b-2fcd-5c43-abca-2bb681642d5c",
+            "concept:25f1a9ee-0f36-5386-b2cc-995cdd2a7925"
+          ],
+          "provenance_record": {
+            "inputs": {
+              "interpretation_version": "domainforge-interpretation/v1",
+              "language_schema_version": "domainforge-ast/v3",
+              "semantic_pack_set_hash": "sha256:6e5312099a8d89e1d271bd89d9fcb36b031069bd8dad72be397af6b331d85c40",
+              "source_set_hash": "sha256:cf48dd9ea8e3ab0edaae54d26eefe7e5ed9e0998a2c1b9b51d6dcc6276b6eb3b"
+            },
+            "producer": {
+              "name": "domainforge-core",
+              "version": "0.21.2"
+            },
+            "resolution_inputs": {
+              "entry_logical_path": "interaction-model.sea",
+              "registry_content_hash": null,
+              "resolved_namespaces": {
+                "interaction-model.sea": "horizon.interaction",
+                "product-integration-contract.sea": "horizon.contracts",
+                "products/godspeed-research.sea": "horizon.products.godspeed_research",
+                "products/strategist.sea": "horizon.products.strategist",
+                "research-artifacts.sea": "horizon.research.artifacts"
+              }
+            }
+          },
+          "representation_id": "representation:sha256:7a611a98db2b343180dd232927f1237c179a87b325aab4e0ad1c08ecaa554a96",
+          "representation_kind": "derived",
+          "representation_type": "domainforge_semantic_envelope_document",
+          "scope": "interaction-model.sea",
+          "semantic_hash": "sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+          "size_bytes": 167944,
+          "source": "domainforge 0.21.2",
+          "validation_status": "valid"
+        }
+      ],
+      "scope": {},
+      "validation_status": "validated"
+    },
+    "record_kind": "semantic.snapshot"
+  },
+  {
+    "append_ordinal": 3,
+    "entry_hash": "sha256:6558b3c90853bdaff822c74c8c0aa14cb305f262af5d70f0cc28ae83f92c01e4",
+    "ledger_id": "01M6TXKBCGD0K3REMNE0RDYW29",
+    "payload": {
+      "boundary_record": {
+        "excluded_sections": [],
+        "included_sections": [],
+        "known_omissions": [],
+        "limitations": [
+          "sxr slice-1 runtime record"
+        ],
+        "unknowns": []
+      },
+      "cep_version": "0.1.0",
+      "completeness_status": "complete_for_declared_state",
+      "created_at": "2026-11-07T11:51:44.772862Z",
+      "created_by": "sxr 0.3.0",
+      "envelope_id": "01M6TXKBW4RYR23PJ0FMSVBBNX",
+      "envelope_kind": "work_request",
+      "envelope_version": "1.0.0",
+      "lineage_refs": [],
+      "omission_status": "no_known_omissions",
+      "provenance_refs": [
+        "ledger:gen:1"
+      ],
+      "questions": [
+        {
+          "question_form": "is_true",
+          "question_id": "q-edition-check",
+          "question_type": "verification"
+        }
+      ],
+      "representations": [
+        {
+          "inline_content": {
+            "expected_answer_shape": "boolean",
+            "question_form": "is_true",
+            "question_id": "q-edition-check",
+            "question_type": "verification",
+            "target_entities": [],
+            "title": "true exits zero"
+          },
+          "representation_id": "rep:question:q-edition-check",
+          "representation_kind": "atomic",
+          "representation_type": "question_spec"
+        }
+      ],
+      "scope": {
+        "checkout_id": "01M6TXKBCG0WM48HDXV4YA675V",
+        "repo_id": "01M6TXKBCGD0K3REMNE0RDYW29"
+      },
+      "validation_status": "validated"
+    },
+    "record_kind": "question.declared"
+  },
+  {
+    "append_ordinal": 4,
+    "entry_hash": "sha256:705d2021ee299fc5684b6002c4f43e0a34d62cf5755fec407f2406b05e5b14b9",
+    "ledger_id": "01M6TXKBCGD0K3REMNE0RDYW29",
+    "payload": {
+      "boundary_record": {
+        "excluded_sections": [],
+        "included_sections": [],
+        "known_omissions": [],
+        "limitations": [
+          "sxr slice-1 runtime record"
+        ],
+        "unknowns": []
+      },
+      "cep_version": "0.1.0",
+      "completeness_status": "complete_for_declared_state",
+      "created_at": "2026-11-07T11:51:44.780666Z",
+      "created_by": "sxr 0.3.0",
+      "envelope_id": "01M6TXKBWCV0F9V715RX9S0XVA",
+      "envelope_kind": "work_request",
+      "envelope_version": "1.0.0",
+      "lineage_refs": [],
+      "omission_status": "no_known_omissions",
+      "provenance_refs": [
+        "question:q-edition-check"
+      ],
+      "representations": [
+        {
+          "inline_content": {
+            "minimum_relevance": "medium",
+            "minimum_reliability": "medium",
+            "threshold_id": "t-edition-check"
+          },
+          "representation_id": "rep:threshold:t-edition-check",
+          "representation_kind": "atomic",
+          "representation_type": "settlement_threshold_spec"
+        }
+      ],
+      "scope": {
+        "checkout_id": "01M6TXKBCG0WM48HDXV4YA675V",
+        "repo_id": "01M6TXKBCGD0K3REMNE0RDYW29"
+      },
+      "states": [
+        {
+          "scope": "question:q-edition-check",
+          "state_id": "t-edition-check",
+          "state_type": "settlement_threshold"
+        }
+      ],
+      "validation_status": "validated"
+    },
+    "record_kind": "threshold.declared"
+  },
+  {
+    "append_ordinal": 5,
+    "entry_hash": "sha256:f8f2432d7519a685415e13c84af54c3563e09d4190dd062c9482824e775224f7",
+    "ledger_id": "01M6TXKBCGD0K3REMNE0RDYW29",
+    "payload": {
+      "boundary_record": {
+        "excluded_sections": [],
+        "included_sections": [],
+        "known_omissions": [],
+        "limitations": [
+          "sxr slice-1 runtime record"
+        ],
+        "unknowns": []
+      },
+      "cep_version": "0.1.0",
+      "completeness_status": "complete_for_declared_state",
+      "created_at": "2026-11-07T11:51:44.789102Z",
+      "created_by": "sxr 0.3.0",
+      "envelope_id": "01M6TXKBWNS22VG7QKJZABXS44",
+      "envelope_kind": "work_request",
+      "envelope_version": "1.0.0",
+      "lineage_refs": [],
+      "omission_status": "no_known_omissions",
+      "provenance_refs": [
+        "question:q-edition-check",
+        "threshold:t-edition-check",
+        "snapshot:sha256:62004b660e41a675e84a05165941afb8a2e3a56625846c4bf93d9313a48640a1"
+      ],
+      "questions": [
+        {
+          "question_form": "is_true",
+          "question_id": "q-edition-check"
+        }
+      ],
+      "scope": {
+        "checkout_id": "01M6TXKBCG0WM48HDXV4YA675V",
+        "repo_id": "01M6TXKBCGD0K3REMNE0RDYW29",
+        "run_id": "01M6TXKBWM6HPDR21V8ZJ84E1T"
+      },
+      "transformations": [
+        {
+          "transformation_id": "tx:01M6TXKBWM6HPDR21V8ZJ84E1T",
+          "transformation_type": "run_start"
+        }
+      ],
+      "validation_status": "validated"
+    },
+    "record_kind": "run.started"
+  },
+  {
+    "append_ordinal": 6,
+    "entry_hash": "sha256:fcbc887a82e2accfc96e27d08261032b1cb86e32e4df3032ec334bdc080d2aaa",
+    "ledger_id": "01M6TXKBCGD0K3REMNE0RDYW29",
+    "payload": {
+      "boundary_record": {
+        "excluded_sections": [],
+        "included_sections": [],
+        "known_omissions": [],
+        "limitations": [
+          "sxr slice-1 runtime record"
+        ],
+        "unknowns": []
+      },
+      "cep_version": "0.1.0",
+      "completeness_status": "complete_for_declared_state",
+      "created_at": "2026-11-07T11:51:44.796969Z",
+      "created_by": "sxr 0.3.0",
+      "envelope_id": "01M6TXKBWWP26B97DR4DQY8VHD",
+      "envelope_kind": "work_request",
+      "envelope_version": "1.0.0",
+      "lineage_refs": [],
+      "omission_status": "no_known_omissions",
+      "provenance_refs": [
+        "question:q-edition-check",
+        "threshold:t-edition-check"
+      ],
+      "questions": [
+        {
+          "question_form": "is_true",
+          "question_id": "q-edition-check"
+        }
+      ],
+      "representations": [
+        {
+          "inline_content": {
+            "boundary": {
+              "excluded": [
+                "browser",
+                "performance",
+                "security"
+              ],
+              "limitations": [
+                "declared command verifier: exit code is the result"
+              ]
+            },
+            "evaluation_profile_ref": "profile://slice2-policy@1",
+            "evidence_requirements": [
+              {
+                "evidence_type": "test_result",
+                "min_count": 1,
+                "min_relevance": "high",
+                "min_reliability": "medium"
+              }
+            ],
+            "plan_id": "01M6TXKBWW4YE2DN2CD7ZHZ89D",
+            "plan_version": "sxr-plan/v1",
+            "question_ref": "q-edition-check",
+            "semantic_verification_contract_ref": null,
+            "snapshot_ref": "sha256:62004b660e41a675e84a05165941afb8a2e3a56625846c4bf93d9313a48640a1",
+            "steps": [
+              {
+                "claim_ref": null,
+                "evidence_requirement_ref": null,
+                "expected_answer_shape": "boolean_with_failure_list",
+                "invocation": {
+                  "argv": [
+                    "/usr/bin/true"
+                  ],
+                  "cwd": ".",
+                  "env_allowlist": [
+                    "PATH",
+                    "HOME"
+                  ],
+                  "timeout_s": 30
+                },
+                "limitations": [],
+                "obligation_ref": null,
+                "produces_evidence_type": "test_result",
+                "relevance_to_question": "high",
+                "step_id": "unit",
+                "targets": [
+                  "concept:navigation_intent"
+                ],
+                "verifier_id": "command"
+              }
+            ],
+            "threshold_ref": "t-edition-check",
+            "transformation_ref": "transformation:plan:01M6TXKBWW4YE2DN2CD7ZHZ89D"
+          },
+          "representation_id": "rep:plan:01M6TXKBWW4YE2DN2CD7ZHZ89D",
+          "representation_kind": "atomic",
+          "representation_type": "verification_plan"
+        }
+      ],
+      "scope": {
+        "checkout_id": "01M6TXKBCG0WM48HDXV4YA675V",
+        "repo_id": "01M6TXKBCGD0K3REMNE0RDYW29",
+        "run_id": "01M6TXKBWM6HPDR21V8ZJ84E1T"
+      },
+      "validation_status": "validated"
+    },
+    "record_kind": "plan.created"
+  },
+  {
+    "append_ordinal": 7,
+    "entry_hash": "sha256:a6a3a7e5ae113473c377ed7b7ad3b4b667304d1056bbbfc6a76b93db3422ced7",
+    "ledger_id": "01M6TXKBCGD0K3REMNE0RDYW29",
+    "payload": {
+      "boundary_record": {
+        "excluded_sections": [],
+        "included_sections": [],
+        "known_omissions": [],
+        "limitations": [
+          "sxr slice-1 runtime record"
+        ],
+        "unknowns": []
+      },
+      "cep_version": "0.1.0",
+      "completeness_status": "complete_for_declared_state",
+      "created_at": "2026-11-07T11:51:44.856486Z",
+      "created_by": "sxr 0.3.0",
+      "envelope_id": "01M6TXKBYRWK637MT9FKKZ9A03",
+      "envelope_kind": "execution_trace",
+      "envelope_version": "1.0.0",
+      "lineage_refs": [],
+      "observations": [
+        {
+          "observation_id": "01M6TXKBYQYKNZVAGMV5J84730",
+          "scope": "run:01M6TXKBWM6HPDR21V8ZJ84E1T"
+        }
+      ],
+      "omission_status": "no_known_omissions",
+      "provenance_refs": [
+        "plan:01M6TXKBWW4YE2DN2CD7ZHZ89D"
+      ],
+      "representations": [
+        {
+          "content_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "inline_content": {
+            "completed_at": "2026-11-07T11:51:44.855632Z",
+            "crashed": false,
+            "exit_code": 0,
+            "invocation": {
+              "argv": [
+                "/usr/bin/true"
+              ],
+              "launcher": [],
+              "timeout_s": 30
+            },
+            "parsed": null,
+            "started_at": "2026-11-07T11:51:44.804905Z",
+            "stderr_ref": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "target_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "verifier_id": "command"
+          },
+          "representation_id": "rep:obs:01M6TXKBYQYKNZVAGMV5J84730",
+          "representation_kind": "atomic",
+          "representation_type": "verifier_stdout"
+        }
+      ],
+      "scope": {
+        "checkout_id": "01M6TXKBCG0WM48HDXV4YA675V",
+        "repo_id": "01M6TXKBCGD0K3REMNE0RDYW29",
+        "run_id": "01M6TXKBWM6HPDR21V8ZJ84E1T"
+      },
+      "validation_status": "validated"
+    },
+    "record_kind": "observation.recorded"
+  }
+]

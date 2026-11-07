@@ -91,12 +91,12 @@ export function buildStructuralFrame(options: {
     choices: [
       {
         operation_ref: "horizon.health",
-        label: "Check the structural world and Cognate projection",
+        label: "Check that the rules and records are connected",
         assessment: { ...statusOf("horizon.health"), reversibility: "read_only" },
       },
       {
         operation_ref: "horizon.research.health",
-        label: "Check the optional Python research subsystem contract",
+        label: "Check that the optional research tools answer",
         assessment: { ...statusOf("horizon.research.health"), reversibility: "read_only" },
       },
       ...(options.bound ?? []),

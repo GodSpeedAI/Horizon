@@ -1,0 +1,75 @@
+{
+  "tool_names": [
+    "desk_find",
+    "desk_inspect",
+    "desk_propose_handoff",
+    "desk_propose_note",
+    "desk_state"
+  ],
+  "exactly_five": true,
+  "none_can_send_or_decide": true,
+  "refusals": [
+    {
+      "method": "POST",
+      "path": "/desk/handoff",
+      "status": 403,
+      "body": {
+        "ok": false,
+        "outcome": "agent_refused",
+        "message": "Only you can confirm this. The agent's suggestion is waiting in the conversation."
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/desk/decide",
+      "status": 403,
+      "body": {
+        "ok": false,
+        "outcome": "agent_refused",
+        "message": "Only you can confirm this. The agent's suggestion is waiting in the conversation."
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/desk/note",
+      "status": 403,
+      "body": {
+        "ok": false,
+        "outcome": "agent_refused",
+        "message": "An agent can suggest a note; you save it."
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/desk/panels/op",
+      "status": 403,
+      "body": {
+        "ok": false,
+        "outcome": "agent_refused",
+        "message": "Only you can confirm this. The agent's suggestion is waiting in the conversation."
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/desk/start",
+      "status": 403,
+      "body": {
+        "ok": false,
+        "outcome": "agent_refused",
+        "message": "Only you can confirm this. The agent's suggestion is waiting in the conversation."
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/desk/lesson",
+      "status": 403,
+      "body": {
+        "ok": false,
+        "outcome": "agent_refused",
+        "message": "Only you can confirm this. The agent's suggestion is waiting in the conversation."
+      }
+    }
+  ],
+  "all_403": true,
+  "agent_preview_status": 200
+}

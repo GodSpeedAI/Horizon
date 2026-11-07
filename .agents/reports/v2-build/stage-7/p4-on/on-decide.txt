@@ -1,0 +1,178 @@
+Skip to the open view
+This computer: Yoga7i
+Setup: testing
+Rulebook edition 0a10c20d
+Case: Seed: triage inbox. One human step to look through what arrived.
+Needs you: 7
+Cases: connected
+Records: connected
+Agent work: connected
+Reference library: Not connected
+Presenting: on
+Settings
+Phone remote
+
+Loading… Check phone control
+
+Setup guide
+
+Today
+Explore
+Decide (7)
+Work
+DAYS
+2026-11-07 (2)
+2026-11-06 (1)
+2026-11-05 (1)
+2026-11-04 (1)
+2026-11-03 (1)
+CASES
+Seed: triage inbox. One human step to look through what arrived.
+Seed: weekly release. One human sign-off step that waits for the operator.
+TAGS
+planning (1)
+questions (1)
+release (1)
+retro (1)
+review (1)
+seed (6)
+today (1)
+triage (1)
+Decide
+
+What needs you, oldest first. Nothing is decided until you confirm a preview.
+
+NEEDS YOU · 1 of 7 · waiting 5 minutes
+
+Seed: sign off the weekly release notes: Seed: weekly release. One human sign-off step that waits for the operator.
+Step: Seed: sign off the weekly release notes
+Case: Seed: weekly release. One human sign-off step that waits for the operator.
+Waiting for you to do it and mark it done
+Hold… (H)
+Mark done… (A)
+
+Only a person can do this step, so the choices are to mark it done or to hold it.
+
+If you hold: nothing changes and the step keeps waiting. To undo: release the hold. Nothing else is decided until you confirm in the preview.
+
+Waiting · 2 of 7 · waiting 5 minutes
+
+Seed: look through the triage inbox: Seed: triage inbox. One human step to look through what arrived.
+Step: Seed: look through the triage inbox
+Case: Seed: triage inbox. One human step to look through what arrived.
+Waiting for you to do it and mark it done
+Hold… (H)
+Mark done… (A)
+
+Only a person can do this step, so the choices are to mark it done or to hold it.
+
+If you hold: nothing changes and the step keeps waiting. To undo: release the hold. Nothing else is decided until you confirm in the preview.
+
+Waiting · 3 of 7 · waiting 5 minutes
+
+Seed: review the release checklist: Seed: triage inbox. One human step to look through what arrived.
+Step: Seed: review the release checklist
+Case: Seed: triage inbox. One human step to look through what arrived.
+Waiting for you to do it and mark it done
+Hold… (H)
+Mark done… (A)
+
+Only a person can do this step, so the choices are to mark it done or to hold it.
+
+If you hold: nothing changes and the step keeps waiting. To undo: release the hold. Nothing else is decided until you confirm in the preview.
+
+Waiting · 4 of 7 · waiting 5 minutes
+
+Seed hand off: collect this week's release numbers: Seed: triage inbox. One human step to look through what arrived.
+Step: Seed hand off: collect this week's release numbers
+Case: Seed: triage inbox. One human step to look through what arrived.
+Waiting for you to do it and mark it done
+Hold… (H)
+Mark done… (A)
+
+Only a person can do this step, so the choices are to mark it done or to hold it.
+
+If you hold: nothing changes and the step keeps waiting. To undo: release the hold. Nothing else is decided until you confirm in the preview.
+
+Waiting · 5 of 7 · waiting 5 minutes
+
+Seed proposal: add a rollback note to the release: Seed: triage inbox. One human step to look through what arrived.
+Step: Seed proposal: add a rollback note to the release
+Case: Seed: triage inbox. One human step to look through what arrived.
+Waiting for you to do it and mark it done
+Hold… (H)
+Mark done… (A)
+
+Only a person can do this step, so the choices are to mark it done or to hold it.
+
+If you hold: nothing changes and the step keeps waiting. To undo: release the hold. Nothing else is decided until you confirm in the preview.
+
+Waiting · 6 of 7 · waiting 5 minutes
+
+Write a two-line summary of what the seed cases show: Seed: triage inbox. One human step to look through what arrived.
+Step: Write a two-line summary of what the seed cases show
+Case: Seed: triage inbox. One human step to look through what arrived.
+Waiting for you to do it and mark it done
+Hold… (H)
+Mark done… (A)
+
+Only a person can do this step, so the choices are to mark it done or to hold it.
+
+If you hold: nothing changes and the step keeps waiting. To undo: release the hold. Nothing else is decided until you confirm in the preview.
+
+Waiting · 7 of 7 · waiting 3 minutes
+
+Write a two-line summary of this step for the weekly notes: Seed: triage inbox. One human step to look through what arrived.
+Step: Write a two-line summary of this step for the weekly notes
+Case: Seed: triage inbox. One human step to look through what arrived.
+Waiting for you to do it and mark it done
+Hold… (H)
+Mark done… (A)
+
+Only a person can do this step, so the choices are to mark it done or to hold it.
+
+If you hold: nothing changes and the step keeps waiting. To undo: release the hold. Nothing else is decided until you confirm in the preview.
+
+The next decision
+
+Nothing is offered from this focus right now.
+
+Try
+Call the supplier about the invoice
+Ideas for the Friday meeting
+Remember to renew the licence
+
+Ready
+WRITE
+
+Write ▾
+Today · Seed: triage inbox. One human step to look through what arrived.
+Write
+
+Saves a note on today (2026-11-07) and on the case "Seed: triage inbox. One human step to look through what arrived.". Enter saves, Shift+Enter adds a line, @ adds a link. Tab changes the mode. Esc leaves the box.
+
+testing · Seed: triage inbox. One human step to look through what arrived. · Decide
+Enter send · Shift+Enter new line · Tab mode · Esc leave
+INSPECTOR
+
+Nothing is selected. Press J or K to move through the list, then Enter to look at an item here.
+
+ASK ABOUT THE FOCUS
+
+Choose a question about what is in focus. The answer is shown as facts, each with where it came from.
+
+Question
+Why is it this way?
+What does it affect?
+What changed?
+What happened, in order?
+What if it were different?
+What can reach it?
+Replay what happened
+Look up in the reference library (optional)
+
+The reference library is Not connected, so nothing can be looked up. Questions are still answered from what is recorded.
+
+Ask
+
+Saturday, 7 November 2026. 7 waiting for you.

@@ -8,6 +8,7 @@
     "dev": "bun run src/main.ts",
     "ignite": "bun run scripts/ignite.ts",
     "check": "bun run scripts/check.ts",
+    "build:desk": "bun run scripts/build-desk.ts",
     "test": "bun test && uv run --project research pytest -q",
     "boundaries": "bun run scripts/check-boundaries.ts",
     "verify": "bun run scripts/check-single-cognate.ts && bun run check && bun test && bun run scripts/check-boundaries.ts && bun run scripts/teeth-inv2-mutation.ts && uv run --project research pytest -q && python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --require-freeze && python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py . --ledger requirements/ledger.yaml"
@@ -21,16 +22,19 @@
     "@godspeedai/cognate-kernel-api": "0.9.0",
     "@godspeedai/cognate-profile-harness": "0.9.0",
     "@godspeedai/cognate-projections": "0.9.0",
+    "@godspeedai/cognate-protocol-connect": "0.9.0",
+    "@godspeedai/cognate-protocol-connect-bun": "0.9.0",
     "@godspeedai/cognate-provider-local": "0.9.0",
     "@godspeedai/cognate-react": "0.9.0",
+    "@godspeedai/cognate-realitytrace": "0.9.0",
     "@godspeedai/cognate-runtime-api": "0.9.0",
     "@godspeedai/cognate-runtime-bun": "0.9.0",
+    "@mcp-b/webmcp-polyfill": "5.1.0",
     "@opentui/core": "0.5.12",
     "@opentui/react": "0.5.12",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "zod": "3.25.76",
-    "@godspeedai/cognate-realitytrace": "0.9.0"
+    "zod": "3.25.76"
   },
   "overrides": {
     "@godspeedai/cognate-events": "0.9.0",

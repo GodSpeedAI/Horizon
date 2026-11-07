@@ -1,0 +1,11 @@
+{
+  "url": "http://127.0.0.1:4339/desk",
+  "with_preview_open": {
+    "violations": 0,
+    "detail": []
+  },
+  "thread_after_cancel": {
+    "violations": 0,
+    "detail": []
+  }
+}

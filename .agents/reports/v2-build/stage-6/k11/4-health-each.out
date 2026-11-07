@@ -1,0 +1,12 @@
+## records
+ok   records: every record source answers repo list (personal, workshop, horizon)
+## workbench
+FAIL workbench: workshop GET /health on port 3180 failed: The operation timed out.
+## horizon
+ok   horizon: Horizon /health ok on port 4319
+## tap
+ok   tap: drain state modified 0.2 h ago
+## seaforge
+ok   seaforge: case keeper answers case_list (0 cases)
+## connector
+FAIL connector: /home/sprime01/.horizon/setups/production/run/connector.heartbeat does not exist (is the connector running?)

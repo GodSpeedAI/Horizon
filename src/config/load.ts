@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { assertVerifierTemplate } from "../domain/expectation.ts";
 import { assertAllowance, assertPaymentEntry } from "../domain/payment.ts";
 import { REVERSIBILITY_CLASSES } from "../domain/navigation.ts";
@@ -15,10 +15,15 @@ import type {
   LoadedConfig,
   OperationBindingConfig,
   OperatorsConfig,
+  RecordSource,
+  RecordsConfig,
   SecretsConfig,
   SettlementConfig,
   TransportConfig,
+  UiConfig,
+  WorkshopConfig,
 } from "./types.ts";
+import { parseSetup, setupMapping, setupTenant, type SetupName } from "./setup.ts";
 
 export class ConfigError extends Error {
   override readonly name = "ConfigError";
@@ -166,6 +171,49 @@ function asEconomics(value: unknown): EconomicsConfig | undefined {
   };
 }
 
+const RECORD_KINDS = new Set<RecordSource["kind"]>(["personal", "workshop", "horizon"]);
+
+function asRecords(value: unknown): RecordsConfig | undefined {
+  if (value === undefined) return undefined;
+  const doc = asRecord(value, "records");
+  const names = new Set<string>();
+  const sources = asList(doc.sources, "records.sources").map((raw, index) => {
+    const field = `records.sources[${index}]`;
+    const source = asRecord(raw, field);
+    const name = asString(source.name, `${field}.name`);
+    if (names.has(name)) bounded(`${field}: duplicate record source ${name}`);
+    names.add(name);
+    const kind = asString(source.kind, `${field}.kind`) as RecordSource["kind"];
+    if (!RECORD_KINDS.has(kind)) bounded(`${field}.kind must be personal, workshop or horizon`);
+    if (kind === "personal" && (source.data_home !== undefined || source.state_home !== undefined)) {
+      bounded(`${field}: the personal record has no paths; it uses RealityTrace's default location`);
+    }
+    return {
+      name,
+      kind,
+      ...(source.data_home === undefined ? {} : { data_home: asString(source.data_home, `${field}.data_home`) }),
+      ...(source.state_home === undefined ? {} : { state_home: asString(source.state_home, `${field}.state_home`) }),
+    };
+  });
+  return { sources };
+}
+
+function asWorkshop(value: unknown): WorkshopConfig | undefined {
+  if (value === undefined) return undefined;
+  const doc = asRecord(value, "workshop");
+  return {
+    url: asString(doc.url, "workshop.url"),
+    key_path: asString(doc.key_path, "workshop.key_path"),
+    ...(doc.expert_id === undefined ? {} : { expert_id: asString(doc.expert_id, "workshop.expert_id") }),
+    ...(doc.workspace_id === undefined ? {} : { workspace_id: asString(doc.workspace_id, "workshop.workspace_id") }),
+  };
+}
+
+function asUi(value: unknown): UiConfig | undefined {
+  if (value === undefined) return undefined;
+  return { timezone: asString(asRecord(value, "ui").timezone, "ui.timezone") };
+}
+
 /** Environment override of `[economics]` (HORIZON_ECONOMICS_REALITYTRACE_BIN / _DATA_HOME / _STATE_HOME). */
 export function economicsFromEnv(env: Record<string, string | undefined>, fromFile?: EconomicsConfig): EconomicsConfig | undefined {
   const bin = env.HORIZON_ECONOMICS_REALITYTRACE_BIN?.trim();
@@ -244,6 +292,9 @@ export function configFromDocument(document: unknown): HorizonConfig {
     ...(doc.settlement === undefined ? {} : { settlement: asSettlement(doc.settlement)! }),
     ...(doc.economics === undefined ? {} : { economics: asEconomics(doc.economics)! }),
     ...(doc.operators === undefined ? {} : { operators: asOperators(doc.operators) }),
+    ...(doc.records === undefined ? {} : { records: asRecords(doc.records)! }),
+    ...(doc.workshop === undefined ? {} : { workshop: asWorkshop(doc.workshop)! }),
+    ...(doc.ui === undefined ? {} : { ui: asUi(doc.ui)! }),
   };
 }
 
@@ -298,6 +349,7 @@ export function assertAgentPrincipal(config: HorizonConfig, caller: { readonly a
 }
 
 export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.toml"): LoadedConfig {
+  const setup = readSetup();
   let document: unknown;
   try {
     document = Bun.TOML.parse(readText(path));
@@ -313,15 +365,70 @@ export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.
   const withStore = { ...(store ? { ...config, runtime_store: store } : config), identity: identityWithOperator };
   const secretPath = process.env.HORIZON_SECRET_FILE ?? withStore.secrets.path;
   const launchSecret = writeLaunchSecret(secretPath);
+  const agentKeyPath = resolve(agentKeyFileOf(setup));
+  const agentKey = agentKeyAt(agentKeyPath);
   return {
     config: withStore,
     operator: {
       principal: operatorPrincipal(withStore),
-      tenant: `local:${hostname()}`,
+      tenant: setupTenant(setup, hostname()),
     },
     launchSecret,
     secretPath: resolve(secretPath),
+    agentKey,
+    agentKeyPath,
+    ...(setup === undefined ? {} : { setup }),
   };
+}
+
+const AGENT_KEY = /^[0-9a-f]{64}$/;
+
+/**
+ * Where the agent door's key lives: `HORIZON_AGENT_KEY_FILE`, else the active setup's `secrets/agent.key`
+ * (the setup root, from `setupMapping`), else `.cognate/agent.key`.
+ */
+function agentKeyFileOf(setup: SetupName | undefined): string {
+  const override = process.env.HORIZON_AGENT_KEY_FILE?.trim();
+  if (override) return override;
+  if (setup !== undefined) return join(setupMapping(setup, process.env).root, "secrets", "agent.key");
+  return ".cognate/agent.key";
+}
+
+/**
+ * The agent door's key. It is kept across starts: an existing valid key (64 hex characters) is read
+ * and never rewritten. A missing or invalid file gets a new key, written once with mode 0600.
+ */
+function agentKeyAt(path: string): string {
+  if (existsSync(path)) {
+    let kept = "";
+    try {
+      kept = readFileSync(path, "utf8").trim();
+    } catch {
+      kept = "";
+    }
+    if (AGENT_KEY.test(kept)) return kept;
+  }
+  const key = randomBytes(32).toString("hex");
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${key}\n`, { encoding: "utf8", mode: 0o600 });
+  chmodSync(path, 0o600);
+  if (!existsSync(path)) bounded(`could not create the agent key at ${path}`);
+  return key;
+}
+
+/** `HORIZON_SETUP`: refuses unknown names, and a named setup whose `SETUP.json` marker is missing. */
+function readSetup() {
+  let setup;
+  try {
+    setup = parseSetup(process.env);
+  } catch (error) {
+    bounded(error instanceof Error ? error.message : String(error));
+  }
+  if (setup !== undefined) {
+    const { marker } = setupMapping(setup, process.env);
+    if (!existsSync(marker)) bounded(`HORIZON_SETUP=${setup} but ${marker} is missing; run bun run scripts/setup-init.ts --setup ${setup}`);
+  }
+  return setup;
 }
 
 function readText(path: string): string {

@@ -1,0 +1,26 @@
+{
+  "mode": "Mode: Hand off. Press to change.",
+  "preview_a": "NEEDS YOUR OK\n\nPreview: Hand off\nStep that will be added\nStage 8 proof: draft the weekly release summary\nTo this case\nSeed: triage inbox. One human step to look through what arrived.\nCheck\nThe case keeper checked this step against the case and it fits.\nAgent\nNo, it stays with you\nConfirm: Hand off\nCancel",
+  "rows_after_a": [
+    "Done Stage 8 proof: draft the weekly release summary You 01:44 PM Handed off: \"Stage 8 proof: draft the weekly release summary\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+  ],
+  "preview_b": "NEEDS YOUR OK\n\nPreview: Hand off\nStep that will be added\nStage 8 proof: list open questions for the review\nTo this case\nSeed: triage inbox. One human step to look through what arrived.\nCheck\nThe case keeper checked this step against the case and it fits.\nAgent\nNo, it stays with you\nConfirm: Hand off\nCancel",
+  "rows_after_b": [
+    "Done Stage 8 proof: list open questions for the review You 01:44 PM Handed off: \"Stage 8 proof: list open questions for the review\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+  ],
+  "new_handoff_rows": [
+    {
+      "kind": "handoff",
+      "status": "done",
+      "badge": "You",
+      "text": "Done Stage 8 proof: draft the weekly release summary You 01:44 PM Handed off: \"Stage 8 proof: draft the weekly release summary\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+    },
+    {
+      "kind": "handoff",
+      "status": "done",
+      "badge": "You",
+      "text": "Done Stage 8 proof: list open questions for the review You 01:44 PM Handed off: \"Stage 8 proof: list open questions for the review\" is now a step in \"Seed: triage inbox. One human step to look through what arrived.\". It has started."
+    }
+  ],
+  "console_errors": []
+}

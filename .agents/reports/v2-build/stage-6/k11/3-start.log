@@ -1,0 +1,10 @@
+$ bun run scripts/ignite.ts --unisolated-development --cell "/home/sprime01/.horizon/setups/production/cell" --remote-port "4320"
+ignite: WARNING mode unisolated-development: governed approvals are INSECURE; use only for development
+ignite: cell /home/sprime01/.horizon/setups/production/cell
+ignite: SEA-Forge /home/sprime01/projects/sea-rs/target/release/sea-forge-server (log /home/sprime01/.horizon/setups/production/cell/sea-forge.log)
+ignite: RealityTrace /home/sprime01/.local/share/mise/shims/realitytrace
+horizon: local_operator listening on http://127.0.0.1:4319/
+horizon: workspace http://127.0.0.1:4319/workspace
+horizon: world world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b
+horizon: cognate world:horizon@sha256:3907903595cb690dcd6026cc3aa16543283a9919e5ed7fd878ca9aad4155041a
+horizon: semantics 150 objects / 77 relations

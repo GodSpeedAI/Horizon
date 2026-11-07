@@ -5,7 +5,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
@@ -17,6 +17,7 @@ const RT = process.env.REALITYTRACE_BIN;
 const BWRAP = process.env.HORIZON_BWRAP;
 const live = RT && BWRAP ? test : test.skip;
 const RECORDED = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const TARGET = "concept:navigation_intent";
 const ABSENT = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 let root = "";
@@ -52,15 +53,16 @@ function ledger(rt: { dataHome: string; stateHome: string; repoDir: string }, re
 }
 
 describe("the vetted verifier under RealityTrace", () => {
-  live("the confined verifier discriminates, and RealityTrace's ledger records exit code, argv and completion time after the threshold", () => {
+  live("the confined verifier discriminates, and RealityTrace's ledger records exit code, argv and completion time after the threshold", async () => {
     const config = { bin: RT!, dataHome: join(root, "rt-data"), stateHome: join(root, "rt-state"), repoDir: join(root, "rt-repo") };
     const rt = new RealityTraceObligation(config);
-    const threshold = rt.declare(RECORDED, expectation);
-    const yes = rt.run(threshold, argvFor(RECORDED), launcher(), 30);
-    const no = rt.run(threshold, argvFor(ABSENT), launcher(), 30);
+    const threshold = await rt.declare({ intentId: RECORDED, statement: expectation.statement, target: TARGET, criteria: { minimum_relevance: "medium", minimum_reliability: "medium" } });
+    const opts = { target: TARGET, snapshot: "snapshot:horizon" };
+    const yes = await rt.run(threshold, argvFor(RECORDED), launcher(), 30, opts);
+    const no = await rt.run(threshold, argvFor(ABSENT), launcher(), 30, opts);
     expect([yes.exit_code, no.exit_code]).toEqual([0, 1]);
     expect(yes.position.ordinal).toBeGreaterThan(threshold.position.ordinal);
-    const rows = ledger(config, rt.repo());
+    const rows = ledger(config, await rt.repo());
     const thresholdRow = rows.find((row) => row.append_ordinal === threshold.position.ordinal)!;
     expect(thresholdRow.record_kind).toBe("threshold.declared");
     expect(thresholdRow.payload.states[0].state_id).toBe(threshold.threshold_id);
@@ -87,4 +89,107 @@ describe("the vetted verifier under RealityTrace", () => {
     const reported = JSON.parse(built.stdout.trim().split("\n").pop()!).sha256 as string;
     expect(reported).toBe(createHash("sha256").update(readFileSync(join(root, "again"))).digest("hex"));
   }, 120_000);
+});
+
+// Stage 4 (annex): the adapter is async, takes its question, thresholds and target as input, and stops a child that hangs.
+// These use a fake `realitytrace` script, so they run everywhere.
+describe("the RealityTrace obligation adapter, against a fake binary", () => {
+  const dirs: string[] = [];
+  afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
+  function rig(script: string, timeoutMs?: number, rulebookEntry?: string) {
+    const dir = mkdtempSync(join(tmpdir(), "horizon-rt-fake-"));
+    dirs.push(dir);
+    const bin = join(dir, "realitytrace");
+    writeFileSync(bin, `#!/bin/sh\n${script}\n`);
+    chmodSync(bin, 0o755);
+    return { dir, bin, rt: new RealityTraceObligation({ bin, dataHome: join(dir, "d"), stateHome: join(dir, "s"), repoDir: join(dir, "repo"), ...(timeoutMs ? { timeoutMs } : {}), ...(rulebookEntry ? { rulebookEntry } : {}) }) };
+  }
+  const input = { intentId: "i1", statement: "the record exists", target: TARGET, criteria: { minimum_relevance: "high", minimum_reliability: "low" } };
+
+  test("declare writes question and threshold before run", async () => {
+    const { rt, bin } = rig(
+      `echo "$1 $2" >> $0.log
+for a in "$@"; do case "$a" in --file) f=1;; *) [ -n "$f" ] && { cat "$a" >> $0.files; echo >> $0.files; f=; };; esac; done
+case "$1 $2" in
+  "repo list") echo '{"repos":[]}';;
+  "repo enroll") echo '{"repo_id":"R1"}';;
+  "question declare") echo '{}';;
+  "threshold declare") echo '{"threshold_id":"t-i1","ledger_position":{"ledger_id":"L","append_ordinal":4}}';;
+  "run begin") echo '{"run_id":"run1"}';;
+  "plan create") echo '{}';;
+  "verify run") echo '{"observations":[{"observation_id":"o1","exit_code":1,"ledger_position":{"ledger_id":"L","append_ordinal":6}}]}';;
+esac`,
+    );
+    const threshold = await rt.declare(input);
+    expect(threshold.position).toEqual({ ledger_id: "L", ordinal: 4 });
+    const run = await rt.run(threshold, ["v"], [], 5, { target: "concept:other", snapshot: "snapshot:test" });
+    expect(run.position.ordinal).toBe(6);
+    const calls = readFileSync(`${bin}.log`, "utf8").trim().split("\n");
+    const order = calls.filter((c) => ["question declare", "threshold declare", "run begin", "plan create", "verify run"].includes(c));
+    expect(order).toEqual(["question declare", "threshold declare", "run begin", "plan create", "verify run"]);
+    const files = readFileSync(`${bin}.files`, "utf8");
+    expect(files).toContain('"title":"the record exists"');
+    expect(files).toContain('"minimum_relevance":"high"');
+    expect(files).toContain('"minimum_reliability":"low"');
+  });
+
+  test("horizon run begins on the real snapshot id", async () => {
+    const SNAP = "sha256:" + "ab".repeat(32);
+    const { rt, bin, dir } = rig(
+      `echo "$@" >> $0.log
+case "$1 $2" in
+  "repo list") echo '{"repos":[]}';;
+  "repo enroll") echo '{"repo_id":"R1"}';;
+  "semantic configure") echo '{"state":"semantic"}';;
+  "snapshot create") echo '{"snapshot_id":"${SNAP}"}';;
+  "run begin") echo '{"run_id":"run1"}';;
+  "plan create") echo '{}';;
+  "verify run") echo '{"observations":[{"observation_id":"o1","exit_code":0,"ledger_position":{"ledger_id":"L","append_ordinal":6}}]}';;
+esac`,
+      undefined,
+      "/rulebook/interaction-model.sea",
+    );
+    const snapshot = await rt.snapshot();
+    expect(snapshot).toBe(SNAP);
+    expect(rt.rulebookConnected()).toBe(true);
+    await rt.run({ question_id: "q", threshold_id: "t", position: { ledger_id: "L", ordinal: 1 } }, ["v"], [], 5, { target: TARGET, snapshot });
+    const log = readFileSync(`${bin}.log`, "utf8");
+    expect(log).toContain("semantic configure --repo R1 --entry /rulebook/interaction-model.sea");
+    expect(log).toContain(`run begin --repo R1 --snapshot ${SNAP}`);
+    expect(log).not.toContain("snapshot:horizon");
+    expect(dir).toBeTruthy();
+  });
+
+  test("a rulebook that cannot be snapshotted falls back to genesis and says it is not connected", async () => {
+    const { rt } = rig(`case "$1 $2" in "repo list") echo '{"repos":[]}';; "repo enroll") echo '{"repo_id":"R1"}';; "semantic configure") echo no >&2; exit 3;; esac`, undefined, "/rulebook/x.sea");
+    expect(await rt.snapshot()).toBe("snapshot:genesis");
+    expect(rt.rulebookConnected()).toBe(false);
+  });
+
+  test("sxr does not block the event loop", async () => {
+    const { rt } = rig(`case "$1 $2" in "repo list") sleep 0.6; echo '{"repos":[]}';; "repo enroll") echo '{"repo_id":"R1"}';; esac`);
+    let ticks = 0;
+    const timer = setInterval(() => (ticks += 1), 20);
+    const started = Date.now();
+    await rt.repo();
+    clearInterval(timer);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(500);
+    // A blocked loop would have counted about zero ticks across 600 ms.
+    expect(ticks).toBeGreaterThan(10);
+  });
+
+  test("a timeout kills the child", async () => {
+    const { rt, dir } = rig(`echo $$ > $0.pid\nexec sleep 30`, 300);
+    const started = Date.now();
+    await expect(rt.repo()).rejects.toThrow(/timed out after/);
+    expect(Date.now() - started).toBeLessThan(5_000);
+    const pid = Number(readFileSync(join(dir, "realitytrace.pid"), "utf8").trim());
+    let alive = true;
+    try {
+      process.kill(pid, 0);
+    } catch {
+      alive = false;
+    }
+    expect(alive).toBe(false);
+  });
 });

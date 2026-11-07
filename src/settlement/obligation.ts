@@ -35,9 +35,13 @@ import type { GateAssessment } from "../domain/navigation.ts";
 import { paymentGate } from "../domain/payment.ts";
 import type { CapacityAllowance } from "../domain/payment.ts";
 import type { OperationBindingConfig } from "../config/types.ts";
+import { GENESIS_SNAPSHOT } from "../adapters/realitytrace-obligation.ts";
 import type { DeclaredThreshold, RealityTraceObligation, VerifierRun } from "../adapters/realitytrace-obligation.ts";
 import { readLedger } from "../capabilities/capacity-ledger.ts";
 import { takeSnapshot } from "./snapshot.ts";
+
+/** The concept the verifier run attests (was a literal in the adapter). The snapshot is the rulebook's real snapshot id. */
+const RT_TARGET = "concept:navigation_intent";
 import { type PendingIntent, reservePendingIntent, terminate, updatePending } from "../capabilities/pending-intent.ts";
 
 export class ObligationRefusal extends Error {
@@ -52,7 +56,7 @@ export interface ObligationDeps {
   readonly store: () => DurableStore;
   readonly tenant: string;
   /** Null when RealityTrace is not configured for settlement. */
-  readonly realityTrace: Pick<RealityTraceObligation, "declare" | "run"> | null;
+  readonly realityTrace: Pick<RealityTraceObligation, "declare" | "run"> & Partial<Pick<RealityTraceObligation, "snapshot">> | null;
   /** Null when no settlement confinement is configured. */
   readonly settlement: { readonly launcher: readonly string[]; readonly close_grace_s: number } | null;
   /** Where the verifier's read-only store snapshot is taken from and to. Absent: the verifier is not given one. */
@@ -130,7 +134,7 @@ export async function prepare(deps: ObligationDeps, binding: OperationBindingCon
     });
   }
   const expectation: ExpectedOutcome = assertExpectedOutcome(rawExpectation);
-  const threshold: DeclaredThreshold = deps.realityTrace!.declare(intent.intent_id, expectation);
+  const threshold: DeclaredThreshold = await deps.realityTrace!.declare({ intentId: intent.intent_id, statement: expectation.statement, target: RT_TARGET, criteria: { minimum_relevance: "medium", minimum_reliability: "medium" } });
   return reservePendingIntent(deps.store(), {
     tenant: deps.tenant,
     pending: { intent, operation_ref: binding.operation_ref, expectation, threshold, window: openWindow(now, expectation.window_s), verifier_argv: argvFor(binding, intent.intent_id) },
@@ -165,12 +169,12 @@ const evidenceOf = (run: VerifierRun, argv: readonly string[]): VerifierEvidence
 });
 
 /** Run the pinned verifier once under the launcher, after re-checking every artifact digest. Null: not run. */
-function runVerifier(deps: ObligationDeps, binding: OperationBindingConfig, pending: PendingIntent, timeoutS: number): VerifierRun | null {
-  return runVerifierWith(deps, binding, pending, timeoutS).run;
+async function runVerifier(deps: ObligationDeps, binding: OperationBindingConfig, pending: PendingIntent, timeoutS: number): Promise<VerifierRun | null> {
+  return (await runVerifierWith(deps, binding, pending, timeoutS)).run;
 }
 
 /** As runVerifier, saying why when the snapshot the verifier reads could not be taken (never run on a stale one). */
-function runVerifierWith(deps: ObligationDeps, binding: OperationBindingConfig, pending: PendingIntent, timeoutS: number): { readonly run: VerifierRun | null; readonly snapshotFailure?: string } {
+async function runVerifierWith(deps: ObligationDeps, binding: OperationBindingConfig, pending: PendingIntent, timeoutS: number): Promise<{ readonly run: VerifierRun | null; readonly snapshotFailure?: string }> {
   if (!deps.realityTrace || !deps.settlement || !binding.verifier || !pending.threshold || !pending.verifier_argv) return { run: null };
   // Before every run: a digest mismatch makes the run undefined, so it is never run at all.
   if (artifactMismatches(binding.verifier, observedDigests(binding, deps.digestOf)).length > 0) return { run: null };
@@ -182,7 +186,7 @@ function runVerifierWith(deps: ObligationDeps, binding: OperationBindingConfig, 
     }
   }
   try {
-    return { run: deps.realityTrace.run(pending.threshold, pending.verifier_argv, deps.settlement.launcher, timeoutS) };
+    return { run: await deps.realityTrace.run(pending.threshold, pending.verifier_argv, deps.settlement.launcher, timeoutS, { target: RT_TARGET, snapshot: (await deps.realityTrace.snapshot?.()) ?? GENESIS_SNAPSHOT }) };
   } catch {
     return { run: null };
   }
@@ -195,7 +199,7 @@ function runVerifierWith(deps: ObligationDeps, binding: OperationBindingConfig, 
 export async function discriminateRun(deps: ObligationDeps, binding: OperationBindingConfig, pending: PendingIntent): Promise<{ readonly run: VerifierRun | null; readonly decision: DiscriminationDecision }> {
   if (pending.window && !windowOpen(pending.window, deps.now())) return { run: null, decision: { proceed: false, refusal: "discrimination unknown" } };
   const timeout = pending.window ? runTimeoutS(pending.window, deps.now(), deps.settlement?.close_grace_s) : null;
-  const attempt = timeout === null ? { run: null } : runVerifierWith(deps, binding, pending, Math.min(timeout, 120));
+  const attempt = timeout === null ? { run: null } : await runVerifierWith(deps, binding, pending, Math.min(timeout, 120));
   const run = attempt.run;
   const decision: DiscriminationDecision = "snapshotFailure" in attempt && attempt.snapshotFailure
     ? { proceed: false, refusal: `discrimination unknown: ${attempt.snapshotFailure}` }
@@ -215,7 +219,7 @@ export async function verifyRun(deps: ObligationDeps, binding: OperationBindingC
   if (!pending.window) return null;
   const timeout = runTimeoutS(pending.window, deps.now(), deps.settlement?.close_grace_s);
   if (timeout === null) return null;
-  const run = runVerifier(deps, binding, pending, timeout);
+  const run = await runVerifier(deps, binding, pending, timeout);
   if (run) await updatePending(deps.store(), deps.tenant, pending.intent.intent_id, (current) => ({ verifications: [...(current.verifications ?? []), run] }));
   return run;
 }

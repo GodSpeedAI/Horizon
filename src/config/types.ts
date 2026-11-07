@@ -1,4 +1,5 @@
 import type { VerifierTemplate } from "../domain/expectation.ts";
+import type { SetupName } from "./setup.ts";
 import type { CapacityAllowance, PaymentEntry } from "../domain/payment.ts";
 
 export type DeploymentProfile = "local_operator" | "shared_remote";
@@ -39,11 +40,36 @@ export interface ContextKernelConfig {
  * It is NOT the obligation store: that one has its own data home. Absent means the view says how to enable it.
  */
 export interface EconomicsConfig {
-  /** The `realitytrace` binary. Only `repo list`, `ledger export` and `projections export` are ever run. */
+  /** The `realitytrace` binary. Only `repo list`, `ledger export`, `projections export` and `ledger verify` are ever run. */
   readonly realitytrace_bin: string;
   /** XDG_DATA_HOME of the store to read (the agent tap's). Absent: RealityTrace's own default location. */
   readonly data_home?: string;
   readonly state_home?: string;
+}
+
+/** One record store Horizon reads (`[[records.sources]]`). `personal` has no paths: RealityTrace's own default location, read-only. */
+export interface RecordSource {
+  readonly name: string;
+  readonly kind: "personal" | "workshop" | "horizon";
+  readonly data_home?: string;
+  readonly state_home?: string;
+}
+
+export interface RecordsConfig {
+  readonly sources: readonly RecordSource[];
+}
+
+/** Where the workshop (Cognate Workbench) listens and where its Horizon key file lives. */
+export interface WorkshopConfig {
+  readonly url: string;
+  readonly key_path: string;
+  /** The workshop agent that is given handed-off steps. Absent: steps can be handed off but not given to an agent. */
+  readonly expert_id?: string;
+  readonly workspace_id?: string;
+}
+
+export interface UiConfig {
+  readonly timezone: string;
 }
 
 export interface HorizonConfig {
@@ -72,6 +98,10 @@ export interface HorizonConfig {
   readonly economics?: EconomicsConfig;
   /** Operator-to-SEA-Forge-actor mapping for remote and desktop sessions. Absent: the single-operator development default. */
   readonly operators?: OperatorsConfig;
+  /** Setup stage 0: the record stores Horizon reads. Absent: none configured. */
+  readonly records?: RecordsConfig;
+  readonly workshop?: WorkshopConfig;
+  readonly ui?: UiConfig;
 }
 
 /**
@@ -120,4 +150,9 @@ export interface LoadedConfig {
   };
   readonly launchSecret: string;
   readonly secretPath: string;
+  /** The agent door's key: stable across starts, read from `agentKeyPath`. */
+  readonly agentKey: string;
+  readonly agentKeyPath: string;
+  /** `HORIZON_SETUP`; undefined when unset (Horizon behaves as before). */
+  readonly setup?: SetupName;
 }

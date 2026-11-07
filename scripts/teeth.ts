@@ -50,6 +50,9 @@ function tempRoot(name: string): string {
 function copyManifest(root: string): string {
   const path = join(root, "package.json");
   copyFileSync("package.json", path);
+  // The boundary check scans src/ and refuses a root with nothing to scan, so the synthetic root gets a clean src/.
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "src", "placeholder.ts"), "export const placeholder = true;\n");
   return path;
 }
 
