@@ -313,8 +313,8 @@ export async function seedWorkshop(ctx: Context): Promise<void> {
     const after = setWorkshopIds(before, { expert_id: DEMO_EXPERT, workspace_id: workspaceId });
     if (after !== before) writeFileSync(port.configPath, after);
     ctx.io.out(`  workshop agent: ${after === before ? "already set up" : `set up "Horizon demo helper" with the workspace ${folder} and recorded both in horizon.toml`}`);
-    ctx.io.out("  workshop agent: restart the desk so it picks up the new settings.");
-    ctx.io.out("  workshop agent: the workshop needs a model set (workshop Settings > Models) before an agent can run.");
+    if (after !== before) ctx.io.out("  workshop agent: restart the desk so it picks up the new settings.");
+    ctx.io.out("  workshop agent: an agent runs only once the workshop has a model chosen (workshop Settings > Models).");
   } catch (error) {
     if (error instanceof SeedRefused) throw error;
     ctx.io.out(`  workshop agent: not set up. ${wordsOf(error)} Nothing was written to horizon.toml.`);
