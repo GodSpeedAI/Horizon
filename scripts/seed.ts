@@ -41,7 +41,12 @@ import {
 
 const here = dirname(import.meta.path);
 // Fallback only: ignite now writes this rule. This covers cells written before that change.
-const POLICY_RULE = "  - { name: operator-adds-steps, verdict: allow, actor_role: operator, operation_kind: discretionary_task_add }";
+// The rules the seed needs in the test setup's rules file: the operator adds steps and marks waiting steps done.
+const POLICY_RULES: readonly { readonly kind: string; readonly line: string }[] = [
+  { kind: "discretionary_task_add", line: "  - { name: operator-adds-steps, verdict: allow, actor_role: operator, operation_kind: discretionary_task_add }" },
+  { kind: "human_task_completion", line: "  - { name: operator-finishes-steps, verdict: allow, actor_role: operator, operation_kind: human_task_completion }" },
+];
+const missingRules = (text: string) => POLICY_RULES.filter((r) => !text.includes(`operation_kind: ${r.kind}`));
 
 /** A refusal: said in words, exit 1, nothing written. */
 export class SeedRefused extends Error {
@@ -546,13 +551,14 @@ function templatePort(cell: string): TemplatePort {
       }
       return written;
     },
-    policyAllowsAdd: () => existsSync(policy) && readFileSync(policy, "utf8").includes("discretionary_task_add"),
+    policyAllowsAdd: () => existsSync(policy) && missingRules(readFileSync(policy, "utf8")).length === 0,
     allowAdd() {
       if (!existsSync(policy)) throw new SeedRefused(`${policy} does not exist. Start the test setup once (ignite writes it), then seed.`);
       const text = readFileSync(policy, "utf8");
-      if (text.includes("discretionary_task_add")) return false;
+      const missing = missingRules(text);
+      if (missing.length === 0) return false;
       // The case keeper rereads this file on every decision. It is the test setup's own copy; production is never touched.
-      writeFileSync(policy, `${text.endsWith("\n") ? text : `${text}\n`}${POLICY_RULE}\n`);
+      writeFileSync(policy, `${text.endsWith("\n") ? text : `${text}\n`}${missing.map((r) => `${r.line}\n`).join("")}`);
       return true;
     },
   };

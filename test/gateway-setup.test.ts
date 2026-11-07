@@ -526,6 +526,7 @@ describe("server.yaml and policy.yaml (rendered from the runtime account's uid, 
   test("the cell policy ignite writes lets the operator and agents add steps", () => {
     const ignite = readFileSync(join(repoRoot, "scripts", "ignite.ts"), "utf8");
     expect(ignite).toContain("{ name: operator-adds-steps, verdict: allow, actor_role: operator, operation_kind: discretionary_task_add }");
+    expect(ignite).toContain("{ name: operator-finishes-steps, verdict: allow, actor_role: operator, operation_kind: human_task_completion }");
     expect(ignite).toContain("{ name: agents-propose-steps, verdict: allow, actor_role: service, operation_kind: discretionary_task_add }");
     expect(ignite).toContain("proposed steps still need a person to finish them");
   });

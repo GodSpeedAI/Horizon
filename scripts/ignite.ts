@@ -126,6 +126,7 @@ ${approve ? "    requires_approval: true\n" : ""}    actor_role: service
   # proposed steps still need a person to finish them
   - { name: operator-adds-steps, verdict: allow, actor_role: operator, operation_kind: discretionary_task_add }
   - { name: agents-propose-steps, verdict: allow, actor_role: service, operation_kind: discretionary_task_add }
+  - { name: operator-finishes-steps, verdict: allow, actor_role: operator, operation_kind: human_task_completion }
   - { name: evidence, verdict: allow, actor_role: service, operation_kind: evidence_mutation }
   - { name: settlement, verdict: allow, actor_role: service, operation_kind: settlement_declaration }
 `,
