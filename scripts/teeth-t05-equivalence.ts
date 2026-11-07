@@ -106,10 +106,10 @@ async function main(): Promise<void> {
       const json = await get(`${server.url}/surface?role=agent`, "application/json");
       if (json.status !== 200) fail(`GUI json body exited ${json.status}`);
       const document = JSON.parse(json.body) as { schema: string; view: { schema: string; role: string } };
-      if (document.schema !== "horizon.surface/2") fail(`GUI document schema is ${document.schema}`);
+      if (document.schema !== "horizon.surface/3") fail(`GUI document schema is ${document.schema}`);
       if (document.view.schema !== "horizon.gui-view/1") fail(`GUI view schema is ${document.view.schema}`);
       if (document.view.role !== "agent") fail(`GUI ignored the requested role: ${document.view.role}`);
-      ok("PE-04 GUI json is a horizon.surface/2 frame carrying one horizon.gui-view/1 projection");
+      ok("PE-04 GUI json is a horizon.surface/3 frame carrying one horizon.gui-view/1 projection");
 
       // A role nobody holds is refused at the route, not quietly served as `human`.
       const bad = await get(`${server.url}/surface?role=root`, "application/json");

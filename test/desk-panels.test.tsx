@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
-import { acceptanceBlocked, listAnswers, markReplied, recordAnswer, stopWaiting, PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
+import { acceptanceBlocked, listAnswers, recordAnswer, routeAnswer, stopWaiting, PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
 import { START, type UiState } from "../src/ui/desk/attention.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";
 import { MAX_OPEN_PANELS, NO_PANELS, reduceAgent, reduceHuman, type Panels as PanelsState } from "../src/ui/desk/panels-model.ts";
@@ -99,7 +99,13 @@ describe("answers are kept", () => {
     expect((await store.getRecord(PANEL_ANSWERS_COLLECTION, "answer:release:2"))?.value).toMatchObject({ replied: false, outcome: "deferred", step: "signoff" });
     expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(true);
     expect(acceptanceBlocked(await listAnswers(store, "t"), "another_step")).toBe(false);
-    expect(await markReplied(store, "t", "release")).toBe(2);
+    // A later agent call is no reply; only a route that says where it went closes the answer.
+    expect((await routeAnswer(store, "t", "release", "q1", "ok")).ok).toBe(false);
+    expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(true);
+    expect(await routeAnswer(store, "t", "release", "q1", "step handoff_0a49 in Seed: triage inbox")).toEqual({ ok: true, closed: 1 });
+    expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(true);
+    expect(await routeAnswer(store, "t", "release", "q2", "no action: put off by the person")).toEqual({ ok: true, closed: 1 });
+    expect((await listAnswers(store, "t", "release"))[0]).toMatchObject({ replied: true, routed_as: "step handoff_0a49 in Seed: triage inbox" });
     expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(false);
     await recordAnswer(store, { tenant: "t", panel_id: "other", ask: "q", outcome: "answered", value: "no", step: "s2", now });
     expect(await stopWaiting(store, "t", "s2")).toBe(1);
@@ -164,10 +170,13 @@ describe("acceptance through the application", () => {
     expect(refused.status).toBe(409);
     expect(refused.body.message).toContain("has not replied yet");
     expect(completed).toHaveLength(0);
-    // Reading the answer is not a reply. Annotating the panel is.
+    // Reading the answer and annotating the panel are not replies. Saying where it went is.
     await app.application.applyAgentOp({ tool: "read_responses" });
-    expect((await cardNow()).blocked).not.toBeNull();
     expect((await app.application.applyAgentOp({ tool: "annotate", panel: "release", text: "Thanks, noted." })).ok).toBe(true);
+    expect((await cardNow()).blocked).not.toBeNull();
+    expect((await app.application.applyAgentOp({ tool: "answer.route", panel_id: "release", ask_id: "q1", routed_as: "no" } as never)).ok).toBe(false);
+    expect((await cardNow()).blocked).not.toBeNull();
+    expect((await app.application.applyAgentOp({ tool: "answer.route", panel_id: "release", ask_id: "q1", routed_as: "step signoff_release: release approved" } as never)).ok).toBe(true);
     expect((await cardNow()).blocked).toBeNull();
     expect((await app.state()).panels.waiting).toEqual([]);
     const ok = await accept();

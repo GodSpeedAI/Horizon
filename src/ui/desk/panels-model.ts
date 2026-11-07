@@ -8,6 +8,7 @@
  */
 export const MAX_OPEN_PANELS = 8;
 
+import { answerFor, MIN_ROUTED_AS, MAX_ROUTED_AS, TOO_SHORT_ROUTE } from "../../capabilities/panel-answers.ts";
 import { clip, itemOf, questionOf, toneOf, type PanelItem, type PanelTone, type QuestionItem } from "../surface2/panel-blocks.ts";
 
 export type Tone = PanelTone;
@@ -41,7 +42,17 @@ export type AgentOp =
   | { readonly tool: "ask_human"; readonly panel: string; readonly ask: Record<string, unknown>; readonly step?: string | null }
   | { readonly tool: "arrange"; readonly action: { readonly op: "surface.remove"; readonly id: string } | { readonly op: "view.focus"; readonly id: string } | { readonly op: "view.place"; readonly id: string } }
   | { readonly tool: "annotate"; readonly panel: string; readonly text: string; readonly tone?: string }
-  | { readonly tool: "read_responses" };
+  | { readonly tool: "read_responses" }
+  /** The agent takes a question back, with the reason (1 to 200 characters) shown in its place. Only a question nobody answered. */
+  | { readonly tool: "ask.withdraw"; readonly panel_id: string; readonly ask_id: string; readonly reason: string }
+  /** The agent says where an answer went (`routed_as`, at least 6 characters). This is the only thing that closes an answer. */
+  | { readonly tool: "answer.route"; readonly panel_id: string; readonly ask_id: string; readonly routed_as: string };
+
+export const MAX_WITHDRAW_REASON = 200;
+export const ALL_WAITING = "Eight panels are waiting for answers. Answer or skip one first.";
+/** A question still waiting for the person: not answered (not even put off) and not withdrawn. */
+export const isOpenAsk = (b: PanelBlock): boolean => b.kind === "question" && b.answered === null && (b.withdrawn ?? null) === null;
+export const hasOpenAsk = (p: Panel): boolean => p.blocks.some(isOpenAsk);
 
 export type HumanOp =
   | { readonly op: "human.answer"; readonly panel: string; readonly ask: string; readonly outcome: "answered" | "deferred" | "cancelled"; readonly value?: unknown; readonly note?: string | null }
@@ -56,14 +67,14 @@ const refuse = (state: Panels, code: Refusal["code"], message: string): Reduced 
 const same = (a: string, b: string): boolean => a === b;
 
 /**
- * Adds a new panel, never past the cap. At the cap the oldest panel that is not pinned makes room; if every panel is pinned the new
- * one is refused and the person is told to close one.
+ * Adds a new panel, never past the cap. At the cap the oldest panel that is neither pinned nor waiting for an answer makes room.
+ * A panel with an open question is never removed to make room. If none can go, the new one is refused in words.
  */
 function admit(state: Panels, panel: Panel): Reduced {
   let open = [...state.open];
   while (open.length >= state.max) {
-    const oldest = open.findIndex((p) => !p.pinned);
-    if (oldest < 0) return refuse(state, "CAP", `${state.max} panels are open and all of them are pinned. Close one to make room.`);
+    const oldest = open.findIndex((p) => !p.pinned && !hasOpenAsk(p));
+    if (oldest < 0) return open.every(hasOpenAsk) ? refuse(state, "CAP", ALL_WAITING) : refuse(state, "CAP", `${state.max} panels are open and all of them are pinned or waiting for an answer. Close or answer one to make room.`);
     open = open.filter((_, i) => i !== oldest);
   }
   return { state: { ...state, open: [...open, panel] }, result: { ok: true, panel: panel.id } };
@@ -83,7 +94,7 @@ export function reduceAgent(state: Panels, op: AgentOp): Reduced {
       if (existing !== undefined) {
         // An update keeps the panel where it is and keeps it pinned; answers already given stay on their questions.
         const before = (id: string): AskBlock | undefined => existing.blocks.find((o): o is AskBlock => o.kind === "question" && o.id === id);
-        const kept = blocks.map((b) => (b.kind === "question" ? { ...b, answered: before(b.id)?.answered ?? null } : b));
+        const kept = blocks.map((b) => (b.kind === "question" ? { ...b, answered: before(b.id)?.answered ?? null, withdrawn: before(b.id)?.withdrawn ?? null } : b));
         return { state: replace(state, s.id, (p) => ({ ...p, title: str(s.title, 120) || p.title, step: s.step === undefined ? p.step : (s.step ?? null), blocks: kept })), result: { ok: true, panel: s.id } };
       }
       return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks, notes: [] });
@@ -92,7 +103,7 @@ export function reduceAgent(state: Panels, op: AgentOp): Reduced {
       const panel = state.open.find((p) => same(p.id, op.panel));
       const id = typeof op.ask.id === "string" && ID.test(op.ask.id) ? op.ask.id : "";
       const block = id === "" ? null : questionOf(op.ask, id);
-      if (block === null) return refuse(state, "SCHEMA", "A question needs an id, the question, and at least two options.");
+      if (block === null) return refuse(state, "SCHEMA", "A question needs an id, the question, and (for pick-one and pick-several) at least two options.");
       if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [block], notes: [] });
       return { state: replace(state, panel.id, (p) => ({ ...p, step: op.step === undefined ? p.step : (op.step ?? null), blocks: [...p.blocks.filter((b) => b.id !== block.id), block] })), result: { ok: true, panel: panel.id } };
     }
@@ -101,6 +112,24 @@ export function reduceAgent(state: Panels, op: AgentOp): Reduced {
       const text = str(op.text, 400);
       if (text === "") return refuse(state, "SCHEMA", "A note needs some words.");
       return { state: replace(state, op.panel, (p) => ({ ...p, notes: [...p.notes, { text, tone: toneOf(op.tone) }].slice(-20) })), result: { ok: true, panel: op.panel } };
+    }
+    case "ask.withdraw": {
+      const panel = state.open.find((p) => same(p.id, op.panel_id));
+      const ask = panel?.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === op.ask_id);
+      if (panel === undefined || ask === undefined) return refuse(state, "NOT_FOUND", "That question is not open.");
+      const reason = typeof op.reason === "string" ? op.reason.trim() : "";
+      if (reason === "" || reason.length > MAX_WITHDRAW_REASON) return refuse(state, "SCHEMA", `Say why you are withdrawing it, in 1 to ${MAX_WITHDRAW_REASON} characters.`);
+      if (ask.answered !== null) return refuse(state, "SCHEMA", "That question was already answered, so it cannot be withdrawn.");
+      return { state: replace(state, panel.id, (p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === ask.id ? { ...b, withdrawn: { reason } } : b)) })), result: { ok: true, panel: panel.id } };
+    }
+    case "answer.route": {
+      // The record of the answer lives in the store (`routeAnswer`); here the panel, if still open, shows where it went.
+      const words = typeof op.routed_as === "string" ? op.routed_as.trim() : "";
+      if (words.length < MIN_ROUTED_AS || words.length > MAX_ROUTED_AS) return refuse(state, "SCHEMA", TOO_SHORT_ROUTE);
+      const panel = state.open.find((p) => same(p.id, op.panel_id));
+      const ask = panel?.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === op.ask_id);
+      if (panel === undefined || ask === undefined || ask.answered === null) return { state, result: { ok: true, panel: op.panel_id } };
+      return { state: replace(state, panel.id, (p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === ask.id && b.answered !== null ? { ...b, answered: { ...b.answered, routed_as: words } } : b)) })), result: { ok: true, panel: panel.id } };
     }
     case "arrange": {
       const target = state.open.find((p) => same(p.id, op.action.id));
@@ -131,7 +160,15 @@ export function reduceHuman(state: Panels, op: HumanOp): Reduced {
       const ask = panel?.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === op.ask);
       if (panel === undefined || ask === undefined) return refuse(state, "NOT_FOUND", "That question is no longer open.");
       if (ask.answered !== null) return refuse(state, "SCHEMA", "That question was already answered.");
-      return { state: replace(state, panel.id, (p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === ask.id ? { ...b, answered: { outcome: op.outcome, value: op.value ?? null, note: op.note ?? null } } : b)) })), result: { ok: true, panel: panel.id } };
+      if ((ask.withdrawn ?? null) !== null) return refuse(state, "SCHEMA", "The agent withdrew that question.");
+      // Not now and Skip carry no value; an answer must fit the kind of question.
+      let value: unknown = null;
+      if (op.outcome === "answered") {
+        const checked = answerFor({ input: ask.input ?? "select", options: ask.options }, op.value);
+        if (!checked.ok) return refuse(state, "SCHEMA", checked.message);
+        value = checked.value;
+      }
+      return { state: replace(state, panel.id, (p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === ask.id ? { ...b, answered: { outcome: op.outcome, value: op.outcome === "answered" ? value : (op.value ?? null), note: op.note ?? null, routed_as: null } } : b)) })), result: { ok: true, panel: panel.id } };
     }
   }
 }
