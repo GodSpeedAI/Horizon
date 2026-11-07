@@ -1,0 +1,144 @@
+{
+ "refusals": {
+  "no_key": 401,
+  "wrong_key": 401,
+  "page_agent_with_key": 403,
+  "human_op_with_key": 403
+ },
+ "show_all": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "panel": "all_parts"
+  }
+ },
+ "part_types_drawn": [
+  "ask",
+  "callout",
+  "chart",
+  "compare",
+  "document",
+  "entity",
+  "form",
+  "graph",
+  "media",
+  "metric",
+  "preflight",
+  "progress",
+  "table",
+  "timeline",
+  "tree"
+ ],
+ "missing_types": [],
+ "cannot_be_shown_lines": [],
+ "panel_text_has_cannot_show": false,
+ "echo_after_answer": "Which plan should I follow?You answered: Plan AWaiting for the agent to say where it went",
+ "answer_rows": [
+  "Waiting for you You answered: Plan A You 05:24 PM Waiting for the agent to say where it went"
+ ],
+ "route": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "panel": "all_parts"
+  }
+ },
+ "echo_after_route": "Which plan should I follow?You answered: Plan AThe agent took it to: step handoff_0a49 in Seed: triage inbox",
+ "answer_rows_after_route": [
+  "Done You answered: Plan A You 05:24 PM The agent took it to: step handoff_0a49 in Seed: triage inbox"
+ ],
+ "show_b": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "panel": "more_asks"
+  }
+ },
+ "ask_confirm": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "panel": "more_asks"
+  }
+ },
+ "ask_multi": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "panel": "more_asks"
+  }
+ },
+ "ask_text": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "panel": "more_asks"
+  }
+ },
+ "show_c": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "panel": "withdraw_me"
+  }
+ },
+ "ask_withdraw_src": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "panel": "withdraw_me"
+  }
+ },
+ "echoes_waiting": [
+  "Ship the release today?You answered: YesWaiting for the agent to say where it went",
+  "Which checks should I run?You answered: Unit tests, End-to-endWaiting for the agent to say where it went",
+  "What should the report be called?You answered: Release readiness reportWaiting for the agent to say where it went"
+ ],
+ "route_confirm": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "panel": "more_asks"
+  }
+ },
+ "route_multi": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "panel": "more_asks"
+  }
+ },
+ "route_short": {
+  "status": 400,
+  "body": {
+   "ok": false,
+   "code": "SCHEMA",
+   "message": "Say where the answer went in at least 6 characters, for example \"step handoff_0a49 in Seed: triage inbox\" or \"no action: <why>\"."
+  }
+ },
+ "route_text": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "panel": "more_asks"
+  }
+ },
+ "withdraw": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "panel": "withdraw_me"
+  }
+ },
+ "echoes_routed": [
+  "Which plan should I follow?You answered: Plan AThe agent took it to: step handoff_0a49 in Seed: triage inbox",
+  "Ship the release today?You answered: YesThe agent took it to: decision: release date set to today",
+  "Which checks should I run?You answered: Unit tests, End-to-endThe agent took it to: no action: I run both from the build job",
+  "What should the report be called?You answered: Release readiness reportThe agent took it to: file name in the release step"
+ ],
+ "withdrawn_text": [
+  "Is the staging copy current?The agent withdrew this question: I found the answer in the build log myself."
+ ],
+ "phone_hscroll": false,
+ "console_errors": []
+}

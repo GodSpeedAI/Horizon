@@ -2,6 +2,26 @@
 
 Run on 2026-11-07 against the testing desk (127.0.0.1:4339, branch `horizon-desk-v2`). Evidence comes from Playwright, axe and saved script output only. Scripts are in this folder (`lib.ts`, `j1.ts` to `j8.ts`, `scans.ts`, `presenting-words.ts`, `mock.ts`, `panel-harness.ts`). Production (4319) was not touched. No server was started, stopped or restarted.
 
+## Update: journey 5 is now live (2026-11-07, 17:24)
+
+After this proof, the agent's panel calls got a real door: `POST /agent/panels`, `GET /agent/panels/answers` and `GET /agent/panels/catalogue` on the desk's own port, checked against the setup's agent key (`~/.horizon/setups/<setup>/secrets/agent.key`, 0600, the same across restarts; commits `2965131`, `c4b949d`). Journey 5 was run again with no stand-in: `j5-live.ts` sends every agent call through that door with `live-door.ts`, which reads the key and never prints or saves it.
+
+| Check | Result | Evidence |
+|---|---|---|
+| Door refusals | no key 401, wrong key 401, page agent with the key 403, a "you" action with the key 403 | `j5live-log.json` (`refusals`) |
+| All 15 parts drawn from a real agent call | PASS: 15 of 15 types, none missing, no "cannot be shown" line, "from the agent" on agent data | `j5live-log.json`, `j5live-1-all-parts-wide.png`, `j5live-part-01-*.png` to `j5live-part-15-*.png` |
+| Answer, then the agent says where it went | PASS: "You answered: Plan A" with "Waiting for the agent to say where it went", then one entry, done, "The agent took it to: step handoff_0a49 in Seed: triage inbox" | `j5live-3-answered-waiting-for-agent.png`, `j5live-4-agent-took-it.png` |
+| Yes/no, pick several, typed answer | PASS: "Yes", "Unit tests, End-to-end", the typed words; a 2-character route refused with the plain message; each routed | `j5live-5-*.png`, `j5live-6-*.png`, `j5live-7-*.png` |
+| Withdraw | PASS: "The agent withdrew this question: I found the answer in the build log myself." | `j5live-7-routed-and-withdrawn.png` |
+| Phone, console | no sideways scroll; 0 console errors | `j5live-8-phone.png`, `j5live-log.json` |
+| Keys in evidence | none (scanned for bearer values and 64-hex strings) | — |
+
+Found on the live run and fixed: while your answer waited on the agent, its label said "Waiting for you". It now says "Waiting for the agent" (`1ebb12d`, with a test). The live screenshots were taken before that fix.
+
+Still true: the server keeps open panels in memory, so a desk restart clears them; the conversation entries stay.
+
+The original stand-in run is kept below for the record.
+
 ## The one thing that is not live: the agent's panel calls (journeys 5, 6, 7 panel part)
 
 The running desk has no way to receive an agent's panel call. `applyAgentOp` (`src/app.ts:1809`, handed out at `src/app.ts:2109`) is reachable only from inside the server process. `/desk/panels/op` takes the person's operations only, and an agent on the page is refused there with 403 (journey 4). Nothing else in the repo calls it except tests.
