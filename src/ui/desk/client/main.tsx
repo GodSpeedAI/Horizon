@@ -366,6 +366,17 @@ function App() {
       }
     },
     conversation: {
+      retryStart: async (caseId) => {
+        try {
+          const response = await fetch("/desk/start", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ case_id: caseId }) });
+          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+          void loadRows();
+          void loadWork();
+          return { ok: response.ok && body.ok === true, message: body.message ?? (response.ok ? "Started." : "It did not start.") };
+        } catch {
+          return { ok: false, message: "Horizon did not answer, so nothing was started." };
+        }
+      },
       discard: async (rowId) => {
         try {
           const response = await fetch("/desk/conversation/discard", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ row_id: rowId }) });

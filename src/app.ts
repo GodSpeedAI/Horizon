@@ -82,7 +82,7 @@ import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
 import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
 import { answerRowOf, appendRow, discardRow, listConversation, panelRowOf, settleDraftRow, updateRow } from "./capabilities/conversation.ts";
-import { answerEcho, cleanAgentName, WAITING_FOR_AGENT, type RowSource } from "./ui/desk/conversation-model.ts";
+import { answerEcho, cleanAgentName, WAITING_FOR_AGENT, type ConversationRow, type RowSource, type RowStage } from "./ui/desk/conversation-model.ts";
 import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
 import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
@@ -2069,6 +2069,35 @@ export async function createApplication(
     return Response.json(on ? applyStandIns(body, presentingKey(), deskRepoNames()) : body, { headers });
   }
 
+  /** What came of each stage of a hand off that was sent. A stage that was not tried is not shown; the result is "Not seen yet" until it is observed. */
+  function handoffStages(body: Record<string, any> | null): RowStage[] {
+    const stages: RowStage[] = [{ name: "Sent", status: "done", words: "The step was added to the case." }];
+    const started = body?.started as { ok?: boolean; words?: string } | undefined;
+    if (started !== undefined) stages.push(started.ok === true ? { name: "Started", status: "done", words: "The step is under way." } : { name: "Started", status: "refused", words: `It did not start: ${started.words ?? "No reason was given."}`, recovery: "Try again" });
+    const assigned = body?.assigned as { done?: boolean; words?: string } | null | undefined;
+    if (assigned !== null && assigned !== undefined) stages.push(assigned.done === true ? { name: "Given to an agent", status: "done", words: "An agent has the step." } : { name: "Given to an agent", status: "refused", words: `No agent has it: ${assigned.words ?? "No reason was given."}`, recovery: "Open the step" });
+    stages.push({ name: "Result seen", status: "unseen", words: "Not seen yet." });
+    return stages;
+  }
+
+  /** The "Result seen" stage turns to done only when the case keeper shows the step finished. Nothing is stored for it. */
+  async function observeResults(rows: ConversationRow[]): Promise<ConversationRow[]> {
+    if (caseKeeper === null) return rows;
+    const wanted = rows.filter((r) => r.stages?.some((g) => g.name === "Result seen" && g.status === "unseen") && r.refs.case_id !== undefined && r.refs.step_id !== undefined);
+    const finished = new Set<string>();
+    for (const caseId of [...new Set(wanted.map((r) => r.refs.case_id!))].slice(0, 20)) {
+      try {
+        const horizon = await caseSteps(caseKeeper, caseId);
+        if (horizon.kind === "ok") for (const st of horizon.value.steps) if (st.execution === "completed") finished.add(`${caseId}/${st.plan_item_id}`);
+      } catch {
+        // Not seen stays not seen.
+      }
+    }
+    return rows.map((r) => (r.refs.case_id !== undefined && r.refs.step_id !== undefined && finished.has(`${r.refs.case_id}/${r.refs.step_id}`) && r.stages !== undefined
+      ? { ...r, stages: r.stages.map((g) => (g.name === "Result seen" ? { ...g, status: "done" as const, words: "The step finished." } : g)) }
+      : r));
+  }
+
   /** Hand off (stage 4): `POST /desk/handoff/preview` shows the step that would be added; `POST /desk/handoff` adds it. */
   async function deskHandoff(request: Request, phase: "preview" | "send", page: PageAgent | null = null): Promise<Response> {
     let sent: Record<string, unknown> = {};
@@ -2092,8 +2121,10 @@ export async function createApplication(
       else if (!page && words !== "" && response.status !== 400) await logRow({ source, kind: "handoff", words, outcome: outcomeWords, status: "refused", refs: { draft_id: draftId } });
     } else if (words !== "" && draftId !== "" && !(response.status === 400)) {
       const ok = response.ok;
+      const stages = ok ? handoffStages(body) : undefined;
+      const status = !ok ? "refused" : stages?.some((g) => g.status === "refused") ? "partial" : "done";
       try {
-        await settleDraftRow(runtime.runtime.store, deskWho, draftId, ok ? "done" : "refused", outcomeWords, { source: "you", kind: "handoff", words, outcome: outcomeWords, status: ok ? "done" : "refused", refs: { ...(ok && typeof body?.step_id === "string" ? { step_id: body.step_id } : {}) } }, clock());
+        await settleDraftRow(runtime.runtime.store, deskWho, draftId, status, outcomeWords, { source: "you", kind: "handoff", words, outcome: outcomeWords, status, refs: { ...(ok && typeof body?.step_id === "string" ? { step_id: body.step_id } : {}), ...(ok && typeof body?.case_id === "string" ? { case_id: body.case_id } : {}) } }, clock(), stages);
       } catch {
         // The hand off already happened; the answer says the row is missing instead of failing.
         recorded = false;
@@ -2176,7 +2207,7 @@ export async function createApplication(
       assigned = result.kind === "ok" ? { done: true, words: "Given to an agent." } : { done: false, words: result.words };
     }
     const next = await nextDraft(store, caller.tenant, caller.actor.id, draftId);
-    return out({ ok: true, message: `Handed off: "${item.name}" is now a step in "${caseTitleNow}".${started.ok ? " It has started." : ` It has not started yet: ${started.words} Use Start it under Work.`}${assigned === null ? "" : assigned.done ? " It was given to an agent." : ` It was not given to an agent: ${assigned.words}`}`, step_id: sent.value.plan_item_id, started, assigned, draft_id: next.draftId }, headers);
+    return out({ ok: true, message: `Handed off: "${item.name}" is now a step in "${caseTitleNow}".${started.ok ? " It has started." : ` It has not started yet: ${started.words} Use Start it under Work.`}${assigned === null ? "" : assigned.done ? " It was given to an agent." : ` It was not given to an agent: ${assigned.words}`}`, step_id: sent.value.plan_item_id, case_id: target.case_id, started, assigned, draft_id: next.draftId }, headers);
   }
 
   /** Whether a step can be given to an agent right now, in words. Nothing is offered that would fail silently. */
@@ -2396,7 +2427,7 @@ export async function createApplication(
             return Response.json(found, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
           }
           if (url.pathname === "/desk/conversation" && request.method === "GET") {
-            return presentedJson({ rows: await listConversation(runtime.runtime.store, deskWho) }, { "cache-control": "no-store", "x-content-type-options": "nosniff" });
+            return presentedJson({ rows: await observeResults(await listConversation(runtime.runtime.store, deskWho)) }, { "cache-control": "no-store", "x-content-type-options": "nosniff" });
           }
           if (url.pathname === "/desk/conversation/discard" && request.method === "POST") {
             const asked = (await request.json().catch(() => null)) as { row_id?: unknown } | null;

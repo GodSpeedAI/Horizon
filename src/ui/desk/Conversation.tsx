@@ -6,11 +6,11 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { conversationWaiting, type Action, type UiState } from "./attention.ts";
-import type { ConversationRow, RowStatus } from "./conversation-model.ts";
+import type { ConversationRow, RowStage, RowStatus } from "./conversation-model.ts";
 import { PanelCard, type PanelsIo } from "./Panels.tsx";
 import type { BlockCtx } from "./blocks/index.tsx";
 
-export const STATUS_WORD: Readonly<Record<RowStatus, string>> = { done: "Done", waiting: "Waiting for you", refused: "Refused", unseen: "Not seen yet", claimed: "Agent says so" };
+export const STATUS_WORD: Readonly<Record<RowStatus, string>> = { done: "Done", waiting: "Waiting for you", refused: "Refused", unseen: "Not seen yet", claimed: "Agent says so", partial: "Partly done" };
 /** An answer you gave waits on the agent, not on you. */
 export function statusWord(row: { readonly status: RowStatus; readonly kind: string }): string {
   return row.status === "waiting" && row.kind === "answer" ? "Waiting for the agent" : STATUS_WORD[row.status];
@@ -34,7 +34,12 @@ export const isWaitingMove = (row: ConversationRow): boolean => row.status === "
 /** What Confirm asks the composer for: the move's words, and its draft when it has one. Without a draft the composer makes one. */
 export const requestFor = (row: ConversationRow): { readonly words: string; readonly draftId?: string } => (row.refs.draft_id === undefined ? { words: row.words } : { words: row.words, draftId: row.refs.draft_id });
 
+/** How a stage reads: its own words, never the word for the whole row. */
+export const STAGE_WORD: Readonly<Record<RowStage["status"], string>> = { done: "Yes", refused: "Failed", unseen: "Not seen yet" };
+
 export interface ConversationIo {
+  /** Starts the waiting steps of a case again, after "Started" failed. */
+  readonly retryStart?: (caseId: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
   readonly discard: (rowId: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
 }
 
@@ -84,6 +89,29 @@ function MoveCard({ row, onConfirm, onDiscard, busy }: { readonly row: Conversat
   );
 }
 
+function Stages({ row, onRetry, onOpenStep, busy }: { readonly row: ConversationRow; readonly onRetry: () => void; readonly onOpenStep: () => void; readonly busy: boolean }): ReactNode {
+  if (row.stages === undefined) return null;
+  return (
+    <ol className="cv-stages" aria-label="What came of each stage" data-stages>
+      {row.stages.map((g) => (
+        <li key={g.name} className="cv-stage" data-stage={g.name} data-stage-status={g.status}>
+          <span className="cv-stage-name">{g.name}:</span> <span className="cv-stage-word">{STAGE_WORD[g.status]}</span>
+          <span className="muted"> {g.words}</span>
+          {g.recovery === "Try again" ? (
+            <button type="button" onClick={onRetry} disabled={busy || row.refs.case_id === undefined} data-recover="try-again">
+              Try again
+            </button>
+          ) : g.recovery === "Open the step" ? (
+            <button type="button" onClick={onOpenStep} data-recover="open-step">
+              Open the step
+            </button>
+          ) : null}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function ConversationView({ ui, dispatch, panels, conversation, onConfirm, onPreviewWords }: ConversationViewProps): ReactNode {
   const data = ui.data;
   const rows = ui.rows;
@@ -124,6 +152,13 @@ export function ConversationView({ ui, dispatch, panels, conversation, onConfirm
   const discard = async (row: ConversationRow): Promise<void> => {
     setBusyRow(row.row_id);
     const result = await conversation.discard(row.row_id);
+    setBusyRow(null);
+    setProblem(result.ok ? null : result.message);
+  };
+  const retry = async (row: ConversationRow): Promise<void> => {
+    if (row.refs.case_id === undefined || conversation.retryStart === undefined) return;
+    setBusyRow(row.row_id);
+    const result = await conversation.retryStart(row.refs.case_id);
     setBusyRow(null);
     setProblem(result.ok ? null : result.message);
   };
@@ -197,6 +232,7 @@ export function ConversationView({ ui, dispatch, panels, conversation, onConfirm
                     </time>
                   </button>
                   {panel === undefined ? <p className="cv-outcome" data-unseen={row.status === "unseen" ? "yes" : undefined}>{row.outcome}</p> : null}
+                  <Stages row={row} busy={busyRow === row.row_id} onOpenStep={() => dispatch({ type: "view", view: "work" })} onRetry={() => void retry(row)} />
                   {panel !== undefined ? <PanelCard panel={panel} io={panels} presenting={presenting} {...ctxFor()} /> : null}
                   {isWaitingMove(row) ? <MoveCard row={row} busy={busyRow === row.row_id} onConfirm={() => onConfirm(row)} onDiscard={() => void discard(row)} /> : null}
                 </li>
