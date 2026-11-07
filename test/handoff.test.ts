@@ -18,6 +18,7 @@ const adds: Record<string, unknown>[] = [];
 const assignments = new Map<string, string>();
 let assignCalls = 0;
 let connected = true;
+let hangNextAdd = false;
 
 const digestOf = (ids: string[]): string => `sha256:${ids.join(",")}`;
 const resulting = (id: string): string[] => (plan.includes(id) ? plan : [...plan, id]);
@@ -53,8 +54,17 @@ beforeAll(async () => {
         if (r.dry_run === true) return { json: { ok: true, dry_run: true, outcome: "would_add", case_id: r.case_id, plan_item_id: item.plan_item_id, proposed_by: "operator_local", item, plan_precondition: { ref: `plan:${CASE}`, expected_digest: digestOf(resulting(item.plan_item_id)) } } };
         const requestId = String(r.request_id);
         if (replies.has(requestId)) return { json: replies.get(requestId) };
+        if (hangNextAdd) {
+          hangNextAdd = false;
+          return { hang: true };
+        }
         const pre = (r.preconditions as { records: { expected_digest: string }[] } | undefined)?.records[0];
-        if (pre === undefined || pre.expected_digest !== digestOf(resulting(item.plan_item_id))) return { json: { outcome: "rejected_as_stale", code: "precondition_failed", changed_records: [{ ref: `plan:${CASE}`, expected_digest: pre?.expected_digest ?? "", current_digest: digestOf(resulting(item.plan_item_id)) }] } };
+        if (pre === undefined || pre.expected_digest !== digestOf(resulting(item.plan_item_id))) {
+          // Like the real case keeper: a refusal is remembered under its request id and replayed.
+          const stale = { outcome: "rejected_as_stale", code: "precondition_failed", changed_records: [{ ref: `plan:${CASE}`, expected_digest: pre?.expected_digest ?? "", current_digest: digestOf(resulting(item.plan_item_id)) }] };
+          replies.set(requestId, stale);
+          return { json: stale };
+        }
         plan = resulting(item.plan_item_id);
         adds.push(r);
         const reply = { ok: true, case_id: r.case_id, plan_item_id: item.plan_item_id, proposed_by: "operator_local" };
@@ -79,6 +89,7 @@ const reset = (): void => {
   assignments.clear();
   assignCalls = 0;
   connected = true;
+  hangNextAdd = false;
 };
 const draft = async (): Promise<{ draftId: string; agent: { offered: boolean } }> => app.get("/desk/draft");
 const preview = async (draftId: string, text: string) => {
@@ -150,6 +161,48 @@ describe("Hand off", () => {
     expect((await draft()).draftId).toBe(draftId);
     const again = await preview(draftId, "Fix the checkout total");
     expect((await send({ draft_id: draftId, text: "Fix the checkout total", plan_precondition: again.body.preview.plan_precondition })).status).toBe(200);
+  });
+
+  test("a hand off retried after a stale preview succeeds with the next attempt id", async () => {
+    reset();
+    const { draftId } = await draft();
+    const p = await preview(draftId, "Fix the checkout total");
+    plan = ["someone_elses_step"];
+    const stale = await send({ draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition });
+    expect(stale.body.outcome).toBe("preview_out_of_date");
+    const p2 = await preview(draftId, "Fix the checkout total");
+    const ok = await send({ draft_id: draftId, text: "Fix the checkout total", plan_precondition: p2.body.preview.plan_precondition });
+    expect(ok.status).toBe(200);
+    const ids = keeper.received.filter((r) => r.verb === "case_add_item" && r.dry_run === false).slice(-2).map((r) => r.request_id);
+    expect(ids).toEqual([`handoff:${draftId}`, `handoff:${draftId}:a1`]);
+    expect(plan).toHaveLength(2);
+    expect(adds).toHaveLength(1);
+  });
+
+  test("a timeout keeps the same request id", async () => {
+    reset();
+    const { draftId } = await draft();
+    const p = await preview(draftId, "Fix the checkout total");
+    const body = { draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition };
+    hangNextAdd = true;
+    const lost = await send(body);
+    expect(lost.status).toBe(502);
+    const again = await send(body);
+    expect(again.status).toBe(200);
+    const ids = keeper.received.filter((r) => r.verb === "case_add_item" && r.dry_run === false).slice(-2).map((r) => r.request_id);
+    expect(ids).toEqual([`handoff:${draftId}`, `handoff:${draftId}`]);
+    expect(adds).toHaveLength(1);
+  });
+
+  test("two confirms of one draft still make one step", async () => {
+    reset();
+    const { draftId } = await draft();
+    const p = await preview(draftId, "Fix the checkout total");
+    const body = { draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition };
+    const [a, b] = await Promise.all([send(body), send(body)]);
+    expect([a.status, b.status]).toEqual([200, 200]);
+    expect(plan).toHaveLength(1);
+    expect(adds).toHaveLength(1);
   });
 
   test("when agent work is not connected the desk says so and refuses to hand a step to an agent", async () => {
