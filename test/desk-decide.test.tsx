@@ -226,6 +226,7 @@ describe("decisions through the application and a fake case keeper", () => {
     const sent = keeper.received.filter((r) => r.verb === "approval_decide");
     expect(sent.length).toBe(before + 1);
     expect(sent.at(-1)).toMatchObject({ approval_id: "ap1", decision: "approve", preconditions: { records: [{ ref: "approval:ap1", expected_digest: "sha256:d1" }] } });
+    expect(sent.at(-1)!.request_id).toBe("horizon:decide:ap1:accept");
     expect(decided).toHaveLength(0);
     expect((await app.state()).decide.cards).toHaveLength(1);
   });
@@ -238,7 +239,7 @@ describe("decisions through the application and a fake case keeper", () => {
     expect(ok.status).toBe(200);
     expect(ok.body.ok).toBe(true);
     expect(decided).toHaveLength(1);
-    expect(decided[0]).toMatchObject({ verb: "approval_decide", case_id: "case_1", decision: "approve", note: "looks right", request_id: "horizon:decide:ap1:accept", on_behalf_of: { actor_id: "actor:operator" } });
+    expect(decided[0]).toMatchObject({ verb: "approval_decide", case_id: "case_1", decision: "approve", note: "looks right", request_id: "horizon:decide:ap1:accept:a1", on_behalf_of: { actor_id: "actor:operator" } });
     // It is no longer waiting, so a second press does nothing and says so.
     const again = await send({ card_id: card.id, choice: "accept", preview_code: card.preview.code, records: card.preview.records });
     expect(again.status).toBe(404);
