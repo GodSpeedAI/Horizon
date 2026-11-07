@@ -2166,8 +2166,10 @@ export async function createApplication(
   async function logRow(input: Parameters<typeof appendRow>[2]): Promise<void> {
     try {
       await appendRow(runtime.runtime.store, deskWho, input, clock());
-    } catch {
-      // The operation itself is already done or refused; the record is a read model.
+    } catch (error) {
+      // The operation itself is already done or refused; the record is a read model. A failed
+      // write is logged by its kind only, so the gap is visible to whoever runs the desk.
+      console.error(`conversation: a row could not be recorded (${error instanceof Error ? error.name : "unknown error"})`);
     }
   }
 
