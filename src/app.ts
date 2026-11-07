@@ -89,6 +89,7 @@ import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistor
 import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
 import { acceptanceBlocked, answerFor, listAnswers, recordAnswer, routeAnswer, stopWaiting, checkValue, OUTCOMES, WAITING_WORDS, type PanelAnswer } from "./capabilities/panel-answers.ts";
+import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
 import { NO_PANELS, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { readableTitle } from "./ui/desk/banned-words.ts";
@@ -1804,7 +1805,7 @@ export async function createApplication(
   // ---- Stage 4: panels from agents. The open panels are held here; the person's answers are kept in `horizon-panel-answers`. ----
   let panelBoard: PanelsBoard = NO_PANELS;
 
-  /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`). A reply on a panel clears the wait on the answers given there. */
+  /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`). To choose parts well an agent reads `GET /desk/panels/catalogue`. A reply on a panel clears the wait on the answers given there. */
   async function applyAgentOp(op: AgentOp): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
     if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied) };
     // Only the agent saying where an answer went closes it; nothing else counts as a reply.
@@ -2255,6 +2256,8 @@ export async function createApplication(
           }
           if (url.pathname === "/desk/start" && request.method === "POST") return deskStart(request);
           if (url.pathname === "/desk/panels/op" && request.method === "POST") return deskPanelOp(request);
+          // The parts catalogue, in plain words, for agents choosing how to build a panel. Read-only, so an agent on the page may call it.
+          if (url.pathname === "/desk/panels/catalogue" && request.method === "GET") return Response.json({ schema: SURFACE_SCHEMA, vocabulary: vocabulary(), blocks: CATALOGUE }, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
           if (url.pathname === "/desk/handoff/preview" && request.method === "POST") return deskHandoff(request, "preview", page);
           if (url.pathname === "/desk/handoff" && request.method === "POST") return deskHandoff(request, "send");
           if ((url.pathname === "/workspace" || url.pathname === "/workspace/approvals") && request.method === "GET") {

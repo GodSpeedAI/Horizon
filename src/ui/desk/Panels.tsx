@@ -20,6 +20,8 @@ export interface PanelsIo {
 
 /** The grammar's own drawer for each thing a card holds. A question uses the question drawer, with the answer and withdrawal state of that card. */
 function Item({ panel, item, io, ctx }: { readonly panel: Panel; readonly item: PanelBlock; readonly io: PanelsIo; readonly ctx: BlockCtx }): ReactNode {
+  // A part that passed the grammar whole is drawn by its own drawer, whatever its type. A question's answer state comes from the card.
+  if (item.block !== undefined) return drawBlock(item.block, ctx);
   switch (item.kind) {
     case "text":
       return drawBlock({ type: "callout", id: item.id, tone: item.tone, text: item.label !== null ? `${item.label}: ${item.text}` : item.text }, ctx);
@@ -77,6 +79,10 @@ export function PanelCard({ panel, io, presenting = false, onAction = () => unde
     onSubmit,
     onAction,
     openRef,
+    askState: (askId) => {
+      const ask = panel.blocks.find((b) => b.kind === "question" && b.id === askId);
+      return ask?.kind === "question" ? { answered: ask.answered, withdrawn: ask.withdrawn ?? null } : undefined;
+    },
     hideNames: (text) => text,
     mediaUrl: () => null,
   };

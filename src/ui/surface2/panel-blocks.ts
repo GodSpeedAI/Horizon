@@ -6,20 +6,25 @@
  * this file is a small display shape (`text`, `rows`, `question`, `unavailable`) that the desk can draw without naming any block type,
  * so no second copy of the vocabulary exists outside this directory. Text is always text: nothing here produces markup.
  */
-import { ASK_INPUTS, BLOCK_TYPES, MAX_CONSEQUENCE, MAX_TEXT_ANSWER, type AskInput, type BlockType } from "./grammar";
+import { ASK_INPUTS, BLOCK_TYPES, MAX_CONSEQUENCE, MAX_TEXT_ANSWER, SurfaceBlock, type AskInput, type BlockType } from "./grammar";
 
 export { MAX_TEXT_ANSWER, type AskInput };
 
+/** A block that passed the grammar whole (strict, with provenance). It is kept on its item, so the desk can draw it with its own drawer. */
+export interface Validated {
+  readonly block?: SurfaceBlock;
+}
+
 export type PanelTone = "neutral" | "info" | "success" | "warning" | "danger";
 
-export interface TextItem {
+export interface TextItem extends Validated {
   readonly kind: "text";
   readonly id: string;
   readonly tone: PanelTone;
   readonly label: string | null;
   readonly text: string;
 }
-export interface RowsItem {
+export interface RowsItem extends Validated {
   readonly kind: "rows";
   readonly id: string;
   readonly columns: readonly string[];
@@ -36,7 +41,7 @@ export interface QuestionOption {
  * `confirm` (Yes / No, no options) or `text` (one line, at most `MAX_TEXT_ANSWER` characters, no options).
  * `withdrawn` is set when the agent took the question back; the reason is shown in its place.
  */
-export interface QuestionItem {
+export interface QuestionItem extends Validated {
   readonly kind: "question";
   readonly id: string;
   /** Missing means `select`. `questionOf` always sets it. */
@@ -49,7 +54,7 @@ export interface QuestionItem {
   readonly answered: { readonly outcome: string; readonly value: unknown; readonly note: string | null; readonly routed_as?: string | null } | null;
   readonly withdrawn?: { readonly reason: string } | null;
 }
-export interface UnavailableItem {
+export interface UnavailableItem extends Validated {
   readonly kind: "unavailable";
   readonly id: string;
 }
@@ -88,12 +93,16 @@ const DRAWN: Partial<Record<BlockType, (raw: Record<string, unknown>, id: string
   ask: (raw, id) => questionOf(raw, id),
 };
 
-/** One cockpit block as a panel item. Anything outside the grammar, or not drawable here, becomes `unavailable`. */
+/** One cockpit block as a panel item. Anything outside the grammar, or not drawable here, becomes `unavailable`. A block that passes the grammar whole is kept on the item as `block`. */
 export function itemOf(raw: unknown, index: number): PanelItem {
   const fallback = `block_${index + 1}`;
   if (!isRec(raw)) return { kind: "unavailable", id: fallback };
   const id = typeof raw.id === "string" && ID.test(raw.id) ? raw.id : fallback;
   const type = BLOCK_TYPES.find((t) => t === raw.type);
   const draw = type === undefined ? undefined : DRAWN[type];
-  return draw?.(raw, id) ?? { kind: "unavailable", id };
+  const item = draw?.(raw, id) ?? { kind: "unavailable" as const, id };
+  const checked = type === undefined ? null : SurfaceBlock.safeParse(raw);
+  if (checked?.success !== true) return item;
+  // The kept block draws with the grammar's own drawer. An item the display shapes could not make (a tree, a graph) is still kept.
+  return { ...item, block: checked.data };
 }

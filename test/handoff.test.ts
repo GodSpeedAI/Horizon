@@ -206,6 +206,33 @@ describe("Hand off", () => {
     expect(adds).toHaveLength(1);
   });
 
+  test("an agent's proposal keeps its own draft: your draft and preview are untouched, and each confirm sends its own words", async () => {
+    reset();
+    const mine = (await draft()).draftId;
+    const p1 = await preview(mine, "My own words");
+    await app.post("/desk/draft", { draft_id: mine, text: "My own words", mode: "handoff" });
+    // The agent proposes under a fresh draft id.
+    const theirs = crypto.randomUUID();
+    const proposed = await fetch(`${app.base}/desk/handoff/preview`, { method: "POST", headers: { "content-type": "application/json", "x-horizon-source": "page-agent", "x-horizon-agent-name": "Helper" }, body: JSON.stringify({ draft_id: theirs, text: "The agent's words" }) });
+    expect(proposed.status).toBe(200);
+    const p2 = (await proposed.json()) as Record<string, any>;
+    // Your draft is still yours, with your words.
+    expect(await draft()).toMatchObject({ draftId: mine, text: "My own words" });
+    // Confirm your own: your words go out, not the agent's.
+    const first = await send({ draft_id: mine, text: "My own words", plan_precondition: p1.body.preview.plan_precondition });
+    expect(first.status).toBe(200);
+    expect(adds.map((a) => (a.item as { name: string }).name)).toEqual(["My own words"]);
+    // The plan changed, so the agent's older preview is out of date; looking again gives the same proposal a fresh preview.
+    const stale = await send({ draft_id: theirs, text: "The agent's words", plan_precondition: p2.preview.plan_precondition });
+    expect(stale.status).toBe(409);
+    const again = await fetch(`${app.base}/desk/handoff/preview`, { method: "POST", headers: { "content-type": "application/json", "x-horizon-source": "page-agent" }, body: JSON.stringify({ draft_id: theirs, text: "The agent's words" }) });
+    const p3 = (await again.json()) as Record<string, any>;
+    const second = await send({ draft_id: theirs, text: "The agent's words", plan_precondition: p3.preview.plan_precondition });
+    expect(second.status).toBe(200);
+    expect(adds.map((a) => (a.item as { name: string }).name)).toEqual(["My own words", "The agent's words"]);
+    expect(new Set(adds.map((a) => a.request_id)).size).toBe(2);
+  });
+
   test("two confirms of one draft still make one step", async () => {
     reset();
     const { draftId } = await draft();
