@@ -37,6 +37,8 @@ export interface DeskStatus {
   /** Days left on the workshop access key, only when 7 or fewer (or it has run out). */
   readonly keyWarning: string | null;
   readonly presenting: boolean;
+  /** Plain words when records are being made without a rulebook edition; absent or null otherwise. */
+  readonly rulebookWarning?: string | null;
 }
 
 export interface DeskCase {

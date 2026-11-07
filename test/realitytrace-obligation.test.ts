@@ -96,13 +96,13 @@ describe("the vetted verifier under RealityTrace", () => {
 describe("the RealityTrace obligation adapter, against a fake binary", () => {
   const dirs: string[] = [];
   afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
-  function rig(script: string, timeoutMs?: number) {
+  function rig(script: string, timeoutMs?: number, rulebookEntry?: string) {
     const dir = mkdtempSync(join(tmpdir(), "horizon-rt-fake-"));
     dirs.push(dir);
     const bin = join(dir, "realitytrace");
     writeFileSync(bin, `#!/bin/sh\n${script}\n`);
     chmodSync(bin, 0o755);
-    return { dir, bin, rt: new RealityTraceObligation({ bin, dataHome: join(dir, "d"), stateHome: join(dir, "s"), repoDir: join(dir, "repo"), ...(timeoutMs ? { timeoutMs } : {}) }) };
+    return { dir, bin, rt: new RealityTraceObligation({ bin, dataHome: join(dir, "d"), stateHome: join(dir, "s"), repoDir: join(dir, "repo"), ...(timeoutMs ? { timeoutMs } : {}), ...(rulebookEntry ? { rulebookEntry } : {}) }) };
   }
   const input = { intentId: "i1", statement: "the record exists", target: TARGET, criteria: { minimum_relevance: "high", minimum_reliability: "low" } };
 
@@ -131,6 +131,39 @@ esac`,
     expect(files).toContain('"title":"the record exists"');
     expect(files).toContain('"minimum_relevance":"high"');
     expect(files).toContain('"minimum_reliability":"low"');
+  });
+
+  test("horizon run begins on the real snapshot id", async () => {
+    const SNAP = "sha256:" + "ab".repeat(32);
+    const { rt, bin, dir } = rig(
+      `echo "$@" >> $0.log
+case "$1 $2" in
+  "repo list") echo '{"repos":[]}';;
+  "repo enroll") echo '{"repo_id":"R1"}';;
+  "semantic configure") echo '{"state":"semantic"}';;
+  "snapshot create") echo '{"snapshot_id":"${SNAP}"}';;
+  "run begin") echo '{"run_id":"run1"}';;
+  "plan create") echo '{}';;
+  "verify run") echo '{"observations":[{"observation_id":"o1","exit_code":0,"ledger_position":{"ledger_id":"L","append_ordinal":6}}]}';;
+esac`,
+      undefined,
+      "/rulebook/interaction-model.sea",
+    );
+    const snapshot = await rt.snapshot();
+    expect(snapshot).toBe(SNAP);
+    expect(rt.rulebookConnected()).toBe(true);
+    await rt.run({ question_id: "q", threshold_id: "t", position: { ledger_id: "L", ordinal: 1 } }, ["v"], [], 5, { target: TARGET, snapshot });
+    const log = readFileSync(`${bin}.log`, "utf8");
+    expect(log).toContain("semantic configure --repo R1 --entry /rulebook/interaction-model.sea");
+    expect(log).toContain(`run begin --repo R1 --snapshot ${SNAP}`);
+    expect(log).not.toContain("snapshot:horizon");
+    expect(dir).toBeTruthy();
+  });
+
+  test("a rulebook that cannot be snapshotted falls back to genesis and says it is not connected", async () => {
+    const { rt } = rig(`case "$1 $2" in "repo list") echo '{"repos":[]}';; "repo enroll") echo '{"repo_id":"R1"}';; "semantic configure") echo no >&2; exit 3;; esac`, undefined, "/rulebook/x.sea");
+    expect(await rt.snapshot()).toBe("snapshot:genesis");
+    expect(rt.rulebookConnected()).toBe(false);
   });
 
   test("sxr does not block the event loop", async () => {

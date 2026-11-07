@@ -365,11 +365,14 @@ export async function createApplication(
         : (options.realityTrace ?? realityTraceFromEnv(process.env, defaultRealityTraceRepo(options.storePath ?? process.env.HORIZON_STORE ?? loaded.config.runtime_store)));
   // HORIZON-001 1.1.0: bound operations, capacity and the obligation flow (SPEC-CR-002).
   const bindingFor = (operationRef: string) => loaded.config.operations.find((binding) => binding.operation_ref === operationRef);
+  // The rulebook is Horizon's DomainForge model; RealityTrace snapshots it so records carry its edition.
+  const obligationRt = realityTrace ? new RealityTraceObligation({ bin: realityTrace.bin, dataHome: realityTrace.dataHome, stateHome: realityTrace.stateHome, repoDir: `${realityTrace.repoDir}-obligations`, rulebookEntry: resolve("domain", "interaction-model.sea") }) : null;
+  void obligationRt?.snapshot();
   const obligationDeps: ObligationDeps = {
     store: () => runtime.runtime.store,
     tenant: caller.tenant,
     // Its own repository in the same RealityTrace home, so SEA-Forge reads both through one data home.
-    realityTrace: realityTrace ? new RealityTraceObligation({ bin: realityTrace.bin, dataHome: realityTrace.dataHome, stateHome: realityTrace.stateHome, repoDir: `${realityTrace.repoDir}-obligations` }) : null,
+    realityTrace: obligationRt,
     settlement: loaded.config.settlement ?? null,
     // The verifier reads a read-only snapshot of the store, never the live WAL database (see settlement/snapshot.ts).
     get snapshot() {
@@ -1472,6 +1475,7 @@ export async function createApplication(
         parts: health.parts,
         keyWarning: health.keyWarning,
         presenting,
+        rulebookWarning: obligationRt !== null && obligationRt.rulebookConnected() === false ? "Rulebook not connected for records: new records are made without a rulebook edition." : null,
       },
       days: await listDays(store, deskWho),
       cases: casesNow,

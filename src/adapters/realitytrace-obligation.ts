@@ -25,7 +25,12 @@ export interface RealityTraceObligationConfig {
   readonly timeoutMs?: number;
   /** Largest answer read from any command, in bytes. Default 16 MB. */
   readonly maxBytes?: number;
+  /** Absolute path of the DomainForge entry (.sea) that is Horizon's rulebook. When absent, runs begin on the genesis snapshot. */
+  readonly rulebookEntry?: string;
 }
+
+/** The snapshot RealityTrace falls back to when no rulebook is configured; a run on it carries no rulebook edition. */
+export const GENESIS_SNAPSHOT = "snapshot:genesis";
 
 export interface DeclareInput {
   readonly intentId: string;
@@ -66,6 +71,8 @@ export class RealityTraceError extends Error {
 
 export class RealityTraceObligation {
   private repoId: string | null = null;
+  private snapshotId: string | null = null;
+  private rulebookOk: boolean | null = null;
 
   constructor(private readonly config: RealityTraceObligationConfig) {}
 
@@ -132,6 +139,36 @@ export class RealityTraceObligation {
     const known = (listed.repos ?? []).find((repo) => [repo.filesystem_path, repo.path, repo.root].some((p) => p !== undefined && real(p) === want));
     this.repoId = known?.repo_id ?? ((await this.sxr(["repo", "enroll", this.config.repoDir])) as { repo_id: string }).repo_id;
     return this.repoId;
+  }
+
+  /** Whether the rulebook is connected: null until the first try, then true or false. */
+  rulebookConnected(): boolean | null {
+    return this.rulebookOk;
+  }
+
+  /**
+   * The real snapshot id of the rulebook, made once: configure the repository's semantics with the rulebook entry, then
+   * `snapshot create`. If that fails the genesis snapshot is used and rulebookConnected() says false (it is tried again next call).
+   */
+  async snapshot(): Promise<string> {
+    if (this.snapshotId !== null) return this.snapshotId;
+    const entry = this.config.rulebookEntry;
+    if (entry === undefined) {
+      this.rulebookOk = false;
+      return GENESIS_SNAPSHOT;
+    }
+    try {
+      const repo = await this.repo();
+      await this.sxr(["semantic", "configure", "--repo", repo, "--entry", entry]);
+      const made = (await this.sxr(["snapshot", "create", "--repo", repo])) as { snapshot_id?: unknown };
+      if (typeof made.snapshot_id !== "string" || !made.snapshot_id.startsWith("sha256:")) throw new RealityTraceError("snapshot create returned no snapshot id");
+      this.snapshotId = made.snapshot_id;
+      this.rulebookOk = true;
+      return this.snapshotId;
+    } catch {
+      this.rulebookOk = false;
+      return GENESIS_SNAPSHOT;
+    }
   }
 
   private async withFile<T>(name: string, content: unknown, body: (path: string) => Promise<T>): Promise<T> {

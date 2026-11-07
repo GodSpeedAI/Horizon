@@ -45,6 +45,11 @@ export function StatusBar({ status, onPresenting, remote = null }: StatusBarProp
           </li>
         ))}
       </ul>
+      {status.rulebookWarning ? (
+        <p className="status-line needs-you" data-field="rulebook-warning" role="status">
+          {status.rulebookWarning}
+        </p>
+      ) : null}
       <div className="status-line">
         <button type="button" role="switch" aria-checked={status.presenting} data-presenting-switch onClick={() => onPresenting(!status.presenting)}>
           Presenting: {status.presenting ? "on" : "off"}

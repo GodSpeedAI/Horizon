@@ -35,13 +35,13 @@ import type { GateAssessment } from "../domain/navigation.ts";
 import { paymentGate } from "../domain/payment.ts";
 import type { CapacityAllowance } from "../domain/payment.ts";
 import type { OperationBindingConfig } from "../config/types.ts";
+import { GENESIS_SNAPSHOT } from "../adapters/realitytrace-obligation.ts";
 import type { DeclaredThreshold, RealityTraceObligation, VerifierRun } from "../adapters/realitytrace-obligation.ts";
 import { readLedger } from "../capabilities/capacity-ledger.ts";
 import { takeSnapshot } from "./snapshot.ts";
 
-/** The concept the verifier run attests and the rulebook snapshot it runs under (were literals in the adapter). */
+/** The concept the verifier run attests (was a literal in the adapter). The snapshot is the rulebook's real snapshot id. */
 const RT_TARGET = "concept:navigation_intent";
-const RT_SNAPSHOT = "snapshot:horizon";
 import { type PendingIntent, reservePendingIntent, terminate, updatePending } from "../capabilities/pending-intent.ts";
 
 export class ObligationRefusal extends Error {
@@ -56,7 +56,7 @@ export interface ObligationDeps {
   readonly store: () => DurableStore;
   readonly tenant: string;
   /** Null when RealityTrace is not configured for settlement. */
-  readonly realityTrace: Pick<RealityTraceObligation, "declare" | "run"> | null;
+  readonly realityTrace: Pick<RealityTraceObligation, "declare" | "run"> & Partial<Pick<RealityTraceObligation, "snapshot">> | null;
   /** Null when no settlement confinement is configured. */
   readonly settlement: { readonly launcher: readonly string[]; readonly close_grace_s: number } | null;
   /** Where the verifier's read-only store snapshot is taken from and to. Absent: the verifier is not given one. */
@@ -186,7 +186,7 @@ async function runVerifierWith(deps: ObligationDeps, binding: OperationBindingCo
     }
   }
   try {
-    return { run: await deps.realityTrace.run(pending.threshold, pending.verifier_argv, deps.settlement.launcher, timeoutS, { target: RT_TARGET, snapshot: RT_SNAPSHOT }) };
+    return { run: await deps.realityTrace.run(pending.threshold, pending.verifier_argv, deps.settlement.launcher, timeoutS, { target: RT_TARGET, snapshot: (await deps.realityTrace.snapshot?.()) ?? GENESIS_SNAPSHOT }) };
   } catch {
     return { run: null };
   }
