@@ -31,6 +31,17 @@ export function interpretDecision() {
   return { decision: "deny", reason: "memory-only fake runtime" };
 }
 
+// The real package's gateway client, reduced to one that refuses everything. The cockpit imports it, so
+// the fake must export it to load; it governs nothing.
+export class SeaForgeAuthority {
+  constructor(options) {
+    this.options = options;
+  }
+  async decide() {
+    return { disposition: "unknown", reason: "memory-only fake runtime" };
+  }
+}
+
 export async function createRuntime(options) {
   const storePath = typeof options.store === "string" ? options.store : options.store?.sqlite?.path ?? "/tmp/fake.sqlite";
   mkdirSync(dirname(storePath), { recursive: true });
