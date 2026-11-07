@@ -181,7 +181,7 @@ li[data-cursor="true"]::before { content:"Current item"; position:absolute; widt
 .cv-view .cv-try { margin:.5rem auto; padding:0; }
 .cv-rows-wrap { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; padding:.4rem 0 1rem; }
 .cv-rows { list-style:none; margin:0; padding:0; display:grid; gap:.9rem; }
-.cv-row { display:grid; gap:.2rem; border:1px solid transparent; border-radius:var(--cg-r-sm); }
+.cv-row { display:grid; grid-template-columns:minmax(0,1fr); min-width:0; gap:.2rem; border:1px solid transparent; border-radius:var(--cg-r-sm); }
 .cv-row[data-cursor="true"] { border-color:var(--cg-accent); }
 .cv-line { display:flex; flex-wrap:wrap; align-items:baseline; gap:.2rem .6rem; width:100%; text-align:left; border-color:transparent !important; background:transparent !important; padding:.2rem .4rem; }
 .cv-line:hover { background:var(--cg-hover) !important; }

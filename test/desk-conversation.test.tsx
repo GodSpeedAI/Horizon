@@ -1,6 +1,7 @@
 /** @jsxImportSource react */
 /** The Conversation view and the one composer (stage 8): rows, badges, cards, commands, the status line, and plain words throughout. */
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { START, type UiState } from "../src/ui/desk/attention.ts";
 import { BANNED } from "../src/ui/desk/banned-words.ts";
@@ -175,5 +176,17 @@ describe("a confirmed proposal", () => {
     expect(keepsDraft("mine", "theirs")).toBe(true);
     expect(keepsDraft("mine", null)).toBe(true);
     expect(keepsDraft("theirs", "theirs")).toBe(false);
+  });
+});
+
+describe("a wide part on a phone", () => {
+  test("a row may shrink to the screen, so a wide part inside it scrolls on its own and the page does not (seen live at 390 px)", () => {
+    expect(readFileSync(new URL("../src/ui/desk/desk.css", import.meta.url), "utf8")).toMatch(/\.cv-row \{ display:grid; grid-template-columns:minmax\(0,1fr\); min-width:0;/);
+  });
+});
+
+describe("a chart on a phone", () => {
+  test("its hidden table is contained by the chart, so it cannot make the page scroll sideways (seen live at 390 px)", () => {
+    expect(readFileSync(new URL("../src/ui/desk/blocks/blocks.css", import.meta.url), "utf8")).toMatch(/\.hb-chart \{ position:relative; overflow:hidden; \}/);
   });
 });

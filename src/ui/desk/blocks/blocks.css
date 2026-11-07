@@ -17,7 +17,9 @@
 .hb-tree, .hb-timeline, .hb-media, .hb-pins { margin:.2rem 0; padding-left:1.2rem; } .hb-tree ul { padding-left:1.1rem; }
 .hb-timeline li, .hb-tree li { margin:.15rem 0; } .hb-timeline time { color:var(--muted); font-size:.8rem; }
 .hb-media { list-style:none; padding:0; display:flex; flex-wrap:wrap; gap:.6rem; } .hb-media img { max-width:16rem; max-height:12rem; border:1px solid var(--line); }
-.hb-chart, .hb-graph { margin:0; } .hb-svg { width:100%; max-width:36rem; height:auto; } .hb-svg-fixed { max-width:none; }
+.hb-chart, .hb-graph { margin:0; }
+/* The chart's hidden table (.hb-sr) is a table, which cannot shrink to 1px; contain it so it never widens the page on a phone. */
+.hb-chart { position:relative; overflow:hidden; } .hb-svg { width:100%; max-width:36rem; height:auto; } .hb-svg-fixed { max-width:none; }
 .hb-grid { stroke:var(--line); stroke-width:1; } .hb-axis { fill:var(--muted); font-size:11px; }
 .hb-s0 { fill:var(--accent); } .hb-s1 { fill:var(--ok); } .hb-s2 { fill:var(--danger); } .hb-s3 { fill:var(--focus); } .hb-s4 { fill:var(--edge); } .hb-s5 { fill:var(--muted); } .hb-s6 { fill:var(--fg); } .hb-s7 { fill:var(--line); }
 .hb-l0, .hb-l1, .hb-l2, .hb-l3, .hb-l4, .hb-l5, .hb-l6, .hb-l7 { fill:none; }
