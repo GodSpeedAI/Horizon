@@ -90,7 +90,7 @@ import { NO_PANELS, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type P
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { caseTitle, matches, partsOf, plainWords, sourcesOf, type DeskCase, type DecideState, type DecisionCardData, type PanelsData, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
 import { buildDecide, waitingCount, type CaseApprovals, type HumanStepInput } from "./ui/desk/decide-build.ts";
-import { addItem, approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
+import { addItem, advance as caseAdvance, entryOptions, approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
 import { activeHolds, checkReason, putHold, recordDecision } from "./capabilities/decisions.ts";
 import { caseItems, costSource, orderWork, sessionItems, type AcceptedKnowledge, type WorkData } from "./ui/desk/work-build.ts";
 import { readLedgerDay } from "./adapters/ledger-day.ts";
@@ -1400,6 +1400,34 @@ export async function createApplication(
     keeperCaseCache = { at: Date.now(), value };
     return value;
   }
+  // A case is named by what its template says it is for. The template of a case never changes, so it is read once per case; a template's
+  // description is read once per template (and again, at most every 30 s, while some template is still unknown).
+  const caseTemplate = new Map<string, string | null>();
+  const templateWords = new Map<string, string | null>();
+  let templatesAt = 0;
+  const humanise = (ref: string): string => {
+    const words = ref.split("@")[0]!.replace(/[-_.]+/g, " ").trim();
+    return words === "" ? "" : words[0]!.toUpperCase() + words.slice(1);
+  };
+  async function titleOf(c: CaseLine): Promise<string> {
+    const fallback = caseTitle(c.summary, c.created_at);
+    if (caseKeeper === null) return fallback;
+    if (!caseTemplate.has(c.case_id)) {
+      const overview = await caseDigest(caseKeeper, c.case_id);
+      if (overview.kind !== "ok") return fallback;
+      caseTemplate.set(c.case_id, overview.value.template_ref);
+    }
+    const ref = caseTemplate.get(c.case_id) ?? null;
+    if (ref === null) return fallback;
+    if (!templateWords.has(ref) && Date.now() - templatesAt > 30_000) {
+      templatesAt = Date.now();
+      const options = await entryOptions(caseKeeper);
+      if (options.kind === "ok") for (const t of options.value.templates) templateWords.set(t.template_ref, t.description);
+    }
+    const description = templateWords.get(ref);
+    const oneLine = description ? description.replace(/\s+/g, " ").slice(0, 90) : "";
+    return oneLine !== "" ? oneLine : humanise(ref) || fallback;
+  }
   const isOpenCase = (c: CaseLine): boolean => c.case_state === "active" || c.case_state === "awaiting_approval";
   const CASE_STATE_PLAIN: Record<string, string> = { active: "Running", awaiting_approval: "Waiting for your approval", completed: "Done", terminated: "Stopped" };
 
@@ -1408,7 +1436,7 @@ export async function createApplication(
     const rows = await runtime.runtime.store.listRecords(CASE_COLLECTION, { tenant: caller.tenant });
     const own = rows.map((row): DeskCase => ({ case_ref: String(row.value.case_ref), purpose: String(row.value.purpose), opened_at: String(row.value.opened_at), source: "horizon" }));
     const listed = await keeperCases();
-    const theirs = listed?.kind === "ok" ? listed.value.cases.map((c): DeskCase => ({ case_ref: `case:${c.case_id}`, purpose: caseTitle(c.summary, c.created_at), opened_at: c.created_at, source: "case keeper", state: CASE_STATE_PLAIN[c.case_state] ?? "Unknown state" })) : [];
+    const theirs = listed?.kind === "ok" ? await Promise.all(listed.value.cases.map(async (c): Promise<DeskCase> => ({ case_ref: `case:${c.case_id}`, purpose: await titleOf(c), opened_at: c.created_at, source: "case keeper", state: CASE_STATE_PLAIN[c.case_state] ?? "Unknown state" }))) : [];
     return [...own, ...theirs].sort((a, b) => (a.opened_at < b.opened_at ? 1 : -1));
   }
 
@@ -1524,13 +1552,13 @@ export async function createApplication(
     for (const c of listed.value.cases.filter(isOpenCase).slice(0, 20)) {
       const horizon = await caseSteps(caseKeeper, c.case_id);
       if (horizon.kind !== "ok") {
-        notices.push(`The steps of ${caseTitle(c.summary, c.created_at)} could not be read, so one waiting for you may be missing. ${horizon.kind === "stale" ? REFUSED_OLD : horizon.words}`);
+        notices.push(`The steps of ${await titleOf(c)} could not be read, so one waiting for you may be missing. ${horizon.kind === "stale" ? REFUSED_OLD : horizon.words}`);
         continue;
       }
       const waiting = horizon.value.steps.filter((s) => /^human_?task$/i.test(s.item_kind) && s.execution === "active" && s.settlement === "unsettled");
       if (waiting.length === 0) continue;
       const overview = await caseDigest(caseKeeper, c.case_id);
-      for (const step of waiting) steps.push({ case_id: c.case_id, case_title: caseTitle(c.summary, c.created_at), plan_item_id: step.plan_item_id, name: step.name, last_event_at: step.last_event_at, digest: overview.kind === "ok" ? overview.value.digest : null });
+      for (const step of waiting) steps.push({ case_id: c.case_id, case_title: await titleOf(c), plan_item_id: step.plan_item_id, name: step.name, last_event_at: step.last_event_at, digest: overview.kind === "ok" ? overview.value.digest : null });
     }
     return { steps, notices };
   }
@@ -1694,7 +1722,8 @@ export async function createApplication(
     if (caseKeeper !== null) {
       const listed = await listCases(caseKeeper);
       if (listed.kind === "ok") {
-        cases = { connected: true, words: listed.value.cases.length === 0 ? "No cases yet." : `${listed.value.cases.length} ${listed.value.cases.length === 1 ? "case" : "cases"}.`, items: listed.value.cases, unreadable: listed.value.unreadable.length };
+        const waitingMap = await waitingToStart(listed.value.cases);
+        cases = { connected: true, words: listed.value.cases.length === 0 ? "No cases yet." : `${listed.value.cases.length} ${listed.value.cases.length === 1 ? "case" : "cases"}.`, items: await Promise.all(listed.value.cases.map(async (c) => ({ ...c, title: await titleOf(c), waiting: (waitingMap.get(c.case_id) ?? []) as { plan_item_id: string; name: string }[] }))), unreadable: listed.value.unreadable.length };
         knowledge = listed.value.unreadable.length > 0 ? { kind: "unknown", why: "some cases could not be read, so the count of accepted outcomes cannot be trusted." } : { kind: "known", completed: listed.value.cases.filter((c) => c.case_state === "completed").map((c) => c.case_id) };
       } else {
         const words = listed.kind === "stale" ? REFUSED_OLD : listed.words;
@@ -1783,6 +1812,48 @@ export async function createApplication(
     return { ...panelBoard, waiting: [...waiting].map(([step, panel]) => ({ step, panel })) };
   }
 
+  /** Starts the waiting steps of a case (`case_advance`). The id names one attempt; a refusal moves it on, a timeout keeps it. */
+  async function startCase(caseId: string, base: string): Promise<{ readonly ok: boolean; readonly words: string }> {
+    if (caseKeeper === null) return { ok: false, words: "Cases are not connected." };
+    const store = runtime.runtime.store;
+    const id = await requestIdFor(store, caller.tenant, base);
+    const result = await caseAdvance(caseKeeper, caseId, id);
+    if (result.kind === "ok") return { ok: true, words: "Started." };
+    if (result.kind === "stale" || result.kind === "refused") await attemptRefused(store, caller.tenant, base, id);
+    return { ok: false, words: result.kind === "stale" ? REFUSED_OLD : result.words };
+  }
+
+  /** Steps that were added but have not started, per open case. They are listed under Work as "Waiting to start". */
+  async function waitingToStart(cases: readonly CaseLine[]): Promise<Map<string, { plan_item_id: string; name: string }[]>> {
+    const out = new Map<string, { plan_item_id: string; name: string }[]>();
+    if (caseKeeper === null) return out;
+    for (const c of cases.filter(isOpenCase).slice(0, 20)) {
+      const horizon = await caseSteps(caseKeeper, c.case_id);
+      if (horizon.kind !== "ok") continue;
+      const pending = horizon.value.steps.filter((st) => st.execution === "pending").map((st) => ({ plan_item_id: st.plan_item_id, name: st.name }));
+      if (pending.length > 0) out.set(c.case_id, pending);
+    }
+    return out;
+  }
+
+  async function deskStart(request: Request): Promise<Response> {
+    const headers = { "cache-control": "no-store" };
+    const body = (await request.json().catch(() => null)) as { case_id?: unknown } | null;
+    if (caseKeeper === null) return Response.json({ ok: false, message: "Cases are not connected, so nothing can be started." }, { status: 503, headers });
+    const caseId = typeof body?.case_id === "string" ? body.case_id.replace(/^case:/, "") : "";
+    const listed = await listCases(caseKeeper);
+    if (listed.kind !== "ok") return Response.json({ ok: false, message: listed.kind === "stale" ? REFUSED_OLD : listed.words }, { status: 502, headers });
+    const target = listed.value.cases.find((c) => c.case_id === caseId && isOpenCase(c));
+    if (target === undefined) return Response.json({ ok: false, message: "That case is not running, so nothing can be started." }, { status: 409, headers });
+    const waiting = (await waitingToStart([target])).get(caseId) ?? [];
+    if (waiting.length === 0) return Response.json({ ok: false, message: "Nothing is waiting to start in that case." }, { status: 409, headers });
+    // The id names this set of waiting steps: a later, different set is a different request.
+    const digest = createHash("sha256").update(waiting.map((w) => w.plan_item_id).sort().join("\n")).digest("hex").slice(0, 12);
+    const result = await startCase(caseId, `advance:start:${caseId}:${digest}`);
+    keeperCaseCache = null;
+    return Response.json(result.ok ? { ok: true, message: "Started. The waiting steps are under way." } : { ok: false, message: `It did not start: ${result.words}` }, { status: result.ok ? 200 : 502, headers });
+  }
+
   /** Hand off (stage 4): `POST /desk/handoff/preview` shows the step that would be added; `POST /desk/handoff` adds it. */
   async function deskHandoff(request: Request, phase: "preview" | "send"): Promise<Response> {
     const headers = { "cache-control": "no-store" };
@@ -1809,7 +1880,7 @@ export async function createApplication(
     const wanted = typeof body.case_id === "string" && body.case_id !== "" ? body.case_id.replace(/^case:/, "") : (open[0]?.case_id ?? "");
     const target = open.find((c) => c.case_id === wanted);
     if (target === undefined) return fail(409, "no_case", wanted === "" ? "There is no running case to add a step to. Start a case first." : "That case is not running, so a step cannot be added to it.");
-    const caseTitleNow = caseTitle(target.summary, target.created_at);
+    const caseTitleNow = await titleOf(target);
     const item = handoffItem(draftId, text);
     const agent = deskAgent();
     if (phase === "preview") {
@@ -1837,6 +1908,8 @@ export async function createApplication(
     if (sent.kind === "stale" || sent.kind === "refused") await attemptRefused(store, caller.tenant, handoffRequestId(draftId), sentId);
     if (sent.kind === "stale") return fail(409, "preview_out_of_date", "Preview out of date. This case changed after you looked at it. Nothing was sent. Look at the new preview and decide again.");
     if (sent.kind !== "ok") return fail(sent.kind === "refused" ? 409 : 502, sent.kind, sent.words);
+    // A step that was added stays waiting until the case is advanced. If starting fails, the step is still there.
+    const started = await startCase(target.case_id, `advance:${sentId}`);
     let assigned: { readonly done: boolean; readonly words: string } | null = null;
     if (wantsAgent) {
       const access = options.workshop?.() ?? workshopAccess(loaded.config.workshop, caller, clock());
@@ -1844,7 +1917,7 @@ export async function createApplication(
       assigned = result.kind === "ok" ? { done: true, words: "Given to an agent." } : { done: false, words: result.words };
     }
     const next = await nextDraft(store, caller.tenant, caller.actor.id, draftId);
-    return Response.json({ ok: true, message: `Handed off: "${item.name}" is now a step in "${caseTitleNow}".${assigned === null ? "" : assigned.done ? " It was given to an agent." : ` It was not given to an agent: ${assigned.words}`}`, step_id: sent.value.plan_item_id, assigned, draft_id: next.draftId }, { headers });
+    return Response.json({ ok: true, message: `Handed off: "${item.name}" is now a step in "${caseTitleNow}".${started.ok ? " It has started." : ` It has not started yet: ${started.words} Use Start it under Work.`}${assigned === null ? "" : assigned.done ? " It was given to an agent." : ` It was not given to an agent: ${assigned.words}`}`, step_id: sent.value.plan_item_id, started, assigned, draft_id: next.draftId }, { headers });
   }
 
   /** Whether a step can be given to an agent right now, in words. Nothing is offered that would fail silently. */
@@ -2032,6 +2105,7 @@ export async function createApplication(
             const kept = await saveDraft(runtime.runtime.store, caller.tenant, caller.actor.id, { draftId: parsed.draft_id, text: parsed.text, mode: parsed.mode === "handoff" ? "handoff" : "write" });
             return Response.json({ ok: kept }, { status: kept ? 200 : 409, headers: { "cache-control": "no-store" } });
           }
+          if (url.pathname === "/desk/start" && request.method === "POST") return deskStart(request);
           if (url.pathname === "/desk/panels/op" && request.method === "POST") return deskPanelOp(request);
           if (url.pathname === "/desk/handoff/preview" && request.method === "POST") return deskHandoff(request, "preview");
           if (url.pathname === "/desk/handoff" && request.method === "POST") return deskHandoff(request, "send");

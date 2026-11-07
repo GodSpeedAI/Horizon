@@ -142,6 +142,15 @@ describe("no product names and no internal terms on screen", () => {
     scan("panels", draw({ ...START, view: "decide", data: base({ panels }) }));
   });
 
+  test("Work, with steps waiting to start", () => {
+    const w = work({ readout: { state: "not_configured" }, knowledge: { kind: "unknown", why: "x" } });
+    const withWaiting: WorkData = { ...w, cases: { ...w.cases, items: [{ ...w.cases.items[0]!, title: "Sort the new bug reports", waiting: [{ plan_item_id: "s1", name: "Check the rollback note" }] }] } };
+    const html = draw({ ...START, view: "work", data: base(), work: withWaiting });
+    scan("work, waiting to start", html);
+    expect(text(html)).toContain("Waiting to start (1)");
+    expect(text(html)).toContain("Sort the new bug reports");
+  });
+
   test("the Inspector, the keys list and the quick menu", () => {
     scan("inspector, asked", draw({ ...START, data: base(), selection: "case:c1", inspection: { operation: "why", query: "", busy: false, answer, problem: null } }));
     scan("inspector, failed", draw({ ...START, data: base(), inspection: { operation: "why", query: "", busy: false, answer: null, problem: "Horizon did not answer, so nothing is shown." } }));

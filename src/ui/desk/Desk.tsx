@@ -42,6 +42,8 @@ export interface DeskIo extends NoteIo, InspectIo {
   readonly handoff: HandoffIo;
   /** Answers, pins and closes on panels from agents (stage 4). */
   readonly panels: PanelsIo;
+  /** Starts the steps of a case that were added and are waiting. */
+  readonly startCase: (caseId: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
 }
 
 export interface DeskProps {
@@ -134,7 +136,7 @@ export function Desk(props: DeskProps): ReactNode {
     today: <Today {...viewProps} />,
     explore: <Explore {...viewProps} />,
     decide: <Decide {...viewProps} confirm={confirm} release={release} {...(props.nowMs === undefined ? {} : { nowMs: props.nowMs })} />,
-    work: <Work {...viewProps} saveLabel={io.saveLabel} />,
+    work: <Work {...viewProps} saveLabel={io.saveLabel} startCase={io.startCase} />,
   };
   const history = data?.selected?.history ?? [];
   return (

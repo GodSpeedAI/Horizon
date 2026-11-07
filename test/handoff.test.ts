@@ -19,6 +19,8 @@ const assignments = new Map<string, string>();
 let assignCalls = 0;
 let connected = true;
 let hangNextAdd = false;
+let advanceFails = false;
+const advances: Record<string, unknown>[] = [];
 
 const digestOf = (ids: string[]): string => `sha256:${ids.join(",")}`;
 const resulting = (id: string): string[] => (plan.includes(id) ? plan : [...plan, id]);
@@ -71,6 +73,11 @@ beforeAll(async () => {
         replies.set(requestId, reply);
         return { json: reply };
       }
+      case "case_advance":
+        advances.push(r);
+        return advanceFails ? { json: { ok: false, error_class: "advance_failed", error: "the case keeper could not start it" } } : { json: { ok: true } };
+      case "case_get_horizon":
+        return { json: { case_id: CASE, case_state: "active", items: plan.map((id) => ({ plan_item_id: id, name: `Step ${id}`, item_kind: "human_task", execution: "pending", settlement: "unsettled" })) } };
       default:
         return { json: { ok: false, error_class: "unscripted_verb" } };
     }
@@ -90,6 +97,8 @@ const reset = (): void => {
   assignCalls = 0;
   connected = true;
   hangNextAdd = false;
+  advanceFails = false;
+  advances.length = 0;
 };
 const draft = async (): Promise<{ draftId: string; agent: { offered: boolean } }> => app.get("/desk/draft");
 const preview = async (draftId: string, text: string) => {
@@ -203,6 +212,44 @@ describe("Hand off", () => {
     expect([a.status, b.status]).toEqual([200, 200]);
     expect(plan).toHaveLength(1);
     expect(adds).toHaveLength(1);
+  });
+
+  test("a handed-off step is started after it is added", async () => {
+    reset();
+    const { draftId } = await draft();
+    const p = await preview(draftId, "Fix the checkout total");
+    const body = { draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition };
+    const done = await send(body);
+    expect(done.body.started).toMatchObject({ ok: true });
+    expect(done.body.message).toContain("It has started.");
+    expect(advances).toHaveLength(1);
+    expect(advances[0]).toMatchObject({ verb: "case_advance", case_id: CASE, request_id: `advance:handoff:${draftId}` });
+    // Under Work the step shows as waiting to start until it is started.
+    const work = await app.get("/desk/work.json");
+    expect(work.cases.items[0].waiting.map((w: any) => w.plan_item_id)).toEqual(plan);
+    // Sending again replays: still one step, and the same advance request.
+    await send(body);
+    expect(adds).toHaveLength(1);
+    expect(new Set(advances.map((a) => a.request_id))).toEqual(new Set([`advance:handoff:${draftId}`]));
+  });
+
+  test("if starting fails the step is still added, said in words, and Start it tries again with a new id", async () => {
+    reset();
+    advanceFails = true;
+    const { draftId } = await draft();
+    const p = await preview(draftId, "Fix the checkout total");
+    const done = await send({ draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition });
+    expect(done.status).toBe(200);
+    expect(plan).toHaveLength(1);
+    expect(done.body.started.ok).toBe(false);
+    expect(done.body.message).toContain("It has not started yet:");
+    expect(done.body.message).toContain("Start it");
+    advanceFails = false;
+    const start = await app.post("/desk/start", { case_id: CASE });
+    expect(start.status).toBe(200);
+    expect(advances.length).toBe(2);
+    expect(advances[1]!.request_id).not.toBe(advances[0]!.request_id);
+    expect((await app.post("/desk/start", { case_id: "nope" })).status).toBe(409);
   });
 
   test("when agent work is not connected the desk says so and refuses to hand a step to an agent", async () => {
