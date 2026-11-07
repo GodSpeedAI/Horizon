@@ -1840,7 +1840,9 @@ export async function createApplication(
     return presenting ? applyStandIns(work, presentingKey(), data.repoNames) : work;
   }
 
-  const DESK_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon desk</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/desk/app.css"></head><body><div id="root"></div><noscript>The desk needs JavaScript to show live updates. Turn it on for this page.</noscript><script type="module" src="/desk/app.js"></script></body></html>`;
+  /** The desk page carries a write token. The person's writes send it back; a caller that never loaded the page has none. */
+  const deskWriteToken = randomBytes(24).toString("hex");
+  const DESK_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="horizon-write-token" content="${deskWriteToken}"><title>Horizon desk</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/desk/app.css"></head><body><div id="root"></div><noscript>The desk needs JavaScript to show live updates. Turn it on for this page.</noscript><script type="module" src="/desk/app.js"></script></body></html>`;
   const SETUP_GUIDE_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon setup guide</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:1rem auto;padding:0 1rem}code{overflow-wrap:anywhere}</style></head><body><p><a href="/workspace">Back to the desk</a></p><h1>Setup guide</h1><h2>Start Horizon with the case keeper and record keeper</h2><p>Start the whole set with <code>bun run ignite</code> (see docs/IGNITION.md).</p><h2>Record what agent work costs</h2><ol><li>Install the agent tap with the record keeper: <code>te-agents install --with-realitytrace</code></li><li>Enroll each repository you want measured: <code>te-agents rt enroll &lt;repo&gt;</code></li><li>Point Horizon at the record keeper and the tap's store: set <code>HORIZON_ECONOMICS_REALITYTRACE_BIN</code> (and, if the tap does not use the default location, <code>HORIZON_ECONOMICS_DATA_HOME</code> and <code>HORIZON_ECONOMICS_STATE_HOME</code>), or add an <code>[economics]</code> table with <code>realitytrace_bin</code> to the Horizon config.</li></ol></body></html>`;
   const deskPage = (): Response => new Response(DESK_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": DESK_CSP, "x-content-type-options": "nosniff" } });
   const DESK_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
@@ -2257,6 +2259,11 @@ export async function createApplication(
           if (page !== null) {
             const blocked = pageAgentRefusal(request.method, url.pathname);
             if (blocked !== null) return blocked;
+          }
+          // The person's writes must carry the token the desk page was served with.
+          if (page === null) {
+            const needsToken = request.method === "POST" && HUMAN_WRITES.has(url.pathname);
+            if (needsToken && !writeTokenOk(request.headers.get(WRITE_TOKEN_HEADER), deskWriteToken)) return writeTokenRefusal();
           }
           if (url.pathname === "/health") {
             const semantic = await runtime.runtime.service.invoke(caller, {
@@ -2683,6 +2690,22 @@ export function pageAgentOf(request: Request): PageAgent | null {
   if (request.headers.get("x-horizon-source")?.trim().toLowerCase() !== "page-agent") return null;
   const name = cleanAgentName(request.headers.get("x-horizon-agent-name"));
   return name === undefined ? {} : { name };
+}
+
+/** Every route that writes as the person. Each one needs the desk page's write token. */
+export const HUMAN_WRITES: ReadonlySet<string> = new Set(["/desk/handoff", "/desk/handoff/preview", "/desk/decide", "/desk/note", "/desk/draft", "/desk/panels/op", "/desk/conversation/discard", "/desk/start", "/desk/lesson", "/intent", "/surface/intent"]);
+export const WRITE_TOKEN_HEADER = "x-horizon-write";
+export const WRITE_TOKEN_WORDS = "This did not come from the desk page, so nothing was changed. Reload the desk page and try again.";
+
+export function writeTokenOk(given: string | null, expected: string): boolean {
+  if (given === null) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+export function writeTokenRefusal(): Response {
+  return Response.json({ ok: false, outcome: "no_token", code: "forbidden_write", message: WRITE_TOKEN_WORDS }, { status: 403, headers: { "cache-control": "no-store" } });
 }
 
 export const AGENT_NOTE_WORDS = "An agent can suggest a note; you save it.";

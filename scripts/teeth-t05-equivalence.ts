@@ -142,10 +142,12 @@ async function main(): Promise<void> {
   await withStore(async (store) => {
     const server = await startServer(store);
     try {
+      // Like the desk page, send back the write token the page was served with.
+      const token = /name="horizon-write-token" content="([0-9a-f]+)"/.exec(await (await fetch(`${server.url}/desk`)).text())?.[1] ?? "";
       const submit = async (body: unknown): Promise<number> => {
         const response = await fetch(`${server.url}/surface/intent`, {
           method: "POST",
-          headers: { "content-type": "application/json", accept: "application/json" },
+          headers: { "content-type": "application/json", accept: "application/json", "x-horizon-write": token },
           body: JSON.stringify(body),
         });
         return response.status;

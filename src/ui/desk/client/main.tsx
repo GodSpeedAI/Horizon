@@ -23,6 +23,20 @@ const PINS_KEY = "horizon.desk.pins";
 const ROWS_POLL_MS = 5000;
 const AGENT_HEADERS = { "x-horizon-source": "page-agent", "x-horizon-agent-name": "Agent on this page" } as const;
 
+/** The desk page is served with a write token. Every write the person makes sends it back; an agent's call (marked with the page-agent header) never does. */
+function sendWriteToken(): void {
+  const token = document.querySelector('meta[name="horizon-write-token"]')?.getAttribute("content") ?? "";
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = Object.assign((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+    const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+    if (method === "GET" || method === "HEAD" || headers.has("x-horizon-source") || token === "") return nativeFetch(input, init);
+    headers.set("x-horizon-write", token);
+    return nativeFetch(input, { ...init, headers });
+  }, nativeFetch);
+}
+sendWriteToken();
+
 function read<T>(key: string, fallback: T): T {
   try {
     const raw = window.localStorage.getItem(key);
