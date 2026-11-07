@@ -1,0 +1,24 @@
+== bash scripts/teeth-ledger-freeze.sh
+exit=0
+
+teeth: 6 blocked, 0 missed
+== python3 scripts/teeth-domainforge-gate.py
+exit=0
+
+tooth: gate discriminates (control fails, and the two blind spots are proven)
+== python3 scripts/teeth-idm-integrity.py
+exit=0
+
+tooth: referential integrity is enforced (dangling and duplicate both fail)
+== just check-t05
+exit=0
+  NOTE: linkage only. Whether the assertions reject a violating implementation is
+        proven separately by `bun run scripts/teeth-t05-mutation.ts`.
+== just teeth-t05
+exit=0
+  ok   M3 a callout silently drops smuggled keys instead of refusing them → caught by the NE-02 test
+teeth-t05-mutation: ok (3 mutants, each caught by the test that claims the property)
+== bun run build:desk
+exit=0
+$ bun run scripts/build-desk.ts
+built /home/sprime01/projects/Horizon-merge/dist/desk/app.js and /home/sprime01/projects/Horizon-merge/dist/desk/app.css
