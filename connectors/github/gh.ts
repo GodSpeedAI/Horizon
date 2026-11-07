@@ -48,7 +48,12 @@ export interface GhClient {
   /** REST: `method` and `path` such as `repos/o/r/issues`. A `body` is sent as JSON on standard input. */
   api(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", path: string, body?: unknown): Promise<any>;
   graphql(query: string, variables?: Record<string, unknown>): Promise<any>;
+  /** GET every page of a list (`path` may carry a query), until a page is empty. Throws in words past `maxPages`. */
+  list(path: string, maxPages?: number): Promise<any[]>;
 }
+
+import { redact } from "../../src/adapters/redact.ts";
+import { runChild } from "../../src/adapters/run-child.ts";
 
 export interface GhOptions {
   readonly env?: Record<string, string | undefined>;
@@ -60,9 +65,7 @@ export interface GhOptions {
 }
 
 const MAX_BYTES = 16 * 1024 * 1024;
-const TOKEN = /\b(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{16,}/g;
-/** Never let a token-shaped string reach a message, even though `gh` does not print one. */
-export const redact = (text: string): string => text.replace(TOKEN, "[token removed]");
+export { redact };
 
 function splitHeaders(out: string): { status: number | undefined; headers: Map<string, string>; body: string } {
   const match = /^HTTP\/[\d.]+ (\d{3})/.exec(out);
@@ -118,43 +121,36 @@ export function classify(input: { status: number | undefined; headers: Map<strin
 export function createGh(options: GhOptions = {}): GhClient {
   const now = options.now ?? Date.now;
   const run = async (args: readonly string[], stdin?: string): Promise<any> => {
-    let proc: ReturnType<typeof Bun.spawn>;
+    const limit = options.timeoutMs ?? 30_000;
+    let result;
     try {
-      proc = Bun.spawn(["gh", "api", "--include", ...args], {
-        env: (options.env ?? process.env) as Record<string, string>,
-        stdin: stdin === undefined ? "ignore" : new Blob([stdin]),
-        stdout: "pipe",
-        stderr: "pipe",
-      });
+      result = await runChild(["gh", "api", "--include", ...args], { env: options.env ?? process.env, ...(stdin === undefined ? {} : { stdin }), timeoutMs: limit, maxBytes: options.maxBytes ?? MAX_BYTES });
     } catch (error) {
       if (/ENOENT|not found|no such file/i.test(String(error))) throw new GhError("missing", "The GitHub command line (`gh`) is not installed, so Horizon cannot reach GitHub.");
       throw new GhError("other", "The GitHub command could not be started.", { detail: redact(String(error)).slice(0, 200) });
     }
-    let timedOut = false;
-    const limit = options.timeoutMs ?? 30_000;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      proc.kill("SIGKILL");
-    }, limit);
+    if (result.timedOut) throw new GhError("timeout", `GitHub did not answer within ${Math.round(limit / 1000)} seconds. Horizon will try again.`);
+    if (result.tooLarge) throw new GhError("too_large", "GitHub sent an answer larger than Horizon reads, so it was refused.");
+    const { status, headers, body } = splitHeaders(result.stdout);
+    if (result.code !== 0 || (status !== undefined && status >= 400)) throw classify({ status, headers, body, stderr: result.stderr, now: now() });
+    if (body.trim() === "") return null;
     try {
-      const max = options.maxBytes ?? MAX_BYTES;
-      const [out, err] = await Promise.all([new Response(proc.stdout as ReadableStream).text(), new Response(proc.stderr as ReadableStream).text(), proc.exited]);
-      if (timedOut) throw new GhError("timeout", `GitHub did not answer within ${Math.round(limit / 1000)} seconds. Horizon will try again.`);
-      if (out.length > max) throw new GhError("too_large", "GitHub sent an answer larger than Horizon reads, so it was refused.");
-      const { status, headers, body } = splitHeaders(out);
-      if (proc.exitCode !== 0 || (status !== undefined && status >= 400)) throw classify({ status, headers, body, stderr: err, now: now() });
-      if (body.trim() === "") return null;
-      try {
-        return JSON.parse(body);
-      } catch {
-        throw new GhError("garbled", "GitHub sent an answer Horizon could not read. Nothing was changed.");
-      }
-    } finally {
-      clearTimeout(timer);
+      return JSON.parse(body);
+    } catch {
+      throw new GhError("garbled", "GitHub sent an answer Horizon could not read. Nothing was changed.");
     }
   };
   return {
     api: (method, path, body) => run(["-X", method, path, ...(body === undefined ? [] : ["--input", "-"])], body === undefined ? undefined : JSON.stringify(body)),
+    async list(path, maxPages = 500) {
+      const all: any[] = [];
+      for (let page = 1; page <= maxPages; page += 1) {
+        const rows = await run(["-X", "GET", `${path}${path.includes("?") ? "&" : "?"}per_page=100&page=${page}`]);
+        if (!Array.isArray(rows) || rows.length === 0) return all;
+        all.push(...rows);
+      }
+      throw new GhError("too_large", `GitHub has more than ${maxPages * 100} entries for this list, more than Horizon reads. Nothing was changed.`);
+    },
     async graphql(query, variables = {}) {
       const answer = await run(["graphql", "--input", "-"], JSON.stringify({ query, variables }));
       if (answer && Array.isArray(answer.errors) && answer.errors.length > 0) {

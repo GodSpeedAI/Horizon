@@ -17,7 +17,7 @@ export interface FakeRestIssue {
   labels: string[];
   html_url: string;
   updated_at: string;
-  comments: { id: number; body: string }[];
+  comments: { id: number; body: string; user?: { login: string } }[];
   /** A deleted issue answers 404 and drops out of listings. */
   deleted?: boolean;
   parent_issue_url?: string;
@@ -46,6 +46,10 @@ export interface FakeGhState {
     projects: { id: string; title: string; fields: { id: string; name: string }[]; items: { id: string; content: string; values: Record<string, string> }[] }[];
     /** Whether `sub_issues` is available. */
     subIssues: boolean;
+    /** Page size for comments, issues, sub-issues and GraphQL lists (default 100). */
+    pageSize?: number;
+    /** The signed-in user's login. */
+    login?: string;
   };
   failures?: FakeFailure[];
   calls: string[][];
@@ -135,10 +139,29 @@ function restMain(state: FakeGhState, args: string[], stdin: string): { out: str
     return { ...rest2, labels: i.labels.map((name) => ({ name })) };
   };
 
+  const LOGIN = rest.login ?? "horizon-bot";
+  const pageOf = <T>(rows: T[]): T[] => {
+    const size = rest.pageSize ?? 100;
+    const per = Number(new URLSearchParams(path.split("?")[1] ?? "").get("per_page") ?? "100");
+    const page = Number(new URLSearchParams(path.split("?")[1] ?? "").get("page") ?? "1");
+    const n = Math.min(size, per);
+    return rows.slice((page - 1) * n, page * n);
+  };
+  if (path === "user") return ok({ login: LOGIN });
   if (graphql) {
     const q: string = body?.query ?? "";
     const v = body?.variables ?? {};
-    if (/projectsV2\(/.test(q)) return ok({ data: { organization: { id: "O_1", projectsV2: { nodes: rest.projects.map((p) => ({ id: p.id, title: p.title, fields: { nodes: p.fields } })) } } } });
+    const size = rest.pageSize ?? 50;
+    const start = Number(v.after ?? 0);
+    const info = (total: number) => ({ hasNextPage: start + size < total, endCursor: String(start + size) });
+    if (/node\(id/.test(q)) {
+      const project = rest.projects.find((p) => p.id === v.id)!;
+      return ok({ data: { node: { fields: { nodes: project.fields.slice(start, start + size), pageInfo: info(project.fields.length) } } } });
+    }
+    if (/projectsV2\(/.test(q)) {
+      const page = rest.projects.slice(start, start + size);
+      return ok({ data: { organization: { id: "O_1", projectsV2: { nodes: page.map((p) => ({ id: p.id, title: p.title, fields: { nodes: p.fields.slice(0, size), pageInfo: { hasNextPage: p.fields.length > size, endCursor: String(size) } } })), pageInfo: info(rest.projects.length) } } } });
+    }
     if (/createProjectV2\(/.test(q)) {
       const project = { id: `PVT_${rest.projects.length + 1}`, title: v.title, fields: [], items: [] };
       rest.projects.push(project);
@@ -175,7 +198,7 @@ function restMain(state: FakeGhState, args: string[], stdin: string): { out: str
     const label = params.get("labels");
     const page = Number(params.get("page") ?? "1");
     const rows = rest.issues.filter((i) => !i.deleted && (!label || i.labels.includes(label)));
-    return ok(page === 1 ? rows.map(view) : []);
+    return ok(pageOf(rows).map(view));
   }
   if (tail === "issues" && method === "POST") {
     const number = rest.issues.length + 1;
@@ -183,7 +206,7 @@ function restMain(state: FakeGhState, args: string[], stdin: string): { out: str
     rest.issues.push(issue);
     return ok(view(issue), 201);
   }
-  const one = /^issues\/(\d+)(?:\/(comments|labels|sub_issues))?$/.exec(tail);
+  const one = /^issues\/(\d+)(?:\/(comments|labels|sub_issues)(?:\/(.+))?)?$/.exec(tail);
   if (!one) return notFound();
   const issue = rest.issues.find((i) => i.number === Number(one[1]));
   if (!issue || issue.deleted) return notFound();
@@ -194,9 +217,9 @@ function restMain(state: FakeGhState, args: string[], stdin: string): { out: str
     issue.updated_at = now;
     return ok(view(issue));
   }
-  if (sub === "comments" && method === "GET") return ok(issue.comments);
+  if (sub === "comments" && method === "GET") return ok(pageOf(issue.comments));
   if (sub === "comments" && method === "POST") {
-    const comment = { id: rest.nextId++, body: body.body };
+    const comment = { id: rest.nextId++, body: body.body, user: { login: LOGIN } };
     issue.comments.push(comment);
     return ok(comment, 201);
   }
@@ -204,10 +227,20 @@ function restMain(state: FakeGhState, args: string[], stdin: string): { out: str
     issue.labels = body.labels;
     return ok(body.labels.map((name: string) => ({ name })));
   }
+  if (sub === "labels" && method === "POST") {
+    for (const name of body.labels as string[]) if (!issue.labels.includes(name)) issue.labels.push(name);
+    return ok(issue.labels.map((name) => ({ name })));
+  }
+  if (sub === "labels" && method === "DELETE") {
+    issue.labels = issue.labels.filter((l) => l !== decodeURIComponent(one[3] ?? ""));
+    return ok(issue.labels.map((name) => ({ name })));
+  }
+  if (sub === "sub_issues" && method === "GET") return ok(pageOf(rest.issues.filter((i) => i.parent_issue_url?.endsWith(`/issues/${issue.number}`)).map(view)));
   if (sub === "sub_issues" && method === "POST") {
     if (!rest.subIssues) return notFound();
     const child = rest.issues.find((i) => i.id === body.sub_issue_id);
     if (!child) return { out: reply(422, { message: "Validation Failed" }), err: "gh: Validation Failed (HTTP 422)", code: 1 };
+    if (child.parent_issue_url) return { out: reply(422, { message: "Validation Failed", errors: ["Issue may not already have a parent"] }), err: "gh: Validation Failed (HTTP 422)", code: 1 };
     child.parent_issue_url = `https://api.github.com/repos/${repo}/issues/${issue.number}`;
     return ok(view(child), 201);
   }

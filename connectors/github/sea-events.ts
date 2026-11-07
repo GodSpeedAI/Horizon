@@ -66,20 +66,31 @@ export interface FollowOptions {
   /** Throw to say the write failed; the same frame comes back after `waitMs(error)`. */
   readonly onEvent: (frame: EventFrame) => Promise<void>;
   readonly waitMs?: (error: unknown) => number;
-  readonly onState?: (state: FollowState) => void;
+  /** Plain words for what the feed is doing; a state other than "following" means events are not arriving. */
+  readonly onState?: (state: FollowState, words: string) => void;
   readonly reconnectMs?: number;
   readonly sweepMs?: number;
   readonly pageSize?: number;
+  /** Stop reading ahead while this many events wait. Default 1000. */
+  readonly maxQueue?: number;
+  /** Drop a connection that sends this many bytes without a newline. Default 8 MB. */
+  readonly maxLineBytes?: number;
 }
 
 export interface Follower {
   /** Last cursor whose handler succeeded. */
   cursor(): string | null;
+  /** Events read and waiting for their turn. */
+  queued(): number;
   /** Resolves when everything queued so far has been handled. */
   idle(): Promise<void>;
   stop(): void;
 }
 
+/**
+ * Order is taken only from `events_get_range`, which is contiguous. A frame on the live stream is a wake-up: it makes
+ * the follower read the range after the last cursor it holds, so a frame the stream dropped earlier is read before a later one.
+ */
 export function followEvents(options: FollowOptions): Follower {
   let done: string | null = options.from_cursor;
   let queued: string | null = options.from_cursor;
@@ -89,7 +100,9 @@ export function followEvents(options: FollowOptions): Follower {
   let socket: { end(): void } | undefined;
   let retry: ReturnType<typeof setTimeout> | undefined;
   const page = options.pageSize ?? 500;
-  const say = (state: FollowState) => options.onState?.(state);
+  const maxQueue = options.maxQueue ?? 1000;
+  const maxLine = options.maxLineBytes ?? 8 * 1024 * 1024;
+  const say = (state: FollowState, words: string) => options.onState?.(state, words);
 
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
   const pump = (): Promise<void> => {
@@ -101,6 +114,7 @@ export function followEvents(options: FollowOptions): Follower {
           await options.onEvent(frame);
           done = frame.cursor;
           queue.shift();
+          if (queue.length < maxQueue / 2) wake();
         } catch (error) {
           await sleep(options.waitMs?.(error) ?? 1_000);
         }
@@ -111,40 +125,68 @@ export function followEvents(options: FollowOptions): Follower {
     pumping = run;
     return run;
   };
-  const enqueue = (frame: EventFrame): void => {
-    if (queued !== null && frame.cursor <= queued) return;
-    queued = frame.cursor;
-    queue.push(frame);
-    void pump();
-  };
 
+  let catching = false;
+  let again = false;
+  /** Read what follows the last cursor held. Returns false when the case keeper could not say. */
   const catchUp = async (): Promise<boolean> => {
     for (;;) {
+      if (stopped) return false;
+      if (queue.length >= maxQueue) return true;
       let reply: Record<string, unknown>;
       try {
         reply = await keeperCall(options.keeper, { verb: "events_get_range", ...(queued !== null ? { from_cursor: queued } : {}), limit: page });
       } catch (error) {
         if (error instanceof KeeperError && /cursor/i.test(`${error.errorClass ?? ""}`)) {
-          say("cursor_unknown");
+          say("cursor_unknown", "The case keeper does not know Horizon's saved place in its events, so no events are being followed. Nothing shown from GitHub is up to date until this is fixed.");
           stopped = true;
+        } else {
+          say("reconnecting", `Not connected to the case keeper's events: ${error instanceof KeeperError ? error.words : String(error)}`);
         }
         return false;
       }
-      if (!Array.isArray(reply.events)) return false;
-      for (const frame of reply.events) if (isFrame(frame)) enqueue(frame);
+      if (!Array.isArray(reply.events)) {
+        say("reconnecting", "Not connected to the case keeper's events: it sent an answer Horizon could not read.");
+        return false;
+      }
+      for (const frame of reply.events) {
+        if (isFrame(frame) && (queued === null || frame.cursor > queued)) {
+          queued = frame.cursor;
+          queue.push(frame);
+        }
+      }
+      void pump();
       if (reply.events.length < page) return true;
     }
   };
+  /** Coalesced: any number of wake-ups while a read is in flight cause one more read after it. */
+  function wake(): void {
+    if (stopped) return;
+    if (catching) {
+      again = true;
+      return;
+    }
+    catching = true;
+    void (async () => {
+      try {
+        do {
+          again = false;
+          await catchUp();
+        } while (again && !stopped);
+      } finally {
+        catching = false;
+      }
+    })();
+  }
 
   const scheduleRetry = () => {
     if (stopped) return;
-    say("reconnecting");
     retry = setTimeout(() => void connect(), options.reconnectMs ?? 500);
   };
 
   const connect = async (): Promise<void> => {
     if (stopped) return;
-    say("connecting");
+    say("connecting", "Connecting to the case keeper's events.");
     if (!(await catchUp())) return scheduleRetry();
     let buffered = "";
     const decoder = new TextDecoder();
@@ -155,23 +197,25 @@ export function followEvents(options: FollowOptions): Follower {
           open(s) {
             socket = s;
             s.write(`${JSON.stringify({ verb: "events_subscribe", ...(queued !== null ? { from_cursor: queued } : {}), actor: options.keeper.actor })}\n`);
-            say("following");
+            say("following", "Following the case keeper's events.");
           },
-          data(_s, chunk) {
+          data(s, chunk) {
             buffered += decoder.decode(chunk, { stream: true });
+            if (buffered.length > maxLine && buffered.indexOf("\n") < 0) {
+              buffered = "";
+              say("reconnecting", "The case keeper's event stream sent a line that was too long, so the connection was dropped. Reconnecting.");
+              s.end();
+              return;
+            }
             for (let nl = buffered.indexOf("\n"); nl >= 0; nl = buffered.indexOf("\n")) {
               const line = buffered.slice(0, nl);
               buffered = buffered.slice(nl + 1);
-              try {
-                const message = JSON.parse(line) as { type?: string; event?: unknown };
-                if (message.type === "event" && isFrame(message.event)) enqueue(message.event);
-              } catch {
-                // A line that is not JSON is skipped; the ranged read recovers anything it carried.
-              }
+              if (line.includes('"type":"event"') || line.includes('"type": "event"')) wake();
             }
           },
           close() {
             socket = undefined;
+            say("reconnecting", "The case keeper's event stream dropped. Reconnecting and picking up from the last event read.");
             scheduleRetry();
           },
           error() {
@@ -180,15 +224,17 @@ export function followEvents(options: FollowOptions): Follower {
         },
       });
     } catch {
+      say("reconnecting", "Could not open the case keeper's event stream. Trying again.");
       scheduleRetry();
     }
   };
 
   void connect();
-  const sweep = setInterval(() => void (stopped || catchUp()), options.sweepMs ?? 5_000);
+  const sweep = setInterval(() => wake(), options.sweepMs ?? 5_000);
 
   return {
     cursor: () => done,
+    queued: () => queue.length,
     async idle() {
       while (queue.length > 0 && !stopped) await (pumping ?? pump());
     },
@@ -197,7 +243,7 @@ export function followEvents(options: FollowOptions): Follower {
       clearInterval(sweep);
       if (retry) clearTimeout(retry);
       socket?.end();
-      say("stopped");
+      say("stopped", "Not following events.");
     },
   };
 }

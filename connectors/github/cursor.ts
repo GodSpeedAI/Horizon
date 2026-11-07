@@ -15,8 +15,11 @@ export async function loadCursor(store: DurableStore, setup: string): Promise<st
   return typeof value === "string" && value !== "" ? value : null;
 }
 
+/** Cursors are ULIDs and sort in event order. A lower or equal cursor never replaces a higher one. */
 export async function saveCursor(store: DurableStore, setup: string, from_cursor: string): Promise<void> {
   const id = cursorKey(setup);
   const current = await store.getRecord(CURSOR_COLLECTION, id);
+  const saved = current?.value.from_cursor;
+  if (typeof saved === "string" && saved >= from_cursor) return;
   await store.commit({ appends: [], records: [{ collection: CURSOR_COLLECTION, id, expectedVersion: current?.version ?? 0, value: { name: setup, from_cursor } }] });
 }

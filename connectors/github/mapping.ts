@@ -122,15 +122,16 @@ export function stateOf(item: Pick<HorizonItem, "execution" | "settlement">, iss
 export const stateLabel = (word: string): string => `${STATE_PREFIX}${word}`;
 export const caseMarker = (caseId: string): string => `<!-- horizon:case:${caseId} -->`;
 export const stepMarker = (caseId: string, stepId: string): string => `<!-- horizon:step:${caseId}/${stepId} -->`;
-export const stateMarker = (caseId: string, stepId: string, word: string): string => `<!-- horizon:state:${caseId}/${stepId}:${word} -->`;
+/** One marker per transition and event: `ready~active@<event cursor>`. Returning to an earlier state is a new transition. */
+export const stateMarker = (caseId: string, stepId: string, transition: string): string => `<!-- horizon:state:${caseId}/${stepId}:${transition.replace(/[^A-Za-z0-9_.:~@+-]/g, "_")} -->`;
 export const noteMarker = (key: string): string => `<!-- horizon:note:${key} -->`;
 
 /** Ids are used inside HTML comments and code spans; refuse any that could break out of them. */
 export const safeId = (id: string): boolean => /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(id);
 
-export function stateComment(input: { caseId: string; stepId: string; state: StepState; deskUrl?: string }): string {
+export function stateComment(input: { caseId: string; stepId: string; state: StepState; transition: string; deskUrl?: string }): string {
   const link = input.deskUrl ? `\n\n[Open in Horizon](${input.deskUrl})` : "";
-  return `Horizon: this step is now ${input.state.words}.\n\nThe case keeper decides; closing an issue on GitHub never accepts the work.${link}\n\n${stateMarker(input.caseId, input.stepId, input.state.word)}`;
+  return `Horizon: this step is now ${input.state.words}.\n\nThe case keeper decides; closing an issue on GitHub never accepts the work.${link}\n\n${stateMarker(input.caseId, input.stepId, input.transition)}`;
 }
 
 export interface ParentInput {

@@ -19,7 +19,9 @@ import { seaForgeActorOf } from "../../src/adapters/sea-forge-approvals.ts";
 import { argValue, parseSetup, setupMapping } from "../../src/config/setup.ts";
 import { ensureBoard, placeIssue, type Board } from "./board.ts";
 import { loadCursor, saveCursor } from "./cursor.ts";
+import { redact } from "../../src/adapters/redact.ts";
 import { GhError, createGh, type GhClient } from "./gh.ts";
+import { LockError, acquireLock } from "./lock.ts";
 import {
   LABEL_CASE, LABEL_INTAKE, STATE_PREFIX, caseMarker, hasLabel, intakeFrame, labelNames, noteMarker, parentBody, parentTitle, parseIssueRef, plainLine, safeId, stateComment,
   stateLabel, stateOf, stepIdFor, stepMarker, subIssueBody, type HorizonItem, type Issue,
@@ -43,6 +45,8 @@ export interface ConnectorStatus {
   /** "connected" or the plain words for what is wrong. The desk shows "GitHub: not connected" when this is not "connected". */
   github: string;
   keeper: string;
+  /** "following", or "not connected: <reason>" when the case keeper's events are not arriving. Not cleared by a good GitHub poll. */
+  feed: string;
   /** Plain notes about things skipped (a deleted issue, a repeated request). */
   notes: string[];
 }
@@ -57,14 +61,17 @@ export interface ConnectorDeps {
 
 const ACTIVE_CASE = new Set(["active", "awaiting_approval"]);
 const asArray = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+const STEP_MARK = /<!-- horizon:step:([^/\s]+)\/([^\s]+) -->/;
 
 export class Connector {
-  readonly status: ConnectorStatus = { github: "connected", keeper: "connected", notes: [] };
+  readonly status: ConnectorStatus = { github: "connected", keeper: "connected", feed: "starting", notes: [] };
   private readonly now: () => number;
   private board: Board | undefined;
   private readonly placed = new Map<string, string>();
   private readonly seenIssues = new Map<number, string>();
   private failures = 0;
+  private tail: Promise<unknown> = Promise.resolve();
+  private myLogin: string | undefined;
 
   constructor(private readonly deps: ConnectorDeps) {
     this.now = deps.now ?? Date.now;
@@ -80,11 +87,23 @@ export class Connector {
     if (!this.status.notes.includes(text)) this.status.notes = [...this.status.notes.slice(-19), text];
   }
 
+  /** Every GitHub write for this setup goes through this one queue, one job at a time, in the order asked. */
+  private serial<T>(job: () => Promise<T>): Promise<T> {
+    const run = this.tail.then(job, job);
+    this.tail = run.catch(() => undefined);
+    return run;
+  }
+
+  /** What the event feed is doing, in words. A feed that is not following stays visible until it follows again. */
+  onFeedState(state: string, words: string): void {
+    this.status.feed = state === "following" ? "following" : state === "connecting" ? this.status.feed : words.startsWith("Not connected") ? words.replace(/^Not connected/, "not connected") : `not connected: ${words}`;
+  }
+
   /** Put what a failure means into the status, in words. */
   private describe(error: unknown): void {
     if (error instanceof GhError) this.status.github = error.words;
     else if (error instanceof KeeperError) this.status.keeper = error.words;
-    else this.status.github = `Horizon hit an unexpected problem and will try again: ${error instanceof Error ? error.message : String(error)}`.slice(0, 300);
+    else this.status.github = redact(`Horizon hit an unexpected problem and will try again: ${error instanceof Error ? error.message : String(error)}`).slice(0, 300);
   }
 
   /** How long to wait before the same work is tried again; also records the failure in the status. */
@@ -111,20 +130,29 @@ export class Connector {
   // ---- reads -------------------------------------------------------------------------------------------------------
 
   private async issuesWith(label: string): Promise<Issue[]> {
-    const all: Issue[] = [];
-    for (let page = 1; page <= 20; page += 1) {
-      let rows: unknown;
-      try {
-        rows = await this.gh.api("GET", `repos/${this.repo}/issues?labels=${encodeURIComponent(label)}&state=all&per_page=100&page=${page}`);
-      } catch (error) {
-        if (error instanceof GhError && error.kind === "not_found") throw new GhError("not_found", `The repository ${this.repo} was not found on GitHub (404), or this sign-in cannot see it. Nothing was changed.`, { status: 404 });
-        throw error;
-      }
-      const batch = asArray<Issue>(rows).filter((i) => i && typeof i.number === "number" && !i.pull_request);
-      all.push(...batch);
-      if (asArray(rows).length < 100) break;
+    try {
+      const rows = await this.gh.list(`repos/${this.repo}/issues?labels=${encodeURIComponent(label)}&state=all`);
+      return rows.filter((i: Issue) => i && typeof i.number === "number" && !i.pull_request);
+    } catch (error) {
+      if (error instanceof GhError && error.kind === "not_found") throw new GhError("not_found", `The repository ${this.repo} was not found on GitHub (404), or this sign-in cannot see it. Nothing was changed.`, { status: 404 });
+      throw error;
     }
-    return all;
+  }
+
+  /** The login `gh` is signed in as; read once. Only comments by this login can prove a write was Horizon's. */
+  private async login(): Promise<string> {
+    if (this.myLogin) return this.myLogin;
+    const me = await this.gh.api("GET", "user");
+    if (typeof me?.login !== "string" || me.login === "") throw new GhError("garbled", "GitHub did not say who Horizon is signed in as, so it cannot tell its own comments from others. Nothing was changed.");
+    const login: string = me.login;
+    this.myLogin = login;
+    return login;
+  }
+
+  private async ownComments(number: number): Promise<string[]> {
+    const me = await this.login();
+    const comments = await this.gh.list(`repos/${this.repo}/issues/${number}/comments`);
+    return comments.filter((c: { user?: { login?: string } }) => c?.user?.login === me).map((c: { body?: string }) => c.body ?? "");
   }
 
   private async targetCase(): Promise<string | null> {
@@ -154,29 +182,27 @@ export class Connector {
 
   // ---- in: issues become steps -----------------------------------------------------------------------------------------
 
-  /** One pass over the issues labelled for Horizon. Safe to run any number of times. */
-  async pollIssues(): Promise<void> {
-    try {
-      await this.pollOnce();
-    } catch (error) {
-      this.describe(error);
-      throw error;
-    }
+  /** One pass over the issues labelled for Horizon, and over the step issues Horizon made. Safe to run any number of times. */
+  pollIssues(): Promise<void> {
+    return this.serial(async () => {
+      try {
+        await this.pollOnce();
+      } catch (error) {
+        this.describe(error);
+        throw error;
+      }
+    });
   }
 
   private async pollOnce(): Promise<void> {
     const issues = (await this.issuesWith(LABEL_INTAKE)).sort((a, b) => a.number - b.number);
     const open: Issue[] = issues.filter((i) => hasLabel(i, LABEL_INTAKE));
-    if (open.length === 0) return this.ok();
-    const caseId = await this.targetCase();
-    if (!caseId) {
-      this.note("No case is open, so issues labelled for Horizon are waiting. They will be added when a case is open.");
-      return this.ok();
-    }
-    for (const issue of open) {
+    const caseId = open.length > 0 ? await this.targetCase() : null;
+    if (open.length > 0 && !caseId) this.note("No case is open, so issues labelled for Horizon are waiting. They will be added when a case is open.");
+    for (const issue of caseId ? open : []) {
       const signature = `${issue.state}|${(issue as { updated_at?: string }).updated_at ?? ""}|${caseId}`;
       if (this.seenIssues.get(issue.number) === signature) continue;
-      const { frame, notes } = intakeFrame({ caseId, repo: this.repo, issue });
+      const { frame, notes } = intakeFrame({ caseId: caseId!, repo: this.repo, issue });
       try {
         await keeperCall(this.deps.keeper, frame, true);
       } catch (error) {
@@ -189,31 +215,44 @@ export class Connector {
         throw error;
       }
       for (const text of notes) await this.tellIssue(issue.number, `note:${issue.number}:${text.length}`, text);
-      const horizon = await this.horizonOf(caseId);
+      const horizon = await this.horizonOf(caseId!);
       const item = horizon?.items.find((i) => i.plan_item_id === stepIdFor(this.repo, issue.number));
-      if (item) await this.syncStep(caseId, item, issue.number, undefined);
+      if (item) await this.syncStep(caseId!, item, issue.number, undefined, "poll");
+      this.seenIssues.set(issue.number, signature);
+    }
+    // Issues Horizon made for steps: closing or reopening one has no event in the case keeper, so look for it here.
+    const horizons = new Map<string, Awaited<ReturnType<Connector["horizonOf"]>>>();
+    for (const issue of await this.issuesWith(LABEL_STEP)) {
+      const signature = `${issue.state}|${(issue as { updated_at?: string }).updated_at ?? ""}`;
+      if (this.seenIssues.get(issue.number) === signature) continue;
+      const mark = STEP_MARK.exec(issue.body ?? "");
+      if (!mark || !safeId(mark[1]!)) continue;
+      if (!horizons.has(mark[1]!)) horizons.set(mark[1]!, await this.horizonOf(mark[1]!));
+      const item = horizons.get(mark[1]!)?.items.find((i) => i.plan_item_id === mark[2]);
+      if (item) await this.syncStep(mark[1]!, item, issue.number, undefined, "poll");
       this.seenIssues.set(issue.number, signature);
     }
     this.ok();
   }
 
   private async tellIssue(number: number, key: string, text: string): Promise<void> {
-    const comments = asArray<{ body?: string }>(await this.gh.api("GET", `repos/${this.repo}/issues/${number}/comments?per_page=100`));
     const marker = noteMarker(key);
-    if (comments.some((c) => (c.body ?? "").includes(marker))) return;
+    if ((await this.ownComments(number)).some((c) => c.includes(marker))) return;
     await this.gh.api("POST", `repos/${this.repo}/issues/${number}/comments`, { body: `Horizon: ${text}\n\n${marker}` });
   }
 
   // ---- out: a case and its steps show on GitHub ----------------------------------------------------------------------
 
   /** Handle one event from the case keeper. Throws when a GitHub write failed; the cursor is then not saved. */
-  async handleEvent(frame: EventFrame): Promise<void> {
-    try {
-      await this.handleOnce(frame);
-    } catch (error) {
-      this.describe(error);
-      throw error;
-    }
+  handleEvent(frame: EventFrame): Promise<void> {
+    return this.serial(async () => {
+      try {
+        await this.handleOnce(frame);
+      } catch (error) {
+        this.describe(error);
+        throw error;
+      }
+    });
   }
 
   private async handleOnce(frame: EventFrame): Promise<void> {
@@ -221,14 +260,18 @@ export class Connector {
       if (!safeId(frame.case_id)) {
         this.note("An event named a case id Horizon will not write to GitHub; it was skipped.");
       } else {
-        await this.syncCase(frame.case_id);
+        await this.syncCaseInner(frame.case_id, frame.cursor);
       }
     }
     await saveCursor(this.deps.store, this.deps.config.setup, frame.cursor);
     this.ok();
   }
 
-  async syncCase(caseId: string): Promise<void> {
+  syncCase(caseId: string, evt = "manual"): Promise<void> {
+    return this.serial(() => this.syncCaseInner(caseId, evt));
+  }
+
+  private async syncCaseInner(caseId: string, evt: string): Promise<void> {
     const horizon = await this.horizonOf(caseId);
     if (!horizon || horizon.items.length === 0) return;
     const summary = await this.summaryOf(caseId);
@@ -239,7 +282,6 @@ export class Connector {
     const numbers = new Map<string, number>();
     const closed = new Map<string, boolean>();
 
-    // The parent first, so sub-issues have something to attach to.
     const bodyFor = () => parentBody({ caseId, summary, caseState: horizon.case_state, items: horizon.items, subIssues: this.deps.config.subIssues, numberOf: (i) => numbers.get(i.plan_item_id), issueClosed: (i) => closed.get(i.plan_item_id) === true, repo: this.repo });
     for (const item of horizon.items) {
       const ref = item.external_ref?.kind === "github_issue" ? parseIssueRef(item.external_ref.id) : null;
@@ -258,20 +300,14 @@ export class Connector {
           step = (await this.gh.api("POST", `repos/${this.repo}/issues`, { title: plainLine(item.name, 256), body: subIssueBody({ caseId, item }), labels: [LABEL_STEP] })) as Issue;
         }
         numbers.set(item.plan_item_id, step.number);
-        if (!(step as { parent_issue_url?: string }).parent_issue_url && typeof step.id === "number") {
-          try {
-            await this.gh.api("POST", `repos/${this.repo}/issues/${parent.number}/sub_issues`, { sub_issue_id: step.id });
-          } catch (error) {
-            if (!(error instanceof GhError && error.kind === "invalid")) throw error;
-          }
-        }
       }
     }
 
+    // Every step that has an issue (made here or imported) is attached to the parent and brought in line with the case keeper.
     for (const item of horizon.items) {
       const n = numbers.get(item.plan_item_id);
       if (n === undefined) continue;
-      closed.set(item.plan_item_id, (await this.syncStep(caseId, item, n, parent.number)) === "closed");
+      closed.set(item.plan_item_id, (await this.syncStep(caseId, item, n, this.deps.config.subIssues ? parent.number : undefined, evt)) === "closed");
     }
 
     const body = bodyFor();
@@ -288,11 +324,34 @@ export class Connector {
     }
   }
 
+  /** Attach `issue` under the parent. A refusal counts as success only when GitHub shows the relationship exists. */
+  private async attach(issue: Issue, parentNumber: number): Promise<void> {
+    const current = (issue as { parent_issue_url?: string }).parent_issue_url;
+    if (current) {
+      if (!current.endsWith(`/issues/${parentNumber}`)) this.note(`Issue #${issue.number} is already a sub-issue of another issue, so it was left there.`);
+      return;
+    }
+    if (typeof issue.id !== "number") return;
+    try {
+      await this.gh.api("POST", `repos/${this.repo}/issues/${parentNumber}/sub_issues`, { sub_issue_id: issue.id });
+    } catch (error) {
+      if (!(error instanceof GhError && error.kind === "invalid")) throw error;
+      let exists = false;
+      try {
+        exists = (await this.gh.list(`repos/${this.repo}/issues/${parentNumber}/sub_issues`)).some((c: { number?: number }) => c.number === issue.number);
+      } catch {
+        exists = false;
+      }
+      if (!exists) throw new GhError("invalid", `GitHub did not attach issue #${issue.number} as a sub-issue of #${parentNumber}. The step is not shown under its case yet; Horizon will try again.`, { status: 422 });
+    }
+  }
+
   /**
-   * Bring one step's issue in line with the case keeper: a state label and, on a change, one comment. Looks first, so
-   * a repeated event writes nothing. Returns "closed" when the issue is closed on GitHub, "deleted" when it is gone.
+   * Bring one step's issue in line with the case keeper: attach it, set the state label (add and remove only `horizon-state/*`),
+   * and on a change post one comment. Looks first, and only trusts markers in comments written by Horizon's own login.
+   * Returns "closed" when the issue is closed on GitHub, "deleted" when it is gone.
    */
-  private async syncStep(caseId: string, item: HorizonItem, number: number, _parent: number | undefined): Promise<"open" | "closed" | "deleted"> {
+  private async syncStep(caseId: string, item: HorizonItem, number: number, parentNumber: number | undefined, evt: string): Promise<"open" | "closed" | "deleted"> {
     let issue: Issue;
     try {
       issue = (await this.gh.api("GET", `repos/${this.repo}/issues/${number}`)) as Issue;
@@ -305,16 +364,18 @@ export class Connector {
       throw error;
     }
     const isClosed = issue.state === "closed";
+    if (parentNumber !== undefined) await this.attach(issue, parentNumber);
     const state = stateOf(item, isClosed);
     const want = stateLabel(state.word);
     const have = labelNames(issue.labels);
     const current = have.filter((l) => l.startsWith(STATE_PREFIX));
     if (current.length === 1 && current[0] === want) return isClosed ? "closed" : "open";
-    const comments = asArray<{ body?: string }>(await this.gh.api("GET", `repos/${this.repo}/issues/${number}/comments?per_page=100`));
-    const text = stateComment({ caseId, stepId: item.plan_item_id, state, ...(this.deps.config.deskUrl ? { deskUrl: `${this.deps.config.deskUrl}#case/${encodeURIComponent(caseId)}` } : {}) });
+    const from = current.length === 0 ? "none" : current.map((l) => l.slice(STATE_PREFIX.length)).sort().join("+");
+    const text = stateComment({ caseId, stepId: item.plan_item_id, state, transition: `${from}~${state.word}@${evt}`, ...(this.deps.config.deskUrl ? { deskUrl: `${this.deps.config.deskUrl}#case/${encodeURIComponent(caseId)}` } : {}) });
     const marker = text.slice(text.lastIndexOf("<!--"));
-    if (!comments.some((c) => (c.body ?? "").includes(marker))) await this.gh.api("POST", `repos/${this.repo}/issues/${number}/comments`, { body: text });
-    await this.gh.api("PUT", `repos/${this.repo}/issues/${number}/labels`, { labels: [...have.filter((l) => !l.startsWith(STATE_PREFIX)), want] });
+    if (!(await this.ownComments(number)).some((c) => c.includes(marker))) await this.gh.api("POST", `repos/${this.repo}/issues/${number}/comments`, { body: text });
+    if (!have.includes(want)) await this.gh.api("POST", `repos/${this.repo}/issues/${number}/labels`, { labels: [want] });
+    for (const old of current) if (old !== want) await this.gh.api("DELETE", `repos/${this.repo}/issues/${number}/labels/${encodeURIComponent(old)}`);
     return isClosed ? "closed" : "open";
   }
 }
@@ -323,7 +384,7 @@ export class Connector {
 
 function writeHeartbeat(path: string, status: ConnectorStatus, nowMs: number): void {
   const tmp = `${path}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify({ at: new Date(nowMs).toISOString(), github: status.github, keeper: status.keeper, notes: status.notes })}\n`);
+  writeFileSync(tmp, `${JSON.stringify({ at: new Date(nowMs).toISOString(), github: status.github, keeper: status.keeper, feed: status.feed, notes: status.notes })}\n`);
   renameSync(tmp, path);
 }
 
@@ -345,6 +406,16 @@ export async function main(env: Record<string, string | undefined> = process.env
     return 2;
   }
   mkdirSync(mapping.run, { recursive: true });
+  let lock;
+  try {
+    lock = acquireLock(join(mapping.run, "connector.lock"));
+  } catch (error) {
+    if (error instanceof LockError) {
+      console.error(`connector: ${error.message}`);
+      return 1;
+    }
+    throw error;
+  }
   const operatorRef = env.HORIZON_OPERATOR_REF?.trim();
   const socketPath = env.SEA_FORGE_SOCKET?.trim() || mapping.socket;
   const keeper: Keeper = {
@@ -378,6 +449,7 @@ export async function main(env: Record<string, string | undefined> = process.env
       await connector.handleEvent(frame);
     },
     waitMs: (error) => connector.waitFor(error),
+    onState: (state, words) => connector.onFeedState(state, words),
   });
   let stopped = false;
   const pollMs = Number(argValue(args, "poll-ms") ?? 30_000);
@@ -399,6 +471,7 @@ export async function main(env: Record<string, string | undefined> = process.env
   stopped = true;
   follower.stop();
   clearInterval(beatTimer);
+  lock.release();
   void poll;
   return 0;
 }
