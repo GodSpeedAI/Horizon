@@ -12,10 +12,16 @@ import type { RemoteInfo } from "../RemotePanel.tsx";
 import type { WorkData } from "../work-build.ts";
 import type { InspectionAnswer, NextState } from "../model.ts";
 import { resolveKey } from "../keys.ts";
+import type { ConversationRow } from "../conversation-model.ts";
+import { startDeskTools } from "../webmcp.ts";
+import type { DeskAgentInvoker } from "../webmcp-tools.ts";
 import { POLL_MS, itemsOf, shiftDay, withDetails, type DeskState, type SearchResult } from "../model.ts";
 
 const DRAFT_KEY = "horizon.desk.draft";
 const PINS_KEY = "horizon.desk.pins";
+/** The conversation is refetched this often while the tab is visible, so rows from agents appear. */
+const ROWS_POLL_MS = 5000;
+const AGENT_HEADERS = { "x-horizon-source": "page-agent", "x-horizon-agent-name": "Agent on this page" } as const;
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -80,6 +86,72 @@ function App() {
       // Offline or restarting: the last state stays on screen and the next poll tries again.
     }
   }, []);
+
+  // The conversation: refetched after each of your own operations and gently every 5 seconds while the tab is visible.
+  const loadRows = useCallback(async () => {
+    try {
+      const response = await fetch("/desk/conversation", { headers: { accept: "application/json" } });
+      if (!response.ok) return;
+      const body = (await response.json()) as { rows?: ConversationRow[] };
+      if (Array.isArray(body.rows)) dispatch({ type: "rows", rows: body.rows });
+    } catch {
+      // The last rows stay; the next read tries again.
+    }
+  }, []);
+  useEffect(() => {
+    void loadRows();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void loadRows();
+    }, ROWS_POLL_MS);
+    const onVisible = (): void => {
+      if (document.visibilityState === "visible") void loadRows();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [loadRows]);
+
+  // The page offers a few actions to an agent beside you. Each calls the same desk endpoints the buttons use, as an agent, and none can confirm anything.
+  useEffect(() => {
+    const call = async (path: string, init: RequestInit = {}): Promise<unknown> => {
+      const response = await fetch(path, { ...init, headers: { accept: "application/json", ...(init.body === undefined ? {} : { "content-type": "application/json" }), ...AGENT_HEADERS } });
+      const body: unknown = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error((body as { message?: string }).message ?? "The desk could not do that.");
+      return body;
+    };
+    const invoker: DeskAgentInvoker = {
+      state: () => call("/desk/state.json"),
+      find: (q) => call(`/desk/search?${new URLSearchParams({ q, record: "1" })}`).finally(() => void loadRows()),
+      inspect: async (rowId) => {
+        const listed = (await call("/desk/conversation")) as { rows?: ConversationRow[] };
+        const row = listed.rows?.find((r) => r.row_id === rowId);
+        if (row === undefined) throw new Error("No such item in the conversation.");
+        const intent = row.refs.intent_id;
+        const move = intent === undefined ? null : (latest.current.data?.home.moves.find((m) => m.intent_id === intent) ?? null);
+        return { row, decided: move?.decided ?? null, recorded: move?.recorded ?? null, observed: move?.observed ?? null };
+      },
+      proposeHandoff: (words, caseId) =>
+        call("/desk/handoff/preview", { method: "POST", body: JSON.stringify({ draft_id: crypto.randomUUID(), text: words, ...(caseId === undefined ? {} : { case_id: caseId }) }) })
+          .then(() => ({ ok: true, message: "Your suggestion is waiting in the conversation. Nothing is sent until the person confirms." }))
+          .finally(() => void loadRows()),
+      proposeNote: async (words) => {
+        // No network write: the words go in the box as a suggestion for the person to save or discard.
+        dispatch({ type: "mode", mode: "write" });
+        dispatch({ type: "typing", text: words, selStart: words.length, selEnd: words.length });
+        dispatch({ type: "notice", text: "Suggested by an agent — save or discard" });
+        return { ok: true, message: "The words are in the box for the person to save or discard." };
+      },
+    };
+    const handle = startDeskTools(document, invoker);
+    const stop = (): void => handle.stop();
+    window.addEventListener("pagehide", stop);
+    return () => {
+      window.removeEventListener("pagehide", stop);
+      handle.stop();
+    };
+  }, [loadRows]);
 
   useEffect(() => {
     void poll();
@@ -146,15 +218,24 @@ function App() {
 
   // Find runs when the question changes or Explore opens.
   const findKey = JSON.stringify(ui.find);
+  const recorded = useRef("");
   useEffect(() => {
     if (ui.view !== "explore") return;
     const params = new URLSearchParams({ q: ui.find.q });
     if (ui.find.day) params.set("day", ui.find.day);
     if (ui.find.tag) params.set("tag", ui.find.tag);
+    // Only a find the person submitted is kept in the conversation, and only once; find-as-you-type and reopening Explore are not moves.
+    if (ui.find.record === true && recorded.current !== findKey) {
+      recorded.current = findKey;
+      params.set("record", "1");
+    }
     let live = true;
     void fetch(`/desk/search?${params}`)
       .then((r) => r.json() as Promise<SearchResult>)
-      .then((results) => live && dispatch({ type: "results", results }))
+      .then((results) => {
+        if (live) dispatch({ type: "results", results });
+        if (params.has("record")) void loadRows();
+      })
       .catch(() => undefined);
     return () => {
       live = false;
@@ -174,7 +255,7 @@ function App() {
         { decisionCard: current.view === "decide" && (current.data?.decide.cards.some((c) => c.held === null) ?? false) },
       );
       if (action === null) return;
-      const items = itemsOf(current.view, current.data, current.results);
+      const items = itemsOf(current.view, current.data, current.results, current.rows);
       switch (action.type) {
         case "focus-composer":
           dispatch({ type: "focus", target: "composer" });
@@ -241,6 +322,7 @@ function App() {
         const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string };
         rev.current = "";
         void poll();
+          void loadRows();
         return { ok: response.ok && body.ok === true, message: withDetails(body.message ?? (response.ok ? "Done." : "Horizon could not send that decision. Nothing was done."), body.details) };
       } catch {
         return { ok: false, message: "Horizon did not answer, so the decision may not have been sent. Check Decide before trying again." };
@@ -266,6 +348,18 @@ function App() {
         return { ok: false, message: "Horizon did not answer, so nothing was started." };
       }
     },
+    conversation: {
+      discard: async (rowId) => {
+        try {
+          const response = await fetch("/desk/conversation/discard", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ row_id: rowId }) });
+          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+          void loadRows();
+          return { ok: response.ok && body.ok === true, message: body.message ?? (response.ok ? "Discarded. Nothing was sent." : "That could not be discarded.") };
+        } catch {
+          return { ok: false, message: "Horizon did not answer, so nothing was discarded." };
+        }
+      },
+    },
     panels: {
       answer: async (input) => {
         try {
@@ -273,6 +367,7 @@ function App() {
           const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
           rev.current = "";
           void poll();
+          void loadRows();
           return { ok: response.ok && body.ok === true, message: body.message ?? (response.ok ? "Sent." : "The answer was not sent.") };
         } catch {
           return { ok: false, message: "Horizon did not answer, so your answer may not have been sent." };
@@ -282,11 +377,13 @@ function App() {
         await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.pin", id, pinned }) }).catch(() => undefined);
         rev.current = "";
         void poll();
+          void loadRows();
       },
       close: async (id) => {
         await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.close", id }) }).catch(() => undefined);
         rev.current = "";
         void poll();
+          void loadRows();
       },
       stopWaiting: async (step) => {
         try {
@@ -294,6 +391,7 @@ function App() {
           const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
           rev.current = "";
           void poll();
+          void loadRows();
           return { ok: response.ok && body.ok === true, message: body.message ?? "Done." };
         } catch {
           return { ok: false, message: "Horizon did not answer." };
@@ -316,6 +414,7 @@ function App() {
         try {
           const response = await fetch("/desk/handoff/preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
           const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string; preview?: never };
+          void loadRows();
           return response.ok && body.ok === true && body.preview ? { ok: true, preview: body.preview } : { ok: false, message: withDetails(body.message ?? "Horizon could not show a preview. Nothing was sent.", body.details) };
         } catch {
           return { ok: false, message: "Horizon did not answer, so there is no preview. Nothing was sent." };
@@ -327,6 +426,7 @@ function App() {
           const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string; outcome?: string; draft_id?: string };
           rev.current = "";
           void poll();
+          void loadRows();
           return response.ok && body.ok === true ? { ok: true, message: body.message ?? "Handed off.", draft_id: body.draft_id ?? "" } : { ok: false, outcome: body.outcome ?? "failed", message: withDetails(body.message ?? "The hand off was not sent. Nothing was done.", body.details) };
         } catch {
           return { ok: false, outcome: "unreachable", message: "Horizon did not answer, so the hand off may not have been sent. Press Confirm again: the same request is never applied twice." };
@@ -349,6 +449,7 @@ function App() {
         if (response.ok && body.ok) {
           rev.current = "";
           void poll();
+          void loadRows();
           return body;
         }
         return { ok: false, message: ("message" in body && body.message) || "The note was not saved. Try again." };
@@ -360,6 +461,7 @@ function App() {
       void fetch("/workspace/presenting", { method: "POST", redirect: "manual", body: new URLSearchParams({ on: on ? "1" : "0", return: "" }) }).then(() => {
         rev.current = "";
         void poll();
+          void loadRows();
       });
     },
   };

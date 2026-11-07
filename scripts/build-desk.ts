@@ -20,7 +20,7 @@ export async function buildDesk(outdir: string = join(root, "dist", "desk")): Pr
     define: { "process.env.NODE_ENV": JSON.stringify("production") },
   });
   if (!result.success) throw new Error(`desk bundle failed: ${result.logs.map((l) => l.message).join("; ")}`);
-  const css = [...stylesheetPaths(), join(root, "src/ui/desk/desk.css")].map((path) => readFileSync(path, "utf8")).join("\n");
+  const css = [...stylesheetPaths(), join(root, "src/ui/desk/desk.css"), join(root, "src/ui/desk/blocks/blocks.css")].map((path) => readFileSync(path, "utf8")).join("\n");
   writeFileSync(join(outdir, "app.css"), css);
   return { js: join(outdir, "app.js"), css: join(outdir, "app.css") };
 }
