@@ -20,6 +20,8 @@ export interface PanelAnswer {
   readonly value: AnswerValue | null;
   readonly note: string | null;
   readonly at: string;
+  /** The version of the question the person was looking at when they answered. Missing on older answers. */
+  readonly version?: string | null;
   /** True once the agent has said where the answer went (`routed_as`), or the operator chose to stop waiting. */
   readonly replied: boolean;
   /** Where the agent took the answer ("step handoff_0a49 in Seed: triage inbox", "no action: <why>"). Null until it says. */
@@ -45,12 +47,12 @@ export async function listAnswers(store: DurableStore, tenant: string, panelId?:
 
 export async function recordAnswer(
   store: DurableStore,
-  input: { readonly tenant: string; readonly panel_id: string; readonly ask: string; readonly outcome: Outcome; readonly value?: AnswerValue | null; readonly note?: string | null; readonly step?: string | null; readonly now: Date },
+  input: { readonly tenant: string; readonly panel_id: string; readonly ask: string; readonly outcome: Outcome; readonly value?: AnswerValue | null; readonly note?: string | null; readonly step?: string | null; readonly version?: string | null; readonly now: Date },
 ): Promise<PanelAnswer> {
   for (let attempt = 0; ; attempt += 1) {
     const existing = await listAnswers(store, input.tenant, input.panel_id);
     const n = (existing.at(-1)?.n ?? 0) + 1;
-    const answer: PanelAnswer = { tenant: input.tenant, panel_id: input.panel_id, n, ask: input.ask, outcome: input.outcome, value: input.value ?? null, note: input.note ?? null, at: input.now.toISOString(), replied: false, step: input.step ?? null };
+    const answer: PanelAnswer = { tenant: input.tenant, panel_id: input.panel_id, n, ask: input.ask, outcome: input.outcome, value: input.value ?? null, note: input.note ?? null, at: input.now.toISOString(), version: input.version ?? null, replied: false, step: input.step ?? null };
     try {
       await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(input.panel_id, n), expectedVersion: 0, value: answer as unknown as { readonly [key: string]: Json } }] });
       return answer;

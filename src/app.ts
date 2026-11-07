@@ -1985,15 +1985,15 @@ export async function createApplication(
       const note = typeof body.note === "string" && body.note.trim() !== "" ? body.note.trim().slice(0, 600) : null;
       const before = panelBoard;
       const step = before.open.find((p) => p.id === body.panel)?.step ?? null;
-      const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note });
+      const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note, ...(typeof body.version === "string" ? { version: body.version } : {}) });
       if (!result.ok) return fail(409, result.message);
       // Store what the question accepted (a text answer is trimmed), not the raw body.
-      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string }[] } | undefined;
+      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { version?: string; input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string }[] } | undefined;
       const checked = outcome === "answered" && askBlock !== undefined ? answerFor({ input: askBlock.input ?? "select", options: askBlock.options }, value.value) : null;
       if (checked !== null && !checked.ok) return fail(400, checked.message);
       const stored = checked !== null && checked.ok ? checked.value : value.value;
       try {
-        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, now: clock() });
+        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, now: clock() });
       } catch {
         return fail(500, "Your answer was not saved. Nothing was sent. Try again.");
       }

@@ -49,13 +49,18 @@ export type AgentOp =
   | { readonly tool: "answer.route"; readonly panel_id: string; readonly ask_id: string; readonly routed_as: string };
 
 export const MAX_WITHDRAW_REASON = 200;
+export const QUESTION_CHANGED = "This question changed after you looked at it. Look again, then answer.";
+export const ANSWERED_CANNOT_CHANGE = "The person already answered this question, so it cannot be changed. Ask a new question with a different id.";
+/** A question the person answered (not put off, not skipped) is an agreement to those exact words. */
+const agreedTo = (b: AskBlock | undefined): b is AskBlock => b !== undefined && b.answered !== null && b.answered.outcome === "answered";
 export const ALL_WAITING = "Eight panels are waiting for answers. Answer or skip one first.";
 /** A question still waiting for the person: not answered (not even put off) and not withdrawn. */
 export const isOpenAsk = (b: PanelBlock): boolean => b.kind === "question" && b.answered === null && (b.withdrawn ?? null) === null;
 export const hasOpenAsk = (p: Panel): boolean => p.blocks.some(isOpenAsk);
 
 export type HumanOp =
-  | { readonly op: "human.answer"; readonly panel: string; readonly ask: string; readonly outcome: "answered" | "deferred" | "cancelled"; readonly value?: unknown; readonly note?: string | null }
+  /** `version` is the version of the question the person was looking at. When it is sent and no longer matches, the answer is refused. */
+  | { readonly op: "human.answer"; readonly panel: string; readonly ask: string; readonly outcome: "answered" | "deferred" | "cancelled"; readonly value?: unknown; readonly note?: string | null; readonly version?: string }
   | { readonly op: "human.pin"; readonly id: string; readonly pinned: boolean }
   | { readonly op: "human.close"; readonly id: string }
   | { readonly op: "human.open"; readonly template: string; readonly title?: string; readonly step?: string | null };
@@ -94,7 +99,13 @@ export function reduceAgent(state: Panels, op: AgentOp): Reduced {
       if (existing !== undefined) {
         // An update keeps the panel where it is and keeps it pinned; answers already given stay on their questions.
         const before = (id: string): AskBlock | undefined => existing.blocks.find((o): o is AskBlock => o.kind === "question" && o.id === id);
-        const kept = blocks.map((b) => (b.kind === "question" ? { ...b, answered: before(b.id)?.answered ?? null, withdrawn: before(b.id)?.withdrawn ?? null } : b));
+        // A question the person answered cannot be reworded under them; one they put off or skipped starts again when it changes.
+        for (const b of blocks) if (b.kind === "question" && agreedTo(before(b.id)) && before(b.id)?.version !== b.version) return refuse(state, "SCHEMA", ANSWERED_CANNOT_CHANGE);
+        const kept = blocks.map((b) => {
+          if (b.kind !== "question") return b;
+          const old = before(b.id);
+          return old !== undefined && old.version === b.version ? { ...b, answered: old.answered, withdrawn: old.withdrawn ?? null } : b;
+        });
         return { state: replace(state, s.id, (p) => ({ ...p, title: str(s.title, 120) || p.title, step: s.step === undefined ? p.step : (s.step ?? null), blocks: kept })), result: { ok: true, panel: s.id } };
       }
       return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks, notes: [] });
@@ -105,7 +116,11 @@ export function reduceAgent(state: Panels, op: AgentOp): Reduced {
       const block = id === "" ? null : questionOf(op.ask, id);
       if (block === null) return refuse(state, "SCHEMA", "A question needs an id, the question, and (for pick-one and pick-several) at least two options.");
       if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [block], notes: [] });
-      return { state: replace(state, panel.id, (p) => ({ ...p, step: op.step === undefined ? p.step : (op.step ?? null), blocks: [...p.blocks.filter((b) => b.id !== block.id), block] })), result: { ok: true, panel: panel.id } };
+      const old = panel.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === block.id);
+      if (agreedTo(old) && old.version !== block.version) return refuse(state, "SCHEMA", ANSWERED_CANNOT_CHANGE);
+      // The very same question again keeps what the person said; a changed one starts again.
+      const next = old !== undefined && old.version === block.version ? { ...block, answered: old.answered, withdrawn: old.withdrawn ?? null } : block;
+      return { state: replace(state, panel.id, (p) => ({ ...p, step: op.step === undefined ? p.step : (op.step ?? null), blocks: [...p.blocks.filter((b) => b.id !== block.id), next] })), result: { ok: true, panel: panel.id } };
     }
     case "annotate": {
       if (!state.open.some((p) => same(p.id, op.panel))) return refuse(state, "NOT_FOUND", "That panel is not open.");
@@ -159,6 +174,7 @@ export function reduceHuman(state: Panels, op: HumanOp): Reduced {
       const panel = state.open.find((p) => same(p.id, op.panel));
       const ask = panel?.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === op.ask);
       if (panel === undefined || ask === undefined) return refuse(state, "NOT_FOUND", "That question is no longer open.");
+      if (op.version !== undefined && ask.version !== undefined && op.version !== ask.version) return refuse(state, "SCHEMA", QUESTION_CHANGED);
       if (ask.answered !== null) return refuse(state, "SCHEMA", "That question was already answered.");
       if ((ask.withdrawn ?? null) !== null) return refuse(state, "SCHEMA", "The agent withdrew that question.");
       // Not now and Skip carry no value; an answer must fit the kind of question.

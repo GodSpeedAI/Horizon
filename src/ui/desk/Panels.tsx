@@ -13,7 +13,7 @@ import { MAX_OPEN_PANELS, hasOpenAsk, type Panel, type PanelBlock } from "./pane
 export { MAX_OPEN_PANELS };
 
 export interface PanelsIo {
-  readonly answer: (input: { panel: string; ask: string; outcome: "answered" | "deferred" | "cancelled"; value?: string | readonly string[]; note?: string }) => Promise<{ readonly ok: boolean; readonly message: string }>;
+  readonly answer: (input: { panel: string; ask: string; outcome: "answered" | "deferred" | "cancelled"; value?: string | readonly string[]; note?: string; version?: string }) => Promise<{ readonly ok: boolean; readonly message: string }>;
   readonly pin: (id: string, pinned: boolean) => Promise<void>;
   readonly close: (id: string) => Promise<void>;
   readonly stopWaiting: (step: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
@@ -87,7 +87,7 @@ export function PanelCard({ panel, io, presenting = false, onAction = () => unde
     onAnswer: (askId, outcome, value, note) => {
       const ask = panel.blocks.find((b) => b.kind === "question" && b.id === askId);
       const listed = ask?.kind === "question" && ask.input === "multiselect";
-      void io.answer({ panel: panel.id, ask: askId, outcome, ...(value === undefined ? {} : { value: listed ? value.split(",").filter((v) => v !== "") : value }), ...(note === undefined ? {} : { note }) });
+      void io.answer({ panel: panel.id, ask: askId, outcome, ...(ask?.kind === "question" && ask.version !== undefined ? { version: ask.version } : {}), ...(value === undefined ? {} : { value: listed ? value.split(",").filter((v) => v !== "") : value }), ...(note === undefined ? {} : { note }) });
     },
     onSubmit,
     onAction,
