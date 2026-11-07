@@ -1,0 +1,11 @@
+{
+  "median_ms": 0,
+  "p95_ms": 0,
+  "n": 9,
+  "threshold_ms": 2000,
+  "measured_at": "2026-11-07T11:55:45.405Z",
+  "source": "horizon",
+  "repo": "01M6TWQ4VX299FT63J03JX4FK2",
+  "note": "Every event was stamped at the moment it was recorded (seeded events), so this zero is not a live delay. Rerun after live agent work for a real figure.",
+  "pass": true
+}
