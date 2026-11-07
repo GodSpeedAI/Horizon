@@ -38,11 +38,11 @@ function fakeRt(exitFor: (argv: readonly string[]) => number | null = () => 1) {
   let ordinal = 10;
   return {
     calls,
-    declare(intentId: string): DeclaredThreshold {
+    async declare(input: { intentId: string }): Promise<DeclaredThreshold> {
       calls.push({ kind: "declare" });
-      return { question_id: `q-${intentId}`, threshold_id: `t-${intentId}`, position: { ledger_id: "L1", ordinal: 3 } };
+      return { question_id: `q-${input.intentId}`, threshold_id: `t-${input.intentId}`, position: { ledger_id: "L1", ordinal: 3 } };
     },
-    run(_threshold: DeclaredThreshold, argv: readonly string[], _launcher: readonly string[], timeoutS: number): VerifierRun {
+    async run(_threshold: DeclaredThreshold, argv: readonly string[], _launcher: readonly string[], timeoutS: number, _opts?: unknown): Promise<VerifierRun> {
       calls.push({ kind: "run", argv, timeoutS });
       ordinal += 2;
       const exit = exitFor(argv);

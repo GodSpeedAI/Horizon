@@ -20,6 +20,20 @@ export interface RealityTraceObligationConfig {
   readonly stateHome: string;
   /** The repository RealityTrace enrolls; verifier argv runs with this as its working directory. */
   readonly repoDir: string;
+  /** Each RealityTrace command is killed after this long. Default 120 s. */
+  readonly timeoutMs?: number;
+}
+
+export interface DeclareInput {
+  readonly intentId: string;
+  readonly statement: string;
+  readonly target: string;
+  readonly criteria: { readonly minimum_relevance: string; readonly minimum_reliability: string };
+}
+
+export interface RunOptions {
+  readonly target: string;
+  readonly snapshot: string;
 }
 
 export interface LedgerPosition {
@@ -47,31 +61,50 @@ export class RealityTraceError extends Error {
   override readonly name = "RealityTraceError";
 }
 
-const TARGET = "concept:navigation_intent";
-
 export class RealityTraceObligation {
   private repoId: string | null = null;
 
   constructor(private readonly config: RealityTraceObligationConfig) {}
 
-  private sxr(args: readonly string[]): any {
-    const result = spawnSync(this.config.bin, [...args, "--json"], {
-      cwd: this.config.repoDir,
-      env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME ?? "/", XDG_DATA_HOME: this.config.dataHome, XDG_STATE_HOME: this.config.stateHome },
-      encoding: "utf8",
-      timeout: 120_000,
-    });
-    if (result.error) throw new RealityTraceError(`realitytrace ${args[0]} ${args[1]}: ${result.error.message}`);
-    if (result.status !== 0) throw new RealityTraceError(`realitytrace ${args.slice(0, 2).join(" ")} failed (exit ${result.status}): ${(result.stderr || result.stdout).trim()}`);
+  /**
+   * One RealityTrace command. It runs as a child process and is awaited, so the event loop keeps serving while it works.
+   * After the time limit the child is killed and the error says so.
+   */
+  private async sxr(args: readonly string[]): Promise<any> {
+    const label = args.slice(0, 2).join(" ");
+    const limitMs = this.config.timeoutMs ?? 120_000;
+    let proc: ReturnType<typeof Bun.spawn>;
     try {
-      return JSON.parse(result.stdout);
-    } catch {
-      throw new RealityTraceError(`realitytrace ${args.slice(0, 2).join(" ")} printed no JSON`);
+      proc = Bun.spawn([this.config.bin, ...args, "--json"], {
+        cwd: this.config.repoDir,
+        env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME ?? "/", XDG_DATA_HOME: this.config.dataHome, XDG_STATE_HOME: this.config.stateHome },
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+    } catch (error) {
+      throw new RealityTraceError(`realitytrace ${label}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      proc.kill("SIGKILL");
+    }, limitMs);
+    try {
+      const [stdout, stderr] = await Promise.all([new Response(proc.stdout as ReadableStream).text(), new Response(proc.stderr as ReadableStream).text(), proc.exited]);
+      if (timedOut) throw new RealityTraceError(`realitytrace ${label} timed out after ${Math.round(limitMs / 1000)} s and was stopped`);
+      if (proc.exitCode !== 0) throw new RealityTraceError(`realitytrace ${label} failed (exit ${proc.exitCode}): ${(stderr || stdout).trim()}`);
+      try {
+        return JSON.parse(stdout);
+      } catch {
+        throw new RealityTraceError(`realitytrace ${label} printed no JSON`);
+      }
+    } finally {
+      clearTimeout(timer);
     }
   }
 
   /** The enrolled repository, enrolling it once (an empty git repository is enough). */
-  repo(): string {
+  async repo(): Promise<string> {
     if (this.repoId !== null) return this.repoId;
     mkdirSync(this.config.repoDir, { recursive: true });
     const git = (args: string[]) => spawnSync("git", args, { cwd: this.config.repoDir, encoding: "utf8" });
@@ -79,48 +112,48 @@ export class RealityTraceObligation {
       git(["init", "-q"]);
       git(["-c", "user.email=horizon@localhost", "-c", "user.name=horizon", "commit", "--allow-empty", "-qm", "horizon realitytrace enrollment"]);
     }
-    const listed = this.sxr(["repo", "list"]) as { repos?: { repo_id: string; path?: string; root?: string }[] };
+    const listed = (await this.sxr(["repo", "list"])) as { repos?: { repo_id: string; path?: string; root?: string }[] };
     const known = (listed.repos ?? []).find((repo) => [repo.path, repo.root].includes(this.config.repoDir));
-    this.repoId = known?.repo_id ?? (this.sxr(["repo", "enroll", this.config.repoDir]) as { repo_id: string }).repo_id;
+    this.repoId = known?.repo_id ?? ((await this.sxr(["repo", "enroll", this.config.repoDir])) as { repo_id: string }).repo_id;
     return this.repoId;
   }
 
-  private withFile<T>(name: string, content: unknown, body: (path: string) => T): T {
+  private async withFile<T>(name: string, content: unknown, body: (path: string) => Promise<T>): Promise<T> {
     const dir = mkdtempSync(join(tmpdir(), "horizon-rt-"));
     try {
       const path = join(dir, name);
       writeFileSync(path, JSON.stringify(content));
-      return body(path);
+      return await body(path);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   }
 
   /** Register the expectation as a question and threshold; returns T. Before authority is requested. */
-  declare(intentId: string, expectation: ExpectedOutcome): DeclaredThreshold {
-    const repo = this.repo();
-    const questionId = `q-${intentId}`;
-    const thresholdId = `t-${intentId}`;
-    this.withFile("question.json", { question_id: questionId, question_form: "is_true", question_type: "verification", target_entities: [], expected_answer_shape: "boolean", title: expectation.statement }, (file) =>
+  async declare(input: DeclareInput): Promise<DeclaredThreshold> {
+    const repo = await this.repo();
+    const questionId = `q-${input.intentId}`;
+    const thresholdId = `t-${input.intentId}`;
+    await this.withFile("question.json", { question_id: questionId, question_form: "is_true", question_type: "verification", target_entities: [], expected_answer_shape: "boolean", title: input.statement }, (file) =>
       this.sxr(["question", "declare", "--repo", repo, "--file", file]),
     );
-    const threshold = this.withFile("threshold.json", { threshold_id: thresholdId, minimum_relevance: "medium", minimum_reliability: "medium" }, (file) =>
+    const threshold = (await this.withFile("threshold.json", { threshold_id: thresholdId, minimum_relevance: input.criteria.minimum_relevance, minimum_reliability: input.criteria.minimum_reliability }, (file) =>
       this.sxr(["threshold", "declare", "--repo", repo, "--question", questionId, "--file", file]),
-    ) as { threshold_id: string; ledger_position?: { ledger_id: string; append_ordinal: number } };
+    )) as { threshold_id: string; ledger_position?: { ledger_id: string; append_ordinal: number } };
     if (!threshold.ledger_position) throw new RealityTraceError("threshold declare returned no ledger position");
     return { question_id: questionId, threshold_id: threshold.threshold_id, position: { ledger_id: threshold.ledger_position.ledger_id, ordinal: threshold.ledger_position.append_ordinal } };
   }
 
   /** Run the instantiated verifier once, confined by `launcher`, as its own RealityTrace run. */
-  run(threshold: DeclaredThreshold, argv: readonly string[], launcher: readonly string[], timeoutS: number): VerifierRun {
-    const repo = this.repo();
-    const run = this.sxr(["run", "begin", "--repo", repo, "--snapshot", "snapshot:horizon", "--question", threshold.question_id, "--threshold", threshold.threshold_id]) as { run_id: string };
-    this.sxr([
-      "plan", "create", "--run", run.run_id, "--verifier", "command", "--target", TARGET,
+  async run(threshold: DeclaredThreshold, argv: readonly string[], launcher: readonly string[], timeoutS: number, opts: RunOptions): Promise<VerifierRun> {
+    const repo = await this.repo();
+    const run = (await this.sxr(["run", "begin", "--repo", repo, "--snapshot", opts.snapshot, "--question", threshold.question_id, "--threshold", threshold.threshold_id])) as { run_id: string };
+    await this.sxr([
+      "plan", "create", "--run", run.run_id, "--verifier", "command", "--target", opts.target,
       "--argv-json", JSON.stringify(argv), "--cwd", ".", "--timeout-s", String(Math.max(1, Math.floor(timeoutS))),
       ...(launcher.length > 0 ? ["--launcher-json", JSON.stringify(launcher)] : []),
     ]);
-    const verified = this.sxr(["verify", "run", "--run", run.run_id]) as { observations?: Record<string, any>[] };
+    const verified = (await this.sxr(["verify", "run", "--run", run.run_id])) as { observations?: Record<string, any>[] };
     const observation = verified.observations?.[0];
     if (!observation?.ledger_position) throw new RealityTraceError("verify run recorded no observation");
     return {
