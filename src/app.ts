@@ -1882,6 +1882,12 @@ export async function createApplication(
     return Response.json(result.ok ? { ok: true, message: "Started. The waiting steps are under way." } : { ok: false, message: `It did not start: ${result.words}` }, { status: result.ok ? 200 : 502, headers });
   }
 
+  /** A hand off answer that shows case and step names: while Presenting is on, repository names in it get their stand-ins. */
+  async function presentedJson(body: unknown, headers: Record<string, string>): Promise<Response> {
+    const on = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
+    return Response.json(on ? applyStandIns(body, presentingKey(), deskRepoNames()) : body, { headers });
+  }
+
   /** Hand off (stage 4): `POST /desk/handoff/preview` shows the step that would be added; `POST /desk/handoff` adds it. */
   async function deskHandoff(request: Request, phase: "preview" | "send"): Promise<Response> {
     const headers = { "cache-control": "no-store" };
@@ -1927,7 +1933,7 @@ export async function createApplication(
       const dry = await addItem(caseKeeper, { case_id: target.case_id, item, dry_run: true });
       if (dry.kind !== "ok") return fail(dry.kind === "refused" ? 409 : dry.kind === "stale" ? 409 : 502, dry.kind, dry.kind === "stale" ? REFUSED_OLD : dry.words, detailsOf(dry));
       if (dry.value.plan_precondition === null) return fail(502, "unreadable", "The case keeper did not give a version code for this case, so the hand off cannot be tied to what you see. Try again in a moment.");
-      return Response.json({ ok: true, preview: { draft_id: draftId, case_id: target.case_id, case_title: caseTitleNow, step_name: item.name, step_id: dry.value.plan_item_id, check: "The case keeper checked this step against the case and it fits.", plan_precondition: dry.value.plan_precondition, agent, review: reviewAsked ? { reviewable } : null } }, { headers });
+      return presentedJson({ ok: true, preview: { draft_id: draftId, case_id: target.case_id, case_title: caseTitleNow, step_name: item.name, step_id: dry.value.plan_item_id, check: "The case keeper checked this step against the case and it fits.", plan_precondition: dry.value.plan_precondition, agent, review: reviewAsked ? { reviewable } : null } }, headers);
     }
     const pre = body.plan_precondition;
     if (typeof pre !== "object" || pre === null || typeof (pre as { ref?: unknown }).ref !== "string" || typeof (pre as { expected_digest?: unknown }).expected_digest !== "string") {
@@ -1956,7 +1962,7 @@ export async function createApplication(
       assigned = result.kind === "ok" ? { done: true, words: "Given to an agent." } : { done: false, words: result.words };
     }
     const next = await nextDraft(store, caller.tenant, caller.actor.id, draftId);
-    return Response.json({ ok: true, message: `Handed off: "${item.name}" is now a step in "${caseTitleNow}".${started.ok ? " It has started." : ` It has not started yet: ${started.words} Use Start it under Work.`}${assigned === null ? "" : assigned.done ? " It was given to an agent." : ` It was not given to an agent: ${assigned.words}`}`, step_id: sent.value.plan_item_id, started, assigned, draft_id: next.draftId }, { headers });
+    return presentedJson({ ok: true, message: `Handed off: "${item.name}" is now a step in "${caseTitleNow}".${started.ok ? " It has started." : ` It has not started yet: ${started.words} Use Start it under Work.`}${assigned === null ? "" : assigned.done ? " It was given to an agent." : ` It was not given to an agent: ${assigned.words}`}`, step_id: sent.value.plan_item_id, started, assigned, draft_id: next.draftId }, headers);
   }
 
   /** Whether a step can be given to an agent right now, in words. Nothing is offered that would fail silently. */

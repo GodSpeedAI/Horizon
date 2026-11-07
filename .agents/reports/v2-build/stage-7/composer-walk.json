@@ -1,0 +1,21 @@
+{
+  "wide:hscroll": false,
+  "phone:hscroll": false,
+  "axe_with_preview_open": [],
+  "axe_thread_idle": [],
+  "phone:thread hscroll": false,
+  "keyboard": {
+    "stops": 70,
+    "composer_stops": [
+      "button:Preview hand off",
+      "textarea:Say what you want done. It becomes a ste",
+      "input:",
+      "select:Case for the step",
+      "button:Mode: Hand off. Press to change.",
+      "button:Cancel",
+      "button:Confirm: Hand off",
+      "button:▾ Conversation (1)"
+    ],
+    "composer_without_focus_ring": []
+  }
+}
