@@ -65,6 +65,18 @@ export function Decide({ ui, data, dispatch, confirm, release, nowMs }: DecideVi
           ))}
         </div>
       ) : null}
+      {(data.decide.decided ?? []).length > 0 ? (
+        <div className="decided" data-decided>
+          <h2>Already decided ({data.decide.decided!.length})</h2>
+          <ul>
+            {data.decide.decided!.map((line, index) => (
+              <li key={`${index}:${line}`}>
+                <Words text={line} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
 }

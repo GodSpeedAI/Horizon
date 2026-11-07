@@ -131,6 +131,8 @@ export interface DecideState {
   readonly notices: readonly string[];
   /** Waiting, oldest first, then held. */
   readonly cards: readonly DecisionCardData[];
+  /** Requests already answered, as the case keeper lists them: what was decided and who resolved it. Never a card. */
+  readonly decided?: readonly string[];
 }
 
 /** The frame-based "next decision": what can be done next from the shared focus, and what cannot and why. */

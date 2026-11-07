@@ -94,6 +94,7 @@ import { NO_PANELS, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type P
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { readableTitle } from "./ui/desk/banned-words.ts";
 import { caseTitle, matches, partsOf, plainWords, sourcesOf, type DeskCase, type DecideState, type DecisionCardData, type PanelsData, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
+import { confirmedDecision, failedDecision } from "./ui/desk/decision-words.ts";
 import { buildDecide, waitingCount, type CaseApprovals, type HumanStepInput } from "./ui/desk/decide-build.ts";
 import { addItem, advance as caseAdvance, detailsOf, entryOptions, approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
 import { activeHolds, checkReason, putHold, recordDecision } from "./capabilities/decisions.ts";
@@ -1713,18 +1714,27 @@ export async function createApplication(
 
     if (card.kind === "escalation") {
       const approvalId = card.id.slice("approval:".length);
+      let failure: unknown = null;
       try {
         await resolveNavigationApproval({ approvalId, resolution: choice === "accept" ? "approved" : "rejected" });
       } catch (error) {
         // A rejected commit fails by design and is audited; anything else is refused here.
-        if (!(error instanceof Error && error.message.startsWith("INTENT: governed commit refused"))) {
-          await audit("refused");
-          return fail(409, "refused", error instanceof Error ? error.message : String(error));
-        }
+        if (!(error instanceof Error && error.message.startsWith("INTENT: governed commit refused"))) failure = error;
+      }
+      // What was decided and what happened is read back from the case keeper's own list, never from the click.
+      const readout = await approvalInbox(clock());
+      const listedItem = readout.state === "listed" ? [...readout.inbox.waiting, ...readout.inbox.decided].find((entry) => entry.approval_id === approvalId) : undefined;
+      const standing = listedItem === undefined ? null : { state: listedItem.state, resolved_by: listedItem.resolved_by };
+      if (failure !== null) {
+        const code = approvalErrorCode(failure);
+        // A later step failed after the decision was recorded: the decision itself still counts.
+        await audit(code === "followup_failed" ? (choice === "accept" ? "approved" : "rejected") : "refused");
+        return fail(409, code, failedDecision(code, standing), failure instanceof Error ? failure.message : String(failure));
       }
       await audit(choice === "accept" ? "approved" : "rejected");
       const intentId = await intentIdForApproval(approvalId);
-      return Response.json({ ok: true, message: choice === "accept" ? "Approved. The case keeper checks the move again and runs it once." : "Rejected. The move stops and the refusal is recorded.", receipt: intentId }, { headers: { "cache-control": "no-store" } });
+      const confirmed = confirmedDecision(choice, standing);
+      return Response.json({ ok: confirmed.ok, ...(confirmed.ok ? {} : { outcome: "unconfirmed" }), message: confirmed.message, receipt: intentId }, { headers: { "cache-control": "no-store" } });
     }
 
     if (card.kind === "lesson") {

@@ -8,6 +8,7 @@
 import { createHash } from "node:crypto";
 import type { InboxItem, InboxReadout } from "../../domain/approval-inbox.ts";
 import type { WorkspaceMove } from "../workspace/model.ts";
+import { decidedLine } from "./decision-words.ts";
 import { plainWords, type CaseApprovalRow, type ChoicePreview, type DecideState, type DecisionCardData, type DecisionPreview, type RecordPin } from "./model.ts";
 
 export type CaseApprovals = { readonly kind: "none" } | { readonly kind: "listed"; readonly approvals: readonly CaseApprovalRow[]; readonly unreadable: string | null } | { readonly kind: "notice"; readonly words: string };
@@ -272,6 +273,8 @@ export function buildDecide(input: DecideInput): DecideState {
     if (input.caseApprovals.unreadable) notices.push(`The case keeper could not read its list of approvals (${plainWords(input.caseApprovals.unreadable)}), so some may be missing.`);
     for (const row of input.caseApprovals.approvals) cards.push(caseTaskCard(row));
   }
+  // An older move waits on a decision it cannot name: it is said here and never offered as a card.
+  for (const move of input.moves) if (move.approval_identity?.state === "unverified") notices.push(`The move "${move.operation_ref}" waits for a decision, but this older record does not carry a verified request, so it cannot be approved from here.`);
   notices.push(...(input.extraNotices ?? []).map(plainWords));
   for (const step of input.humanSteps ?? []) cards.push(humanStepCard(step));
   for (const lesson of input.lessons ?? []) cards.push(lessonCard(lesson));
@@ -287,7 +290,8 @@ export function buildDecide(input: DecideInput): DecideState {
   const age = (c: DecisionCardData): string => c.requested_at ?? "9999";
   const waiting = withHolds.filter((c) => c.held === null).sort((a, b) => (age(a) < age(b) ? -1 : age(a) > age(b) ? 1 : a.id < b.id ? -1 : 1));
   const held = withHolds.filter((c) => c.held !== null).sort((a, b) => (a.held!.at < b.held!.at ? -1 : 1));
-  return { notices, cards: [...waiting, ...held] };
+  const decided = input.inbox.state === "listed" ? input.inbox.inbox.decided.map((item) => decidedLine(item.operation_name, item.requester, item)) : [];
+  return { notices, cards: [...waiting, ...held], ...(decided.length > 0 ? { decided } : {}) };
 }
 
 export const waitingCount = (decide: DecideState): number => decide.cards.filter((c) => c.held === null).length;
