@@ -284,3 +284,48 @@ describe("decisions through the application and a fake case keeper", () => {
     expect(keeper.received.filter((r) => r.verb === "approval_decide").length).toBe(before);
   });
 });
+
+describe("lessons", () => {
+  let app: DeskApp;
+  beforeAll(async () => {
+    app = await startDeskApp();
+  });
+  afterAll(async () => {
+    await app.stop();
+  });
+  const lessons = async () => ((await app.get("/desk/lessons.json")) as { lessons: { status: string; decided_by: string | null; decided_at: string | null; lesson_id: string }[] }).lessons;
+
+  test("a lesson becomes active only after a person accepts", async () => {
+    const proposed = await (await app.post("/desk/lesson", { text: "Check the rollback note before release.", source: "case_1/review_2", proposed_by: "a review" })).json();
+    expect(proposed).toMatchObject({ ok: true, status: "proposed" });
+    // Proposing again changes nothing; waiting is not active.
+    await app.post("/desk/lesson", { text: "Check the rollback note before release.", source: "case_1/review_2", proposed_by: "a review" });
+    expect(await lessons()).toHaveLength(1);
+    expect((await lessons())[0]).toMatchObject({ status: "proposed", decided_by: null, decided_at: null });
+    const card = (await app.state()).decide.cards.find((c: any) => c.id === proposed.lesson_id);
+    expect(card.kind).toBe("lesson");
+    expect(card.preview.accept).not.toBeNull();
+    expect((await app.state()).status.waiting).toBeGreaterThanOrEqual(1);
+    // An old or wrong preview code does nothing.
+    const refused = await app.post("/desk/decide", { card_id: card.id, choice: "accept", preview_code: "stale" });
+    expect(refused.status).toBe(409);
+    expect((await lessons())[0]!.status).toBe("proposed");
+    // The person accepts: active, with who and when.
+    const accepted = await app.post("/desk/decide", { card_id: card.id, choice: "accept", preview_code: card.preview.code, records: [] });
+    expect(accepted.status).toBe(200);
+    const [after] = await lessons();
+    expect(after).toMatchObject({ status: "active" });
+    expect(after!.decided_by).toBeTruthy();
+    expect(after!.decided_at).toBe("2026-11-06T10:00:00.000Z");
+    expect((await app.state()).decide.cards.some((c: any) => c.id === proposed.lesson_id)).toBe(false);
+    // Deciding twice is refused.
+    expect((await app.post("/desk/decide", { card_id: card.id, choice: "reject", preview_code: card.preview.code })).status).toBe(404);
+  });
+
+  test("a rejected lesson never becomes active", async () => {
+    const proposed = await (await app.post("/desk/lesson", { text: "Always rewrite the tests.", proposed_by: "an agent" })).json();
+    const card = (await app.state()).decide.cards.find((c: any) => c.id === proposed.lesson_id);
+    expect((await app.post("/desk/decide", { card_id: card.id, choice: "reject", preview_code: card.preview.code })).status).toBe(200);
+    expect((await lessons()).find((l) => l.lesson_id === proposed.lesson_id)!.status).toBe("rejected");
+  });
+});

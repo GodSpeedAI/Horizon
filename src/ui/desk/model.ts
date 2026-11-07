@@ -108,7 +108,7 @@ export interface CaseApprovalRow {
   readonly expired: boolean;
   readonly digest: RecordPin | null;
 }
-export type CardKind = "escalation" | "case_task" | "acceptance" | "human_step";
+export type CardKind = "escalation" | "case_task" | "acceptance" | "human_step" | "lesson";
 export interface DecisionCardData {
   readonly id: string;
   readonly kind: CardKind;

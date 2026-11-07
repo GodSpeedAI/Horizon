@@ -19,6 +19,7 @@ import { appendIntentAttempt, appendIntentRecord, createFrameRegister, NAVIGATIO
 import { checkPurpose, latestCase, onboardingSkipped, openCase, setOnboardingSkipped } from "./capabilities/workspace-records.ts";
 import { CONTRACT_VERSION, contractVersionOf } from "./capabilities/capacity-ledger.ts";
 import { activateContract } from "./capabilities/contract-upgrade.ts";
+import { decideLesson, listLessons, proposeLesson } from "./capabilities/lessons.ts";
 import { RealityTraceObligation } from "./adapters/realitytrace-obligation.ts";
 import { realityTraceEconomics, type EconomicsSource } from "./adapters/realitytrace-economics.ts";
 import { listPending, readPending, terminate, updatePending, type PendingIntent } from "./capabilities/pending-intent.ts";
@@ -83,7 +84,7 @@ import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
 import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
 import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
-import { assign as assignToAgent, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
+import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
 import { acceptanceBlocked, listAnswers, markReplied, recordAnswer, stopWaiting, checkValue, OUTCOMES, WAITING_WORDS, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { NO_PANELS, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
@@ -1527,7 +1528,8 @@ export async function createApplication(
     }
     const holds = await activeHolds(runtime.runtime.store, caller.tenant);
     const human = await humanSteps();
-    const built = buildDecide({ inbox, moves, caseApprovals, holds, humanSteps: human.steps, extraNotices: human.notices });
+    const proposedLessons = await listLessons(runtime.runtime.store, caller.tenant, "proposed");
+    const built = buildDecide({ inbox, moves, caseApprovals, holds, humanSteps: human.steps, extraNotices: human.notices, lessons: proposedLessons });
     // Accepting a step is blocked while an answer the operator gave an agent about it has had no reply.
     const answers = (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.step !== null);
     if (answers.length === 0) return built;
@@ -1587,6 +1589,22 @@ export async function createApplication(
   const REFUSED_OLD = "That decision changed or is no longer waiting. Look at the new version and decide again.";
 
   /** One decision from a card. The preview code the operator looked at must still be the card's, or nothing is done. */
+  /** A finding from a review, proposed as a lesson. It waits in Decide; only a person's accept makes it active. */
+  async function deskProposeLesson(request: Request): Promise<Response> {
+    const headers = { "cache-control": "no-store" };
+    let body: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(await request.text());
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("not an object");
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return Response.json({ ok: false, message: "That lesson could not be read. Nothing was recorded." }, { status: 400, headers });
+    }
+    const proposed = await proposeLesson(runtime.runtime.store, { tenant: caller.tenant, text: typeof body.text === "string" ? body.text : "", source: typeof body.source === "string" && body.source !== "" ? body.source.slice(0, 200) : null, proposed_by: typeof body.proposed_by === "string" && body.proposed_by.trim() !== "" ? body.proposed_by.trim().slice(0, 100) : "a review", now: clock() });
+    if (!proposed.ok) return Response.json({ ok: false, message: proposed.message }, { status: 400, headers });
+    return Response.json({ ok: true, message: "Lesson proposed. It waits in Decide until you accept it.", lesson_id: proposed.lesson.lesson_id, status: proposed.lesson.status }, { headers });
+  }
+
   async function deskDecide(request: Request): Promise<Response> {
     const fail = (status: number, outcome: string, message: string): Response => Response.json({ ok: false, outcome, message }, { status, headers: { "cache-control": "no-store" } });
     let body: Record<string, unknown>;
@@ -1649,6 +1667,16 @@ export async function createApplication(
       await audit(choice === "accept" ? "approved" : "rejected");
       const intentId = await intentIdForApproval(approvalId);
       return Response.json({ ok: true, message: choice === "accept" ? "Approved. The case keeper checks the move again and runs it once." : "Rejected. The move stops and the refusal is recorded.", receipt: intentId }, { headers: { "cache-control": "no-store" } });
+    }
+
+    if (card.kind === "lesson") {
+      const decided = await decideLesson(store, { lesson_id: card.id, choice: choice === "accept" ? "accept" : "reject", person: caller.actor.id, now });
+      if (!decided.ok) {
+        await audit("refused");
+        return fail(409, "refused", decided.message);
+      }
+      await audit(choice === "accept" ? "lesson_active" : "lesson_rejected");
+      return Response.json({ ok: true, message: choice === "accept" ? "Lesson accepted. It is now active, recorded with your name and the time." : "Lesson rejected. It will not become active." }, { headers: { "cache-control": "no-store" } });
     }
 
     if (card.kind === "case_task") {
@@ -1885,14 +1913,25 @@ export async function createApplication(
     const target = open.find((c) => c.case_id === wanted);
     if (target === undefined) return fail(409, "no_case", wanted === "" ? "There is no running case to add a step to. Start a case first." : "That case is not running, so a step cannot be added to it.");
     const caseTitleNow = await titleOf(target);
-    const item = handoffItem(draftId, text);
+    // Run a review: the new step is marked as a review, and it points at a finished step whose agent work it checks.
+    const reviewAsked = typeof body.review === "object" && body.review !== null && !Array.isArray(body.review);
+    const reviewStepId = reviewAsked && typeof (body.review as { step_id?: unknown }).step_id === "string" ? ((body.review as { step_id: string }).step_id) : "";
+    let reviewable: { step_id: string; name: string }[] = [];
+    if (reviewAsked) {
+      const horizon = await caseSteps(caseKeeper, target.case_id);
+      if (horizon.kind !== "ok") return fail(horizon.kind === "refused" || horizon.kind === "stale" ? 409 : 502, horizon.kind, horizon.kind === "stale" ? REFUSED_OLD : horizon.words);
+      reviewable = horizon.value.steps.filter((st) => st.execution === "completed").map((st) => ({ step_id: st.plan_item_id, name: st.name }));
+      if (reviewStepId === "" && phase === "send") return fail(400, "no_review_target", "Choose which finished work to review first. Nothing was sent.");
+      if (reviewStepId !== "" && !reviewable.some((st) => st.step_id === reviewStepId)) return fail(409, "not_finished", "That step has no finished work to review. Nothing was sent.");
+    }
+    const item = handoffItem(draftId, text, reviewAsked);
     const agent = deskAgent();
     if (phase === "preview") {
       await saveDraft(store, caller.tenant, caller.actor.id, { draftId, text, mode: "handoff" });
       const dry = await addItem(caseKeeper, { case_id: target.case_id, item, dry_run: true });
       if (dry.kind !== "ok") return fail(dry.kind === "refused" ? 409 : dry.kind === "stale" ? 409 : 502, dry.kind, dry.kind === "stale" ? REFUSED_OLD : dry.words);
       if (dry.value.plan_precondition === null) return fail(502, "unreadable", "The case keeper did not give a version code for this case, so the hand off cannot be tied to what you see. Try again in a moment.");
-      return Response.json({ ok: true, preview: { draft_id: draftId, case_id: target.case_id, case_title: caseTitleNow, step_name: item.name, step_id: dry.value.plan_item_id, check: "The case keeper checked this step against the case and it fits.", plan_precondition: dry.value.plan_precondition, agent } }, { headers });
+      return Response.json({ ok: true, preview: { draft_id: draftId, case_id: target.case_id, case_title: caseTitleNow, step_name: item.name, step_id: dry.value.plan_item_id, check: "The case keeper checked this step against the case and it fits.", plan_precondition: dry.value.plan_precondition, agent, review: reviewAsked ? { reviewable } : null } }, { headers });
     }
     const pre = body.plan_precondition;
     if (typeof pre !== "object" || pre === null || typeof (pre as { ref?: unknown }).ref !== "string" || typeof (pre as { expected_digest?: unknown }).expected_digest !== "string") {
@@ -1917,7 +1956,7 @@ export async function createApplication(
     let assigned: { readonly done: boolean; readonly words: string } | null = null;
     if (wantsAgent) {
       const access = options.workshop?.() ?? workshopAccess(loaded.config.workshop, caller, clock());
-      const result = await assignToAgent(access, { caseId: target.case_id, stepId: sent.value.plan_item_id, expertId: loaded.config.workshop?.expert_id ?? "", workspaceId: loaded.config.workshop?.workspace_id ?? "", message: text });
+      const result = await assignToAgent(access, { caseId: target.case_id, stepId: sent.value.plan_item_id, expertId: loaded.config.workshop?.expert_id ?? "", workspaceId: loaded.config.workshop?.workspace_id ?? "", message: text, ...(reviewAsked ? { reviews: assignmentId(target.case_id, reviewStepId) } : {}) });
       assigned = result.kind === "ok" ? { done: true, words: "Given to an agent." } : { done: false, words: result.words };
     }
     const next = await nextDraft(store, caller.tenant, caller.actor.id, draftId);
@@ -2123,6 +2162,8 @@ export async function createApplication(
             return Response.json(shown, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
           }
           if (url.pathname === "/desk/decide" && request.method === "POST") return deskDecide(request);
+          if (url.pathname === "/desk/lesson" && request.method === "POST") return deskProposeLesson(request);
+          if (url.pathname === "/desk/lessons.json" && request.method === "GET") return Response.json({ lessons: await listLessons(runtime.runtime.store, caller.tenant) }, { headers: { "cache-control": "no-store" } });
           if (url.pathname === "/desk/work.json" && request.method === "GET") {
             return Response.json(await deskWork(url.searchParams), { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
           }

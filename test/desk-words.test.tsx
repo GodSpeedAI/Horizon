@@ -128,6 +128,20 @@ describe("no product names and no internal terms on screen", () => {
     scan("hand off preview, agent work not connected", card({ pv: notConnected }));
     expect(text(card({ pv: notConnected }))).toContain("Not connected");
     expect(card({ pv: notConnected })).not.toContain("checkbox");
+    // Run a review: the checkbox in the composer, the preview with finished work to choose, and with none to choose.
+    scan("run a review, composer", draw({ ...START, data: base(), composer: { ...START.composer, mode: "handoff", text: "Check the rollback note" } }));
+    const reviewPv = { ...pv, review: { reviewable: [{ step_id: "s0", name: "Draft the rollback note" }] } };
+    scan("run a review, preview", card({ pv: reviewPv }));
+    scan("run a review, preview, nothing finished", card({ pv: { ...pv, review: { reviewable: [] } } }));
+    expect(text(card({ pv: reviewPv }))).toContain("Run a review");
+  });
+
+  test("Decide, with a lesson card waiting and its preview open", () => {
+    const lessons = buildDecide({ inbox: { state: "not_configured" }, moves: [], caseApprovals: { kind: "none" }, holds: new Map(), lessons: [{ lesson_id: "lesson:abc", text: "Check the rollback note before release.", source: "case_1/review_2", proposed_by: "a review", proposed_at: "2026-11-07T09:00:00Z" }] });
+    scan("decide, lesson", draw({ ...START, view: "decide", data: base({ decide: lessons }) }));
+    const open = deskReducer({ ...START, view: "decide", data: base({ decide: lessons }) }, { type: "preview-open", cardId: "lesson:abc", choice: "accept" });
+    scan("decide, lesson preview", draw(open));
+    expect(text(draw(open))).toContain("Make it active");
   });
 
   test("Panels from agents, with questions, notes, a pinned panel and a wait", () => {

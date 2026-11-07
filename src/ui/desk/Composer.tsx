@@ -26,6 +26,8 @@ export interface HandoffPreview {
   readonly check: string;
   readonly plan_precondition: { readonly ref: string; readonly expected_digest: string };
   readonly agent: { readonly offered: boolean; readonly words: string };
+  /** Set when the step is a review: the steps with finished work that it can check. */
+  readonly review?: { readonly reviewable: readonly { readonly step_id: string; readonly name: string }[] } | null;
 }
 export interface DraftInfo {
   readonly draftId: string;
@@ -36,8 +38,8 @@ export interface DraftInfo {
 export interface HandoffIo {
   readonly draft: () => Promise<DraftInfo | null>;
   readonly saveDraft: (input: { draft_id: string; text: string }) => void;
-  readonly preview: (input: { draft_id: string; text: string; case_id?: string }) => Promise<{ readonly ok: true; readonly preview: HandoffPreview } | { readonly ok: false; readonly message: string }>;
-  readonly send: (input: { draft_id: string; text: string; case_id: string; plan_precondition: HandoffPreview["plan_precondition"]; assign: boolean }) => Promise<{ readonly ok: true; readonly message: string; readonly draft_id: string } | { readonly ok: false; readonly outcome: string; readonly message: string }>;
+  readonly preview: (input: { draft_id: string; text: string; case_id?: string; review?: { step_id?: string } }) => Promise<{ readonly ok: true; readonly preview: HandoffPreview } | { readonly ok: false; readonly message: string }>;
+  readonly send: (input: { draft_id: string; text: string; case_id: string; plan_precondition: HandoffPreview["plan_precondition"]; assign: boolean; review?: { step_id: string } }) => Promise<{ readonly ok: true; readonly message: string; readonly draft_id: string } | { readonly ok: false; readonly outcome: string; readonly message: string }>;
 }
 
 export interface Suggestion {
@@ -78,13 +80,16 @@ export interface HandoffPreviewCardProps {
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
   readonly onRefresh: () => void;
+  /** The finished step chosen to review (review previews only). */
+  readonly reviewStep?: string;
+  readonly onReviewStep?: (stepId: string) => void;
 }
 
 /** What Hand off will add, before anything is sent. A changed case turns Confirm off and says "preview out of date". */
-export function HandoffPreviewCard({ pv, assign, outOfDate, busy, onAssign, onCancel, onConfirm, onRefresh }: HandoffPreviewCardProps): ReactNode {
+export function HandoffPreviewCard({ pv, assign, outOfDate, busy, onAssign, onCancel, onConfirm, onRefresh, reviewStep = "", onReviewStep = () => undefined }: HandoffPreviewCardProps): ReactNode {
   return (
     <section className="preview handoff-preview" aria-label="Hand off preview" data-stale={outOfDate ? "yes" : "no"}>
-      <h4>Preview: Hand off</h4>
+      <h4>{pv.review ? "Preview: Run a review" : "Preview: Hand off"}</h4>
       <dl className="preview-grid">
         <dt>Step that will be added</dt>
         <dd>{pv.step_name}</dd>
@@ -92,6 +97,25 @@ export function HandoffPreviewCard({ pv, assign, outOfDate, busy, onAssign, onCa
         <dd>{pv.case_title}</dd>
         <dt>Check</dt>
         <dd>{pv.check}</dd>
+        {pv.review ? (
+          <>
+            <dt>Work to review</dt>
+            <dd>
+              {pv.review.reviewable.length === 0 ? (
+                "No step in this case has finished work yet, so there is nothing to review."
+              ) : (
+                <select value={reviewStep} onChange={(event) => onReviewStep(event.target.value)} aria-label="Finished work to review">
+                  <option value="">Choose finished work</option>
+                  {pv.review.reviewable.map((st) => (
+                    <option key={st.step_id} value={st.step_id}>
+                      {st.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </dd>
+          </>
+        ) : null}
         <dt>Agent</dt>
         <dd>
           {pv.agent.offered ? (
@@ -115,8 +139,8 @@ export function HandoffPreviewCard({ pv, assign, outOfDate, busy, onAssign, onCa
         <button type="button" onClick={onCancel}>
           Cancel
         </button>
-        <button type="button" className="primary" disabled={busy || outOfDate} aria-disabled={busy || outOfDate} onClick={onConfirm} data-confirm-handoff>
-          {outOfDate ? "Confirm (preview out of date)" : "Confirm: Hand off"}
+        <button type="button" className="primary" disabled={busy || outOfDate || (pv.review != null && reviewStep === "")} aria-disabled={busy || outOfDate || (pv.review != null && reviewStep === "")} onClick={onConfirm} data-confirm-handoff>
+          {outOfDate ? "Confirm (preview out of date)" : pv.review ? "Confirm: Run a review" : "Confirm: Hand off"}
         </button>
       </div>
     </section>
@@ -140,6 +164,9 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
   const [assign, setAssign] = useState(false);
   const [outOfDate, setOutOfDate] = useState(false);
   const [caseId, setCaseId] = useState("");
+  // Run a review: the step added is a review of finished work.
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewStep, setReviewStep] = useState("");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handoff = mode === "handoff";
   // Entering Hand off loads the draft: the same draft number comes back after a restart, with the words written so far.
@@ -184,12 +211,13 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
     }
     setBusy(true);
     setOutOfDate(false);
-    const result = await io.handoff.preview({ draft_id: draft.draftId, text, ...(caseId !== "" ? { case_id: caseId } : {}) });
+    const result = await io.handoff.preview({ draft_id: draft.draftId, text, ...(caseId !== "" ? { case_id: caseId } : {}), ...(reviewing ? { review: reviewStep !== "" ? { step_id: reviewStep } : {} } : {}) });
     setBusy(false);
     if (result.ok) {
       setPv(result.preview);
       setPvText(text);
       setAssign(false);
+      if (!result.preview.review) setReviewStep("");
       dispatch({ type: "notice", text: "" });
     } else {
       setPv(null);
@@ -199,7 +227,7 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
   const confirmHandoff = async (): Promise<void> => {
     if (pv === null || draft === null) return;
     setBusy(true);
-    const result = await io.handoff.send({ draft_id: pv.draft_id, text: pvText, case_id: pv.case_id, plan_precondition: pv.plan_precondition, assign: assign && pv.agent.offered });
+    const result = await io.handoff.send({ draft_id: pv.draft_id, text: pvText, case_id: pv.case_id, plan_precondition: pv.plan_precondition, assign: assign && pv.agent.offered, ...(pv.review ? { review: { step_id: reviewStep } } : {}) });
     setBusy(false);
     if (result.ok) {
       setPv(null);
@@ -308,6 +336,11 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
           </select>
         </label>
       ) : null}
+      {handoff ? (
+        <label className="muted">
+          <input type="checkbox" checked={reviewing} onChange={(event) => { setReviewing(event.target.checked); setReviewStep(""); setPv(null); }} /> Run a review of finished agent work
+        </label>
+      ) : null}
       {handoff && pv !== null ? (
         <HandoffPreviewCard
           pv={pv}
@@ -315,6 +348,8 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
           outOfDate={outOfDate}
           busy={busy}
           onAssign={setAssign}
+          reviewStep={reviewStep}
+          onReviewStep={setReviewStep}
           onCancel={() => {
             setPv(null);
             setOutOfDate(false);

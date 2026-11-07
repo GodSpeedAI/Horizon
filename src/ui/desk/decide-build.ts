@@ -21,7 +21,16 @@ export interface HumanStepInput {
   readonly last_event_at: string | null;
   readonly digest: { readonly ref: string; readonly expected_digest: string } | null;
 }
+/** A lesson proposed from a review's findings that no person has decided yet. */
+export interface LessonInput {
+  readonly lesson_id: string;
+  readonly text: string;
+  readonly source: string | null;
+  readonly proposed_by: string;
+  readonly proposed_at: string;
+}
 export interface DecideInput {
+  readonly lessons?: readonly LessonInput[];
   readonly humanSteps?: readonly HumanStepInput[];
   /** Notices from reading the steps (the case keeper did not answer). */
   readonly extraNotices?: readonly string[];
@@ -147,6 +156,31 @@ function caseTaskCard(row: CaseApprovalRow): DecisionCardData {
  * A human step waiting for a person. "Mark done" needs a typed reason. The case keeper's `human_task_complete` takes no
  * preconditions, so the version the card pins (`case:<id>`) is compared by Horizon itself, just before sending (src/app.ts).
  */
+function lessonCard(lesson: LessonInput): DecisionCardData {
+  const body: Omit<PreviewBody, "hold"> = {
+    touches: [`The lesson: "${lesson.text}"`, `Proposed by ${lesson.proposed_by}`, ...(lesson.source ? [`From: ${lesson.source}`] : [])],
+    who: "You. A lesson becomes active only when a person accepts it. Notes and agent guesses never become active on their own.",
+    stops_if: "Nothing else can make it active. If you do nothing it stays waiting.",
+    limits: "This one lesson only.",
+    accept: {
+      kind: "can be undone",
+      button: "Make it active",
+      effects: [{ text: "Horizon records the lesson as active, with your name and the time.", certainty: "certain" }],
+      undo: "A decided lesson cannot be changed here. Propose it again as a new finding.",
+      next: "The lesson is kept as one you accepted.",
+    },
+    reject: {
+      kind: "can be undone",
+      button: "Reject it",
+      effects: [{ text: "Horizon records the lesson as rejected, with your name and the time. It never becomes active.", certainty: "certain" }],
+      undo: "Propose the lesson again as a new finding.",
+      next: "The card goes away.",
+    },
+    records: [],
+  };
+  return { id: lesson.lesson_id, kind: "lesson", title: `Lesson from a review: ${lesson.text}`, facts: [`Lesson: ${lesson.text}`, `Proposed by ${lesson.proposed_by}`, "Waiting for you to accept or reject it"], requested_at: lesson.proposed_at, preview: preview(body), held: null, blocked: null, reason_for_accept: false };
+}
+
 function humanStepCard(step: HumanStepInput): DecisionCardData {
   const records: RecordPin[] = step.digest ? [{ ref: step.digest.ref, expected_digest: step.digest.expected_digest }] : [];
   const body: Omit<PreviewBody, "hold"> = {
@@ -240,6 +274,7 @@ export function buildDecide(input: DecideInput): DecideState {
   }
   notices.push(...(input.extraNotices ?? []).map(plainWords));
   for (const step of input.humanSteps ?? []) cards.push(humanStepCard(step));
+  for (const lesson of input.lessons ?? []) cards.push(lessonCard(lesson));
   for (const move of input.moves) {
     const card = acceptanceCard(move);
     if (card) cards.push(card);

@@ -153,6 +153,8 @@ export interface AssignRequest {
   readonly workspaceId: string;
   /** What the agent is asked to do, in the step's own words. */
   readonly message: string;
+  /** For a review step: the id of the assignment under review. The workshop then starts the reviewer without the author's memory. */
+  readonly reviews?: string;
   readonly timeoutMs?: number;
 }
 
@@ -165,7 +167,7 @@ export async function assign(access: Access, request: AssignRequest): Promise<Wo
   if (access.kind !== "ready") return { kind: "refused", words: access.words };
   const id = assignmentId(request.caseId, request.stepId);
   try {
-    const result = await guarded(access.client.invoke("expert.converse", { id, requestId: id, expertId: request.expertId, workspaceId: request.workspaceId, message: request.message }), request.timeoutMs ?? DEFAULT_WORKSHOP_TIMEOUT_MS);
+    const result = await guarded(access.client.invoke("expert.converse", { id, requestId: id, expertId: request.expertId, workspaceId: request.workspaceId, message: request.message, ...(request.reviews ? { reviews: request.reviews } : {}) }), request.timeoutMs ?? DEFAULT_WORKSHOP_TIMEOUT_MS);
     const got = typeof result === "object" && result !== null && !Array.isArray(result) ? (result as { assignmentId?: unknown }).assignmentId : undefined;
     return { kind: "ok", value: { assignmentId: typeof got === "string" ? got : id } };
   } catch (error) {

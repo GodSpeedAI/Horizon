@@ -75,12 +75,12 @@ export function stepNameOf(text: string): string {
 }
 
 /** The step the case keeper is asked to add. The same draft always gives the same step, so a retry is a replay. */
-export function handoffItem(draftId: string, text: string): Record<string, unknown> {
+export function handoffItem(draftId: string, text: string, review = false): Record<string, unknown> {
   return {
     plan_item_id: handoffStepId(draftId),
     name: stepNameOf(text),
     item_kind: "human_task",
     settlement_criteria: { required_artifacts: [], required_declarations: [] },
-    markers: { required: false, review: false },
+    markers: { required: false, review },
   };
 }
