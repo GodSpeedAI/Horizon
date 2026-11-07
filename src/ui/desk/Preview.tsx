@@ -44,9 +44,9 @@ export function Preview({ card, decision, onReason, onConfirm, onCancel, onRefre
   const needsReason = decision.choice === "hold" || (decision.choice === "accept" && card.reason_for_accept);
   return (
     <section className="preview" id="decision-preview" aria-labelledby="preview-h" data-stale={stale ? "yes" : "no"} data-code={decision.code}>
-      <h4 id="preview-h">
+      <h3 id="preview-h">
         <StateWord state="preview" /> {choice ? choice.button : "This choice"}
-      </h4>
+      </h3>
       {stale ? (
         <p role="alert" className="error" data-out-of-date>
           {OUT_OF_DATE}. What this shows changed while you were looking, so nothing here will be applied.{" "}

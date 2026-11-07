@@ -45,7 +45,7 @@ export function DecisionCard({ card, position, total, highlighted, nowMs, ui, di
         )}{" "}
         · <span data-age>{ageWords(card.requested_at, nowMs)}</span>
       </p>
-      <h3 id={`${card.id}-h`}>{card.title}</h3>
+      <h2 id={`${card.id}-h`}>{card.title}</h2>
       <ul className="facts">
         {card.facts.map((fact) => (
           <li key={fact}>{fact}</li>
