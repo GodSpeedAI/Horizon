@@ -31,8 +31,8 @@ describe("incoming issues", () => {
       expect((frame.item as any).external_ref).toEqual({ kind: "github_issue", id: `${REPO}#1`, url: `https://github.com/${REPO}/issues/1` });
       expect((frame.item as any).name).toBe("Fix the parser");
     }
-    // The state went back to the issue as a tag plus one comment, however many times it was seen.
-    expect(rig.issue(1).labels).toContain("horizon-state/waiting");
+    // The state went back to the issue as a tag plus one comment, however many times it was seen (the step was started by the advance).
+    expect(rig.issue(1).labels).toContain("horizon-state/in-progress");
     expect(rig.issue(1).comments).toHaveLength(1);
   });
 
@@ -44,7 +44,7 @@ describe("incoming issues", () => {
     const step = rig.keeper.cases[0]!.items[0]!;
     expect(step.settlement).toBe("unsettled");
     // The connector sent no decision of any kind: only reads and the one add.
-    expect(new Set(rig.keeper.verbs.map((v) => v.verb))).toEqual(new Set(["case_list", "case_add_item", "case_get_horizon"]));
+    expect(new Set(rig.keeper.verbs.map((v) => v.verb))).toEqual(new Set(["case_list", "case_add_item", "case_advance", "case_get_horizon"]));
     expect(rig.issue(7).labels).toContain("horizon-state/closed-not-accepted");
     expect(rig.issue(7).comments.at(-1)!.body).toContain("closed on GitHub, not accepted");
     // Only the case keeper's own decision changes that, and then the issue says so.
@@ -52,6 +52,59 @@ describe("incoming issues", () => {
     await rig.connector().syncCase("case_1");
     expect(rig.issue(7).labels).toContain("horizon-state/accepted");
     expect(rig.issue(7).labels).not.toContain("horizon-state/closed-not-accepted");
+  });
+});
+
+describe("intake attempts and starting the step", () => {
+  test("an imported issue's step is started after it is added", async () => {
+    rig = makeRig();
+    rig.keeper.addCase("case_1", "Ship the thing");
+    rig.seedIssue(3, { title: "Start me", labels: [LABEL_INTAKE] });
+    const connector = rig.connector();
+    await connector.pollIssues();
+    const advance = rig.keeper.verbs.filter((v) => v.verb === "case_advance");
+    expect(advance).toHaveLength(1);
+    expect(advance[0]).toMatchObject({ case_id: "case_1", request_id: `advance:github:${REPO}#3` });
+    expect(rig.keeper.cases[0]!.items[0]!.execution).toBe("active");
+    // The advance goes after the add, and a repeat changes nothing.
+    const order = rig.keeper.verbs.map((v) => v.verb).filter((v) => v === "case_add_item" || v === "case_advance");
+    expect(order.slice(0, 2)).toEqual(["case_add_item", "case_advance"]);
+    await rig.connector().pollIssues();
+    expect(rig.keeper.added).toHaveLength(1);
+  });
+
+  test("a refused intake is retried with the next attempt id and then imported once", async () => {
+    rig = makeRig();
+    rig.keeper.addCase("case_1", "Ship the thing");
+    rig.seedIssue(5, { title: "Needs a policy", labels: [LABEL_INTAKE] });
+    rig.keeper.refuseAdds(1);
+    let clock = 1_000_000;
+    const connector = rig.connector({ now: () => clock });
+    await connector.pollIssues();
+    expect(rig.keeper.added).toHaveLength(0);
+    clock += 60 * 60_000;
+    await connector.pollIssues();
+    await connector.pollIssues();
+    expect(rig.keeper.added).toEqual([`gh_${REPO.replace(/[^A-Za-z0-9]+/g, "_")}_5`]);
+    const ids = rig.keeper.verbs.filter((v) => v.verb === "case_add_item").map((v) => v.request_id);
+    expect(ids).toEqual([`github:${REPO}#5`, `github:${REPO}#5:a1`]);
+    expect(rig.keeper.verbs.filter((v) => v.verb === "case_advance")).toHaveLength(1);
+  });
+
+  test("a duplicate step id after a lost reply counts as imported", async () => {
+    rig = makeRig();
+    const stepId = `gh_${REPO.replace(/[^A-Za-z0-9]+/g, "_")}_6`;
+    rig.keeper.addCase("case_1", "Ship the thing", [{ plan_item_id: stepId, name: "Lost reply", item_kind: "human_task", execution: "pending", settlement: "unsettled", external_ref: { kind: "github_issue", id: `${REPO}#6`, url: `https://github.com/${REPO}/issues/6` } }]);
+    rig.seedIssue(6, { title: "Lost reply", labels: [LABEL_INTAKE] });
+    const connector = rig.connector();
+    await connector.pollIssues();
+    expect(rig.keeper.added).toHaveLength(0);
+    expect(rig.keeper.cases[0]!.items).toHaveLength(1);
+    expect(connector.status.notes.join(" ")).not.toContain("refused");
+    expect(rig.issue(6).labels.some((l: string) => l.startsWith("horizon-state/"))).toBe(true);
+    // Imported, so it is not asked again as a new attempt.
+    await connector.pollIssues();
+    expect(rig.keeper.verbs.filter((v) => v.verb === "case_add_item")).toHaveLength(1);
   });
 });
 

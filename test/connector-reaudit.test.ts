@@ -282,7 +282,7 @@ describe("M5 to M7 intake", () => {
     t += 11 * 60_000;
     await connector.pollIssues();
     expect(rig.keeper.added).toHaveLength(1);
-    expect(rig.issue(5).labels).toContain("horizon-state/waiting");
+    expect(rig.issue(5).labels).toContain("horizon-state/in-progress");
   });
 
   test("M7 a credential in an issue title does not reach the case item", async () => {

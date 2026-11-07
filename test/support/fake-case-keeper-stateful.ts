@@ -1,7 +1,7 @@
 /**
  * Test support: a fake case keeper on a Unix socket, speaking the few SFWP verbs the GitHub connector uses
- * (`case_list`, `case_get_horizon`, `case_add_item`, `events_get_range`, `events_subscribe`). It keeps cases and an
- * event ledger in memory, replays a repeated `request_id`, refuses a changed payload with `request_id_reused`, and records
+ * (`case_list`, `case_get_horizon`, `case_add_item`, `case_advance`, `events_get_range`, `events_subscribe`). It keeps cases and an
+ * event ledger in memory, replays the stored outcome of a repeated `request_id` (a refusal is replayed as a refusal, like the real one), refuses a changed payload with `request_id_reused`, and records
  * every verb it was sent so a test can prove what was never sent (a decision, for one).
  */
 import { mkdtempSync, rmSync } from "node:fs";
@@ -29,6 +29,8 @@ export interface FakeKeeper {
   readonly verbs: Record<string, unknown>[];
   readonly cases: FakeCase[];
   readonly events: { cursor: string; kind: string; case_id?: string; detail: unknown; committed_at: string }[];
+  /** The next n `case_add_item` requests (new request ids only) are refused outright, as a policy would; nothing is written. */
+  refuseAdds(n: number): void;
   /** Steps made by `case_add_item` (a replay makes none). */
   readonly added: string[];
   addCase(id: string, summary: string, items?: FakeItem[]): FakeCase;
@@ -49,7 +51,8 @@ export function startFakeKeeper(): FakeKeeper {
   const events: FakeKeeper["events"] = [];
   const verbs: Record<string, unknown>[] = [];
   const added: string[] = [];
-  const seen = new Map<string, string>();
+  const seen = new Map<string, { payload: string; reply: Record<string, unknown> }>();
+  let refusals = 0;
   const subscribers = new Set<{ write(data: string): number; end(): void }>();
   let counter = 0;
   const state = { silence: false };
@@ -77,13 +80,31 @@ export function startFakeKeeper(): FakeKeeper {
         if (!c) return { error: "no such case", error_class: "not_found" };
         const payload = JSON.stringify({ case_id: request.case_id, item: request.item });
         const prior = seen.get(request.request_id);
-        if (prior !== undefined) return prior === payload ? { ok: true, case_id: c.case_id, plan_item_id: request.item.plan_item_id, proposed_by: "operator_local", replayed: true } : { ok: false, error: "request id reused", error_class: "request_id_reused" };
-        seen.set(request.request_id, payload);
-        if (c.items.some((i) => i.plan_item_id === request.item.plan_item_id)) return { ok: false, error: "duplicate item", error_class: "plan_invalid" };
+        if (prior !== undefined) return prior.payload === payload ? { ...prior.reply, ...(prior.reply.ok === true ? { replayed: true } : {}) } : { ok: false, error: "request id reused", error_class: "request_id_reused" };
+        const remember = (reply: Record<string, unknown>) => {
+          seen.set(request.request_id, { payload, reply });
+          return reply;
+        };
+        if (refusals > 0) {
+          refusals -= 1;
+          return remember({ ok: false, error: "authority decision does not grant this action", error_class: "authority_denied" });
+        }
+        if (c.items.some((i) => i.plan_item_id === request.item.plan_item_id)) return remember({ ok: false, error: "duplicate item", error_class: "plan_invalid" });
         c.items.push({ plan_item_id: request.item.plan_item_id, name: request.item.name, item_kind: request.item.item_kind, execution: "pending", settlement: "unsettled", external_ref: request.item.external_ref ?? null });
         added.push(request.item.plan_item_id);
         emit("case.trace.item_added", c.case_id);
-        return { ok: true, case_id: c.case_id, plan_item_id: request.item.plan_item_id, proposed_by: "operator_local" };
+        return remember({ ok: true, case_id: c.case_id, plan_item_id: request.item.plan_item_id, proposed_by: "operator_local" });
+      }
+      case "case_advance": {
+        const c = cases.find((x) => x.case_id === request.case_id);
+        if (!c) return { error: "no such case", error_class: "not_found" };
+        const prior = seen.get(request.request_id);
+        if (prior !== undefined) return { ...prior.reply, replayed: true };
+        const reply = { ok: true, case_id: c.case_id };
+        seen.set(request.request_id, { payload: "", reply });
+        for (const i of c.items) if (i.execution === "pending") i.execution = "active";
+        emit("case.trace.item_changed", c.case_id);
+        return reply;
       }
       case "events_get_range": {
         const from = request.from_cursor as string | undefined;
@@ -129,6 +150,9 @@ export function startFakeKeeper(): FakeKeeper {
     cases,
     events,
     added,
+    refuseAdds(n) {
+      refusals = n;
+    },
     addCase(id, summary, items = []) {
       const c: FakeCase = { case_id: id, summary, case_state: "active", created_at: new Date(1_000_000 + cases.length).toISOString(), items };
       cases.push(c);

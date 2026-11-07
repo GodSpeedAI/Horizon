@@ -66,7 +66,8 @@ export function parseIssueRef(ref: string): { repo: string; number: number } | n
   const m = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)#(\d+)$/.exec(ref);
   return m ? { repo: m[1]!, number: Number(m[2]) } : null;
 }
-export const requestIdFor = (repo: string, n: number): string => `github:${issueRef(repo, n)}`;
+/** The intake request id. Attempt 0 is the plain id; after a refusal the case keeper has remembered, the next attempt is `:a<k>`. */
+export const requestIdFor = (repo: string, n: number, attempt = 0): string => `github:${issueRef(repo, n)}${attempt > 0 ? `:a${attempt}` : ""}`;
 export const stepIdFor = (repo: string, n: number): string => `gh_${repo.replace(/[^A-Za-z0-9]+/g, "_")}_${n}`;
 
 export interface IntakeFrame {
@@ -76,7 +77,7 @@ export interface IntakeFrame {
 }
 
 /** The `case_add_item` for an issue (the caller adds `actor`). */
-export function intakeFrame(input: { readonly caseId: string; readonly repo: string; readonly issue: Issue }): IntakeFrame {
+export function intakeFrame(input: { readonly caseId: string; readonly repo: string; readonly issue: Issue; readonly attempt?: number }): IntakeFrame {
   const { caseId, repo, issue } = input;
   const notes: string[] = [];
   const bodyLength = (issue.body ?? "").length;
@@ -95,7 +96,7 @@ export function intakeFrame(input: { readonly caseId: string; readonly repo: str
         external_ref: { kind: "github_issue", id: issueRef(repo, issue.number), url: issue.html_url },
       },
       policy: POLICY,
-      request_id: requestIdFor(repo, issue.number),
+      request_id: requestIdFor(repo, issue.number, input.attempt ?? 0),
     },
     notes,
   };

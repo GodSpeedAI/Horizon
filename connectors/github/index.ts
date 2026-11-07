@@ -24,7 +24,7 @@ import { killAllChildren } from "../../src/adapters/run-child.ts";
 import { GhError, createGh, type GhClient } from "./gh.ts";
 import { LockError, acquireLock } from "./lock.ts";
 import {
-  LABEL_CASE, LABEL_INTAKE, STATE_PREFIX, caseMarker, hasLabel, intakeFrame, labelNames, noteMarker, parentBody, parentTitle, parseIssueRef, plainLine, safeId, stateComment,
+  LABEL_CASE, LABEL_INTAKE, POLICY, STATE_PREFIX, caseMarker, hasLabel, intakeFrame, labelNames, noteMarker, parentBody, parentTitle, parseIssueRef, plainLine, safeId, stateComment,
   stateLabel, stateOf, stepIdFor, stepMarker, subIssueBody, type HorizonItem, type Issue,
 } from "./mapping.ts";
 import { KeeperError, followEvents, keeperCall, type EventFrame, type Follower, type Keeper } from "./sea-events.ts";
@@ -245,6 +245,11 @@ export class Connector {
     }
   }
 
+  private async hasStep(caseId: string, number: number): Promise<boolean> {
+    const horizon = await this.horizonOf(caseId);
+    return horizon?.items.some((i) => i.plan_item_id === stepIdFor(this.repo, number)) ?? false;
+  }
+
   private async summaryOf(caseId: string): Promise<string> {
     const reply = await keeperCall(this.deps.keeper, { verb: "case_list" });
     const row = asArray<{ case_id?: string; summary?: string }>(reply.cases).find((c) => c.case_id === caseId);
@@ -275,13 +280,15 @@ export class Connector {
       if (this.seenIssues.get(issue.number) === signature) continue;
       const before = this.refused.get(issue.number);
       if (before && before.signature === signature && this.now() < before.nextAt) continue;
-      const { frame, notes } = intakeFrame({ caseId: caseId!, repo: this.repo, issue });
+      // The case keeper remembers every request id, refusals included. After a definite refusal the next try uses a new
+      // attempt id; after a timeout or closed socket (not a refusal) the same id is kept. `attempts` counts refusals.
+      const { frame, notes } = intakeFrame({ caseId: caseId!, repo: this.repo, issue, attempt: before?.attempts ?? 0 });
       try {
         await keeperCall(this.deps.keeper, frame, true);
         this.refused.delete(issue.number);
       } catch (error) {
-        // The same request id with new text means the step already exists (its title was edited): go on and keep its state in step.
-        if (error instanceof KeeperError && error.kind === "refused" && error.errorClass === "request_id_reused") {
+        // The same request id with new text, or a duplicate step id, means the step already exists: go on and keep its state in step.
+        if (error instanceof KeeperError && error.kind === "refused" && (error.errorClass === "request_id_reused" || (await this.hasStep(caseId!, issue.number)))) {
           this.refused.delete(issue.number);
         } else if (error instanceof KeeperError && error.kind === "refused") {
           // Refused is an answer, not an outage: say so, try again later (not remembered as done), and go on to the next issue.
@@ -294,6 +301,9 @@ export class Connector {
           throw error;
         }
       }
+      // An added step stays pending until the case is advanced. A failed advance throws, so the issue is not marked seen and the
+      // next pass asks again under the same id (the add replays, the advance is tried again).
+      await keeperCall(this.deps.keeper, { verb: "case_advance", case_id: caseId, policy: POLICY, request_id: `advance:${String(frame.request_id)}` }, true);
       for (const text of notes) await this.tellIssue(issue.number, `note:${issue.number}:${text.length}`, text);
       const horizon = await this.horizonOf(caseId!);
       const item = horizon?.items.find((i) => i.plan_item_id === stepIdFor(this.repo, issue.number));
