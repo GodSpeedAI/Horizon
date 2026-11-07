@@ -10,7 +10,7 @@ import type { ConversationRow, RowStatus } from "./conversation-model.ts";
 import { PanelCard, type PanelsIo } from "./Panels.tsx";
 import type { BlockCtx } from "./blocks/index.tsx";
 
-export const STATUS_WORD: Readonly<Record<RowStatus, string>> = { done: "Done", waiting: "Waiting for you", refused: "Refused", unseen: "Not seen yet" };
+export const STATUS_WORD: Readonly<Record<RowStatus, string>> = { done: "Done", waiting: "Waiting for you", refused: "Refused", unseen: "Not seen yet", claimed: "Agent says so" };
 /** An answer you gave waits on the agent, not on you. */
 export function statusWord(row: { readonly status: RowStatus; readonly kind: string }): string {
   return row.status === "waiting" && row.kind === "answer" ? "Waiting for the agent" : STATUS_WORD[row.status];

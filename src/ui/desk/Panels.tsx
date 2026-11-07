@@ -58,7 +58,7 @@ export function echoesOf(panel: Panel): string[] {
     if (b.kind !== "question" || b.answered === null || (b.withdrawn ?? null) !== null) continue;
     const say = answerEcho({ ...(b.input === undefined ? {} : { input: b.input }), options: b.options }, b.answered.outcome as "answered", b.answered.value);
     const routed = typeof b.answered.routed_as === "string" && b.answered.routed_as.trim() !== "" ? b.answered.routed_as.trim() : null;
-    out.push(`${say} ${routed !== null ? `The agent took it to: ${routed}` : `${WAITING_FOR_AGENT}.`}`);
+    out.push(`${say} ${routed !== null ? `The agent says it took it to: ${routed}` : `${WAITING_FOR_AGENT}.`}`);
   }
   return out;
 }

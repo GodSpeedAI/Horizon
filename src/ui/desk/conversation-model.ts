@@ -9,7 +9,8 @@ export const AGENT_NAME_MAX = 60;
 
 export type RowSource = "you" | "agent" | "page-agent";
 export type RowKind = "note" | "handoff" | "handoff-proposal" | "find" | "decision" | "panel" | "answer";
-export type RowStatus = "done" | "waiting" | "refused" | "unseen";
+/** `claimed`: the agent says it happened and Horizon has not seen it. */
+export type RowStatus = "done" | "waiting" | "refused" | "unseen" | "claimed";
 
 export interface RowRefs {
   readonly case_id?: string;

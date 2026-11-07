@@ -1873,6 +1873,24 @@ export async function createApplication(
     }
   }
 
+  /** A step the case keeper holds whose id the agent's words name. Null when none does (or cases are not connected). */
+  async function findRoutedStep(said: string): Promise<{ step_id: string; name: string; case_id: string; case_title: string } | null> {
+    if (caseKeeper === null) return null;
+    try {
+      const listed = await listCases(caseKeeper);
+      if (listed.kind !== "ok") return null;
+      for (const c of listed.value.cases.slice(0, 20)) {
+        const horizon = await caseSteps(caseKeeper, c.case_id);
+        if (horizon.kind !== "ok") continue;
+        const hit = horizon.value.steps.find((st) => st.plan_item_id.length >= 4 && said.split(/[^A-Za-z0-9_.:-]+/).includes(st.plan_item_id));
+        if (hit !== undefined) return { step_id: hit.plan_item_id, name: hit.name, case_id: c.case_id, case_title: await titleOf(c) };
+      }
+    } catch {
+      // A case keeper that cannot answer leaves the claim unchecked.
+    }
+    return null;
+  }
+
   /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`, `ask.withdraw`, `answer.route`). To choose parts well an agent reads `GET /desk/panels/catalogue`. A reply on a panel clears the wait on the answers given there. */
   async function applyAgentOp(op: AgentOp, agentName?: string): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
     if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied) };
@@ -1887,11 +1905,14 @@ export async function createApplication(
     panelBoard = state;
     const by = agentName === undefined ? {} : { agent_name: agentName };
     if (op.tool === "answer.route") {
-      const where = `The agent took it to: ${op.routed_as.trim()}`;
+      // The agent's words are kept as its claim. They count as checked only when they name a step the case keeper really holds.
+      const said = op.routed_as.trim();
+      const found = await findRoutedStep(said);
+      const where = found === null ? `The agent says it took it to: ${said}. Not checked: Horizon found no step with that name.` : `The agent says it took it to: ${said}. Checked: the step "${found.name}" is in the case "${found.case_title}".`;
       // One entry per answer: the one made when you answered is finished in place.
       const mine = await answerRowOf(runtime.runtime.store, deskWho, op.panel_id, op.ask_id);
-      await logRow({ source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id } });
-      await settlePanelRow(op.panel_id, "You answered. The agent has taken it on.");
+      await logRow({ source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: found === null ? "claimed" : "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id, ...(found === null ? {} : { step_id: found.step_id, case_id: found.case_id }) } });
+      await settlePanelRow(op.panel_id, "You answered. The agent says it has taken it on.");
     }
     if (op.tool === "ask.withdraw") {
       const why = `The agent withdrew this question: ${op.reason.trim()}`;

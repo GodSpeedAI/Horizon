@@ -98,8 +98,8 @@ describe("the agent door", () => {
     expect((await door("/agent/panels", { tool: "answer.route", panel_id: "plan2", ask_id: "which_way", routed_as: "step s1 in Seed: triage" })).status).toBe(200);
     mine = (await rows()).filter((r) => r.kind === "answer" && r.refs.panel_id === "plan2" && r.refs.ask_id === "which_way");
     expect(mine).toHaveLength(1);
-    expect(mine[0].status).toBe("done");
-    expect(mine[0].outcome).toBe("The agent took it to: step s1 in Seed: triage");
+    expect(mine[0].status).toBe("claimed");
+    expect(mine[0].outcome).toContain("The agent says it took it to: step s1 in Seed: triage");
     expect(mine[0].words).toBe("You answered: Plan A");
     expect((await door("/agent/panels/answers").then((r) => r.json())).responses.filter((a: any) => a.ask === "which_way")).toHaveLength(0);
     const text = JSON.stringify(await rows());
@@ -151,6 +151,6 @@ describe("what waits for you, in one number", () => {
     expect(summary).toContain("You answered: Plan A");
     expect(summary).toContain("Waiting for the agent to say where it went");
     const routed = panel({ outcome: "answered", value: "plan_a", note: null, routed_as: "step s1 in Seed" });
-    expect(renderToStaticMarkup(<PanelCard panel={routed} io={quietIo().panels} />)).toContain("The agent took it to: step s1 in Seed");
+    expect(renderToStaticMarkup(<PanelCard panel={routed} io={quietIo().panels} />)).toContain("The agent says it took it to: step s1 in Seed");
   });
 });

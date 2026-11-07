@@ -148,7 +148,7 @@ describe("asks", () => {
     expect(waiting).toContain("Waiting for the agent to say where it went");
     const routed = text(draw(ask(), { ...NO_CTX, askState: () => ({ answered: { outcome: "answered", value: "plan_b", routed_as: "step handoff_0a49 in Seed: triage inbox" } }) }));
     expect(routed).toContain("You answered: Plan B");
-    expect(routed).toContain("The agent took it to: step handoff_0a49 in Seed: triage inbox");
+    expect(routed).toContain("The agent says it took it to: step handoff_0a49 in Seed: triage inbox");
     expect(routed).not.toContain("Waiting for the agent");
     const confirm = text(draw(ask({ input: "confirm", options: undefined }), { ...NO_CTX, askState: () => ({ answered: { outcome: "answered", value: "yes" } }) }));
     expect(confirm).toContain("You answered: Yes");
@@ -163,7 +163,7 @@ describe("asks", () => {
   });
   test("Question draws a display item directly", () => {
     const item = questionOf({ ...CATALOGUE.ask.example }, "which_way")!;
-    expect(text(renderToStaticMarkup(<Question item={{ ...item, answered: { outcome: "answered", value: "plan_a", note: null, routed_as: "no action: later" } }} />))).toContain("The agent took it to: no action: later");
+    expect(text(renderToStaticMarkup(<Question item={{ ...item, answered: { outcome: "answered", value: "plan_a", note: null, routed_as: "no action: later" } }} />))).toContain("The agent says it took it to: no action: later");
   });
 });
 

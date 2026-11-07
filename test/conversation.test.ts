@@ -168,7 +168,9 @@ describe("rows from each desk operation", () => {
     expect(routed.ok).toBe(true);
     const answerRows = (await rows()).filter((r) => r.kind === "answer");
     expect(answerRows).toHaveLength(1);
-    expect(answerRows[0]).toMatchObject({ words: "You answered: X", status: "done", outcome: "The agent took it to: step handoff_0a49 in Seed: triage inbox" });
+    expect(answerRows[0]).toMatchObject({ words: "You answered: X", status: "claimed" });
+    expect(answerRows[0]!.outcome).toContain("The agent says it took it to: step handoff_0a49 in Seed: triage inbox");
+    expect(answerRows[0]!.outcome).toContain("Not checked");
     expect((await rows()).find((r) => r.kind === "panel")!.status).toBe("done");
   });
 });

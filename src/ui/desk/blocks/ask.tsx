@@ -43,7 +43,7 @@ export function Question({ item, state }: { readonly item: QuestionItem; readonl
       <div className="hb-ask" data-state={routed !== null ? "routed" : "waiting"}>
         {title}
         <p>{how}</p>
-        {answered.outcome === "answered" || routed !== null ? <p className="hb-muted" role="status">{routed !== null ? `The agent took it to: ${shown(routed)}` : "Waiting for the agent to say where it went"}</p> : null}
+        {answered.outcome === "answered" || routed !== null ? <p className="hb-muted" role="status">{routed !== null ? `The agent says it took it to: ${shown(routed)}` : "Waiting for the agent to say where it went"}</p> : null}
       </div>
     );
   }

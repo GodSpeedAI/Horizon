@@ -163,7 +163,7 @@ export interface ComposerRequest {
   readonly draftId?: string;
 }
 
-const STATUS_TONE: Readonly<Record<RowStatus, "ok" | "bad" | "wait" | "quiet">> = { done: "ok", waiting: "wait", refused: "bad", unseen: "quiet" };
+const STATUS_TONE: Readonly<Record<RowStatus, "ok" | "bad" | "wait" | "quiet">> = { done: "ok", waiting: "wait", refused: "bad", unseen: "quiet", claimed: "quiet" };
 
 export interface ComposerProps {
   readonly ui: UiState;
