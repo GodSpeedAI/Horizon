@@ -1,0 +1,25 @@
+D  .cognate/vendor/godspeed-identity-0.1.0-ed6c52a.tgz
+ M src/config/load.ts
+ M src/config/types.ts
+?? .agents/reports/2026-11-03-settlement-live-roundtrip-runbook.md
+?? .agents/reports/2026-11-04-egm-design-discovery/
+?? .agents/reports/2026-11-04-egm-distillation/
+?? .agents/reports/2026-11-05-estate-reconciliation/
+?? .agents/reports/2026-11-05-t1-authority-mediation/
+?? .agents/reports/2026-11-06-operator-workspace-egm-review/
+?? .agents/reports/2026-11-06-v2-readiness-review/
+?? .agents/reports/v2-build/
+?? .agents/specs/Horizon_Operator_Workspace_Design_v1.md
+?? .agents/specs/Horizon_Operator_Workspace_Design_v2.md
+?? .agents/specs/Horizon_Operator_Workspace_Design_v2_technical_annex.md
+?? docs/design/
+?? scripts/setup-check-empty.ts
+?? scripts/setup-clear.ts
+?? scripts/setup-env.ts
+?? scripts/setup-github.ts
+?? scripts/setup-health.ts
+?? scripts/setup-init.ts
+?? src/config/setup.ts
+?? test/setup-config.test.ts
+?? test/setup-scripts.test.ts
+?? test/support/fake-gh.ts

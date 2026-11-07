@@ -1,0 +1,27 @@
+ M .agents/plans/desktop-native-completion/verification.md
+ M .agents/reports/ui-production-readiness/evidence/after/t4/t4-config-dirty.png
+ M .agents/reports/ui-production-readiness/evidence/after/t4/t4-config-saved.png
+ M .agents/reports/ui-production-readiness/evidence/after/t4/t4-delete-confirm.png
+ M .agents/reports/ui-production-readiness/evidence/after/t4/t4-failure-block.png
+ M .agents/reports/ui-production-readiness/evidence/after/t4/t4-retry-card.png
+ M .agents/reports/ui-production-readiness/evidence/after/u5/e2e-harness-approval.png
+ M .agents/reports/ui-production-readiness/evidence/after/u5/e2e-model-picker-search.png
+ M .github/workflows/tauri.yml
+ M .gitignore
+ M package.json
+ M screenshots/concurrency/model-parallel-desktop.png
+ M screenshots/concurrency/model-parallel-mobile.png
+ M screenshots/concurrency/team-admission-policy.png
+ M screenshots/red-journeys/05-task-visibility-choice.png
+ M screenshots/red-journeys/07-directory-suggestions.png
+ M screenshots/red-journeys/08-keyboard-completion.png
+ M screenshots/workbench/e2e-checkout-02-form.png
+ M screenshots/workbench/e2e-checkout-03-bound.png
+ M scripts/tauri-sidecar.ts
+ M src-tauri/src/backend.rs
+ M src-tauri/src/lib.rs
+ M src-tauri/tauri.conf.json
+ M src/cli.ts
+ M src/server.ts
+ M tsconfig.json
+?? docs/jetson-qualification.md

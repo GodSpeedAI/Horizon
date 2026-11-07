@@ -15,10 +15,15 @@ import type {
   LoadedConfig,
   OperationBindingConfig,
   OperatorsConfig,
+  RecordSource,
+  RecordsConfig,
   SecretsConfig,
   SettlementConfig,
   TransportConfig,
+  UiConfig,
+  WorkshopConfig,
 } from "./types.ts";
+import { parseSetup, setupMapping, setupTenant } from "./setup.ts";
 
 export class ConfigError extends Error {
   override readonly name = "ConfigError";
@@ -166,6 +171,44 @@ function asEconomics(value: unknown): EconomicsConfig | undefined {
   };
 }
 
+const RECORD_KINDS = new Set<RecordSource["kind"]>(["personal", "workshop", "horizon"]);
+
+function asRecords(value: unknown): RecordsConfig | undefined {
+  if (value === undefined) return undefined;
+  const doc = asRecord(value, "records");
+  const names = new Set<string>();
+  const sources = asList(doc.sources, "records.sources").map((raw, index) => {
+    const field = `records.sources[${index}]`;
+    const source = asRecord(raw, field);
+    const name = asString(source.name, `${field}.name`);
+    if (names.has(name)) bounded(`${field}: duplicate record source ${name}`);
+    names.add(name);
+    const kind = asString(source.kind, `${field}.kind`) as RecordSource["kind"];
+    if (!RECORD_KINDS.has(kind)) bounded(`${field}.kind must be personal, workshop or horizon`);
+    if (kind === "personal" && (source.data_home !== undefined || source.state_home !== undefined)) {
+      bounded(`${field}: the personal record has no paths; it uses RealityTrace's default location`);
+    }
+    return {
+      name,
+      kind,
+      ...(source.data_home === undefined ? {} : { data_home: asString(source.data_home, `${field}.data_home`) }),
+      ...(source.state_home === undefined ? {} : { state_home: asString(source.state_home, `${field}.state_home`) }),
+    };
+  });
+  return { sources };
+}
+
+function asWorkshop(value: unknown): WorkshopConfig | undefined {
+  if (value === undefined) return undefined;
+  const doc = asRecord(value, "workshop");
+  return { url: asString(doc.url, "workshop.url"), key_path: asString(doc.key_path, "workshop.key_path") };
+}
+
+function asUi(value: unknown): UiConfig | undefined {
+  if (value === undefined) return undefined;
+  return { timezone: asString(asRecord(value, "ui").timezone, "ui.timezone") };
+}
+
 /** Environment override of `[economics]` (HORIZON_ECONOMICS_REALITYTRACE_BIN / _DATA_HOME / _STATE_HOME). */
 export function economicsFromEnv(env: Record<string, string | undefined>, fromFile?: EconomicsConfig): EconomicsConfig | undefined {
   const bin = env.HORIZON_ECONOMICS_REALITYTRACE_BIN?.trim();
@@ -244,6 +287,9 @@ export function configFromDocument(document: unknown): HorizonConfig {
     ...(doc.settlement === undefined ? {} : { settlement: asSettlement(doc.settlement)! }),
     ...(doc.economics === undefined ? {} : { economics: asEconomics(doc.economics)! }),
     ...(doc.operators === undefined ? {} : { operators: asOperators(doc.operators) }),
+    ...(doc.records === undefined ? {} : { records: asRecords(doc.records)! }),
+    ...(doc.workshop === undefined ? {} : { workshop: asWorkshop(doc.workshop)! }),
+    ...(doc.ui === undefined ? {} : { ui: asUi(doc.ui)! }),
   };
 }
 
@@ -298,6 +344,7 @@ export function assertAgentPrincipal(config: HorizonConfig, caller: { readonly a
 }
 
 export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.toml"): LoadedConfig {
+  const setup = readSetup();
   let document: unknown;
   try {
     document = Bun.TOML.parse(readText(path));
@@ -317,11 +364,27 @@ export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.
     config: withStore,
     operator: {
       principal: operatorPrincipal(withStore),
-      tenant: `local:${hostname()}`,
+      tenant: setupTenant(setup, hostname()),
     },
     launchSecret,
     secretPath: resolve(secretPath),
+    ...(setup === undefined ? {} : { setup }),
   };
+}
+
+/** `HORIZON_SETUP`: refuses unknown names, and a named setup whose `SETUP.json` marker is missing. */
+function readSetup() {
+  let setup;
+  try {
+    setup = parseSetup(process.env);
+  } catch (error) {
+    bounded(error instanceof Error ? error.message : String(error));
+  }
+  if (setup !== undefined) {
+    const { marker } = setupMapping(setup, process.env);
+    if (!existsSync(marker)) bounded(`HORIZON_SETUP=${setup} but ${marker} is missing; run bun run scripts/setup-init.ts --setup ${setup}`);
+  }
+  return setup;
 }
 
 function readText(path: string): string {

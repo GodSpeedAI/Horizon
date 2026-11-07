@@ -1,4 +1,5 @@
 import type { VerifierTemplate } from "../domain/expectation.ts";
+import type { SetupName } from "./setup.ts";
 import type { CapacityAllowance, PaymentEntry } from "../domain/payment.ts";
 
 export type DeploymentProfile = "local_operator" | "shared_remote";
@@ -46,6 +47,28 @@ export interface EconomicsConfig {
   readonly state_home?: string;
 }
 
+/** One record store Horizon reads (`[[records.sources]]`). `personal` has no paths: RealityTrace's own default location, read-only. */
+export interface RecordSource {
+  readonly name: string;
+  readonly kind: "personal" | "workshop" | "horizon";
+  readonly data_home?: string;
+  readonly state_home?: string;
+}
+
+export interface RecordsConfig {
+  readonly sources: readonly RecordSource[];
+}
+
+/** Where the workshop (Cognate Workbench) listens and where its Horizon key file lives. */
+export interface WorkshopConfig {
+  readonly url: string;
+  readonly key_path: string;
+}
+
+export interface UiConfig {
+  readonly timezone: string;
+}
+
 export interface HorizonConfig {
   readonly deployment_profile: DeploymentProfile;
   readonly bind_host: string;
@@ -72,6 +95,10 @@ export interface HorizonConfig {
   readonly economics?: EconomicsConfig;
   /** Operator-to-SEA-Forge-actor mapping for remote and desktop sessions. Absent: the single-operator development default. */
   readonly operators?: OperatorsConfig;
+  /** Setup stage 0: the record stores Horizon reads. Absent: none configured. */
+  readonly records?: RecordsConfig;
+  readonly workshop?: WorkshopConfig;
+  readonly ui?: UiConfig;
 }
 
 /**
@@ -120,4 +147,6 @@ export interface LoadedConfig {
   };
   readonly launchSecret: string;
   readonly secretPath: string;
+  /** `HORIZON_SETUP`; undefined when unset (Horizon behaves as before). */
+  readonly setup?: SetupName;
 }

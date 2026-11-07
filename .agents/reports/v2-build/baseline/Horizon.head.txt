@@ -1,0 +1,1 @@
+18f0c40c5e5dc395ae635ace7856cda091fc4f26 fix(approvals): refuse self-approval when identity is unknown (fail closed)
