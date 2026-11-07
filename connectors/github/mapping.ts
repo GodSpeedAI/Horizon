@@ -5,6 +5,8 @@
  * characters removed, length capped) and kept verbatim otherwise. Going into GitHub markdown it is escaped so that
  * markup, HTML, links and @mentions show as the characters typed and run nothing.
  */
+import { redact } from "../../src/adapters/redact.ts";
+
 export const LABEL_INTAKE = "horizon";
 export const LABEL_CASE = "horizon-case";
 export const STATE_PREFIX = "horizon-state/";
@@ -24,6 +26,8 @@ export interface Issue {
   readonly node_id?: string;
   readonly labels: readonly (string | { readonly name?: string })[];
   readonly pull_request?: unknown;
+  /** The author, as GitHub lists it. */
+  readonly user?: { readonly login?: string } | null;
 }
 
 export interface HorizonItem {
@@ -83,7 +87,8 @@ export function intakeFrame(input: { readonly caseId: string; readonly repo: str
       case_id: caseId,
       item: {
         plan_item_id: stepIdFor(repo, issue.number),
-        name: plainLine(issue.title, NAME_MAX, "(untitled GitHub issue)"),
+        // Masked before it is cut, so a credential is never kept as a fragment: the title becomes a durable case item.
+        name: plainLine(redact(String(issue.title ?? "")), NAME_MAX, "(untitled GitHub issue)"),
         item_kind: "human_task",
         // A person decides; nothing about GitHub's issue state counts as acceptance.
         settlement_criteria: { required_artifacts: [], required_declarations: [], require_approval: true },

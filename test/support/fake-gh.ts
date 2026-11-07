@@ -21,6 +21,8 @@ export interface FakeRestIssue {
   /** A deleted issue answers 404 and drops out of listings. */
   deleted?: boolean;
   parent_issue_url?: string;
+  /** The author; absent means the signed-in user. */
+  user?: { login: string };
 }
 
 /** Make a matching call fail. `times` -1 means every time. A `status` answers like GitHub (headers, then exit 1). */
@@ -136,7 +138,7 @@ function restMain(state: FakeGhState, args: string[], stdin: string): { out: str
   const notFound = () => ({ out: reply(404, { message: "Not Found" }), err: "gh: Not Found (HTTP 404)", code: 1 });
   const view = (i: FakeRestIssue) => {
     const { comments: _c, deleted: _d, ...rest2 } = i;
-    return { ...rest2, labels: i.labels.map((name) => ({ name })) };
+    return { ...rest2, user: i.user ?? { login: rest.login ?? "horizon-bot" }, labels: i.labels.map((name) => ({ name })) };
   };
 
   const LOGIN = rest.login ?? "horizon-bot";

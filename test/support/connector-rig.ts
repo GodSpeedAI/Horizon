@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
 import type { DurableStore } from "@godspeedai/cognate-events";
 import { Connector, type ConnectorConfig } from "../../connectors/github/index.ts";
-import { createGh, type GhOptions } from "../../connectors/github/gh.ts";
+import { createGh, type GhClient, type GhOptions } from "../../connectors/github/gh.ts";
 import { emptyRest, installFakeGh, restIssue, type FakeGh, type FakeGhState, type FakeRestIssue } from "./fake-gh.ts";
 import { startFakeKeeper, type FakeKeeper } from "./fake-case-keeper-stateful.ts";
 
@@ -17,7 +17,7 @@ export interface Rig {
   readonly keeper: FakeKeeper;
   readonly store: DurableStore;
   readonly config: ConnectorConfig;
-  connector(over?: { store?: DurableStore; ghOptions?: GhOptions; config?: Partial<ConnectorConfig>; now?: () => number }): Connector;
+  connector(over?: { store?: DurableStore; ghOptions?: GhOptions; config?: Partial<ConnectorConfig>; now?: () => number; wrapGh?: (real: GhClient) => GhClient; maxTracked?: number }): Connector;
   rest(): NonNullable<FakeGhState["rest"]>;
   issue(n: number): FakeRestIssue;
   /** Add an issue as GitHub would hold it. */
@@ -41,11 +41,12 @@ export function makeRig(over: { subIssues?: boolean; env?: Record<string, string
     config,
     connector(o = {}) {
       return new Connector({
-        gh: createGh({ env: fake.env(over.env), timeoutMs: 20_000, ...(o.ghOptions ?? {}) }),
+        gh: ((real) => (o.wrapGh ? o.wrapGh(real) : real))(createGh({ env: fake.env(over.env), timeoutMs: 20_000, ...(o.ghOptions ?? {}) })),
         keeper: { socketPath: keeper.socketPath, actor: { actor_id: "cognate-service", role: "service" }, timeoutMs: 3_000 },
         store: o.store ?? store,
         config: { ...config, ...(o.config ?? {}) },
         ...(o.now ? { now: o.now } : {}),
+        ...(o.maxTracked ? { maxTracked: o.maxTracked } : {}),
       });
     },
     rest: () => fake.state().rest!,

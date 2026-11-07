@@ -9,7 +9,65 @@
  * - no skipping: when the handler fails for a frame, that frame is tried again (after the wait the handler's error asks for)
  *   and nothing behind it is delivered first. `cursor()` is the last frame whose handler succeeded.
  */
-import { seaForgeCall } from "../../src/adapters/sea-forge-approvals.ts";
+const MAX_LINE = 8 * 1024 * 1024;
+
+/**
+ * One NDJSON request and its one-line reply over the Unix socket. The reply is counted as it arrives: past `maxLineBytes`
+ * without a newline the connection is dropped and the call fails in words. The socket is closed however the call ends.
+ */
+function boundedCall(socketPath: string, request: Record<string, unknown>, timeoutMs: number, maxLineBytes: number): Promise<Record<string, unknown>> {
+  let buffered = "";
+  let size = 0;
+  const decoder = new TextDecoder();
+  let open: { end(): void } | undefined;
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const finish = (error: Error | null, value?: Record<string, unknown>) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve(value!);
+      open?.end();
+    };
+    const timer = setTimeout(() => finish(new Error("the case keeper did not answer in time")), timeoutMs);
+    Bun.connect({
+      unix: socketPath,
+      socket: {
+        open(socket) {
+          open = socket;
+          socket.write(`${JSON.stringify(request)}\n`);
+        },
+        data(_socket, chunk) {
+          size += chunk.byteLength;
+          buffered += decoder.decode(chunk, { stream: true });
+          const newline = buffered.indexOf("\n");
+          if (newline < 0 ? size > maxLineBytes : newline > maxLineBytes) {
+            finish(new Error(`the case keeper sent an answer line that was too long (over ${maxLineBytes} bytes), so the connection was dropped`));
+            return;
+          }
+          if (newline < 0) return;
+          try {
+            finish(null, JSON.parse(buffered.slice(0, newline)) as Record<string, unknown>);
+          } catch {
+            finish(new Error("the case keeper answered with invalid JSON"));
+          }
+        },
+        close() {
+          finish(new Error("the case keeper closed the connection without an answer"));
+        },
+        error(_socket, error) {
+          finish(error);
+        },
+      },
+    })
+      .then((socket) => {
+        open = socket;
+        if (done) socket.end();
+      })
+      .catch((error: unknown) => finish(error instanceof Error ? error : new Error(String(error))));
+  });
+}
 
 export interface EventFrame {
   readonly cursor: string;
@@ -25,6 +83,8 @@ export interface Keeper {
   readonly actor: { readonly actor_id: string; readonly role: string };
   readonly onBehalfOf?: { readonly actor_id: string; readonly role: string };
   readonly timeoutMs?: number;
+  /** Drop a reply that sends this many bytes without a newline. Default 8 MB. */
+  readonly maxLineBytes?: number;
 }
 
 export class KeeperError extends Error {
@@ -45,7 +105,7 @@ export const isFrame = (v: unknown): v is EventFrame => isRecord(v) && typeof v.
 export async function keeperCall(keeper: Keeper, request: Record<string, unknown>, write = false): Promise<Record<string, unknown>> {
   let reply: unknown;
   try {
-    reply = await seaForgeCall(keeper.socketPath, { ...request, actor: keeper.actor, ...(write && keeper.onBehalfOf ? { on_behalf_of: keeper.onBehalfOf } : {}) }, keeper.timeoutMs ?? 5_000);
+    reply = await boundedCall(keeper.socketPath, { ...request, actor: keeper.actor, ...(write && keeper.onBehalfOf ? { on_behalf_of: keeper.onBehalfOf } : {}) }, keeper.timeoutMs ?? 5_000, keeper.maxLineBytes ?? MAX_LINE);
   } catch (error) {
     throw new KeeperError("unreachable", `The case keeper could not be reached (${error instanceof Error ? error.message : String(error)}).`);
   }

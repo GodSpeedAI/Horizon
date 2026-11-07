@@ -20,6 +20,7 @@ import { argValue, parseSetup, setupMapping } from "../../src/config/setup.ts";
 import { ensureBoard, placeIssue, type Board } from "./board.ts";
 import { loadCursor, saveCursor } from "./cursor.ts";
 import { redact } from "../../src/adapters/redact.ts";
+import { killAllChildren } from "../../src/adapters/run-child.ts";
 import { GhError, createGh, type GhClient } from "./gh.ts";
 import { LockError, acquireLock } from "./lock.ts";
 import {
@@ -57,6 +58,8 @@ export interface ConnectorDeps {
   readonly store: DurableStore;
   readonly config: ConnectorConfig;
   readonly now?: () => number;
+  /** Most entries kept in each of the connector's memory maps (default 5000); the oldest go first. */
+  readonly maxTracked?: number;
 }
 
 const ACTIVE_CASE = new Set(["active", "awaiting_approval"]);
@@ -69,12 +72,36 @@ export class Connector {
   private board: Board | undefined;
   private readonly placed = new Map<string, string>();
   private readonly seenIssues = new Map<number, string>();
+  /** Intakes the case keeper refused: when to try again, and how many times it has refused. */
+  private readonly refused = new Map<number, { signature: string; nextAt: number; attempts: number }>();
+  /** The last case-keeper event id that brought a step to a state, so polling recovers under the same comment identity. */
+  private readonly lastEvt = new Map<string, { evt: string; word: string }>();
+  private readonly maxTracked: number;
+  private closing = false;
   private failures = 0;
   private tail: Promise<unknown> = Promise.resolve();
   private myLogin: string | undefined;
 
   constructor(private readonly deps: ConnectorDeps) {
     this.now = deps.now ?? Date.now;
+    this.maxTracked = deps.maxTracked ?? 5_000;
+  }
+
+  private cap<K, V>(map: Map<K, V>): void {
+    while (map.size > this.maxTracked) map.delete(map.keys().next().value as K);
+  }
+
+  /**
+   * Stop taking work, wait (up to `drainMs`) for the queued writes, kill any `gh` still running, then call `release`
+   * (the lock). A replacement connector can then never start while this one's write is in flight.
+   */
+  async shutdown(options: { readonly drainMs?: number; readonly release?: () => void } = {}): Promise<void> {
+    this.closing = true;
+    const wait = (ms: number) => new Promise<boolean>((resolve) => setTimeout(() => resolve(false), ms));
+    const drained = await Promise.race([this.tail.then(() => true), wait(options.drainMs ?? 10_000)]);
+    killAllChildren();
+    if (!drained) await Promise.race([this.tail, wait(2_000)]);
+    options.release?.();
   }
 
   private get gh(): GhClient {
@@ -89,6 +116,7 @@ export class Connector {
 
   /** Every GitHub write for this setup goes through this one queue, one job at a time, in the order asked. */
   private serial<T>(job: () => Promise<T>): Promise<T> {
+    if (this.closing) return Promise.reject(new Error("The connector is shutting down and takes no new work."));
     const run = this.tail.then(job, job);
     this.tail = run.catch(() => undefined);
     return run;
@@ -149,6 +177,49 @@ export class Connector {
     return login;
   }
 
+  /** Issues Horizon's own login wrote that carry `marker`, oldest first. A copied marker on someone else's issue proves nothing. */
+  private async ownMarked(rows: readonly Issue[], marker: string): Promise<Issue[]> {
+    const me = await this.login();
+    return rows.filter((i) => i.user?.login === me && (i.body ?? "").includes(marker)).sort((a, b) => a.number - b.number);
+  }
+
+  /** Close an issue made twice by a retry, with a plain comment. */
+  private async closeDuplicate(number: number): Promise<void> {
+    await this.tellIssue(number, `dup:${number}`, "duplicate made by a retry. This issue is closed; the first one carries the case.");
+    await this.gh.api("PATCH", `repos/${this.repo}/issues/${number}`, { state: "closed" });
+  }
+
+  /** The oldest of several issues with the same marker is kept; the open others are closed. */
+  private async keepOldest(matches: readonly Issue[]): Promise<Issue | undefined> {
+    const [keep, ...dups] = matches;
+    for (const dup of dups) if (dup.state !== "closed") await this.closeDuplicate(dup.number);
+    return keep;
+  }
+
+  /**
+   * Create an issue once. A create that timed out or failed may still land, so it is never simply repeated: afterwards the
+   * issues Horizon wrote with this marker are listed (REST list, not search), the oldest is kept and any other is closed.
+   */
+  private async createIssue(label: string, marker: string, payload: Record<string, unknown>): Promise<Issue> {
+    let created: Issue | undefined;
+    let failure: unknown;
+    try {
+      created = (await this.gh.api("POST", `repos/${this.repo}/issues`, payload)) as Issue;
+    } catch (error) {
+      failure = error;
+    }
+    let kept: Issue | undefined;
+    try {
+      kept = await this.keepOldest(await this.ownMarked(await this.issuesWith(label), marker));
+    } catch (error) {
+      if (failure === undefined) return created!;
+      throw failure;
+    }
+    if (kept) return kept;
+    if (failure !== undefined) throw failure;
+    return created!;
+  }
+
   private async ownComments(number: number): Promise<string[]> {
     const me = await this.login();
     const comments = await this.gh.list(`repos/${this.repo}/issues/${number}/comments`);
@@ -202,17 +273,26 @@ export class Connector {
     for (const issue of caseId ? open : []) {
       const signature = `${issue.state}|${(issue as { updated_at?: string }).updated_at ?? ""}|${caseId}`;
       if (this.seenIssues.get(issue.number) === signature) continue;
+      const before = this.refused.get(issue.number);
+      if (before && before.signature === signature && this.now() < before.nextAt) continue;
       const { frame, notes } = intakeFrame({ caseId: caseId!, repo: this.repo, issue });
       try {
         await keeperCall(this.deps.keeper, frame, true);
+        this.refused.delete(issue.number);
       } catch (error) {
-        if (error instanceof KeeperError && error.kind === "refused") {
-          // Refused is an answer, not an outage: say so and go on to the next issue.
-          this.note(`The case keeper refused issue #${issue.number} (${error.errorClass ?? "error"}). Nothing was changed for it.`);
-          this.seenIssues.set(issue.number, signature);
+        // The same request id with new text means the step already exists (its title was edited): go on and keep its state in step.
+        if (error instanceof KeeperError && error.kind === "refused" && error.errorClass === "request_id_reused") {
+          this.refused.delete(issue.number);
+        } else if (error instanceof KeeperError && error.kind === "refused") {
+          // Refused is an answer, not an outage: say so, try again later (not remembered as done), and go on to the next issue.
+          this.note(`The case keeper refused issue #${issue.number} (${error.errorClass ?? "error"}). Nothing was changed for it; Horizon will ask again.`);
+          const attempts = (before?.attempts ?? 0) + 1;
+          this.refused.set(issue.number, { signature, attempts, nextAt: this.now() + Math.min(10 * 60_000, 15_000 * 2 ** (attempts - 1)) });
+          this.cap(this.refused);
           continue;
+        } else {
+          throw error;
         }
-        throw error;
       }
       for (const text of notes) await this.tellIssue(issue.number, `note:${issue.number}:${text.length}`, text);
       const horizon = await this.horizonOf(caseId!);
@@ -222,9 +302,12 @@ export class Connector {
     }
     // Issues Horizon made for steps: closing or reopening one has no event in the case keeper, so look for it here.
     const horizons = new Map<string, Awaited<ReturnType<Connector["horizonOf"]>>>();
-    for (const issue of await this.issuesWith(LABEL_STEP)) {
+    const stepRows = await this.issuesWith(LABEL_STEP);
+    const me = await this.login();
+    for (const issue of stepRows) {
       const signature = `${issue.state}|${(issue as { updated_at?: string }).updated_at ?? ""}`;
       if (this.seenIssues.get(issue.number) === signature) continue;
+      if (issue.user?.login !== me) continue;
       const mark = STEP_MARK.exec(issue.body ?? "");
       if (!mark || !safeId(mark[1]!)) continue;
       if (!horizons.has(mark[1]!)) horizons.set(mark[1]!, await this.horizonOf(mark[1]!));
@@ -232,6 +315,10 @@ export class Connector {
       if (item) await this.syncStep(mark[1]!, item, issue.number, undefined, "poll");
       this.seenIssues.set(issue.number, signature);
     }
+    // A full discovery finished: forget what it no longer shows, then hold the rest to the cap.
+    const live = new Set<number>([...issues, ...stepRows].map((i) => i.number));
+    for (const map of [this.seenIssues, this.refused]) for (const number of [...map.keys()]) if (!live.has(number)) map.delete(number);
+    this.cap(this.seenIssues);
     this.ok();
   }
 
@@ -278,7 +365,7 @@ export class Connector {
     const parents = await this.issuesWith(LABEL_CASE);
     const stepIssues = this.deps.config.subIssues ? await this.issuesWith(LABEL_STEP) : [];
 
-    let parent = parents.find((p) => (p.body ?? "").includes(caseMarker(caseId)));
+    let parent = await this.keepOldest(await this.ownMarked(parents, caseMarker(caseId)));
     const numbers = new Map<string, number>();
     const closed = new Map<string, boolean>();
 
@@ -289,15 +376,16 @@ export class Connector {
       else if (ref) this.note(`Step "${plainLine(item.name, 60)}" is tied to ${item.external_ref!.id}, a repository Horizon does not write to.`);
     }
     if (!parent) {
-      parent = (await this.gh.api("POST", `repos/${this.repo}/issues`, { title: parentTitle(summary), body: bodyFor(), labels: [LABEL_CASE] })) as Issue;
+      parent = await this.createIssue(LABEL_CASE, caseMarker(caseId), { title: parentTitle(summary), body: bodyFor(), labels: [LABEL_CASE] });
     }
 
     if (this.deps.config.subIssues) {
       for (const item of horizon.items) {
         if (numbers.has(item.plan_item_id)) continue;
-        let step = stepIssues.find((s) => (s.body ?? "").includes(stepMarker(caseId, item.plan_item_id)));
+        const marker = stepMarker(caseId, item.plan_item_id);
+        let step = await this.keepOldest(await this.ownMarked(stepIssues, marker));
         if (!step) {
-          step = (await this.gh.api("POST", `repos/${this.repo}/issues`, { title: plainLine(item.name, 256), body: subIssueBody({ caseId, item }), labels: [LABEL_STEP] })) as Issue;
+          step = await this.createIssue(LABEL_STEP, marker, { title: plainLine(item.name, 256), body: subIssueBody({ caseId, item }), labels: [LABEL_STEP] });
         }
         numbers.set(item.plan_item_id, step.number);
       }
@@ -316,10 +404,15 @@ export class Connector {
 
     if (this.deps.config.board && parent.node_id) {
       const marker = `${horizon.case_state}|${summary}`;
+      // Cases whose parent issue is no longer listed are forgotten.
+      const listed = new Set<string>([caseId]);
+      for (const p of await this.ownMarked(parents, "<!-- horizon:case:")) for (const m of (p.body ?? "").matchAll(/<!-- horizon:case:([^\s]+) -->/g)) listed.add(m[1]!);
+      for (const key of [...this.placed.keys()]) if (!listed.has(key)) this.placed.delete(key);
       if (this.placed.get(caseId) !== marker) {
         this.board ??= await ensureBoard(this.gh, this.deps.config.board.org, this.deps.config.board.title);
         await placeIssue(this.gh, this.board, parent.node_id, { case: summary, state: horizon.case_state });
         this.placed.set(caseId, marker);
+        this.cap(this.placed);
       }
     }
   }
@@ -370,8 +463,18 @@ export class Connector {
     const have = labelNames(issue.labels);
     const current = have.filter((l) => l.startsWith(STATE_PREFIX));
     if (current.length === 1 && current[0] === want) return isClosed ? "closed" : "open";
-    const from = current.length === 0 ? "none" : current.map((l) => l.slice(STATE_PREFIX.length)).sort().join("+");
-    const text = stateComment({ caseId, stepId: item.plan_item_id, state, transition: `${from}~${state.word}@${evt}`, ...(this.deps.config.deskUrl ? { deskUrl: `${this.deps.config.deskUrl}#case/${encodeURIComponent(caseId)}` } : {}) });
+    // The comment's identity is the state reached and the event that reached it, never the labels found on the way (a half-done
+    // earlier try leaves odd labels). Polling reuses the last event id seen for the same state; otherwise it is the issue's edit time.
+    const key = `${caseId}/${item.plan_item_id}`;
+    let eventId = evt;
+    if (evt === "poll") {
+      const last = this.lastEvt.get(key);
+      eventId = last && last.word === state.word ? last.evt : `u${(issue as { updated_at?: string }).updated_at ?? ""}`;
+    } else if (evt !== "manual") {
+      this.lastEvt.set(key, { evt, word: state.word });
+      this.cap(this.lastEvt);
+    }
+    const text = stateComment({ caseId, stepId: item.plan_item_id, state, transition: `${state.word}@${eventId}`, ...(this.deps.config.deskUrl ? { deskUrl: `${this.deps.config.deskUrl}#case/${encodeURIComponent(caseId)}` } : {}) });
     const marker = text.slice(text.lastIndexOf("<!--"));
     if (!(await this.ownComments(number)).some((c) => c.includes(marker))) await this.gh.api("POST", `repos/${this.repo}/issues/${number}/comments`, { body: text });
     if (!have.includes(want)) await this.gh.api("POST", `repos/${this.repo}/issues/${number}/labels`, { labels: [want] });
@@ -471,7 +574,8 @@ export async function main(env: Record<string, string | undefined> = process.env
   stopped = true;
   follower.stop();
   clearInterval(beatTimer);
-  lock.release();
+  // Stop intake, let writes in flight finish (bounded), kill any gh still running, and only then give up the lock.
+  await connector.shutdown({ drainMs: 10_000, release: () => lock.release() });
   void poll;
   return 0;
 }
