@@ -33,3 +33,7 @@ tmp/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# Agent door keys (written 0600 by Horizon; never commit)
+.cognate/agent.key
+*.key
