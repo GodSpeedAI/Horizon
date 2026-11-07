@@ -6,6 +6,7 @@
  */
 import { NOT_RECORDED } from "../workspace/compare-model.ts";
 import type { ConversationRow } from "./conversation-model.ts";
+import { isOpenAsk, type Panel } from "./panels-model.ts";
 import type { DeskState, InspectionAnswer, NextState, RecordPin, SearchResult, ViewId } from "./model.ts";
 import type { WorkData } from "./work-build.ts";
 
@@ -353,4 +354,14 @@ export function deskReducer(ui: UiState, action: Action): UiState {
     case "work-query":
       return { ...ui, workQuery: { ...ui.workQuery, ...action.patch } };
   }
+}
+
+/**
+ * How many things wait for the person in the Conversation: open questions, agent proposals waiting for Confirm, and their own
+ * unsent previews. An answer waiting for the agent and a panel's own entry are not counted (the panel's questions are).
+ * The nav, the composer's Conversation button and the Conversation header all use this one number.
+ */
+export function conversationWaiting(rows: readonly ConversationRow[], panels: readonly Panel[]): number {
+  const open = panels.reduce((n, p) => n + p.blocks.filter(isOpenAsk).length, 0);
+  return open + rows.filter((r) => r.status === "waiting" && r.kind !== "answer" && r.kind !== "panel").length;
 }

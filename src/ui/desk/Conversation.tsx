@@ -5,9 +5,9 @@
  * Cards from agents and moves waiting for you are drawn inline. Nothing here sends: Confirm only opens the preview.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { Action, UiState } from "./attention.ts";
+import { conversationWaiting, type Action, type UiState } from "./attention.ts";
 import type { ConversationRow, RowStatus } from "./conversation-model.ts";
-import { PanelCard, openAsksIn, type PanelsIo } from "./Panels.tsx";
+import { PanelCard, type PanelsIo } from "./Panels.tsx";
 import type { BlockCtx } from "./blocks/index.tsx";
 
 export const STATUS_WORD: Readonly<Record<RowStatus, string>> = { done: "Done", waiting: "Waiting for you", refused: "Refused", unseen: "Not seen yet" };
@@ -91,7 +91,7 @@ export function ConversationView({ ui, dispatch, panels, conversation, onConfirm
   const stuck = useRef(true);
   const seen = useRef(rows.length);
   const open = data?.panels?.open ?? [];
-  const needsYou = openAsksIn(open);
+  const needsYou = conversationWaiting(rows, open);
   const stepWaits = data?.panels?.waiting ?? [];
 
   // Newest at the bottom. The view follows new rows unless you scrolled up; then a button says there is more below.

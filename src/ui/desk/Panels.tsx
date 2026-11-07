@@ -4,6 +4,7 @@
  * stays open, and close it. A card from an agent never moves what you are reading. It has no list of its own: the conversation
  * places it where it was put up. A card with no open question folds to its title and summary. Every piece of text is drawn as text.
  */
+import { answerEcho, WAITING_FOR_AGENT } from "./conversation-model.ts";
 import type { ReactNode } from "react";
 import { BlockGuard, Question, drawBlock, type BlockCtx } from "./blocks/index.tsx";
 import { CtxContext } from "./blocks/ctx.tsx";
@@ -48,6 +49,18 @@ const clipWords = (text: string, max: number): string => (text.length <= max ? t
 export function summaryOf(panel: Panel): string {
   const first = panel.blocks.find((b): b is Extract<PanelBlock, { kind: "text" }> => b.kind === "text");
   return first === undefined ? "Nothing needs your answer here." : clipWords(first.text.replace(/\s+/g, " ").trim(), 140);
+}
+
+/** What you said to each answered question and where the agent took it, for the folded line. */
+export function echoesOf(panel: Panel): string[] {
+  const out: string[] = [];
+  for (const b of panel.blocks) {
+    if (b.kind !== "question" || b.answered === null || (b.withdrawn ?? null) !== null) continue;
+    const say = answerEcho({ ...(b.input === undefined ? {} : { input: b.input }), options: b.options }, b.answered.outcome as "answered", b.answered.value);
+    const routed = typeof b.answered.routed_as === "string" && b.answered.routed_as.trim() !== "" ? b.answered.routed_as.trim() : null;
+    out.push(`${say} ${routed !== null ? `The agent took it to: ${routed}` : `${WAITING_FOR_AGENT}.`}`);
+  }
+  return out;
 }
 
 /** How many questions across these cards are still waiting for you. */
@@ -127,7 +140,7 @@ export function PanelCard({ panel, io, presenting = false, onAction = () => unde
       ) : (
         <details>
           <summary>
-            <span className="cv-eyebrow">From an agent</span> {heading} <span className="muted">{summaryOf(panel)}</span>
+            <span className="cv-eyebrow">From an agent</span> {heading} <span className="muted">{summaryOf(panel)}</span>{echoesOf(panel).map((e, i) => <span key={i} className="muted cv-echo" data-echo> {e}</span>)}
           </summary>
           {body}
         </details>

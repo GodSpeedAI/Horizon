@@ -6,7 +6,7 @@
  * This is the one composer for every view: the conversation (the stored record of moves) is drawn by Conversation.tsx and shares this box.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { type Action, type Mode, type UiState } from "./attention.ts";
+import { conversationWaiting, type Action, type Mode, type UiState } from "./attention.ts";
 import { NOT_CONNECTED, VIEWS, parseFind } from "./model.ts";
 import type { NoteIo } from "./NoteEditor.tsx";
 import { Words } from "./Words.tsx";
@@ -177,7 +177,7 @@ export function Composer({ ui, dispatch, io, request = null }: ComposerProps): R
   const { mode, text, selStart } = ui.composer;
   const data = ui.data;
   const latest: ConversationRow | undefined = ui.rows[ui.rows.length - 1];
-  const waitingRows = ui.rows.filter((r) => r.status === "waiting").length;
+  const waitingRows = conversationWaiting(ui.rows, data?.panels?.open ?? []);
   const inConversation = ui.view === "conversation";
   const [active, setActive] = useState(0);
   const [busy, setBusy] = useState(false);

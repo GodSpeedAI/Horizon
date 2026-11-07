@@ -57,7 +57,7 @@ describe("rows", () => {
     const words = text(convo(rows));
     expect(words).toContain("testing setup");
     expect(words).toContain("Try /find invoice");
-    expect(words).toContain("Needs you (0)");
+    expect(words).toContain("Needs you (1)"); // the one waiting agent proposal; no open questions
   });
 });
 

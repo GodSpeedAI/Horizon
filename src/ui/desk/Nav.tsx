@@ -1,11 +1,11 @@
 /** @jsxImportSource react */
 /** The left column: four views and the Days, Cases and Tags lists (design 5.1). */
 import { useState, type ReactNode } from "react";
-import { interruptionsOf, type Action, type UiState } from "./attention.ts";
+import { conversationWaiting, interruptionsOf, type Action, type UiState } from "./attention.ts";
 import { VIEWS, dayLabel, type DeskState } from "./model.ts";
 
 export function Nav({ ui, data, dispatch }: { readonly ui: UiState; readonly data: DeskState | null; readonly dispatch: (action: Action) => void }): ReactNode {
-  const counts = { ...interruptionsOf(data).counts, conversation: ui.rows.filter((r) => r.status === "waiting").length };
+  const counts = { ...interruptionsOf(data).counts, conversation: conversationWaiting(ui.rows, data?.panels?.open ?? []) };
   // On a phone the Days, Cases and Tags lists fold away so the composer stays within reach.
   const [open, setOpen] = useState(false);
   return (
