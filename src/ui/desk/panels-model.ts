@@ -49,6 +49,7 @@ export type AgentOp =
   | { readonly tool: "answer.route"; readonly panel_id: string; readonly ask_id: string; readonly routed_as: string };
 
 export const MAX_WITHDRAW_REASON = 200;
+export const REQUIRED_CANNOT_WITHDRAW = "This question settles a decision, so only you can close it. The agent cannot take it back.";
 export const QUESTION_CHANGED = "This question changed after you looked at it. Look again, then answer.";
 export const ANSWERED_CANNOT_CHANGE = "The person already answered this question, so it cannot be changed. Ask a new question with a different id.";
 /** A question the person answered (not put off, not skipped) is an agreement to those exact words. */
@@ -135,6 +136,8 @@ export function reduceAgent(state: Panels, op: AgentOp): Reduced {
       const reason = typeof op.reason === "string" ? op.reason.trim() : "";
       if (reason === "" || reason.length > MAX_WITHDRAW_REASON) return refuse(state, "SCHEMA", `Say why you are withdrawing it, in 1 to ${MAX_WITHDRAW_REASON} characters.`);
       if (ask.answered !== null) return refuse(state, "SCHEMA", "That question was already answered, so it cannot be withdrawn.");
+      // A question that names the decision it settles is a required decision: only the person closes it (Skip, or closing the panel).
+      if (ask.resolves) return refuse(state, "SCHEMA", REQUIRED_CANNOT_WITHDRAW);
       return { state: replace(state, panel.id, (p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === ask.id ? { ...b, withdrawn: { reason } } : b)) })), result: { ok: true, panel: panel.id } };
     }
     case "answer.route": {
