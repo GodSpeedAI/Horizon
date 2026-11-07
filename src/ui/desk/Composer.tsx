@@ -159,6 +159,8 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
   const data = ui.data;
   const [active, setActive] = useState(0);
   const [busy, setBusy] = useState(false);
+  // The "type something first" hint shows only after an empty box was sent, never because the box is empty again after a success.
+  const [triedEmpty, setTriedEmpty] = useState(false);
   const [draft, setDraft] = useState<DraftInfo | null>(null);
   const [pv, setPv] = useState<HandoffPreview | null>(null);
   const [pvText, setPvText] = useState("");
@@ -193,6 +195,9 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
   const suggestions = at && mode === "write" ? suggestionsFor(ui, at.query) : [];
   const askBlocked = mode === "ask";
   const empty = text.trim() === "";
+  useEffect(() => {
+    if (!empty) setTriedEmpty(false);
+  }, [empty]);
   const reasonOff = askBlocked
     ? "Ask is not connected: no reference library is set up."
     : empty
@@ -204,6 +209,8 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
       : handoff && keeperCases.length === 0
         ? "Cases are not connected or none is running, so there is no case to add a step to."
         : null;
+
+  const hint = empty && !triedEmpty ? null : reasonOff;
 
   const showPreview = async (): Promise<void> => {
     if (draft === null) {
@@ -244,6 +251,7 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
 
   const send = async (): Promise<void> => {
     if (reasonOff !== null) {
+      if (empty) setTriedEmpty(true);
       if (!askBlocked) dispatch({ type: "notice", text: mode === "write" ? "A note needs some words. Type something, then press Enter." : "Type what to look for first." });
       return;
     }
@@ -387,7 +395,7 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
               ? `Turns your words into one step in a case. Enter shows a preview; nothing is sent until you confirm. ${data?.status.parts.find((p) => p.name === "Agent work")?.connected ? "An agent can take the step." : "Agent work: Not connected, so the step stays with you."}`
               : `Ask: ${NOT_CONNECTED}. No reference library is set up, so questions cannot be answered. Use Find to search your own notes.`}{" "}
         Tab changes the mode. Esc leaves the box.
-        {reasonOff !== null && !askBlocked ? ` (${reasonOff})` : ""}
+        {hint !== null && !askBlocked ? ` (${hint})` : ""}
       </p>
       {ui.notice ? (
         <p role="alert" className="notice" data-notice>
