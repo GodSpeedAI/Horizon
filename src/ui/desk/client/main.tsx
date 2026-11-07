@@ -256,6 +256,39 @@ function App() {
         return { ok: false, message: "Horizon did not answer, so the label was not saved." };
       }
     },
+    handoff: {
+      draft: async () => {
+        try {
+          const response = await fetch("/desk/draft");
+          return response.ok ? ((await response.json()) as never) : null;
+        } catch {
+          return null;
+        }
+      },
+      saveDraft: (input) => {
+        void fetch("/desk/draft", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...input, mode: "handoff" }) }).catch(() => undefined);
+      },
+      preview: async (input) => {
+        try {
+          const response = await fetch("/desk/handoff/preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; preview?: never };
+          return response.ok && body.ok === true && body.preview ? { ok: true, preview: body.preview } : { ok: false, message: body.message ?? "Horizon could not show a preview. Nothing was sent." };
+        } catch {
+          return { ok: false, message: "Horizon did not answer, so there is no preview. Nothing was sent." };
+        }
+      },
+      send: async (input) => {
+        try {
+          const response = await fetch("/desk/handoff", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; outcome?: string; draft_id?: string };
+          rev.current = "";
+          void poll();
+          return response.ok && body.ok === true ? { ok: true, message: body.message ?? "Handed off.", draft_id: body.draft_id ?? "" } : { ok: false, outcome: body.outcome ?? "failed", message: body.message ?? "The hand off was not sent. Nothing was done." };
+        } catch {
+          return { ok: false, outcome: "unreachable", message: "Horizon did not answer, so the hand off may not have been sent. Press Confirm again: the same request is never applied twice." };
+        }
+      },
+    },
     remote: {
       load: async () => {
         const response = await fetch("/desk/remote.json");

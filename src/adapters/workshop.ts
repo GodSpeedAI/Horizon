@@ -16,7 +16,7 @@ import type { WorkshopConfig } from "../config/types.ts";
 
 export const KEY_WARNING_DAYS = 7;
 
-export type KeyState = { readonly state: "missing" | "empty" | "unsafe" } | { readonly state: "ok" | "expiring" | "expired"; readonly expiresAt: string | null; readonly days_left: number | null };
+export type KeyState = { readonly state: "missing" } | { readonly state: "empty" } | { readonly state: "unsafe" } | { readonly state: "ok" | "expiring" | "expired"; readonly expiresAt: string | null; readonly days_left: number | null };
 
 type KeyRead = { readonly state: "ok"; readonly key: string } | { readonly state: "missing" | "empty" | "unsafe" };
 

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { createApplication, type HorizonApplication } from "../../src/app.ts";
 import type { RecordReader, EconomicsSource } from "../../src/adapters/realitytrace-economics.ts";
 import type { ApprovalAuthority } from "../../src/adapters/sea-forge-approvals.ts";
+import type { Access } from "../../src/adapters/workshop.ts";
 import { horizonDocument, writeConfig } from "./config.ts";
 
 export interface DeskApp {
@@ -15,7 +16,7 @@ export interface DeskApp {
   readonly get: (path: string) => Promise<any>;
 }
 
-export async function startDeskApp(options: { readonly repoPath?: string; readonly now?: () => Date; readonly approvals?: ApprovalAuthority; readonly economics?: EconomicsSource; readonly reader?: RecordReader } = {}): Promise<DeskApp> {
+export async function startDeskApp(options: { readonly repoPath?: string; readonly now?: () => Date; readonly approvals?: ApprovalAuthority; readonly economics?: EconomicsSource; readonly reader?: RecordReader; readonly workshop?: () => Access } = {}): Promise<DeskApp> {
   const root = mkdtempSync(join(tmpdir(), "desk-"));
   const reader: RecordReader = options.reader ?? {
     repos: () => ({ ok: true, repos: options.repoPath ? [{ repo_id: "R1", path: options.repoPath }] : [] }),
@@ -24,7 +25,7 @@ export async function startDeskApp(options: { readonly repoPath?: string; readon
   };
   const document = { ...horizonDocument({ storePath: join(root, "d.sqlite"), secretPath: join(root, "launch.secret") }), records: { sources: [{ name: "personal", kind: "personal" }] }, ui: { timezone: "UTC" } };
   const configPath = await writeConfig(join(root, "horizon.toml"), document);
-  const application = await createApplication({ configPath, recordReader: () => reader, deskRoot: join(root, "desk"), ...(options.approvals ? { approvals: options.approvals } : {}), ...(options.economics ? { economics: options.economics } : {}), now: options.now ?? (() => new Date("2026-11-06T10:00:00Z")) });
+  const application = await createApplication({ configPath, recordReader: () => reader, deskRoot: join(root, "desk"), ...(options.approvals ? { approvals: options.approvals } : {}), ...(options.economics ? { economics: options.economics } : {}), ...(options.workshop ? { workshop: options.workshop } : {}), now: options.now ?? (() => new Date("2026-11-06T10:00:00Z")) });
   const server = application.startServer(0);
   const base = `http://${server.hostname}:${server.port}`;
   return {

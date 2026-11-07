@@ -83,10 +83,11 @@ import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
 import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
 import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
-import { keyState } from "./adapters/workshop.ts";
+import { assign as assignToAgent, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
+import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { caseTitle, matches, partsOf, plainWords, sourcesOf, type DeskCase, type DecideState, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
 import { buildDecide, waitingCount, type CaseApprovals, type HumanStepInput } from "./ui/desk/decide-build.ts";
-import { approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
+import { addItem, approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
 import { activeHolds, checkReason, putHold, recordDecision } from "./capabilities/decisions.ts";
 import { caseItems, costSource, orderWork, sessionItems, type AcceptedKnowledge, type WorkData } from "./ui/desk/work-build.ts";
 import { readLedgerDay } from "./adapters/ledger-day.ts";
@@ -312,6 +313,8 @@ export async function createApplication(
     readonly operators?: OperatorsConfig;
     /** The wire to SEA-Forge for delegated (`on_behalf_of`) commits. Injected by tests; defaults to the Unix socket. */
     readonly delegationSend?: (request: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    /** Stage 4: how work is handed to a workshop agent. Injected by tests; defaults to the workshop named in the config and its key file. */
+    readonly workshop?: () => Access;
   } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath);
@@ -1692,6 +1695,75 @@ export async function createApplication(
     return new Response(Bun.file(path), { headers: { "content-type": name === "app.js" ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8", "cache-control": "no-cache", "x-content-type-options": "nosniff" } });
   }
 
+  /** Hand off (stage 4): `POST /desk/handoff/preview` shows the step that would be added; `POST /desk/handoff` adds it. */
+  async function deskHandoff(request: Request, phase: "preview" | "send"): Promise<Response> {
+    const headers = { "cache-control": "no-store" };
+    const fail = (status: number, outcome: string, message: string): Response => Response.json({ ok: false, outcome, message }, { status, headers });
+    if (caseKeeper === null) return fail(503, "unreachable", "Cases are not connected, so work cannot be handed off.");
+    let body: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(await request.text());
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("not an object");
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return fail(400, "unreadable", "That hand off could not be read. Nothing was sent.");
+    }
+    const draftId = body.draft_id;
+    const text = typeof body.text === "string" ? body.text : "";
+    if (!validDraftId(draftId)) return fail(400, "unreadable", "That hand off has no draft number. Nothing was sent.");
+    if (stepNameOf(text) === "") return fail(400, "empty", "Type what you want done first.");
+    if (text.length > DRAFT_TEXT_MAX) return fail(400, "too_long", `That is too long for one step (limit ${DRAFT_TEXT_MAX} characters). Split it into smaller steps.`);
+    const store = runtime.runtime.store;
+    // The case to add to: the one named, else the newest case that is still running.
+    const listed = await listCases(caseKeeper);
+    if (listed.kind !== "ok") return fail(502, listed.kind, listed.kind === "stale" ? REFUSED_OLD : listed.words);
+    const open = listed.value.cases.filter(isOpenCase).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    const wanted = typeof body.case_id === "string" && body.case_id !== "" ? body.case_id.replace(/^case:/, "") : (open[0]?.case_id ?? "");
+    const target = open.find((c) => c.case_id === wanted);
+    if (target === undefined) return fail(409, "no_case", wanted === "" ? "There is no running case to add a step to. Start a case first." : "That case is not running, so a step cannot be added to it.");
+    const caseTitleNow = caseTitle(target.summary, target.created_at);
+    const item = handoffItem(draftId, text);
+    const agent = deskAgent();
+    if (phase === "preview") {
+      await saveDraft(store, caller.tenant, caller.actor.id, { draftId, text, mode: "handoff" });
+      const dry = await addItem(caseKeeper, { case_id: target.case_id, item, dry_run: true });
+      if (dry.kind !== "ok") return fail(dry.kind === "refused" ? 409 : dry.kind === "stale" ? 409 : 502, dry.kind, dry.kind === "stale" ? REFUSED_OLD : dry.words);
+      if (dry.value.plan_precondition === null) return fail(502, "unreadable", "The case keeper did not give a version code for this case, so the hand off cannot be tied to what you see. Try again in a moment.");
+      return Response.json({ ok: true, preview: { draft_id: draftId, case_id: target.case_id, case_title: caseTitleNow, step_name: item.name, step_id: dry.value.plan_item_id, check: "The case keeper checked this step against the case and it fits.", plan_precondition: dry.value.plan_precondition, agent } }, { headers });
+    }
+    const pre = body.plan_precondition;
+    if (typeof pre !== "object" || pre === null || typeof (pre as { ref?: unknown }).ref !== "string" || typeof (pre as { expected_digest?: unknown }).expected_digest !== "string") {
+      return fail(400, "unreadable", "This hand off did not carry the version you looked at, so it was not sent. Nothing was done.");
+    }
+    const wantsAgent = body.assign === true;
+    if (wantsAgent && !agent.offered) return fail(409, "not_connected", `${agent.words} Nothing was sent.`);
+    const sent = await addItem(caseKeeper, {
+      case_id: target.case_id,
+      item,
+      request_id: handoffRequestId(draftId),
+      dry_run: false,
+      preconditions: { records: [{ ref: (pre as { ref: string }).ref, expected_digest: (pre as { expected_digest: string }).expected_digest }] },
+    });
+    if (sent.kind === "stale") return fail(409, "preview_out_of_date", "Preview out of date. This case changed after you looked at it. Nothing was sent. Look at the new preview and decide again.");
+    if (sent.kind !== "ok") return fail(sent.kind === "refused" ? 409 : 502, sent.kind, sent.words);
+    let assigned: { readonly done: boolean; readonly words: string } | null = null;
+    if (wantsAgent) {
+      const access = options.workshop?.() ?? workshopAccess(loaded.config.workshop, caller, clock());
+      const result = await assignToAgent(access, { caseId: target.case_id, stepId: sent.value.plan_item_id, expertId: loaded.config.workshop?.expert_id ?? "", workspaceId: loaded.config.workshop?.workspace_id ?? "", message: text });
+      assigned = result.kind === "ok" ? { done: true, words: "Given to an agent." } : { done: false, words: result.words };
+    }
+    const next = await nextDraft(store, caller.tenant, caller.actor.id, draftId);
+    return Response.json({ ok: true, message: `Handed off: "${item.name}" is now a step in "${caseTitleNow}".${assigned === null ? "" : assigned.done ? " It was given to an agent." : ` It was not given to an agent: ${assigned.words}`}`, step_id: sent.value.plan_item_id, assigned, draft_id: next.draftId }, { headers });
+  }
+
+  /** Whether a step can be given to an agent right now, in words. Nothing is offered that would fail silently. */
+  function deskAgent(): { readonly offered: boolean; readonly words: string } {
+    const access = options.workshop?.() ?? workshopAccess(loaded.config.workshop, caller, clock());
+    if (access.kind !== "ready") return { offered: false, words: access.words.replace(/^Agent work is not connected: /, "Agent work: Not connected. ") };
+    if (options.workshop === undefined && (!loaded.config.workshop?.expert_id || !loaded.config.workshop?.workspace_id)) return { offered: false, words: "Agent work: Not connected. No agent is chosen for handed-off steps yet." };
+    return { offered: true, words: "An agent can take this step." };
+  }
+
   async function deskSaveNote(request: Request): Promise<Response> {
     const text = await request.text();
     if (text.length > 1_000_000) return Response.json({ ok: false, message: "That note is too large to save. Split it into smaller notes." }, { status: 413 });
@@ -1859,6 +1931,17 @@ export async function createApplication(
             return Response.json(await deskSearch(url.searchParams), { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
           }
           if (url.pathname === "/desk/note" && request.method === "POST") return deskSaveNote(request);
+          if (url.pathname === "/desk/draft" && request.method === "GET") {
+            return Response.json({ ...(await currentDraft(runtime.runtime.store, caller.tenant, caller.actor.id)), agent: deskAgent() }, { headers: { "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/desk/draft" && request.method === "POST") {
+            const parsed = (await request.json().catch(() => null)) as { draft_id?: unknown; text?: unknown; mode?: unknown } | null;
+            if (parsed === null || !validDraftId(parsed.draft_id) || typeof parsed.text !== "string") return Response.json({ ok: false, message: "That draft could not be read." }, { status: 400 });
+            const kept = await saveDraft(runtime.runtime.store, caller.tenant, caller.actor.id, { draftId: parsed.draft_id, text: parsed.text, mode: parsed.mode === "handoff" ? "handoff" : "write" });
+            return Response.json({ ok: kept }, { status: kept ? 200 : 409, headers: { "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/desk/handoff/preview" && request.method === "POST") return deskHandoff(request, "preview");
+          if (url.pathname === "/desk/handoff" && request.method === "POST") return deskHandoff(request, "send");
           if ((url.pathname === "/workspace" || url.pathname === "/workspace/approvals") && request.method === "GET") {
             // The desk is the workspace: the page is a shell, and the browser bundle draws every view from /desk/*.json.
             return deskPage();

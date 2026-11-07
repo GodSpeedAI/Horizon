@@ -10,7 +10,7 @@ import type { RemoteIo } from "./RemotePanel.tsx";
 import type { SaveLabel } from "./LabelControl.tsx";
 import type { InspectIo } from "./Answers.tsx";
 import type { RecordPin } from "./model.ts";
-import { Composer } from "./Composer.tsx";
+import { Composer, type HandoffIo } from "./Composer.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { KEY_TABLE } from "./keys.ts";
 import { Nav } from "./Nav.tsx";
@@ -37,6 +37,8 @@ export interface DeskIo extends NoteIo, InspectIo {
   readonly decide: (input: DecideInput) => Promise<{ readonly ok: boolean; readonly message: string }>;
   readonly saveLabel: SaveLabel;
   readonly remote: RemoteIo | null;
+  /** Hand off: words become a step in a case (stage 4). */
+  readonly handoff: HandoffIo;
 }
 
 export interface DeskProps {

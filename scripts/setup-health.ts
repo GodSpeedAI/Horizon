@@ -72,7 +72,10 @@ const workbenchCheck: Check = async (mapping) => {
   const health = await healthOf(`http://127.0.0.1:${mapping.workshopPort}/health`);
   if (!health.ok) return { ok: false, detail: `workshop GET /health on port ${mapping.workshopPort} failed: ${health.body.slice(0, 120)}` };
   const key = keyState({ url: "", key_path: mapping.workbenchKey });
-  if (key.state === "missing") return { ok: false, detail: `workshop is up; ${mapping.workbenchKey} is missing (operator step OP3: Settings > Connect Horizon)` };
+  if (key.state === "missing" || key.state === "empty" || key.state === "unsafe") {
+    const why = key.state === "missing" ? `is missing (operator step OP3: Settings > Connect Horizon)` : key.state === "empty" ? "is empty" : "can be read by other users; its mode must be 0600";
+    return { ok: false, detail: `workshop is up; ${mapping.workbenchKey} ${why}` };
+  }
   if (key.state === "expired") return { ok: false, detail: `workshop key expired on ${key.expiresAt}` };
   const when = key.expiresAt === null ? "expiry unknown" : `expires ${key.expiresAt}`;
   return { ok: true, detail: `workshop /health ok; key present, ${when}${key.state === "expiring" ? " (expires within 7 days: issue a new one)" : ""}` };

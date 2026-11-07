@@ -105,8 +105,8 @@ export interface Layer {
   readonly kind: LayerKind;
   readonly returnFocus: string;
 }
-export type Mode = "write" | "find" | "ask";
-export const MODES: readonly Mode[] = ["write", "find", "ask"];
+export type Mode = "write" | "find" | "ask" | "handoff";
+export const MODES: readonly Mode[] = ["write", "find", "ask", "handoff"];
 
 // ---- Rule 4: three strengths of interruption ----
 export interface Interruptions {
