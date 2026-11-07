@@ -75,27 +75,22 @@ function Ask({ panel, block, io }: { readonly panel: Panel; readonly block: AskB
   );
 }
 
-function Block({ panel, block, io }: { readonly panel: Panel; readonly block: PanelBlock; readonly io: PanelsIo }): ReactNode {
-  switch (block.type) {
-    case "callout":
+function Item({ panel, item, io }: { readonly panel: Panel; readonly item: PanelBlock; readonly io: PanelsIo }): ReactNode {
+  switch (item.kind) {
+    case "text":
       return (
-        <p className="callout" data-tone={block.tone}>
-          {block.text}
+        <p className="panel-text" data-tone={item.tone} dir="auto">
+          {item.label !== null ? <strong>{item.label}: </strong> : null}
+          {item.text}
         </p>
       );
-    case "metric":
-      return (
-        <p className="metric">
-          {block.label}: <strong>{block.value}</strong>
-        </p>
-      );
-    case "table":
+    case "rows":
       return (
         <table className="panel-table">
-          {block.columns.length > 0 ? (
+          {item.columns.length > 0 ? (
             <thead>
               <tr>
-                {block.columns.map((c, i) => (
+                {item.columns.map((c, i) => (
                   <th key={i} scope="col">
                     {c}
                   </th>
@@ -104,7 +99,7 @@ function Block({ panel, block, io }: { readonly panel: Panel; readonly block: Pa
             </thead>
           ) : null}
           <tbody>
-            {block.rows.map((row, r) => (
+            {item.rows.map((row, r) => (
               <tr key={r}>
                 {row.map((cell, c) => (
                   <td key={c}>{cell}</td>
@@ -114,16 +109,9 @@ function Block({ panel, block, io }: { readonly panel: Panel; readonly block: Pa
           </tbody>
         </table>
       );
-    case "document":
-      return (
-        <div className="document" dir="auto">
-          {block.title !== "" ? <h4>{block.title}</h4> : null}
-          <p>{block.text}</p>
-        </div>
-      );
-    case "ask":
-      return <Ask panel={panel} block={block} io={io} />;
-    case "unsupported":
+    case "question":
+      return <Ask panel={panel} block={item} io={io} />;
+    case "unavailable":
       return <p className="muted">The agent sent something here that this panel cannot show yet, so it is left out.</p>;
   }
 }
@@ -157,7 +145,7 @@ export function Panels({ panels, waiting, io }: PanelsViewProps): ReactNode {
           </header>
           {panel.blocks.length === 0 ? <p className="muted">Nothing here yet.</p> : null}
           {panel.blocks.map((block) => (
-            <Block key={block.id} panel={panel} block={block} io={io} />
+            <Item key={block.id} panel={panel} item={block} io={io} />
           ))}
           {panel.notes.length > 0 ? (
             <ul className="agent-notes" aria-label="Notes from the agent">

@@ -1,23 +1,18 @@
 /**
  * Agent panels in Horizon's own format (stage 4). An agent's tools (`show_surface`, `ask_human`, `arrange`, `annotate`,
  * `read_responses`) and the person's operations (`human.answer`, `human.pin`, `human.close`, `human.open`) come from the cockpit
- * protocol. They are mapped here onto a small set of Horizon blocks named like the grammar's 15 (callout, metric, table, document, ask).
- * Anything else an agent sends becomes one plain sentence saying it cannot be drawn. Text is only ever shown as text.
+ * protocol. They are mapped onto Horizon's own block vocabulary.
+ * The mapping itself lives with the grammar (`surface2/panel-blocks.ts`); anything else an agent sends becomes one plain sentence saying it cannot be drawn. Text is only ever shown as text.
  *
  * The state is a plain value and every change returns a new one, so what an agent sent can be tested without a screen.
  */
 export const MAX_OPEN_PANELS = 8;
 
-export type Tone = "neutral" | "info" | "success" | "warning" | "danger";
-export type PanelBlock =
-  | { readonly type: "callout"; readonly id: string; readonly tone: Tone; readonly text: string }
-  | { readonly type: "metric"; readonly id: string; readonly label: string; readonly value: string }
-  | { readonly type: "table"; readonly id: string; readonly columns: readonly string[]; readonly rows: readonly (readonly string[])[] }
-  | { readonly type: "document"; readonly id: string; readonly title: string; readonly text: string }
-  | { readonly type: "ask"; readonly id: string; readonly question: string; readonly why_needed: string; readonly options: readonly { readonly option_id: string; readonly label: string }[]; readonly answered: { readonly outcome: string; readonly value: unknown; readonly note: string | null } | null }
-  | { readonly type: "unsupported"; readonly id: string; readonly kind: string };
+import { clip, itemOf, questionOf, toneOf, type PanelItem, type PanelTone, type QuestionItem } from "../surface2/panel-blocks.ts";
 
-export type AskBlock = Extract<PanelBlock, { readonly type: "ask" }>;
+export type Tone = PanelTone;
+export type PanelBlock = PanelItem;
+export type AskBlock = QuestionItem;
 export interface PanelNote {
   readonly text: string;
   readonly tone: Tone;
@@ -37,43 +32,9 @@ export interface Panels {
 }
 export const NO_PANELS: Panels = { open: [], max: MAX_OPEN_PANELS };
 
-const TONE: Readonly<Record<string, Tone>> = { note: "neutral", ok: "success", warning: "warning", danger: "danger", unknown: "neutral", neutral: "neutral", info: "info", success: "success" };
 const ID = /^[a-z][a-z0-9_-]{0,63}$/;
 const isRec = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-const str = (v: unknown, max: number): string => (typeof v === "string" ? v.slice(0, max) : v === null || v === undefined ? "" : String(v).slice(0, max));
-
-/** Maps one cockpit block onto a Horizon block. A block this panel cannot draw becomes `unsupported`, never raw content. */
-export function blockOf(raw: unknown, index: number): PanelBlock {
-  const fallbackId = `block_${index + 1}`;
-  if (!isRec(raw)) return { type: "unsupported", id: fallbackId, kind: "unknown" };
-  const id = typeof raw.id === "string" && ID.test(raw.id) ? raw.id : fallbackId;
-  switch (raw.type) {
-    case "callout":
-      return { type: "callout", id, tone: TONE[String(raw.tone)] ?? "neutral", text: str(raw.text ?? raw.body ?? raw.label, 2048) };
-    case "metric":
-      return { type: "metric", id, label: str(raw.label, 80), value: str(raw.value ?? raw.text, 120) };
-    case "table": {
-      const rows = Array.isArray(raw.rows) ? raw.rows.slice(0, 50).map((row) => (Array.isArray(row) ? row.slice(0, 12).map((c) => str(c, 200)) : isRec(row) ? Object.values(row).slice(0, 12).map((c) => str(c, 200)) : [str(row, 200)])) : [];
-      const columns = Array.isArray(raw.columns) ? raw.columns.slice(0, 12).map((c) => str(isRec(c) ? (c.label ?? c.key) : c, 60)) : [];
-      return { type: "table", id, columns, rows };
-    }
-    case "document":
-      return { type: "document", id, title: str(raw.title, 120), text: str(raw.text ?? raw.body, 4000) };
-    case "ask": {
-      const ask = askOf(raw, id);
-      return ask ?? { type: "unsupported", id, kind: "ask" };
-    }
-    default:
-      return { type: "unsupported", id, kind: typeof raw.type === "string" ? raw.type.slice(0, 30) : "unknown" };
-  }
-}
-
-/** An ask needs a question and at least two options; the person can always defer or cancel instead. */
-function askOf(raw: Record<string, unknown>, id: string): PanelBlock | null {
-  const options = Array.isArray(raw.options) ? raw.options.flatMap((o) => (isRec(o) && typeof o.option_id === "string" && ID.test(o.option_id) ? [{ option_id: o.option_id, label: str(o.label, 120) }] : [])).slice(0, 8) : [];
-  if (typeof raw.question !== "string" || raw.question.trim() === "" || options.length < 2) return null;
-  return { type: "ask", id, question: str(raw.question, 2048), why_needed: str(raw.why_needed, 2048), options, answered: null };
-}
+const str = clip;
 
 export type AgentOp =
   | { readonly tool: "show_surface"; readonly surface: { readonly id: string; readonly title?: string; readonly step?: string | null; readonly blocks: readonly unknown[] } }
@@ -117,12 +78,12 @@ export function reduceAgent(state: Panels, op: AgentOp): Reduced {
     case "show_surface": {
       const s = op.surface;
       if (!isRec(s) || typeof s.id !== "string" || !ID.test(s.id) || !Array.isArray(s.blocks)) return refuse(state, "SCHEMA", "A panel needs an id and a list of blocks.");
-      const blocks = s.blocks.slice(0, 64).map(blockOf);
+      const blocks = s.blocks.slice(0, 64).map(itemOf);
       const existing = state.open.find((p) => same(p.id, s.id));
       if (existing !== undefined) {
         // An update keeps the panel where it is and keeps it pinned; answers already given stay on their questions.
-        const before = (id: string): AskBlock | undefined => existing.blocks.find((o): o is AskBlock => o.type === "ask" && o.id === id);
-        const kept = blocks.map((b) => (b.type === "ask" ? { ...b, answered: before(b.id)?.answered ?? null } : b));
+        const before = (id: string): AskBlock | undefined => existing.blocks.find((o): o is AskBlock => o.kind === "question" && o.id === id);
+        const kept = blocks.map((b) => (b.kind === "question" ? { ...b, answered: before(b.id)?.answered ?? null } : b));
         return { state: replace(state, s.id, (p) => ({ ...p, title: str(s.title, 120) || p.title, step: s.step === undefined ? p.step : (s.step ?? null), blocks: kept })), result: { ok: true, panel: s.id } };
       }
       return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks, notes: [] });
@@ -130,7 +91,7 @@ export function reduceAgent(state: Panels, op: AgentOp): Reduced {
     case "ask_human": {
       const panel = state.open.find((p) => same(p.id, op.panel));
       const id = typeof op.ask.id === "string" && ID.test(op.ask.id) ? op.ask.id : "";
-      const block = id === "" ? null : askOf(op.ask, id);
+      const block = id === "" ? null : questionOf(op.ask, id);
       if (block === null) return refuse(state, "SCHEMA", "A question needs an id, the question, and at least two options.");
       if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [block], notes: [] });
       return { state: replace(state, panel.id, (p) => ({ ...p, step: op.step === undefined ? p.step : (op.step ?? null), blocks: [...p.blocks.filter((b) => b.id !== block.id), block] })), result: { ok: true, panel: panel.id } };
@@ -139,7 +100,7 @@ export function reduceAgent(state: Panels, op: AgentOp): Reduced {
       if (!state.open.some((p) => same(p.id, op.panel))) return refuse(state, "NOT_FOUND", "That panel is not open.");
       const text = str(op.text, 400);
       if (text === "") return refuse(state, "SCHEMA", "A note needs some words.");
-      return { state: replace(state, op.panel, (p) => ({ ...p, notes: [...p.notes, { text, tone: TONE[String(op.tone)] ?? "neutral" }].slice(-20) })), result: { ok: true, panel: op.panel } };
+      return { state: replace(state, op.panel, (p) => ({ ...p, notes: [...p.notes, { text, tone: toneOf(op.tone) }].slice(-20) })), result: { ok: true, panel: op.panel } };
     }
     case "arrange": {
       const target = state.open.find((p) => same(p.id, op.action.id));
@@ -167,10 +128,10 @@ export function reduceHuman(state: Panels, op: HumanOp): Reduced {
     }
     case "human.answer": {
       const panel = state.open.find((p) => same(p.id, op.panel));
-      const ask = panel?.blocks.find((b): b is AskBlock => b.type === "ask" && b.id === op.ask);
+      const ask = panel?.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === op.ask);
       if (panel === undefined || ask === undefined) return refuse(state, "NOT_FOUND", "That question is no longer open.");
       if (ask.answered !== null) return refuse(state, "SCHEMA", "That question was already answered.");
-      return { state: replace(state, panel.id, (p) => ({ ...p, blocks: p.blocks.map((b) => (b.type === "ask" && b.id === ask.id ? { ...b, answered: { outcome: op.outcome, value: op.value ?? null, note: op.note ?? null } } : b)) })), result: { ok: true, panel: panel.id } };
+      return { state: replace(state, panel.id, (p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === ask.id ? { ...b, answered: { outcome: op.outcome, value: op.value ?? null, note: op.note ?? null } } : b)) })), result: { ok: true, panel: panel.id } };
     }
   }
 }

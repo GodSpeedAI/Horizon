@@ -52,7 +52,7 @@ describe("panels from agents", () => {
     state = must(reduceAgent(state, surface("b", { title: "B, newer", blocks: [{ type: "metric", id: "m1", label: "Open", value: "3" }] })));
     expect(state.open.map((p) => p.id)).toEqual(["a", "b", "c"]);
     expect(state.open[1]).toMatchObject({ id: "b", title: "B, newer", pinned: true });
-    expect(state.open[1]!.blocks[0]).toMatchObject({ type: "metric", value: "3" });
+    expect(state.open[1]!.blocks[0]).toMatchObject({ kind: "text", label: "Open", text: "3" });
     // An agent cannot remove what the person pinned; it can remove what is not pinned.
     const stopped = reduceAgent(state, { tool: "arrange", action: { op: "surface.remove", id: "b" } });
     expect(stopped.result.ok).toBe(false);
@@ -62,12 +62,12 @@ describe("panels from agents", () => {
     let asked = must(reduceAgent(NO_PANELS, { tool: "ask_human", panel: "q", ask }));
     asked = reduceHuman(asked, { op: "human.answer", panel: "q", ask: "q1", outcome: "answered", value: "yes" }).state;
     asked = must(reduceAgent(asked, surface("q", { blocks: [{ type: "ask", ...ask }] })));
-    expect(asked.open[0]!.blocks[0]).toMatchObject({ type: "ask", answered: { outcome: "answered", value: "yes" } });
+    expect(asked.open[0]!.blocks[0]).toMatchObject({ kind: "question", answered: { outcome: "answered", value: "yes" } });
   });
 
   test("what an agent sends is mapped to Horizon's blocks and shown as text", () => {
     const state = must(reduceAgent(NO_PANELS, surface("x", { blocks: [{ type: "callout", id: "c", tone: "danger", text: "<script>alert(1)</script>" }, { type: "graph", id: "g" }, { type: "mystery", id: "z" }, { type: "ask", id: "bad", question: "one option", options: [{ option_id: "a", label: "A" }] }] })));
-    expect(state.open[0]!.blocks.map((b) => b.type)).toEqual(["callout", "unsupported", "unsupported", "unsupported"]);
+    expect(state.open[0]!.blocks.map((b) => b.kind)).toEqual(["text", "unavailable", "unavailable", "unavailable"]);
     const html = renderToStaticMarkup(<Panels panels={{ ...state, waiting: [] } as never} waiting={[]} io={quietIo().panels} />);
     expect(html).not.toContain("<script>");
     expect(text(html)).toContain("<script>alert(1)</script>");
