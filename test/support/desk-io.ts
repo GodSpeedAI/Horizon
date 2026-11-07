@@ -9,6 +9,7 @@ export function quietIo(over: Partial<DeskIo> = {}): DeskIo {
     saveLabel: async () => ({ ok: false, message: "not used" }),
     remote: null,
     handoff: { draft: async () => null, saveDraft: () => undefined, preview: async () => ({ ok: false, message: "not used" }), send: async () => ({ ok: false, outcome: "unused", message: "not used" }) },
+    panels: { answer: async () => ({ ok: false, message: "not used" }), pin: async () => undefined, close: async () => undefined, stopWaiting: async () => ({ ok: false, message: "not used" }) },
     inspect: async () => ({ ok: false, message: "not used" }),
     ...over,
   };

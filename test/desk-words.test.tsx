@@ -130,6 +130,18 @@ describe("no product names and no internal terms on screen", () => {
     expect(card({ pv: notConnected })).not.toContain("checkbox");
   });
 
+  test("Panels from agents, with questions, notes, a pinned panel and a wait", () => {
+    const panels = {
+      max: 8,
+      waiting: [{ step: "signoff_release", panel: "release" }],
+      open: [
+        { id: "release", title: "Release check", step: "signoff_release", pinned: true, notes: [{ text: "Checked the build.", tone: "success" as const }], blocks: [{ type: "callout" as const, id: "c", tone: "warning" as const, text: "Two checks are still running." }, { type: "metric" as const, id: "m", label: "Checks passed", value: "8 of 10" }, { type: "table" as const, id: "t", columns: ["Check", "Result"], rows: [["build", "passed"]] }, { type: "document" as const, id: "d", title: "Summary", text: "All good so far." }, { type: "ask" as const, id: "q1", question: "Ship it?", why_needed: "The release is waiting.", options: [{ option_id: "yes", label: "Yes" }, { option_id: "no", label: "No" }], answered: null }, { type: "ask" as const, id: "q2", question: "Tell QA?", why_needed: "", options: [{ option_id: "yes", label: "Yes" }, { option_id: "no", label: "No" }], answered: { outcome: "answered", value: "yes", note: null } }, { type: "unsupported" as const, id: "u", kind: "graph" }] },
+        { id: "empty", title: "Opened by you", step: null, pinned: false, notes: [], blocks: [] },
+      ],
+    };
+    scan("panels", draw({ ...START, view: "decide", data: base({ panels }) }));
+  });
+
   test("the Inspector, the keys list and the quick menu", () => {
     scan("inspector, asked", draw({ ...START, data: base(), selection: "case:c1", inspection: { operation: "why", query: "", busy: false, answer, problem: null } }));
     scan("inspector, failed", draw({ ...START, data: base(), inspection: { operation: "why", query: "", busy: false, answer: null, problem: "Horizon did not answer, so nothing is shown." } }));

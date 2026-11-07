@@ -256,6 +256,40 @@ function App() {
         return { ok: false, message: "Horizon did not answer, so the label was not saved." };
       }
     },
+    panels: {
+      answer: async (input) => {
+        try {
+          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", ...input }) });
+          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+          rev.current = "";
+          void poll();
+          return { ok: response.ok && body.ok === true, message: body.message ?? (response.ok ? "Sent." : "The answer was not sent.") };
+        } catch {
+          return { ok: false, message: "Horizon did not answer, so your answer may not have been sent." };
+        }
+      },
+      pin: async (id, pinned) => {
+        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.pin", id, pinned }) }).catch(() => undefined);
+        rev.current = "";
+        void poll();
+      },
+      close: async (id) => {
+        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.close", id }) }).catch(() => undefined);
+        rev.current = "";
+        void poll();
+      },
+      stopWaiting: async (step) => {
+        try {
+          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.stop_waiting", step }) });
+          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+          rev.current = "";
+          void poll();
+          return { ok: response.ok && body.ok === true, message: body.message ?? "Done." };
+        } catch {
+          return { ok: false, message: "Horizon did not answer." };
+        }
+      },
+    },
     handoff: {
       draft: async () => {
         try {

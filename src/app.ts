@@ -84,8 +84,10 @@ import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
 import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
 import { assign as assignToAgent, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
+import { acceptanceBlocked, listAnswers, markReplied, recordAnswer, stopWaiting, checkValue, OUTCOMES, WAITING_WORDS, type PanelAnswer } from "./capabilities/panel-answers.ts";
+import { NO_PANELS, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
-import { caseTitle, matches, partsOf, plainWords, sourcesOf, type DeskCase, type DecideState, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
+import { caseTitle, matches, partsOf, plainWords, sourcesOf, type DeskCase, type DecideState, type DecisionCardData, type PanelsData, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
 import { buildDecide, waitingCount, type CaseApprovals, type HumanStepInput } from "./ui/desk/decide-build.ts";
 import { addItem, approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
 import { activeHolds, checkReason, putHold, recordDecision } from "./capabilities/decisions.ts";
@@ -194,6 +196,8 @@ export interface HorizonApplication {
   /** The validated operator-to-SEA-Forge-actor mapping. */
   readonly operatorActors: OperatorActors;
   /** The commit the phone makes, run as a session's Caller with its mapped SEA-Forge actor. Refuses any Caller that is not a mapped operator session. */
+  /** Stage 4: an agent's panel tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`). */
+  applyAgentOp(op: AgentOp): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }>;
   commitForSession(actionId: string, intentId: string, who: Caller): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }>;
   /** Healthy, or a typed degraded observation; never a startup prerequisite. */
   readonly research: ResearchStatus;
@@ -1453,6 +1457,7 @@ export async function createApplication(
       selected: selectedNote ? { note: selectedNote, history: await noteHistory(store, deskWho, selectedNote.note_id) } : null,
       decide,
       home: await homeState(params, openCaseNow !== null || keeperOpen !== null, allMoves),
+      panels: await panelsData(),
     };
     const shown = presenting ? applyStandIns(base, presentingKey(), deskRepoNames()) : base;
     return { ...shown, rev: createHash("sha256").update(JSON.stringify(shown)).digest("hex").slice(0, 16) };
@@ -1489,7 +1494,22 @@ export async function createApplication(
     }
     const holds = await activeHolds(runtime.runtime.store, caller.tenant);
     const human = await humanSteps();
-    return buildDecide({ inbox, moves, caseApprovals, holds, humanSteps: human.steps, extraNotices: human.notices });
+    const built = buildDecide({ inbox, moves, caseApprovals, holds, humanSteps: human.steps, extraNotices: human.notices });
+    // Accepting a step is blocked while an answer the operator gave an agent about it has had no reply.
+    const answers = (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.step !== null);
+    if (answers.length === 0) return built;
+    const stepOf = (card: DecisionCardData): string | null => {
+      if (card.kind === "human_step") return /^human:[^:]+:(.+)$/.exec(card.id)?.[1] ?? null;
+      if (card.kind === "case_task" && caseApprovals.kind === "listed") return caseApprovals.approvals.find((row) => `case-task:${row.approval_id}` === card.id)?.plan_item_id ?? null;
+      return null;
+    };
+    return {
+      ...built,
+      cards: built.cards.map((card) => {
+        const step = stepOf(card);
+        return step !== null && acceptanceBlocked(answers, step) ? { ...card, blocked: card.blocked ?? WAITING_WORDS, preview: { ...card.preview, accept: null } } : card;
+      }),
+    };
   }
 
   /** Every human step that is running and not settled, in every open case at the case keeper. Each one waits for a person. */
@@ -1695,6 +1715,67 @@ export async function createApplication(
     return new Response(Bun.file(path), { headers: { "content-type": name === "app.js" ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8", "cache-control": "no-cache", "x-content-type-options": "nosniff" } });
   }
 
+  // ---- Stage 4: panels from agents. The open panels are held here; the person's answers are kept in `horizon-panel-answers`. ----
+  let panelBoard: PanelsBoard = NO_PANELS;
+
+  /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`). A reply on a panel clears the wait on the answers given there. */
+  async function applyAgentOp(op: AgentOp): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
+    if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied) };
+    const { state, result } = reduceAgent(panelBoard, op);
+    if (!result.ok) return result;
+    panelBoard = state;
+    if (result.panel !== null && op.tool !== "arrange") await markReplied(runtime.runtime.store, caller.tenant, result.panel);
+    return result;
+  }
+
+  /** The person's operations on panels: answer, pin, close, open, and stop waiting for an agent's reply. */
+  async function deskPanelOp(request: Request): Promise<Response> {
+    const headers = { "cache-control": "no-store" };
+    const fail = (status: number, message: string): Response => Response.json({ ok: false, message }, { status, headers });
+    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    if (body === null || typeof body !== "object" || typeof body.op !== "string") return fail(400, "That could not be read. Nothing was changed.");
+    const store = runtime.runtime.store;
+    if (body.op === "human.stop_waiting") {
+      if (typeof body.step !== "string" || body.step === "") return fail(400, "Say which step to stop waiting for.");
+      const n = await stopWaiting(store, caller.tenant, body.step);
+      return Response.json({ ok: true, message: n === 0 ? "Nothing was waiting." : "Stopped waiting. The step can be accepted now." }, { headers });
+    }
+    if (body.op === "human.answer") {
+      const outcome = body.outcome;
+      const value = checkValue(body.value);
+      if (typeof body.panel !== "string" || typeof body.ask !== "string" || !(OUTCOMES as readonly unknown[]).includes(outcome) || !value.ok) return fail(400, "That answer could not be read. Nothing was sent.");
+      if (outcome === "answered" && (value.value === null || value.value === "")) return fail(400, "Pick an answer first, or choose Not now.");
+      const note = typeof body.note === "string" && body.note.trim() !== "" ? body.note.trim().slice(0, 600) : null;
+      const before = panelBoard;
+      const step = before.open.find((p) => p.id === body.panel)?.step ?? null;
+      const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note });
+      if (!result.ok) return fail(409, result.message);
+      try {
+        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note, step, now: clock() });
+      } catch {
+        return fail(500, "Your answer was not saved. Nothing was sent. Try again.");
+      }
+      panelBoard = state;
+      return Response.json({ ok: true, message: outcome === "answered" ? "Sent. The agent has not replied yet." : outcome === "deferred" ? "Put off. The agent has not replied yet." : "Cancelled. The agent has not replied yet." }, { headers });
+    }
+    const op: HumanOp | null =
+      body.op === "human.pin" && typeof body.id === "string" && typeof body.pinned === "boolean" ? { op: "human.pin", id: body.id, pinned: body.pinned }
+      : body.op === "human.close" && typeof body.id === "string" ? { op: "human.close", id: body.id }
+      : body.op === "human.open" && typeof body.template === "string" ? { op: "human.open", template: body.template, ...(typeof body.title === "string" ? { title: body.title } : {}) }
+      : null;
+    if (op === null) return fail(400, "That is not something a panel can do. Nothing was changed.");
+    const { state, result } = reduceHuman(panelBoard, op);
+    if (!result.ok) return fail(409, result.message);
+    panelBoard = state;
+    return Response.json({ ok: true, message: "Done." }, { headers });
+  }
+
+  async function panelsData(): Promise<PanelsData> {
+    const waiting = new Map<string, string>();
+    for (const a of await listAnswers(runtime.runtime.store, caller.tenant)) if (!a.replied && a.step !== null && !waiting.has(a.step)) waiting.set(a.step, a.panel_id);
+    return { ...panelBoard, waiting: [...waiting].map(([step, panel]) => ({ step, panel })) };
+  }
+
   /** Hand off (stage 4): `POST /desk/handoff/preview` shows the step that would be added; `POST /desk/handoff` adds it. */
   async function deskHandoff(request: Request, phase: "preview" | "send"): Promise<Response> {
     const headers = { "cache-control": "no-store" };
@@ -1814,6 +1895,7 @@ export async function createApplication(
     identity,
     operatorActors: mappedActors,
     commitForSession,
+    applyAgentOp,
     research,
     frames,
     frame: () => issued,
@@ -1940,6 +2022,7 @@ export async function createApplication(
             const kept = await saveDraft(runtime.runtime.store, caller.tenant, caller.actor.id, { draftId: parsed.draft_id, text: parsed.text, mode: parsed.mode === "handoff" ? "handoff" : "write" });
             return Response.json({ ok: kept }, { status: kept ? 200 : 409, headers: { "cache-control": "no-store" } });
           }
+          if (url.pathname === "/desk/panels/op" && request.method === "POST") return deskPanelOp(request);
           if (url.pathname === "/desk/handoff/preview" && request.method === "POST") return deskHandoff(request, "preview");
           if (url.pathname === "/desk/handoff" && request.method === "POST") return deskHandoff(request, "send");
           if ((url.pathname === "/workspace" || url.pathname === "/workspace/approvals") && request.method === "GET") {

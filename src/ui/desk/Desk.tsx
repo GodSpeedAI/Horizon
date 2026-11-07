@@ -11,6 +11,7 @@ import type { SaveLabel } from "./LabelControl.tsx";
 import type { InspectIo } from "./Answers.tsx";
 import type { RecordPin } from "./model.ts";
 import { Composer, type HandoffIo } from "./Composer.tsx";
+import { Panels, type PanelsIo } from "./Panels.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { KEY_TABLE } from "./keys.ts";
 import { Nav } from "./Nav.tsx";
@@ -39,6 +40,8 @@ export interface DeskIo extends NoteIo, InspectIo {
   readonly remote: RemoteIo | null;
   /** Hand off: words become a step in a case (stage 4). */
   readonly handoff: HandoffIo;
+  /** Answers, pins and closes on panels from agents (stage 4). */
+  readonly panels: PanelsIo;
 }
 
 export interface DeskProps {
@@ -144,6 +147,7 @@ export function Desk(props: DeskProps): ReactNode {
         <Nav ui={ui} data={data} dispatch={dispatch} />
         <main id="main" className="main" aria-label={VIEWS.find((v) => v.id === ui.view)?.label}>
           {view[ui.view]}
+          {data?.panels ? <Panels panels={data.panels} waiting={data.panels.waiting} io={io.panels} /> : null}
           <Composer ui={ui} dispatch={dispatch} io={io} />
         </main>
         <Inspector ui={ui} dispatch={dispatch} io={io} onLink={onLink} />

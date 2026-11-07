@@ -4,6 +4,7 @@
  * words come only from the parts themselves.
  */
 import type { NoteRevision, NoteView } from "../../capabilities/notes.ts";
+import type { Panels } from "./panels-model.ts";
 import type { WorkspaceBlocked, WorkspaceChoice, WorkspaceDebugger, WorkspaceMove, WorkspaceOnboardingStep, WorkspaceRetrieval } from "../workspace/model.ts";
 
 export const NOT_CONNECTED = "Not connected";
@@ -152,6 +153,11 @@ export interface HomeState {
   readonly assurance: string;
 }
 
+/** The open agent panels, and the steps whose answers an agent has not replied to. */
+export interface PanelsData extends Panels {
+  readonly waiting: readonly { readonly step: string; readonly panel: string }[];
+}
+
 export interface DeskState {
   readonly rev: string;
   readonly today: string;
@@ -170,6 +176,8 @@ export interface DeskState {
   readonly selected: { readonly note: NoteView; readonly history: readonly NoteRevision[] } | null;
   readonly decide: DecideState;
   readonly home: HomeState;
+  /** Panels from agents (stage 4). Absent in older fixtures: none open. */
+  readonly panels?: PanelsData;
 }
 
 export interface SearchResult {
