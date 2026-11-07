@@ -1,0 +1,303 @@
+Skip to the open view
+This computer: Yoga7i
+Setup: testing
+Rulebook edition 0a10c20d
+Case: Seed: triage inbox. One human step to look through what arrived.
+Needs you: 15
+Cases: connected
+Records: connected
+Agent work: connected
+Reference library: Not connected
+Presenting: off
+Settings
+Phone remote
+
+Loading… Check phone control
+
+Setup guide
+
+Today
+Conversation (2)
+Explore
+Decide (15)
+Work
+DAYS
+2026-11-07 (2)
+2026-11-06 (1)
+2026-11-05 (1)
+2026-11-04 (1)
+2026-11-03 (1)
+CASES
+Seed: triage inbox. One human step to look through what arrived.
+Seed: weekly release. One human sign-off step that waits for the operator.
+TAGS
+planning (1)
+questions (1)
+release (1)
+retro (1)
+review (1)
+seed (6)
+today (1)
+triage (1)
+
+testing setup
+
+Conversation
+
+Open case: Seed: triage inbox. One human step to look through what arrived.
+Needs you (0)
+
+Try
+/find invoice
+/handoff Fix the checkout total
+/note Call the supplier
+
+Done
+Remember to ask the team about the checkout wording.
+You
+08:41 AM
+
+Saved to today.
+
+Done
+Seed hand off: collect this week's release numbers
+You
+09:41 AM
+
+Added to Seed: triage inbox. It has started.
+
+Done
+Find: checkout
+You
+10:41 AM
+
+2 notes, 1 cases, 0 days, 0 tags.
+
+Waiting for you
+Seed proposal: add a rollback note to the release
+Agent on this page · Demo agent
+12:41 PM
+
+An agent suggests this. Nothing is sent until you confirm.
+
+AN AGENT SUGGESTS
+
+Hand off this work?
+
+Seed proposal: add a rollback note to the release
+
+An agent suggests this. Nothing is sent until you confirm.
+
+Confirm
+Discard
+
+Confirm shows you exactly what will happen first. Nothing is sent until you confirm there.
+
+Done
+Stage 8 proof: draft the weekly release summary
+You
+01:44 PM
+
+Handed off: "Stage 8 proof: draft the weekly release summary" is now a step in "Seed: triage inbox. One human step to look through what arrived.". It has started.
+
+Done
+Stage 8 proof: list open questions for the review
+You
+01:44 PM
+
+Handed off: "Stage 8 proof: list open questions for the review" is now a step in "Seed: triage inbox. One human step to look through what arrived.". It has started.
+
+Done
+Find: checkout
+Agent on this page
+01:45 PM
+
+0 notes, 0 cases, 0 days, 0 tags.
+
+Done
+Stage 8 proof: agent suggests a changelog check
+Agent on this page
+01:45 PM
+
+Handed off: "Stage 8 proof: agent suggests a changelog check" is now a step in "Seed: triage inbox. One human step to look through what arrived.". It has started.
+
+Refused
+Stage 8 proof: agent suggests something you do not want
+Agent on this page
+01:45 PM
+
+Discarded by you. Nothing was sent.
+
+Refused
+Stage 8 probe: discard me
+Agent on this page
+01:45 PM
+
+Discarded by you. Nothing was sent.
+
+Done
+Stage 8 probe: confirm me
+Agent on this page
+01:46 PM
+
+Handed off: "Stage 8 probe: confirm me" is now a step in "Seed: triage inbox. One human step to look through what arrived.". It has started.
+
+Done
+Find: checkout
+Agent on this page
+01:46 PM
+
+0 notes, 0 cases, 0 days, 0 tags.
+
+Done
+Stage 8 proof: agent suggests a changelog check
+Agent on this page
+01:46 PM
+
+Handed off: "Stage 8 proof: agent suggests a changelog check" is now a step in "Seed: triage inbox. One human step to look through what arrived.". It has started.
+
+Refused
+Stage 8 proof: agent suggests something you do not want
+Agent on this page
+01:46 PM
+
+Discarded by you. Nothing was sent.
+
+Done
+Find: checkout
+Agent on this page
+01:47 PM
+
+0 notes, 0 cases, 0 days, 0 tags.
+
+Done
+Stage 8 proof: agent suggests a changelog check
+Agent on this page
+01:47 PM
+
+Handed off: "Stage 8 proof: agent suggests a changelog check" is now a step in "Seed: triage inbox. One human step to look through what arrived.". It has started.
+
+Refused
+Stage 8 proof: agent suggests something you do not want
+Agent on this page
+01:47 PM
+
+Discarded by you. Nothing was sent.
+
+Done
+Find: checkout
+Agent on this page
+01:47 PM
+
+0 notes, 0 cases, 0 days, 0 tags.
+
+Done
+Find: checkout
+Agent on this page
+01:48 PM
+
+0 notes, 0 cases, 0 days, 0 tags.
+
+Done
+Stage 8 proof: agent suggests a changelog check
+Agent on this page
+01:48 PM
+
+Handed off: "Stage 8 proof: agent suggests a changelog check" is now a step in "Seed: triage inbox. One human step to look through what arrived.". It has started.
+
+Refused
+Stage 8 proof: agent suggests something you do not want
+Agent on this page
+01:48 PM
+
+Discarded by you. Nothing was sent.
+
+Done
+Find: checkout
+Agent on this page
+01:49 PM
+
+0 notes, 0 cases, 0 days, 0 tags.
+
+Done
+Stage 8 proof: agent suggests a changelog check
+Agent on this page
+01:49 PM
+
+Handed off: "Stage 8 proof: agent suggests a changelog check" is now a step in "Seed: triage inbox. One human step to look through what arrived.". It has started.
+
+Refused
+Stage 8 proof: agent suggests something you do not want
+Agent on this page
+01:49 PM
+
+Discarded by you. Nothing was sent.
+
+Waiting for you
+Stage 8 proof: preview allowed for agent
+Agent on this page · Proof agent
+01:49 PM
+
+An agent suggests this. Nothing is sent until you confirm.
+
+AN AGENT SUGGESTS
+
+Hand off this work?
+
+Stage 8 proof: preview allowed for agent
+
+An agent suggests this. Nothing is sent until you confirm.
+
+Confirm
+Discard
+
+Confirm shows you exactly what will happen first. Nothing is sent until you confirm there.
+
+Done
+Find: release
+You
+02:01 PM
+
+3 notes, 1 cases, 0 days, 1 tags.
+
+Done
+Find: release
+You
+02:02 PM
+
+3 notes, 1 cases, 0 days, 1 tags.
+
+3 notes, 1 cases, 0 days, 1 tags.
+WRITE
+
+Write ▾
+Today · Seed: triage inbox. One human step to look through what arrived.
+Write
+
+Saves a note on today (2026-11-07) and on the case "Seed: triage inbox. One human step to look through what arrived.". Enter saves, Shift+Enter adds a line, @ adds a link. Start a line with / to run a command: /find <words>, /handoff <words>, /note <words>, /done <step>, /hold <step>. Tab changes the mode. Esc leaves the box.
+
+testing · Seed: triage inbox. One human step to look through what arrived. · Conversation
+Enter send · Shift+Enter new line · Tab mode · Esc leave
+INSPECTOR
+
+Nothing is selected. Press J or K to move through the list, then Enter to look at an item here.
+
+ASK ABOUT THE FOCUS
+
+Choose a question about what is in focus. The answer is shown as facts, each with where it came from.
+
+Question
+Why is it this way?
+What does it affect?
+What changed?
+What happened, in order?
+What if it were different?
+What can reach it?
+Replay what happened
+Look up in the reference library (optional)
+
+The reference library is Not connected, so nothing can be looked up. Questions are still answered from what is recorded.
+
+Ask
+
+Saturday, 7 November 2026. 15 waiting for you.

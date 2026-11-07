@@ -1,0 +1,8 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"q\": \"checkout\",\n  \"day\": null,\n  \"tag\": null,\n  \"notes\": [],\n  \"cases\": [],\n  \"days\": [],\n  \"tags\": [],\n  \"records\": {\n    \"name\": \"Records\",\n    \"connected\": true,\n    \"words\": \"Records: connected. Sessions are listed on the comparison page.\",\n    \"href\": \"/workspace/compare\"\n  }\n}"
+    }
+  ]
+}
