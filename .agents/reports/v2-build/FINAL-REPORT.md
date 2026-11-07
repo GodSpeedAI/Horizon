@@ -13,7 +13,8 @@ Date: 2026-11-07. Branch: `horizon-desk-v2` (Horizon). Evidence lives under `.ag
 | 4 | GitHub mirror: a case becomes a board, its steps become issues; adversarial tests | `stage-4/` |
 | 5 | Timings and record delay; rulebook snapshot on runs | `stage-5/` |
 | 6 | Live proofs: Hand off, Mark done, hand to an agent; walk, axe, keyboard, Presenting and key scans | `stage-6/` |
-| 7 | Conversation thread and new composer (mock layout, Cognate Workbench look) | `stage-7/` |
+| 7 | New composer (mock layout, Cognate Workbench look) | `stage-7/` |
+| 8 | Conversation: one stored record of everything done through the desk, by you or by an agent; the composer is also a command line; agents build panels from all 15 parts and can only suggest; page tools for an agent beside you | `stage-8/` |
 | — | Seed data with `just seed`, `just seed-status`, `just seed-clear`, `just seed-reset` | `seed/`, `runbook.md` |
 
 Other repositories:
@@ -62,15 +63,24 @@ Each line gives the decision and the reason.
 16. **`setup-check-empty` leaves out the setup's own rulebook folder** while it holds only what a start writes (`00c59e3`): the enrollment trace and rulebook snapshots. Any other record there still counts.
 17. **`--exclude personal` in the production check.** Your personal work record is shared by every setup and is not test data.
 18. **Hand-off previews and results go through the Presenting stand-ins** (`b9fc56f`). They were the one answer that skipped them.
-19. **The conversation thread is kept per page, not stored.** Notes, steps and records are already stored. The thread shows what happened in this sitting.
+19. **The conversation is stored** (stage 8, replacing stage 7's per-page thread). It points at the case keeper, the record keeper and the notes, which stay the authority, and keeps only words and references, never raw answers. The newest 200 entries are shown.
 20. **One control for "give to an agent"** (`8fe4507`). The chip is the control, and the preview card states Yes or No.
 21. **The workshop demo agent is part of the seed** (horizon-demo-helper and the demo-1 workspace), so a clear and reseed gives a working demo. Choosing the model stays a manual step, because it needs your key.
 22. **Turned down (M3):** a separate lesson-intake service. Lessons wait in Decide until a person accepts them.
+23. **Record, command line and composer are one piece, called Conversation** (your ruling). Every other view keeps the same composer bar; there is one record and nothing is duplicated.
+24. **Agents propose, people decide, checked on the server.** A call from an agent on the page carries its own caller mark and may only read, search and make a hand-off preview. Sending, deciding, saving a note, discarding and answering are refused with plain words, and a refused attempt leaves no entry.
+25. **An answer is closed only when the agent says where it went** (at least 6 characters, as in the cockpit). Before, any later agent call counted as a reply. A question waiting for you is never pushed out by the limit of 8 panels.
+26. **All 15 parts are drawn** (your question about the cockpit). The grammar stays at 15; it moved to version 3 for the new question kinds, and version 2 is still read.
+27. **The page offers five tools to an agent beside you**, using the same tool library version gs-term pins. None of them can confirm, mark done, approve, answer or settle, and a test checks this. The word "WebMCP" never appears on screen.
+28. **A search typed letter by letter is not recorded.** Only a submitted Find adds an entry, so the record is not flooded.
+29. **The workshop's own tests used your `cognate-dev` database once** before I noticed. They make and drop their own temporary schemas; I reran them on a throwaway instance and dropped it. Please check `cognate-dev` looks as you expect.
+30. **A commit briefly swept in your staged deletion** of `.cognate/vendor/godspeed-identity-0.1.0-ed6c52a.tgz`. I took it back out of the commit and staged the deletion again, as you had it. Since then every commit names its files.
+31. **`setup-clear` drops the workshop's database for that setup** (`horizon-<setup>`), so test data does not survive a clear.
 
 ## 4. What is not done, and why
 
 - **Agent work is not written to the record keeper.** The workshop ran the agent, and the conversation is saved in `stage-6/`. But the run does not reach RealityTrace, so the event-to-record delay (K9) is still measured on 9 seeded events (0 ms) rather than on live work.
-- **Panels are not fed by the workshop yet.** The desk can draw agent panels, but the workshop does not send any.
+- **Panels are not fed by the workshop yet.** The desk draws every agent part and the tests put panels up, but the workshop's agents do not send any yet.
 - **Lessons have no automatic intake.** This is by decision (section 3, item 22).
 - **The workshop branch `feat/horizon-connect` is local only** (section 3, item 9). To publish it, rebase it onto `origin/main` without your 9 unpushed commits, or push those first.
 - **Production's workshop and GitHub mirror are not started.** Their health checks pass only once you start them. Both are optional.
