@@ -22,6 +22,7 @@ import type { DurableStore } from "@godspeedai/cognate-events";
 import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
 import { SANDBOX_REPO, argValue, readMarker, setupMapping, setupTenant, type SetupMapping } from "../src/config/setup.ts";
 import { configFromDocument, operatorPrincipal } from "../src/config/load.ts";
+import { DEFAULT_WORKSHOP_TIMEOUT_MS, workshopAccess, workshopFailure, type Access } from "../src/adapters/workshop.ts";
 import { RealityTraceObligation, type DeclaredThreshold } from "../src/adapters/realitytrace-obligation.ts";
 import { seaForgeCall } from "../src/adapters/sea-forge-approvals.ts";
 import { reasonOf } from "../src/adapters/sea-forge-case.ts";
@@ -99,7 +100,14 @@ export interface RecordsPort {
   openRun(questionId: string): Promise<string>;
   ingest(runId: string, events: readonly AgentEventLine[]): Promise<void>;
 }
+/** The workshop agent part: how to reach the workshop, where the setup's horizon.toml is, and where the demo workspace folder goes. */
+export interface WorkshopPort {
+  readonly access: () => Access;
+  readonly configPath: string;
+  readonly root: string;
+}
 export interface Ports {
+  readonly workshop?: WorkshopPort;
   readonly keeper: KeeperPort;
   readonly templates: TemplatePort;
   readonly github: GithubPort;
@@ -200,6 +208,136 @@ export interface Part {
   readonly name: string;
   readonly present: boolean;
   readonly detail: string;
+  /** Not checked, and not counted as missing (for example the workshop is not connected). */
+  readonly skipped?: boolean;
+}
+
+// ---------------------------------------------------------------------------------------------------- the workshop agent
+
+const DEMO_EXPERT = "horizon-demo-helper";
+const NOT_CONNECTED = "skipped: agent work is not connected (Connect Horizon in the workshop's Settings > Governance & evidence first)";
+const KEYS = ["expert_id", "workspace_id"] as const;
+
+/** The line range of the `[workshop]` table in the text (header excluded), or null. */
+function workshopRange(lines: readonly string[]): { start: number; end: number } | null {
+  const header = lines.findIndex((l) => /^\s*\[workshop\]\s*(#.*)?$/.test(l));
+  if (header < 0) return null;
+  let end = lines.length;
+  for (let i = header + 1; i < lines.length; i++) if (/^\s*\[/.test(lines[i]!)) { end = i; break; }
+  return { start: header + 1, end };
+}
+const keyLine = (key: string) => new RegExp(`^\\s*${key}\\s*=`);
+
+/** Sets the two lines in `[workshop]`; every other byte stays. Returns the same text when nothing changes. */
+export function setWorkshopIds(text: string, ids: { expert_id: string; workspace_id: string }): string {
+  const lines = text.split("\n");
+  const range = workshopRange(lines);
+  if (range === null) throw new SeedRefused("horizon.toml has no [workshop] section, so the agent cannot be recorded there.");
+  for (const key of KEYS) {
+    const want = `${key} = ${JSON.stringify(ids[key])}`;
+    const r = workshopRange(lines)!;
+    const at = lines.findIndex((l, i) => i >= r.start && i < r.end && keyLine(key).test(l));
+    if (at >= 0) {
+      if (lines[at]!.trim() !== want) lines[at] = want;
+    } else {
+      let last = r.end - 1;
+      while (last >= r.start && lines[last]!.trim() === "") last--;
+      lines.splice(Math.max(last, r.start - 1) + 1, 0, want);
+    }
+  }
+  return lines.join("\n");
+}
+
+/** Removes the two lines from `[workshop]`; every other byte stays. */
+export function clearWorkshopIds(text: string): string {
+  const lines = text.split("\n");
+  const range = workshopRange(lines);
+  if (range === null) return text;
+  return lines.filter((l, i) => !(i >= range.start && i < range.end && KEYS.some((k) => keyLine(k).test(l)))).join("\n");
+}
+
+function workshopIdsIn(text: string): { expert_id?: string; workspace_id?: string } {
+  const lines = text.split("\n");
+  const range = workshopRange(lines);
+  const found: Record<string, string> = {};
+  if (range === null) return found;
+  for (const key of KEYS) {
+    const line = lines.slice(range.start, range.end).find((l) => keyLine(key).test(l));
+    const m = line?.match(/=\s*"([^"]*)"/);
+    if (m) found[key] = m[1]!;
+  }
+  return found;
+}
+
+const wordsOf = (error: unknown): string => {
+  const outcome = workshopFailure(error, { write: false });
+  return outcome.kind === "ok" ? "" : outcome.words;
+};
+
+async function withTimeout<T>(work: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([work, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("__slow__")), DEFAULT_WORKSHOP_TIMEOUT_MS); })]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The workshop agent part for seed-status, or null when this run has no workshop port. */
+export function workshopPart(ctx: Context): Part | null {
+  const w = ctx.ports.workshop;
+  if (w === undefined) return null;
+  if (w.access().kind !== "ready") return { name: "workshop agent", present: false, detail: NOT_CONNECTED, skipped: true };
+  const ids = existsSync(w.configPath) ? workshopIdsIn(readFileSync(w.configPath, "utf8")) : {};
+  const ok = ids.expert_id === DEMO_EXPERT && !!ids.workspace_id;
+  return { name: "workshop agent", present: ok, detail: ok ? `${DEMO_EXPERT} in workspace ${ids.workspace_id}` : "not recorded in horizon.toml" };
+}
+
+export async function seedWorkshop(ctx: Context): Promise<void> {
+  const port = ctx.ports.workshop;
+  if (port === undefined) return;
+  const access = port.access();
+  if (access.kind !== "ready") {
+    ctx.io.out(`  workshop agent: ${NOT_CONNECTED}`);
+    return;
+  }
+  const folder = join(port.root, "workbench-demo-workspace", "demo-1");
+  try {
+    mkdirSync(folder, { recursive: true });
+    const selected = (await withTimeout(access.client.invoke("workspace.select", { path: folder }))) as { workspaceId?: unknown } | null;
+    const workspaceId = typeof selected?.workspaceId === "string" && selected.workspaceId !== "" ? selected.workspaceId : createHash("sha256").update(`local\u0000${resolve(folder)}`).digest("hex").slice(0, 16);
+    await withTimeout(access.client.invoke("expert.save", { expertId: DEMO_EXPERT, name: "Horizon demo helper", specialization: "Small written tasks", instructions: "Do the step you are given and report briefly." }));
+    const before = readFileSync(port.configPath, "utf8");
+    const after = setWorkshopIds(before, { expert_id: DEMO_EXPERT, workspace_id: workspaceId });
+    if (after !== before) writeFileSync(port.configPath, after);
+    ctx.io.out(`  workshop agent: ${after === before ? "already set up" : `set up "Horizon demo helper" with the workspace ${folder} and recorded both in horizon.toml`}`);
+    ctx.io.out("  workshop agent: restart the desk so it picks up the new settings.");
+    ctx.io.out("  workshop agent: the workshop needs a model set (workshop Settings > Models) before an agent can run.");
+  } catch (error) {
+    if (error instanceof SeedRefused) throw error;
+    ctx.io.out(`  workshop agent: not set up. ${wordsOf(error)} Nothing was written to horizon.toml.`);
+  }
+}
+
+/** Archives the demo agent (when the workshop answers) and removes the two lines from `[workshop]`. The workspace folder is left to setup-clear. */
+export async function clearWorkshop(port: WorkshopPort, io: IO): Promise<void> {
+  const access = port.access();
+  if (access.kind !== "ready") io.out(`  workshop agent: the workshop is not connected, so the agent was not archived there.`);
+  else {
+    try {
+      await withTimeout(access.client.invoke("expert.archive", { expertId: DEMO_EXPERT }));
+      io.out("  workshop agent: archived Horizon demo helper in the workshop.");
+    } catch (error) {
+      io.out(`  workshop agent: could not archive it in the workshop. ${wordsOf(error)} Continuing.`);
+    }
+  }
+  if (!existsSync(port.configPath)) return;
+  const before = readFileSync(port.configPath, "utf8");
+  const after = clearWorkshopIds(before);
+  if (after !== before) {
+    writeFileSync(port.configPath, after);
+    io.out("  workshop agent: removed expert_id and workspace_id from horizon.toml.");
+  }
 }
 
 async function ensureCase(ctx: Context, seeded: SeedCase): Promise<string> {
@@ -351,6 +489,7 @@ export async function seed(ctx: Context): Promise<{ cases: Map<string, string>; 
   await seedRecords(ctx);
   await seedNotes(ctx, cases);
   await seedLabels(ctx);
+  await seedWorkshop(ctx);
   ctx.io.out("Done. Running it again changes nothing.");
   return { cases, issue };
 }
@@ -407,13 +546,15 @@ export async function status(ctx: Context): Promise<Part[]> {
     return session !== undefined && labels.some((x) => x.session_id === session.session_id && x.event_id === session.event_id && x.verdict === l.verdict);
   }).length;
   add("labels", labelled === LABELS.length, `${labelled} of ${LABELS.length}`);
+  const w = workshopPart(ctx);
+  if (w !== null) parts.push(w);
   return parts;
 }
 
 export function printStatus(parts: readonly Part[], io: IO): void {
   io.out("Seed status (test setup):");
-  for (const p of parts) io.out(`  ${p.present ? "present" : "MISSING"}  ${p.name}${p.detail ? `  ${p.detail}` : ""}`);
-  const missing = parts.filter((p) => !p.present).length;
+  for (const p of parts) io.out(`  ${p.skipped ? "skipped" : p.present ? "present" : "MISSING"}  ${p.name}${p.detail ? `  ${p.detail}` : ""}`);
+  const missing = parts.filter((p) => !p.present && !p.skipped).length;
   io.out(missing === 0 ? `All ${parts.length} parts are present.` : `${missing} of ${parts.length} parts are missing. Run: just seed`);
 }
 
@@ -426,6 +567,8 @@ export interface ClearDeps {
   readonly running: (mapping: SetupMapping, env: Record<string, string | undefined>) => Promise<string[]>;
   /** The line the person typed. */
   readonly ask: (question: string) => Promise<string>;
+  /** The workshop agent part, removed before the clear. Absent: skipped. */
+  readonly workshop?: (mapping: SetupMapping, env: Record<string, string | undefined>) => WorkshopPort | undefined;
 }
 
 function probe(options: net.NetConnectOpts): Promise<boolean> {
@@ -460,7 +603,7 @@ const liveAsk = (question: string): Promise<string> =>
     rl.once("close", () => done(""));
   });
 
-export const liveClearDeps: ClearDeps = { clear: setupClear, init: setupInit, running: liveRunning, ask: liveAsk };
+export const liveClearDeps: ClearDeps = { clear: setupClear, init: setupInit, running: liveRunning, ask: liveAsk, workshop: (mapping, env) => { try { return liveWorkshop(mapping, env); } catch { return undefined; } } };
 
 /** Clears the test setup (never production, never the personal record), then sets it up empty again. */
 export async function clearTestSetup(args: readonly string[], env: Record<string, string | undefined>, io: IO, deps: ClearDeps = liveClearDeps): Promise<number> {
@@ -493,6 +636,8 @@ export async function clearTestSetup(args: readonly string[], env: Record<string
       return 1;
     }
   }
+  const workshop = deps.workshop?.(mapping, env);
+  if (workshop !== undefined) await clearWorkshop(workshop, io);
   const cleared = deps.clear(["--setup", "testing", "--yes"], env, io.out, io.err);
   if (cleared !== 0) {
     io.err("seed-clear: the clear did not finish (see above). The test setup may be partly cleared. Fix the cause, then run it again.");
@@ -689,6 +834,14 @@ export function recordsPort(mapping: SetupMapping, env: Record<string, string | 
   };
 }
 
+function liveWorkshop(mapping: SetupMapping, env: Record<string, string | undefined>): WorkshopPort | undefined {
+  const configPath = env.HORIZON_CONFIG?.trim() || mapping.config;
+  if (!inside(mapping.root, configPath)) return undefined;
+  const config = configFromDocument(Bun.TOML.parse(readFileSync(configPath, "utf8")));
+  const caller = { actor: operatorPrincipal(config), tenant: setupTenant("testing", hostname()) } as unknown as Parameters<typeof workshopAccess>[1];
+  return { configPath, root: mapping.root, access: () => workshopAccess(config.workshop, caller) };
+}
+
 export function livePorts(mapping: SetupMapping, env: Record<string, string | undefined>): { ports: Ports; who: Who; timeZone: string } {
   const configPath = env.HORIZON_CONFIG?.trim() || mapping.config;
   if (!inside(mapping.root, configPath)) throw new SeedRefused(`HORIZON_CONFIG ${configPath} is outside the test setup.`);
@@ -698,6 +851,7 @@ export function livePorts(mapping: SetupMapping, env: Record<string, string | un
   if (!existsSync(mapping.cell)) throw new SeedRefused(`${mapping.cell} does not exist. Start the test setup once (docs: start procedure), then seed.`);
   return {
     ports: {
+      workshop: liveWorkshop(mapping, env),
       keeper: keeperPort(env.SEA_FORGE_SOCKET?.trim() || mapping.socket),
       templates: templatePort(mapping.cell),
       github: githubPort(mapping.root, env),
