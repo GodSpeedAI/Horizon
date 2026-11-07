@@ -14,16 +14,25 @@ function inside(root: string, path: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
-/** Every entry under `root`, without following symlinks. Throws if any resolves outside the real root. */
+/**
+ * Every entry under `root`, without following symlinks. A link is listed and later removed as a link: the remove never
+ * follows it, so whatever it points at (inside or outside the root, or nothing) is left alone. The workshop makes such links.
+ * Any other entry that resolves outside the real root is refused.
+ */
 export function planPaths(root: string): string[] {
   const realRoot = realpathSync(root);
   const found: string[] = [];
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir)) {
       const full = join(dir, entry);
+      const stat = lstatSync(full);
+      if (stat.isSymbolicLink()) {
+        found.push(`${full} (link; only the link is removed)`);
+        continue;
+      }
       if (!inside(realRoot, realpathSync(full))) throw new Error(`${full} resolves outside ${realRoot}`);
       found.push(full);
-      if (lstatSync(full).isDirectory()) walk(full);
+      if (stat.isDirectory()) walk(full);
     }
   };
   walk(root);

@@ -143,18 +143,22 @@ describe("setup-clear", () => {
     expect(gh.calls()).toEqual([]);
   });
 
-  test("setup-clear refuses a path outside the root", async () => {
+  test("setup-clear removes a link that points outside the root, never what it points at", async () => {
     await capture(runInit, ["--setup", "testing"]);
     const outside = join(tmp, "outside");
     mkdirSync(outside);
     writeFileSync(join(outside, "keep.txt"), "keep");
     symlinkSync(outside, join(testing().exports, "escape"));
-    const result = await capture(runClear, ["--setup", "testing", "--yes"]);
-    expect(result.code).toBe(1);
-    expect(result.err).toContain("outside");
-    expect(readFileSync(join(outside, "keep.txt"), "utf8")).toBe("keep");
+    symlinkSync(join(outside, "keep.txt"), join(testing().exports, "file-link"));
+    symlinkSync(join(tmp, "gone"), join(testing().exports, "broken-link"));
+    const listed = await capture(runClear, ["--setup", "testing"]);
+    expect(listed.out).toContain("escape (link; only the link is removed)");
     expect(existsSync(testing().root)).toBe(true);
-    expect(gh.calls()).toEqual([]);
+    const result = await capture(runClear, ["--setup", "testing", "--yes"]);
+    expect(result.code).toBe(0);
+    expect(existsSync(testing().root)).toBe(false);
+    expect(readdirSync(outside)).toEqual(["keep.txt"]);
+    expect(readFileSync(join(outside, "keep.txt"), "utf8")).toBe("keep");
   });
 
   test("setup-clear refuses a root that is itself a symlink out of the setups folder", async () => {
