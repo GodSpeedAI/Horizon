@@ -69,7 +69,8 @@ function fakeKeeper() {
           const item = request.item as { plan_item_id: string; name: string };
           cases.find((c) => c.case_id === request.case_id)!.items.push({ plan_item_id: item.plan_item_id, name: item.name, execution: "active", settlement: "unsettled", ...(options?.asOperator ? {} : { proposed_by: "cognate-service" }) });
           reply = { ok: true, case_id: request.case_id, plan_item_id: item.plan_item_id };
-        } else return { ok: false, error_class: "unknown_verb", error: String(verb) };
+        } else if (verb === "case_advance") reply = { ok: true, case_id: request.case_id };
+        else return { ok: false, error_class: "unknown_verb", error: String(verb) };
         if (request_id) replies.set(request_id, reply);
         return reply;
       },
@@ -240,6 +241,11 @@ describe("seed", () => {
     expect(by["propose:seed-r1:rollback_note"]).toBe(false);
     expect(by["handoff:seed-3f6c1a52-8d0b-4e7a-9a41-5b2d7c9e1f10"]).toBe(true);
     expect(by["github:GodSpeedAI/horizon-sandbox#1"]).toBe(true);
+    // The triage case is advanced once, under a fixed id, after the steps are added.
+    const advances = r.keeper.sent.filter((v) => v.verb === "case_advance");
+    expect(advances.length).toBeGreaterThan(0);
+    expect(new Set(advances.map((a) => a.request_id)).size).toBe(1);
+    expect(advances[0]!.request_id).toMatch(/^advance:seed:case_fake_\d+:3$/);
   });
 
   test("seed-status reports each part", async () => {

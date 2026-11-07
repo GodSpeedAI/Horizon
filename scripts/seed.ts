@@ -40,7 +40,8 @@ import {
 } from "./seed-data/data.ts";
 
 const here = dirname(import.meta.path);
-const POLICY_RULE = "  - { name: seed-operator-adds-steps, verdict: allow, actor_role: operator, operation_kind: discretionary_task_add }";
+// Fallback only: ignite now writes this rule. This covers cells written before that change.
+const POLICY_RULE = "  - { name: operator-adds-steps, verdict: allow, actor_role: operator, operation_kind: discretionary_task_add }";
 
 /** A refusal: said in words, exit 1, nothing written. */
 export class SeedRefused extends Error {
@@ -339,6 +340,9 @@ export async function seed(ctx: Context): Promise<{ cases: Map<string, string>; 
   ctx.io.out(`  hand off step: ${HANDOFF.request_id}`);
   await addStep(ctx, triage, PROPOSAL.item, PROPOSAL.request_id, false);
   ctx.io.out(`  agent proposal step: ${PROPOSAL.request_id}`);
+  // An added step stays pending until the case is advanced. The id is fixed, so a second run replays and changes nothing.
+  await keeperOk(ctx, { verb: "case_advance", case_id: triage, policy: POLICY, request_id: `advance:seed:${triage}:3` }, true);
+  ctx.io.out("  triage case advanced: the added steps are started");
   await seedRecords(ctx);
   await seedNotes(ctx, cases);
   await seedLabels(ctx);
