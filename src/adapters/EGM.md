@@ -69,6 +69,9 @@ Two shapes are used consistently. Read adapters return a closed, typed observati
   Unix socket `[sea-forge-wire.ts:seaForgeCall]`. Only for the verbs the SDK client does not carry (the case
   keeper's `case_*`/`human_task_*`, the ledger reads, the event follower in `sea-forge-events.ts`); governance verbs
   never use it. `scripts/check-boundaries.ts` lets exactly these two files open the socket.
+  These two (`sea-forge-wire.ts`, `sea-forge-events.ts`) make raw calls only for case steps, human tasks and the
+  event stream, which the Cognate SDK does not offer yet; move them to the SDK once it does. Every approval and
+  governance call goes through the SDK.
 - `settlement.ts`: `realityTraceFromEnv(env, repoDir)`, `defaultRealityTraceRepo(storePath)`,
   `observationOutbox(capability)`, `RealityTraceEvidence` (`observe`, `evidenceFor`, `packet`),
   `authorityOf(invocation)`, and `SettlementAuthority = Pick<SeaForgeAuthority, "submitEvidence" |

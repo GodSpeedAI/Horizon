@@ -151,10 +151,10 @@ const WIRE_TEETH: readonly { name: string; pattern: RegExp }[] = [
 ];
 
 /**
- * The two files that may open the SEA-Forge socket themselves: the desk's case-keeper call and its event
- * follower. The SDK client has no `case_*` verbs and no event stream, so these are not governance verbs; every
- * authority verb (decide, approvals, closure, settle) still goes through the SDK client, and the teeth below
- * still reject a socket anywhere else under src/.
+ * Two named exceptions, decided by the operator. These two files make raw socket calls only for case steps,
+ * human tasks and the event stream, which the Cognate SDK does not offer yet. Move them to the SDK once it does.
+ * Every approval and governance call goes through the SDK client, and any other file under src/ that opens
+ * the socket still fails this check (proved by scripts/teeth-inv2-mutation.ts).
  */
 const WIRE_ALLOWED: ReadonlySet<string> = new Set(["src/adapters/sea-forge-wire.ts", "src/adapters/sea-forge-events.ts"]);
 
