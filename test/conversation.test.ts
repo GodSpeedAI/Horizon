@@ -161,12 +161,15 @@ describe("rows from each desk operation", () => {
     expect(panels[0]!.status).toBe("waiting");
     const answered = await post("/desk/panels/op", { op: "human.answer", panel: "plan", ask: "a1", outcome: "answered", value: "x" });
     expect(answered.status).toBe(200);
-    expect((await rows()).at(-1)).toMatchObject({ kind: "answer", source: "you", words: "You answered: x", status: "waiting", refs: { panel_id: "plan", ask_id: "a1" } });
+    expect((await rows()).at(-1)).toMatchObject({ kind: "answer", source: "you", words: "You answered: X", outcome: "Waiting for the agent to say where it went", status: "waiting", refs: { panel_id: "plan", ask_id: "a1" } });
     const short = await app.application.applyAgentOp({ tool: "answer.route", panel_id: "plan", ask_id: "a1", routed_as: "no" });
     expect(short.ok).toBe(false);
     const routed = await app.application.applyAgentOp({ tool: "answer.route", panel_id: "plan", ask_id: "a1", routed_as: "step handoff_0a49 in Seed: triage inbox" });
     expect(routed.ok).toBe(true);
-    expect((await rows()).at(-1)).toMatchObject({ kind: "answer", source: "agent", outcome: "The agent took it to: step handoff_0a49 in Seed: triage inbox" });
+    const answerRows = (await rows()).filter((r) => r.kind === "answer");
+    expect(answerRows).toHaveLength(1);
+    expect(answerRows[0]).toMatchObject({ words: "You answered: X", status: "done", outcome: "The agent took it to: step handoff_0a49 in Seed: triage inbox" });
+    expect((await rows()).find((r) => r.kind === "panel")!.status).toBe("done");
   });
 });
 

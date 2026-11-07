@@ -1,5 +1,5 @@
 import { reconcilePending } from "./capabilities/pending-reconcile.ts";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createIdentityService, type IdentityService } from "@godspeed/identity";
 import { delegatingAuthority, delegationSender } from "./adapters/delegating-authority.ts";
@@ -81,8 +81,8 @@ import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type Debugger
 import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare.tsx";
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
 import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
-import { appendRow, discardRow, listConversation, settleDraftRow } from "./capabilities/conversation.ts";
-import { cleanAgentName, type RowSource } from "./ui/desk/conversation-model.ts";
+import { answerRowOf, appendRow, discardRow, listConversation, panelRowOf, settleDraftRow, updateRow } from "./capabilities/conversation.ts";
+import { answerEcho, cleanAgentName, WAITING_FOR_AGENT, type RowSource } from "./ui/desk/conversation-model.ts";
 import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
 import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
@@ -1805,24 +1805,92 @@ export async function createApplication(
   // ---- Stage 4: panels from agents. The open panels are held here; the person's answers are kept in `horizon-panel-answers`. ----
   let panelBoard: PanelsBoard = NO_PANELS;
 
-  /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`). To choose parts well an agent reads `GET /desk/panels/catalogue`. A reply on a panel clears the wait on the answers given there. */
-  async function applyAgentOp(op: AgentOp): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
+  /** The question's own words and the open-question test for one panel, from the board. */
+  const askOf = (panelId: string, askId: string): { readonly question: string } | null => {
+    const q = panelBoard.open.find((p) => p.id === panelId)?.blocks.find((b) => b.kind === "question" && b.id === askId) as { question?: string } | undefined;
+    return q === undefined ? null : { question: q.question ?? "" };
+  };
+  const stillAsking = (panelId: string): boolean => (panelBoard.open.find((p) => p.id === panelId)?.blocks ?? []).some((b) => { const q = b as unknown as { kind?: string; answered?: unknown; withdrawn?: unknown }; return q.kind === "question" && q.answered == null && q.withdrawn == null; });
+  /** The panel's own conversation entry follows the panel: "Waiting for you" only while a question is open. */
+  async function settlePanelRow(panelId: string, outcome: string): Promise<void> {
+    try {
+      const row = await panelRowOf(runtime.runtime.store, deskWho, panelId);
+      if (row === undefined) return;
+      await updateRow(runtime.runtime.store, deskWho, row.row_id, stillAsking(panelId) ? { status: "waiting", outcome: "An agent asks you a question." } : { status: "done", outcome });
+    } catch {
+      // The record is a read model.
+    }
+  }
+
+  /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`, `ask.withdraw`, `answer.route`). To choose parts well an agent reads `GET /desk/panels/catalogue`. A reply on a panel clears the wait on the answers given there. */
+  async function applyAgentOp(op: AgentOp, agentName?: string): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
     if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied) };
     // Only the agent saying where an answer went closes it; nothing else counts as a reply.
     if (op.tool === "answer.route") {
       const routed = await routeAnswer(runtime.runtime.store, caller.tenant, op.panel_id, op.ask_id, op.routed_as);
       if (!routed.ok) return { ok: false, code: "SCHEMA", message: routed.message };
     }
+    const question = op.tool === "answer.route" || op.tool === "ask.withdraw" ? askOf(op.panel_id, op.ask_id)?.question ?? null : null;
     const { state, result } = reduceAgent(panelBoard, op);
     if (!result.ok) return result;
     panelBoard = state;
-    if (op.tool === "answer.route") await logRow({ source: "agent", kind: "answer", words: `Your answer to ${op.ask_id}`, outcome: `The agent took it to: ${op.routed_as.trim()}`, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id } });
+    const by = agentName === undefined ? {} : { agent_name: agentName };
+    if (op.tool === "answer.route") {
+      const where = `The agent took it to: ${op.routed_as.trim()}`;
+      // One entry per answer: the one made when you answered is finished in place.
+      const mine = await answerRowOf(runtime.runtime.store, deskWho, op.panel_id, op.ask_id);
+      await logRow({ source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id } });
+      await settlePanelRow(op.panel_id, "You answered. The agent has taken it on.");
+    }
+    if (op.tool === "ask.withdraw") {
+      const why = `The agent withdrew this question: ${op.reason.trim()}`;
+      const mine = await answerRowOf(runtime.runtime.store, deskWho, op.panel_id, op.ask_id);
+      if (mine !== undefined) await logRow({ source: "you", kind: "answer", words: mine.words, outcome: why, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id } });
+      await settlePanelRow(op.panel_id, why);
+    }
     if (result.panel !== null && (op.tool === "show_surface" || op.tool === "ask_human")) {
       const panel = panelBoard.open.find((p) => p.id === result.panel);
-      const asking = (panel?.blocks ?? []).some((b) => { const q = b as unknown as { kind?: string; answered?: unknown; withdrawn?: unknown }; return q.kind === "question" && q.answered == null && q.withdrawn == null; });
-      await logRow({ source: "agent", kind: "panel", words: panel?.title ?? result.panel, outcome: asking ? "An agent asks you a question." : "An agent put this up.", status: asking ? "waiting" : "done", refs: { panel_id: result.panel, ...(panel?.step ? { step_id: panel.step } : {}) } });
+      const asking = stillAsking(result.panel);
+      await logRow({ source: "agent", ...by, kind: "panel", words: panel?.title ?? result.panel, outcome: asking ? "An agent asks you a question." : "An agent put this up.", status: asking ? "waiting" : "done", refs: { panel_id: result.panel, ...(panel?.step ? { step_id: panel.step } : {}) } });
     }
     return result;
+  }
+
+  /**
+   * The agents' door for panels: `POST /agent/panels` (one AgentOp), `GET /agent/panels/answers`, `GET /agent/panels/catalogue`.
+   * It needs `Authorization: Bearer <the launch key>`: the key Horizon writes (mode 0600) to its secrets file at every start.
+   * The page-agent header is not a key and is refused here. Only agent tools pass; the person's operations never do.
+   */
+  const AGENT_TOOLS = ["show_surface", "ask_human", "arrange", "annotate", "read_responses", "ask.withdraw", "answer.route"] as const;
+  async function agentDoor(request: Request, pathname: string): Promise<Response> {
+    const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
+    const refuse = (status: number, message: string): Response => Response.json({ ok: false, message }, { status, headers });
+    const given = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
+    const a = Buffer.from(given);
+    const b = Buffer.from(loaded.launchSecret);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return refuse(401, "This door needs the agent key. Send it as: Authorization: Bearer <key>. The key is in Horizon's secrets file.");
+    if (pageAgentOf(request) !== null) return refuse(403, "An agent on the page cannot use this door.");
+    const name = cleanAgentName(request.headers.get("x-horizon-agent-name"));
+    if (pathname === "/agent/panels/catalogue" && request.method === "GET") return Response.json({ schema: SURFACE_SCHEMA, vocabulary: vocabulary(), blocks: CATALOGUE }, { headers });
+    if (pathname === "/agent/panels/answers" && request.method === "GET") {
+      const done = await applyAgentOp({ tool: "read_responses" }, name);
+      return Response.json({ ok: true, responses: done.ok ? done.responses ?? [] : [] }, { headers });
+    }
+    if (pathname !== "/agent/panels" || request.method !== "POST") return refuse(404, "There is nothing at this address. Use POST /agent/panels, GET /agent/panels/answers or GET /agent/panels/catalogue.");
+    const text = await request.text();
+    if (text.length > 500_000) return refuse(413, "That is too large. Send a smaller panel.");
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return refuse(400, "That could not be read as JSON. Nothing was changed.");
+    }
+    const op = body as Record<string, unknown> | null;
+    if (op === null || typeof op !== "object" || Array.isArray(op)) return refuse(400, "Send one object with a \"tool\" field. Nothing was changed.");
+    if (typeof op.op === "string" && op.op.startsWith("human.")) return refuse(403, "Only the person can do that. An agent cannot answer, pin, close or open a panel for them.");
+    if (typeof op.tool !== "string" || !(AGENT_TOOLS as readonly string[]).includes(op.tool)) return refuse(400, `Say which tool: ${AGENT_TOOLS.join(", ")}. Nothing was changed.`);
+    const done = await applyAgentOp(op as unknown as AgentOp, name);
+    return done.ok ? Response.json(done, { headers }) : Response.json(done, { status: done.code === "NOT_FOUND" ? 404 : 400, headers });
   }
 
   /** The person's operations on panels: answer, pin, close, open, and stop waiting for an agent's reply. */
@@ -1848,7 +1916,7 @@ export async function createApplication(
       const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note });
       if (!result.ok) return fail(409, result.message);
       // Store what the question accepted (a text answer is trimmed), not the raw body.
-      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string }[] } | undefined;
+      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string }[] } | undefined;
       const checked = outcome === "answered" && askBlock !== undefined ? answerFor({ input: askBlock.input ?? "select", options: askBlock.options }, value.value) : null;
       if (checked !== null && !checked.ok) return fail(400, checked.message);
       const stored = checked !== null && checked.ok ? checked.value : value.value;
@@ -1859,8 +1927,8 @@ export async function createApplication(
       }
       panelBoard = state;
       const sentWords = outcome === "answered" ? "Sent. Waiting for the agent to say where it went." : outcome === "deferred" ? "Put off. Waiting for the agent to say where it went." : "Cancelled. Waiting for the agent to say where it went.";
-      const shownValue = Array.isArray(stored) ? stored.join(", ") : typeof stored === "boolean" ? (stored ? "Yes" : "No") : String(stored ?? "");
-      await logRow({ source: "you", kind: "answer", words: outcome === "answered" ? `You answered: ${shownValue.slice(0, 200)}` : outcome === "deferred" ? "You put this off." : "You skipped this.", outcome: sentWords, status: "waiting", refs: { panel_id: body.panel, ask_id: body.ask, ...(step ? { step_id: step } : {}) } });
+      await logRow({ source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: WAITING_FOR_AGENT, status: "waiting", refs: { panel_id: body.panel, ask_id: body.ask, ...(step ? { step_id: step } : {}) } });
+      await settlePanelRow(body.panel, "You answered. Waiting for the agent to say where it went.");
       return Response.json({ ok: true, message: sentWords }, { headers });
     }
     const op: HumanOp | null =
@@ -2132,6 +2200,7 @@ export async function createApplication(
           // state-changing routes also check Origin and Sec-Fetch-Site (cross-site POSTs).
           const refused = crossSiteRefusal(request, server.port ?? port, request.method !== "POST");
           if (refused !== null) return refused;
+          if (url.pathname.startsWith("/agent/panels")) return agentDoor(request, url.pathname);
           // An agent on the page may read, find, inspect and preview a hand off. Every other write is the person's alone.
           const page = pageAgentOf(request);
           if (page !== null) {

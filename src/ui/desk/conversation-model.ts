@@ -70,6 +70,26 @@ export function windowOf(rows: readonly ConversationRow[]): ConversationRow[] {
 export const panelRowFor = (rows: readonly ConversationRow[], row: Pick<ConversationRow, "kind" | "refs">): ConversationRow | undefined =>
   row.kind === "panel" && row.refs.panel_id !== undefined ? rows.find((r) => r.kind === "panel" && r.refs.panel_id === row.refs.panel_id) : undefined;
 
+/** The one row for an answer: a second answer to the same question (or the agent's reply) updates it, never adds another. */
+export const answerRowFor = (rows: readonly ConversationRow[], row: Pick<ConversationRow, "kind" | "refs">): ConversationRow | undefined =>
+  row.kind === "answer" && row.refs.panel_id !== undefined && row.refs.ask_id !== undefined ? rows.find((r) => r.kind === "answer" && r.refs.panel_id === row.refs.panel_id && r.refs.ask_id === row.refs.ask_id) : undefined;
+
+export const WAITING_FOR_AGENT = "Waiting for the agent to say where it went";
+const ECHO_MAX = 120;
+
+/** What the person said, in their question's own words: option labels, Yes or No, or their text (clipped). */
+export function answerEcho(ask: { readonly input?: string; readonly options: readonly { readonly option_id: string; readonly label: string }[] }, outcome: "answered" | "deferred" | "cancelled", value: unknown): string {
+  if (outcome === "deferred") return "You said not yet.";
+  if (outcome === "cancelled") return "You skipped this question.";
+  const label = (id: string): string => ask.options.find((o) => o.option_id === id)?.label ?? "your choice";
+  const shown = ask.input === "confirm" ? (value === true || value === "yes" ? "Yes" : "No")
+    : ask.input === "multiselect" ? (Array.isArray(value) ? value.map((v) => label(String(v))).join(", ") : label(String(value)))
+    : ask.input === "text" ? String(value ?? "")
+    : label(String(value));
+  const text = clean(shown, ECHO_MAX + 1);
+  return `You answered: ${text.length > ECHO_MAX ? `${text.slice(0, ECHO_MAX)}...` : text}`;
+}
+
 /** The waiting preview for one draft, which a later send (or a second preview) settles instead of adding another row. */
 export const waitingForDraft = (rows: readonly ConversationRow[], draftId: string): ConversationRow | undefined =>
   rows.find((r) => (r.kind === "handoff" || r.kind === "handoff-proposal") && r.status === "waiting" && r.refs.draft_id === draftId);

@@ -5,7 +5,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
-import { panelRowFor, reduceConversation, tidyRow, waitingForDraft, windowOf, type ConversationRow, type RowKind, type RowRefs, type RowSource, type RowStatus } from "../ui/desk/conversation-model.ts";
+import { answerRowFor, panelRowFor, reduceConversation, tidyRow, waitingForDraft, windowOf, type ConversationRow, type RowKind, type RowRefs, type RowSource, type RowStatus } from "../ui/desk/conversation-model.ts";
 import type { Who } from "./notes.ts";
 
 export const CONVERSATION_COLLECTION = "horizon-conversation";
@@ -52,9 +52,9 @@ export async function appendRow(store: DurableStore, who: Who, input: NewRow, no
   const at = now.toISOString();
   const fresh = tidyRow({ row_id: rowIdOf(), at, source: input.source, ...(input.agent_name === undefined ? {} : { agent_name: input.agent_name }), kind: input.kind, words: input.words, outcome: input.outcome, status: input.status, refs: input.refs ?? {} });
   const rows = await everyRow(store, who);
-  const same = panelRowFor(rows, fresh) ?? (fresh.refs.draft_id !== undefined && fresh.status === "waiting" ? waitingForDraft(rows, fresh.refs.draft_id) : undefined);
+  const same = panelRowFor(rows, fresh) ?? answerRowFor(rows, fresh) ?? (fresh.refs.draft_id !== undefined && fresh.status === "waiting" ? waitingForDraft(rows, fresh.refs.draft_id) : undefined);
   if (same !== undefined) {
-    const next = same.kind === "panel" ? reduceConversation([same], { type: "append", row: fresh })[0]! : { ...same, at, words: fresh.words, outcome: fresh.outcome, refs: { ...same.refs, ...fresh.refs } };
+    const next = same.kind === "answer" ? { ...same, words: fresh.words, outcome: fresh.outcome, status: fresh.status, refs: { ...same.refs, ...fresh.refs } } : same.kind === "panel" ? reduceConversation([same], { type: "append", row: fresh })[0]! : { ...same, at, words: fresh.words, outcome: fresh.outcome, refs: { ...same.refs, ...fresh.refs } };
     await put(store, who, next);
     return next;
   }
@@ -90,4 +90,12 @@ export async function discardRow(store: DurableStore, who: Who, rowId: string): 
   const row = fromRecord(found.value);
   if (row.status !== "waiting" || (row.kind !== "handoff" && row.kind !== "handoff-proposal")) return { ok: false, status: 409, message: "Only a suggestion that is still waiting can be discarded." };
   return { ok: true, row: (await updateRow(store, who, rowId, { status: "refused", outcome: "Discarded by you. Nothing was sent." }))! };
+}
+
+/** The panel's own row, if it has one, and the answer row for one question. */
+export async function panelRowOf(store: DurableStore, who: Who, panelId: string): Promise<ConversationRow | undefined> {
+  return panelRowFor(await everyRow(store, who), { kind: "panel", refs: { panel_id: panelId } });
+}
+export async function answerRowOf(store: DurableStore, who: Who, panelId: string, askId: string): Promise<ConversationRow | undefined> {
+  return answerRowFor(await everyRow(store, who), { kind: "answer", refs: { panel_id: panelId, ask_id: askId } });
 }
