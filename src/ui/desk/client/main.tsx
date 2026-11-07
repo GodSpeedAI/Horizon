@@ -37,6 +37,9 @@ function sendWriteToken(): void {
 }
 sendWriteToken();
 
+/** A move that was done but not recorded says so after its own words. */
+const withRecordNote = (message: string, body: { recorded?: boolean; recorded_words?: string }): string => (body.recorded === false && body.recorded_words ? `${message} ${body.recorded_words}` : message);
+
 function read<T>(key: string, fallback: T): T {
   try {
     const raw = window.localStorage.getItem(key);
@@ -333,11 +336,11 @@ function App() {
     decide: async (input) => {
       try {
         const response = await fetch("/desk/decide", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
-        const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string };
+        const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string; recorded?: boolean; recorded_words?: string };
         rev.current = "";
         void poll();
           void loadRows();
-        return { ok: response.ok && body.ok === true, message: withDetails(body.message ?? (response.ok ? "Done." : "Horizon could not send that decision. Nothing was done."), body.details) };
+        return { ok: response.ok && body.ok === true, message: withRecordNote(withDetails(body.message ?? (response.ok ? "Done." : "Horizon could not send that decision. Nothing was done."), body.details), body) };
       } catch {
         return { ok: false, message: "Horizon did not answer, so the decision may not have been sent. Check Decide before trying again." };
       }
@@ -378,11 +381,11 @@ function App() {
       answer: async (input) => {
         try {
           const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", ...input }) });
-          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; recorded?: boolean; recorded_words?: string };
           rev.current = "";
           void poll();
           void loadRows();
-          return { ok: response.ok && body.ok === true, message: body.message ?? (response.ok ? "Sent." : "The answer was not sent.") };
+          return { ok: response.ok && body.ok === true, message: withRecordNote(body.message ?? (response.ok ? "Sent." : "The answer was not sent."), body) };
         } catch {
           return { ok: false, message: "Horizon did not answer, so your answer may not have been sent." };
         }
@@ -437,11 +440,11 @@ function App() {
       send: async (input) => {
         try {
           const response = await fetch("/desk/handoff", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
-          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string; outcome?: string; draft_id?: string };
+          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string; outcome?: string; draft_id?: string; recorded?: boolean; recorded_words?: string };
           rev.current = "";
           void poll();
           void loadRows();
-          return response.ok && body.ok === true ? { ok: true, message: body.message ?? "Handed off.", draft_id: body.draft_id ?? "" } : { ok: false, outcome: body.outcome ?? "failed", message: withDetails(body.message ?? "The hand off was not sent. Nothing was done.", body.details) };
+          return response.ok && body.ok === true ? { ok: true, message: withRecordNote(body.message ?? "Handed off.", body), draft_id: body.draft_id ?? "" } : { ok: false, outcome: body.outcome ?? "failed", message: withDetails(body.message ?? "The hand off was not sent. Nothing was done.", body.details) };
         } catch {
           return { ok: false, outcome: "unreachable", message: "Horizon did not answer, so the hand off may not have been sent. Press Confirm again: the same request is never applied twice." };
         }
@@ -459,7 +462,7 @@ function App() {
     saveNote: async (input) => {
       try {
         const response = await fetch("/desk/note", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
-        const body = (await response.json()) as { ok: true; note: NoteView } | { ok: false; message?: string };
+        const body = (await response.json()) as { ok: true; note: NoteView; recorded?: boolean; recorded_words?: string } | { ok: false; message?: string };
         if (response.ok && body.ok) {
           rev.current = "";
           void poll();

@@ -1660,8 +1660,8 @@ export async function createApplication(
     const done = (await response.clone().json().catch(() => null)) as { ok?: boolean; message?: string; receipt?: string | null } | null;
     const verb = sent.choice === "hold" ? "Held" : sent.choice === "release" ? "Released" : sent.choice === "reject" ? "Rejected" : card.kind === "human_step" ? "Marked done" : "Accepted";
     const human = /^human:([^:]+):(.+)$/.exec(card.id);
-    await logRow({ source: "you", kind: "decision", words: `${verb}: ${card.title}`, outcome: done?.message ?? "", status: done?.ok === true ? "done" : "refused", refs: { ...(human ? { case_id: human[1]!, step_id: human[2]! } : {}), ...(typeof done?.receipt === "string" ? { intent_id: done.receipt } : {}) } });
-    return response;
+    const recorded = await logRow({ source: "you", kind: "decision", words: `${verb}: ${card.title}`, outcome: done?.message ?? "", status: done?.ok === true ? "done" : "refused", refs: { ...(human ? { case_id: human[1]!, step_id: human[2]! } : {}), ...(typeof done?.receipt === "string" ? { intent_id: done.receipt } : {}) } });
+    return withRecorded(response, recorded);
   }
 
   async function deskDecideCore(request: Request): Promise<Response> {
@@ -1999,9 +1999,9 @@ export async function createApplication(
       }
       panelBoard = state;
       const sentWords = outcome === "answered" ? "Sent. Waiting for the agent to say where it went." : outcome === "deferred" ? "Put off. Waiting for the agent to say where it went." : "Cancelled. Waiting for the agent to say where it went.";
-      await logRow({ source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: WAITING_FOR_AGENT, status: "waiting", refs: { panel_id: body.panel, ask_id: body.ask, ...(step ? { step_id: step } : {}) } });
+      const recorded = await logRow({ source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: WAITING_FOR_AGENT, status: "waiting", refs: { panel_id: body.panel, ask_id: body.ask, ...(step ? { step_id: step } : {}) } });
       await settlePanelRow(body.panel, "You answered. Waiting for the agent to say where it went.");
-      return Response.json({ ok: true, message: sentWords }, { headers });
+      return Response.json({ ok: true, message: sentWords, ...(recorded ? {} : { recorded: false, recorded_words: NOT_RECORDED_WORDS }) }, { headers });
     }
     const op: HumanOp | null =
       body.op === "human.pin" && typeof body.id === "string" && typeof body.pinned === "boolean" ? { op: "human.pin", id: body.id, pinned: body.pinned }
@@ -2086,18 +2086,20 @@ export async function createApplication(
     // The answer goes out with stand-ins when Presenting is on; the row keeps the real words and shows them the same way.
     const body = (await response.clone().json().catch(() => null)) as Record<string, any> | null;
     const outcomeWords = typeof body?.message === "string" ? body.message : "That did not work.";
+    let recorded = true;
     if (phase === "preview") {
-      if (response.ok && body?.preview) await logRow({ source, ...named, kind: page ? "handoff-proposal" : "handoff", words, outcome: page ? "An agent suggests this. Nothing is sent until you confirm." : "Preview ready. Nothing is sent until you confirm.", status: "waiting", refs: { case_id: String(body.preview.case_id), step_id: String(body.preview.step_id), draft_id: draftId } });
+      if (response.ok && body?.preview) recorded = await logRow({ source, ...named, kind: page ? "handoff-proposal" : "handoff", words, outcome: page ? "An agent suggests this. Nothing is sent until you confirm." : "Preview ready. Nothing is sent until you confirm.", status: "waiting", refs: { case_id: String(body.preview.case_id), step_id: String(body.preview.step_id), draft_id: draftId } });
       else if (!page && words !== "" && response.status !== 400) await logRow({ source, kind: "handoff", words, outcome: outcomeWords, status: "refused", refs: { draft_id: draftId } });
     } else if (words !== "" && draftId !== "" && !(response.status === 400)) {
       const ok = response.ok;
       try {
         await settleDraftRow(runtime.runtime.store, deskWho, draftId, ok ? "done" : "refused", outcomeWords, { source: "you", kind: "handoff", words, outcome: outcomeWords, status: ok ? "done" : "refused", refs: { ...(ok && typeof body?.step_id === "string" ? { step_id: body.step_id } : {}) } }, clock());
       } catch {
-        // The hand off already happened; a missing row is not hidden by failing the answer.
+        // The hand off already happened; the answer says the row is missing instead of failing.
+        recorded = false;
       }
     }
-    return response.ok && body !== null ? presentedJson(body, { "cache-control": "no-store" }) : response;
+    return response.ok && body !== null ? presentedJson(recorded ? body : { ...body, recorded: false, recorded_words: NOT_RECORDED_WORDS }, { "cache-control": "no-store" }) : response;
   }
 
   async function deskHandoffCore(request: Request, phase: "preview" | "send", raw = false): Promise<Response> {
@@ -2186,14 +2188,24 @@ export async function createApplication(
   }
 
   /** One conversation row. Never fails the move it describes: a row that could not be kept is only missing from the record. */
-  async function logRow(input: Parameters<typeof appendRow>[2]): Promise<void> {
+  async function logRow(input: Parameters<typeof appendRow>[2]): Promise<boolean> {
     try {
       await appendRow(runtime.runtime.store, deskWho, input, clock());
+      return true;
     } catch (error) {
       // The operation itself is already done or refused; the record is a read model. A failed
       // write is logged by its kind only, so the gap is visible to whoever runs the desk.
       console.error(`conversation: a row could not be recorded (${error instanceof Error ? error.name : "unknown error"})`);
+      return false;
     }
+  }
+
+  /** When the move was done but its row was not kept, the answer says so (`recorded: false`) in plain words, for the status line. */
+  async function withRecorded(response: Response, recorded: boolean): Promise<Response> {
+    if (recorded || !response.ok) return response;
+    const body = (await response.clone().json().catch(() => null)) as Record<string, unknown> | null;
+    if (body === null) return response;
+    return Response.json({ ...body, recorded: false, recorded_words: NOT_RECORDED_WORDS }, { status: response.status, headers: { "cache-control": "no-store" } });
   }
 
   async function deskSaveNote(request: Request): Promise<Response> {
@@ -2207,8 +2219,8 @@ export async function createApplication(
     }
     try {
       const note = await saveNote(runtime.runtime.store, { ...deskWho, input: body, now: clock(), timeZone: deskTimeZone });
-      await logRow({ source: "you", kind: "note", words: note.body, outcome: `Saved to ${note.day}.`, status: "done", refs: note.case_ref ? { case_id: note.case_ref } : {} });
-      return Response.json({ ok: true, note }, { headers: { "cache-control": "no-store" } });
+      const recorded = await logRow({ source: "you", kind: "note", words: note.body, outcome: `Saved to ${note.day}.`, status: "done", refs: note.case_ref ? { case_id: note.case_ref } : {} });
+      return Response.json({ ok: true, note, ...(recorded ? {} : { recorded: false, recorded_words: NOT_RECORDED_WORDS }) }, { headers: { "cache-control": "no-store" } });
     } catch (error) {
       if (error instanceof NoteRefused) await logRow({ source: "you", kind: "note", words: typeof (body as { body?: unknown } | null)?.body === "string" ? (body as { body: string }).body : "", outcome: error.message, status: "refused" });
       if (error instanceof NoteRefused) return Response.json({ ok: false, message: error.message }, { status: 400 });
@@ -2712,6 +2724,8 @@ export function pageAgentOf(request: Request): PageAgent | null {
   const name = cleanAgentName(request.headers.get("x-horizon-agent-name"));
   return name === undefined ? {} : { name };
 }
+
+export const NOT_RECORDED_WORDS = "This was done, but it could not be added to the conversation. Check the desk log.";
 
 /** Every route that writes as the person. Each one needs the desk page's write token. */
 export const HUMAN_WRITES: ReadonlySet<string> = new Set(["/desk/handoff", "/desk/handoff/preview", "/desk/decide", "/desk/note", "/desk/draft", "/desk/panels/op", "/desk/conversation/discard", "/desk/start", "/desk/lesson", "/intent", "/surface/intent"]);

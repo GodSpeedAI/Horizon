@@ -310,7 +310,7 @@ export function Composer({ ui, dispatch, io, request = null }: ComposerProps): R
     setBusy(false);
     if (result.ok) {
       dispatch({ type: "sent" });
-      notify("Saved.", true);
+      notify(result.recorded_words ? `Saved. ${result.recorded_words}` : "Saved.", true);
     } else notify(result.message);
   };
   const findWords = (words: string): void => {

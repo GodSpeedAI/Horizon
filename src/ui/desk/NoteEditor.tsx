@@ -9,7 +9,7 @@ import { timeLabel } from "./model.ts";
 import type { LinkKind } from "../../domain/note.ts";
 
 export interface NoteIo {
-  readonly saveNote: (input: { body: string; note_id?: string; tags?: string[]; case_ref?: string | null }) => Promise<{ ok: true; note: NoteView } | { ok: false; message: string }>;
+  readonly saveNote: (input: { body: string; note_id?: string; tags?: string[]; case_ref?: string | null }) => Promise<{ ok: true; note: NoteView; recorded_words?: string } | { ok: false; message: string }>;
 }
 
 const TOKEN = /\[\[(case|step|session|record|day|note):([^|\]]{1,300})\|([^\]]{0,200})\]\]/g;
