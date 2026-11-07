@@ -122,13 +122,17 @@ describe("no product names and no internal terms on screen", () => {
     scan("hand off, no case", draw({ ...START, data: base(), composer: { ...START.composer, mode: "handoff" } }));
     scan("hand off, typed", draw({ ...START, data: base({ cases: [keeperCase, { ...keeperCase, case_ref: "case:c2", purpose: "Ship the fix" }] }), composer: { ...START.composer, mode: "handoff", text: "Fix the checkout total" } }));
     const pv = { draft_id: "d", case_id: "c1", case_title: "Case started 2026-11-07", step_name: "Fix the checkout total", step_id: "s", check: "The case keeper checked this step against the case and it fits.", plan_precondition: { ref: "plan:c1", expected_digest: "sha256:1" }, agent: { offered: true, words: "An agent can take this step." } };
-    const card = (over: Partial<Parameters<typeof HandoffPreviewCard>[0]> = {}) => renderToStaticMarkup(<HandoffPreviewCard pv={pv} assign={false} outOfDate={false} busy={false} onAssign={() => undefined} onCancel={() => undefined} onConfirm={() => undefined} onRefresh={() => undefined} {...over} />);
+    const card = (over: Partial<Parameters<typeof HandoffPreviewCard>[0]> = {}) => renderToStaticMarkup(<HandoffPreviewCard pv={pv} assign={false} outOfDate={false} busy={false} onCancel={() => undefined} onConfirm={() => undefined} onRefresh={() => undefined} {...over} />);
     scan("hand off preview", card());
     scan("hand off preview, out of date", card({ outOfDate: true }));
     const notConnected = { ...pv, agent: { offered: false, words: "Agent work: Not connected. There is no access key yet. Make one in the workshop settings." } };
     scan("hand off preview, agent work not connected", card({ pv: notConnected }));
     expect(text(card({ pv: notConnected }))).toContain("Not connected");
     expect(card({ pv: notConnected })).not.toContain("checkbox");
+    // The card shows the agent choice as a fact, never as a control.
+    expect(card({ assign: true })).toContain("Yes, an agent will also take it");
+    expect(card({ assign: false })).toContain("No, it stays with you");
+    expect(card({ assign: true })).not.toContain("checkbox");
     // Run a review: the checkbox in the composer, the preview with finished work to choose, and with none to choose.
     scan("run a review, composer", draw({ ...START, data: base(), composer: { ...START.composer, mode: "handoff", text: "Check the rollback note" } }));
     const reviewPv = { ...pv, review: { reviewable: [{ step_id: "s0", name: "Draft the rollback note" }] } };

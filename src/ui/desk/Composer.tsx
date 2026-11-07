@@ -77,7 +77,6 @@ export interface HandoffPreviewCardProps {
   readonly assign: boolean;
   readonly outOfDate: boolean;
   readonly busy: boolean;
-  readonly onAssign: (on: boolean) => void;
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
   readonly onRefresh: () => void;
@@ -87,7 +86,7 @@ export interface HandoffPreviewCardProps {
 }
 
 /** What Hand off will add, before anything is sent. A changed case turns Confirm off and says "preview out of date". */
-export function HandoffPreviewCard({ pv, assign, outOfDate, busy, onAssign, onCancel, onConfirm, onRefresh, reviewStep = "", onReviewStep = () => undefined }: HandoffPreviewCardProps): ReactNode {
+export function HandoffPreviewCard({ pv, assign, outOfDate, busy, onCancel, onConfirm, onRefresh, reviewStep = "", onReviewStep = () => undefined }: HandoffPreviewCardProps): ReactNode {
   const confirmOff = busy || outOfDate || (pv.review != null && reviewStep === "");
   return (
     <section className="preview handoff-preview cv-card" aria-label="Hand off preview" data-stale={outOfDate ? "yes" : "no"}>
@@ -120,15 +119,7 @@ export function HandoffPreviewCard({ pv, assign, outOfDate, busy, onAssign, onCa
           </>
         ) : null}
         <dt>Agent</dt>
-        <dd>
-          {pv.agent.offered ? (
-            <label>
-              <input type="checkbox" checked={assign} onChange={(event) => onAssign(event.target.checked)} /> Also give this step to an agent
-            </label>
-          ) : (
-            pv.agent.words
-          )}
-        </dd>
+        <dd>{pv.agent.offered ? (assign ? "Yes, an agent will also take it" : "No, it stays with you") : pv.agent.words}</dd>
       </dl>
       {outOfDate ? (
         <p role="alert" className="error" data-out-of-date>
@@ -346,7 +337,7 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
   const sendLabel = mode === "write" ? "Save note" : mode === "find" ? "Find" : mode === "ask" ? "Ask" : "Preview hand off";
   const shownNotice = ui.notice !== null && ui.notice !== "" ? ui.notice : null;
   const statusText = busy ? "Sending…" : askBlocked ? "Ask is not connected: no reference library is set up." : hint ?? "Ready";
-  const stateWord = busy ? "Sending" : shownNotice !== null || (hint !== null && !askBlocked) ? "Needs attention" : askBlocked ? "Not connected" : "Ready";
+  const stateWord = MODE_LABEL[mode];
   const tone = busy ? "wait" : shownNotice !== null || (hint !== null && !askBlocked) || askBlocked ? "bad" : "ok";
   const tries = TRY[mode];
   const tryOut = (phrase: string): void => {
@@ -380,7 +371,6 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
                       assign={assign}
                       outOfDate={outOfDate}
                       busy={busy}
-                      onAssign={setAssign}
                       reviewStep={reviewStep}
                       onReviewStep={setReviewStep}
                       onCancel={() => {
@@ -459,7 +449,7 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
             )}
             {handoff && agentConnected ? (
               <label className="cv-chip cv-chip-check">
-                <input type="checkbox" checked={assign} onChange={(event) => setAssign(event.target.checked)} /> Also give to an agent
+                <input type="checkbox" checked={assign} onChange={(event) => setAssign(event.target.checked)} /> Also give this step to an agent
               </label>
             ) : null}
             {handoff ? (
