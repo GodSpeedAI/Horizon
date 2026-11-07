@@ -26,14 +26,15 @@
     "@godspeedai/cognate-protocol-connect-bun": "file:./.cognate/vendor/godspeedai-cognate-protocol-connect-bun-0.8.0.tgz",
     "@godspeedai/cognate-provider-local": "file:./.cognate/vendor/godspeedai-cognate-provider-local-0.8.0.tgz",
     "@godspeedai/cognate-react": "file:./.cognate/vendor/godspeedai-cognate-react-0.8.0.tgz",
+    "@godspeedai/cognate-realitytrace": "file:./.cognate/vendor/godspeedai-cognate-realitytrace-0.8.0.tgz",
     "@godspeedai/cognate-runtime-api": "file:./.cognate/vendor/godspeedai-cognate-runtime-api-0.8.0.tgz",
     "@godspeedai/cognate-runtime-bun": "file:./.cognate/vendor/godspeedai-cognate-runtime-bun-0.8.0.tgz",
+    "@mcp-b/webmcp-polyfill": "5.1.0",
     "@opentui/core": "0.5.12",
     "@opentui/react": "0.5.12",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "zod": "3.25.76",
-    "@godspeedai/cognate-realitytrace": "file:./.cognate/vendor/godspeedai-cognate-realitytrace-0.8.0.tgz"
+    "zod": "3.25.76"
   },
   "overrides": {
     "@godspeedai/cognate-cli": "file:./.cognate/vendor/godspeedai-cognate-cli-0.8.0.tgz",
