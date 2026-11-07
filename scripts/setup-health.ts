@@ -6,6 +6,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { seaForgeCall } from "../src/adapters/sea-forge-approvals.ts";
 import { keyState } from "../src/adapters/workshop.ts";
 import { configFromDocument } from "../src/config/load.ts";
 import { SETUP_NAMES, argValue, setupMapping, type SetupMapping, type SetupName } from "../src/config/setup.ts";
@@ -92,6 +93,18 @@ const tapCheck: Check = (_mapping, env) => {
   return ageHours <= 24 ? { ok: true, detail: `drain state modified ${ageHours.toFixed(1)} h ago` } : { ok: false, detail: `drain state is ${ageHours.toFixed(1)} h old (limit 24 h)` };
 };
 
+/** Stage 3: the case keeper's socket answers `case_list` with a list of cases. */
+const seaforgeCheck: Check = async (mapping, env) => {
+  const actor = { actor_id: env.COGNATE_SEA_FORGE_ACTOR?.trim() || "cognate-service", role: "service" };
+  try {
+    const reply = await seaForgeCall(mapping.socket, { verb: "case_list", actor }, 4000);
+    if (!Array.isArray(reply.cases)) return { ok: false, detail: `case keeper at ${mapping.socket} answered case_list without a cases list` };
+    return { ok: true, detail: `case keeper answers case_list (${reply.cases.length} ${reply.cases.length === 1 ? "case" : "cases"})` };
+  } catch (error) {
+    return { ok: false, detail: `case keeper at ${mapping.socket} did not answer case_list: ${(error instanceof Error ? error.message : String(error)).slice(0, 120)}` };
+  }
+};
+
 /** Stage 4: the GitHub connector wrote its heartbeat file in the last 30 s. Only the file's modification time is read. */
 const connectorCheck: Check = (mapping) => {
   const path = join(mapping.run, "connector.heartbeat");
@@ -100,8 +113,8 @@ const connectorCheck: Check = (mapping) => {
   return ageS <= 30 ? { ok: true, detail: `connector heartbeat ${ageS.toFixed(0)} s ago` } : { ok: false, detail: `connector heartbeat is ${ageS.toFixed(0)} s old (limit 30 s); it is stopped or stuck` };
 };
 
-/** Stage 0 had records; stage 1 adds workbench, horizon and tap (seaforge arrives in stage 3; connector in stage 4). */
-export const CHECKS: Record<string, Check> = { records: recordsCheck, workbench: workbenchCheck, horizon: horizonCheck, tap: tapCheck, connector: connectorCheck };
+/** Stage 0 had records; stage 1 adds workbench, horizon and tap (seaforge in stage 3, connector in stage 4). */
+export const CHECKS: Record<string, Check> = { records: recordsCheck, workbench: workbenchCheck, horizon: horizonCheck, tap: tapCheck, seaforge: seaforgeCheck, connector: connectorCheck };
 
 export async function run(args: readonly string[], env: Env, out: (line: string) => void, err: (line: string) => void): Promise<number> {
   const name = argValue(args, "setup");

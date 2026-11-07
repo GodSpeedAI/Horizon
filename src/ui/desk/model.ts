@@ -187,7 +187,7 @@ export interface PartsInput {
   readonly rules: boolean;
   readonly cases: boolean;
   readonly records: boolean;
-  readonly workshop: { readonly state: "missing" | "ok" | "expiring" | "expired"; readonly days_left: number | null };
+  readonly workshop: { readonly state: "missing" | "empty" | "unsafe" | "ok" | "expiring" | "expired"; readonly days_left: number | null };
 }
 
 /** Per-part health in plain words. "Not connected" is the only phrase for a missing part. */
@@ -196,6 +196,8 @@ export function partsOf(input: PartsInput): { readonly parts: DeskPart[]; readon
   const workshopUp = input.workshop.state === "ok" || input.workshop.state === "expiring";
   let keyWarning: string | null = null;
   if (input.workshop.state === "expired") keyWarning = "The access key for agent work has run out. Make a new one to hand work to agents.";
+  else if (input.workshop.state === "empty") keyWarning = "The access key file for agent work is empty. Make a new key to hand work to agents.";
+  else if (input.workshop.state === "unsafe") keyWarning = "The access key file for agent work can be read by other people on this computer, so it is not used. Make it private to you.";
   else if (input.workshop.state === "expiring") {
     const days = input.workshop.days_left ?? 0;
     keyWarning = `The access key for agent work runs out in ${days} ${days === 1 ? "day" : "days"}.`;
