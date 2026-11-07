@@ -211,3 +211,4 @@ li[data-cursor="true"]::before { content:"Current item"; position:absolute; widt
 .cv-stages { list-style:none; margin:.1rem 0 .2rem .4rem; padding:0; display:grid; gap:.15rem; font-size:.85rem; }
 .cv-stage-name { font-weight:600; } .cv-stage[data-stage-status="refused"] .cv-stage-word { color:var(--cg-danger, var(--cg-warn)); font-weight:600; }
 .cv-stage[data-stage-status="unseen"] { font-style:italic; } .cv-stage button { margin-left:.5rem; }
+.commit-facts { border:1px solid var(--cg-border, currentColor); border-radius:8px; padding:.5rem .7rem; margin:.6rem 0; font-size:.9rem; } .commit-facts p { margin:.15rem 0; overflow-wrap:anywhere; }

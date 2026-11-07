@@ -46,7 +46,7 @@ describe("decision cards and previews", () => {
     let html = draw(ui);
     expect(html).toMatch(/<button[^>]*data-confirm[^>]*>/);
     expect(html).not.toMatch(/<button[^>]*\sdisabled=""[^>]*data-confirm/);
-    expect(text(html)).toContain("Confirm applies to exactly the preview above");
+    expect(text(html)).toContain("The button applies to exactly the preview above");
 
     // The case changes while the operator is looking: the card's preview code moves on.
     const [changed] = cardsFrom([taskRow("ap1", "sha256:two")]);

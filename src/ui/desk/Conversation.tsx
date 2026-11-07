@@ -9,6 +9,7 @@ import { conversationWaiting, type Action, type UiState } from "./attention.ts";
 import type { ConversationRow, RowStage, RowStatus } from "./conversation-model.ts";
 import { PanelCard, type PanelsIo } from "./Panels.tsx";
 import type { BlockCtx } from "./blocks/index.tsx";
+import { CommitSummary, type CommitFacts } from "./Commitment.tsx";
 
 export const STATUS_WORD: Readonly<Record<RowStatus, string>> = { done: "Done", waiting: "Waiting for you", refused: "Refused", unseen: "Not seen yet", claimed: "Agent says so", partial: "Partly done" };
 /** An answer you gave waits on the agent, not on you. */
@@ -63,7 +64,17 @@ function StatusMark({ status, kind }: { readonly status: RowStatus; readonly kin
   );
 }
 
-function MoveCard({ row, onConfirm, onDiscard, busy }: { readonly row: ConversationRow; readonly onConfirm: () => void; readonly onDiscard: () => void; readonly busy: boolean }): ReactNode {
+/** The four facts above the button of a waiting hand off. The button only opens the preview; nothing is sent from the card. */
+export function moveFacts(row: ConversationRow, caseTitle: string | null): CommitFacts {
+  return {
+    action: `Hand off: ${row.words}`,
+    destination: caseTitle ?? "The case that is running",
+    next: "Opens a preview of the step and where it goes. Nothing is sent until you press the button on the preview.",
+    undo: { can: true, words: "Opening the preview sends nothing. Once a step is sent it cannot be undone." },
+  };
+}
+
+function MoveCard({ row, onConfirm, onDiscard, busy, caseTitle }: { readonly row: ConversationRow; readonly onConfirm: () => void; readonly onDiscard: () => void; readonly busy: boolean; readonly caseTitle: string | null }): ReactNode {
   const fromAgent = row.source !== "you";
   const headId = `${row.row_id}-h`;
   return (
@@ -76,15 +87,16 @@ function MoveCard({ row, onConfirm, onDiscard, busy }: { readonly row: Conversat
         {row.words}
       </p>
       <p className="muted">{row.outcome}</p>
+      <CommitSummary facts={moveFacts(row, caseTitle)} />
       <div className="row cv-actions">
         <button type="button" className="primary" onClick={onConfirm} disabled={busy} data-confirm-move>
-          Confirm
+          Preview this hand off
         </button>
         <button type="button" onClick={onDiscard} disabled={busy} data-discard-move>
           Discard
         </button>
       </div>
-      <p className="cv-note muted">Confirm shows you exactly what will happen first. Nothing is sent until you confirm there.</p>
+      <p className="cv-note muted">The preview shows you exactly what will happen first. Nothing is sent until you press the button there.</p>
     </article>
   );
 }
@@ -234,7 +246,7 @@ export function ConversationView({ ui, dispatch, panels, conversation, onConfirm
                   {panel === undefined ? <p className="cv-outcome" data-unseen={row.status === "unseen" ? "yes" : undefined}>{row.outcome}</p> : null}
                   <Stages row={row} busy={busyRow === row.row_id} onOpenStep={() => dispatch({ type: "view", view: "work" })} onRetry={() => void retry(row)} />
                   {panel !== undefined ? <PanelCard panel={panel} io={panels} presenting={presenting} {...ctxFor()} /> : null}
-                  {isWaitingMove(row) ? <MoveCard row={row} busy={busyRow === row.row_id} onConfirm={() => onConfirm(row)} onDiscard={() => void discard(row)} /> : null}
+                  {isWaitingMove(row) ? <MoveCard row={row} caseTitle={data?.cases.find((c) => c.case_ref === `case:${row.refs.case_id ?? ""}`)?.purpose ?? null} busy={busyRow === row.row_id} onConfirm={() => onConfirm(row)} onDiscard={() => void discard(row)} /> : null}
                 </li>
               );
             })}

@@ -6,6 +6,7 @@
 import type { ReactNode } from "react";
 import type { OpenDecision } from "./attention.ts";
 import type { ChoicePreview, DecisionCardData } from "./model.ts";
+import { CommitSummary, type CommitFacts } from "./Commitment.tsx";
 import { StateWord } from "./StateWord.tsx";
 import { Words } from "./Words.tsx";
 
@@ -28,9 +29,19 @@ export function confirmOffReason(card: DecisionCardData, decision: OpenDecision)
   if (choice === null) return card.blocked ?? "This choice is not available for this card.";
   if (decision.choice !== "hold" && card.blocked !== null) return card.blocked;
   const needsReason = decision.choice === "hold" || (decision.choice === "accept" && card.reason_for_accept);
-  if (needsReason && decision.reason.trim() === "") return decision.choice === "hold" ? "Type why you are holding this, then Confirm." : "Type a reason for this decision, then Confirm. It is kept with the decision.";
+  if (needsReason && decision.reason.trim() === "") return decision.choice === "hold" ? "Type why you are holding this, then press the button." : "Type a reason for this decision, then press the button. It is kept with the decision.";
   if (decision.busy) return "Sending your decision…";
   return null;
+}
+
+/** The four facts above the button of a Decide preview. */
+export function decisionFacts(card: DecisionCardData, choice: ChoicePreview): CommitFacts {
+  return {
+    action: `${choice.button}: ${card.title}`,
+    destination: card.preview.touches.length > 0 ? card.preview.touches.join("; ") : card.title,
+    next: choice.next,
+    undo: { can: choice.kind === "can be undone", words: choice.undo },
+  };
 }
 
 export function chosen(card: DecisionCardData, decision: OpenDecision): ChoicePreview | null {
@@ -104,16 +115,17 @@ export function Preview({ card, decision, onReason, onConfirm, onCancel, onRefre
           <Words text={decision.problem} />
         </p>
       ) : null}
+      {choice !== null ? <CommitSummary facts={decisionFacts(card, choice)} /> : null}
       <div className="row">
         <button type="button" onClick={onCancel}>
           Cancel (Esc)
         </button>
         <button type="button" className="primary" disabled={off !== null} aria-disabled={off !== null} onClick={onConfirm} data-confirm data-autofocus={!stale && !needsReason ? true : undefined} aria-describedby="confirm-why">
-          {stale ? `Confirm (${OUT_OF_DATE.toLowerCase()})` : `Confirm: ${choice ? choice.button : "choice"}`}
+          {stale ? `${choice ? choice.button : "This choice"} (${OUT_OF_DATE.toLowerCase()})` : choice ? choice.button : "This choice is not available"}
         </button>
       </div>
       <p id="confirm-why" className="muted" role="status">
-        {off ?? "Confirm applies to exactly the preview above."}
+        {off ?? "The button applies to exactly the preview above."}
       </p>
     </section>
   );

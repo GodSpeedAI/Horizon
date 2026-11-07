@@ -10,6 +10,7 @@ import { conversationWaiting, type Action, type Mode, type UiState } from "./att
 import { NOT_CONNECTED, VIEWS, parseFind } from "./model.ts";
 import type { NoteIo } from "./NoteEditor.tsx";
 import { Words } from "./Words.tsx";
+import { CommitSummary, type CommitFacts } from "./Commitment.tsx";
 import { COMMAND_HINTS, hintsFor, parseLine, unknownCommandWords, type CommandName } from "./commands.ts";
 import type { ConversationRow, RowStatus } from "./conversation-model.ts";
 
@@ -92,6 +93,22 @@ export interface HandoffPreviewCardProps {
 }
 
 /** What Hand off will add, before anything is sent. A changed case turns Confirm off and says "preview out of date". */
+/** The button names what it does. */
+export function handoffButtonLabel(pv: HandoffPreview, assign: boolean): string {
+  return pv.review ? "Run a review" : assign && pv.agent.offered ? "Send step to agent" : "Add step to the case";
+}
+
+/** The four facts above the hand off button. */
+export function handoffFacts(pv: HandoffPreview, assign: boolean): CommitFacts {
+  const toAgent = assign && pv.agent.offered;
+  return {
+    action: pv.review ? `Run a review: ${pv.step_name}` : toAgent ? `Send step to agent: ${pv.step_name}` : `Add step to the case: ${pv.step_name}`,
+    destination: pv.case_title,
+    next: toAgent ? "The step is added to the case and started, and an agent is given it. You see what came of each stage in the conversation." : "The step is added to the case and started. You see what came of each stage in the conversation.",
+    undo: { can: false, words: "A step that is added stays on record." },
+  };
+}
+
 export function HandoffPreviewCard({ pv, assign, outOfDate, busy, onCancel, onConfirm, onRefresh, reviewStep = "", onReviewStep = () => undefined }: HandoffPreviewCardProps): ReactNode {
   const confirmOff = busy || outOfDate || (pv.review != null && reviewStep === "");
   return (
@@ -132,9 +149,10 @@ export function HandoffPreviewCard({ pv, assign, outOfDate, busy, onCancel, onCo
           Preview out of date. This case changed after you looked at it, so nothing was sent.
         </p>
       ) : null}
+      <CommitSummary facts={handoffFacts(pv, assign)} />
       <div className="row cv-actions">
         <button type="button" className="primary" disabled={confirmOff} aria-disabled={confirmOff} onClick={onConfirm} data-confirm-handoff>
-          {outOfDate ? "Confirm (preview out of date)" : pv.review ? "Confirm: Run a review" : "Confirm: Hand off"}
+          {outOfDate ? `${handoffButtonLabel(pv, assign)} (preview out of date)` : handoffButtonLabel(pv, assign)}
         </button>
         <button type="button" onClick={onCancel}>
           Cancel
