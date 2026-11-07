@@ -566,3 +566,24 @@ Seed data lets the operator see every screen working. It is made **only in the t
 | `just seed-reset` | `seed-clear`, then `seed`. |
 
 The seed script is `scripts/seed.ts`, with its data in `scripts/seed-data/`. It is built in the stage where each piece first exists: records and labels in stage 1, notes in 2, decisions in 3, steps from GitHub and hand off in 4. Each stage extends it.
+
+## K. Definition of production ready (operator, 2026-11-06)
+
+The work is done only when every row passes. The final report shows the command and its real output for each row. Agent-written claims do not count as evidence.
+
+| # | Check | Proof |
+| --- | --- | --- |
+| K1 | Horizon type check | `node_modules/.bin/tsc --noEmit` exits 0 |
+| K2 | Horizon's existing gate still passes | `just verify` exits 0 (plus `just check-t05` and `just teeth-t05` for the parts-layer guards) |
+| K3 | Every new test passes, including every J.1 adversarial test | `bun test` over the new files: zero failures, with counts listed |
+| K4 | Case keeper changes | `cargo test` for the changed crates, plus `cargo build --release -p sea-forge-server` |
+| K5 | Workshop changes | `bun run typecheck` and the changed tests in the workshop worktree |
+| K6 | End to end in the test setup | `just seed`, then a scripted browser walk-through (Playwright) of Today, Explore, Decide and Work: real screenshots plus page-text assertions |
+| K7 | The attention rules | the nine rule tests pass, and the screenshots show one highlight and "not recorded" rows |
+| K8 | Accessibility | an automated accessibility scan (axe) of each view: no serious or critical violations. Keyboard-only walk-through: the full flow with no mouse |
+| K9 | Speed | `measure-timings.ts` gives the day view, record lookup and comparison times. Each meets its budget (1 second), or the report shows the reason and the fix |
+| K10 | Presenting | `presenting-scan.ts` finds no real names in the screenshots' page text or the exports |
+| K11 | Clean production | `setup-clear`, then `setup-init --setup production`, then `setup-check-empty --setup production` exits 0. Production starts and answers its health check |
+| K12 | Keys never leak | grep the logs, records, exports and page HTML for the key prefix: zero hits |
+| K13 | Runbook | the operator's runbook for start, stop, seed, clear, connect and ship, tested by following it in the test setup |
+| K14 | Merged and pushed | the branches are pushed, with pull requests or merges recorded, and the repos are left with no stray changes of ours |
