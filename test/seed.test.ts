@@ -265,7 +265,7 @@ describe("seed", () => {
     const text = lines.join("\n");
     for (const part of [
       "templates", "policy lets the operator add steps", "case release", "case triage", "GitHub issue ", "on the test board", "step from the GitHub issue", "step handed off",
-      "step proposed by an agent", "decision waiting for the operator", "notes", "labels",
+      "step proposed by an agent", "decision waiting for the operator", "notes", "conversation", "labels",
       ...OBLIGATIONS.map((o) => `record ${o.id}`), ...SESSIONS.map((x) => `record ${x.id}`), "record journey:J-SEED:release:3",
     ]) {
       expect(text).toContain(part);

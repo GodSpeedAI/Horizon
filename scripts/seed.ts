@@ -28,6 +28,8 @@ import { seaForgeCall } from "../src/adapters/sea-forge-approvals.ts";
 import { reasonOf } from "../src/adapters/sea-forge-case.ts";
 import { runChild } from "../src/adapters/run-child.ts";
 import { saveNote, search, type Who } from "../src/capabilities/notes.ts";
+import { appendRow, listConversation } from "../src/capabilities/conversation.ts";
+import type { ConversationRow } from "../src/ui/desk/conversation-model.ts";
 import { listLabels, putLabel } from "../src/capabilities/labels.ts";
 import { listSessions } from "../src/ui/workspace/compare-model.ts";
 import { reduceRows } from "../src/adapters/ledger-day.ts";
@@ -455,6 +457,25 @@ async function seedNotes(ctx: Context, ids: Map<string, string>): Promise<void> 
   ctx.io.out(`  notes: ${NOTES.length} on ${new Set(NOTES.map((n) => n.daysAgo)).size} days`);
 }
 
+/** The conversation rows the seed adds so the view is not empty: a note, a hand off, a find, and one agent suggestion waiting for the person. */
+type SeedRow = Pick<ConversationRow, "source" | "kind" | "words" | "outcome" | "status"> & { readonly agent_name?: string; readonly hoursAgo: number };
+const CONVERSATION_ROWS: readonly SeedRow[] = [
+  { source: "you", kind: "note", words: "Remember to ask the team about the checkout wording.", outcome: "Saved to today.", status: "done", hoursAgo: 5 },
+  { source: "you", kind: "handoff", words: HANDOFF.item.name, outcome: "Added to Seed: triage inbox. It has started.", status: "done", hoursAgo: 4 },
+  { source: "you", kind: "find", words: "Find: checkout", outcome: "2 notes, 1 cases, 0 days, 0 tags.", status: "done", hoursAgo: 3 },
+  { source: "page-agent", agent_name: "Demo agent", kind: "handoff-proposal", words: PROPOSAL.item.name, outcome: "An agent suggests this. Nothing is sent until you confirm.", status: "waiting", hoursAgo: 1 },
+];
+const seededRow = (have: readonly ConversationRow[], r: SeedRow): boolean => have.some((h) => h.kind === r.kind && h.words === r.words && h.source === r.source);
+
+async function seedConversation(ctx: Context): Promise<void> {
+  const have = await listConversation(ctx.ports.store, ctx.who);
+  for (const r of CONVERSATION_ROWS) {
+    if (seededRow(have, r)) continue;
+    await appendRow(ctx.ports.store, ctx.who, { source: r.source, ...(r.agent_name ? { agent_name: r.agent_name } : {}), kind: r.kind, words: r.words, outcome: r.outcome, status: r.status }, new Date(ctx.now().getTime() - r.hoursAgo * 3_600_000));
+  }
+  ctx.io.out(`  conversation: ${CONVERSATION_ROWS.length} rows`);
+}
+
 async function seedLabels(ctx: Context): Promise<void> {
   const sessions = listSessions(reduceRows(await ctx.ports.records.ledger()));
   const current = await listLabels(ctx.ports.store, ctx.who.tenant);
@@ -488,6 +509,7 @@ export async function seed(ctx: Context): Promise<{ cases: Map<string, string>; 
   ctx.io.out("  triage case advanced: the added steps are started");
   await seedRecords(ctx);
   await seedNotes(ctx, cases);
+  await seedConversation(ctx);
   await seedLabels(ctx);
   await seedWorkshop(ctx);
   ctx.io.out("Done. Running it again changes nothing.");
@@ -539,6 +561,9 @@ export async function status(ctx: Context): Promise<Part[]> {
   const notes = await existingSeedNotes(ctx);
   const noteCount = NOTES.filter((n) => notes.has(n.title)).length;
   add("notes", noteCount === NOTES.length, `${noteCount} of ${NOTES.length} on ${new Set(NOTES.map((n) => n.daysAgo)).size} days`);
+  const have = await listConversation(ctx.ports.store, ctx.who);
+  const rowCount = CONVERSATION_ROWS.filter((r) => seededRow(have, r)).length;
+  add("conversation", rowCount === CONVERSATION_ROWS.length, `${rowCount} of ${CONVERSATION_ROWS.length} rows`);
   const sessions = listSessions(reduceRows(rows));
   const labels = await listLabels(ctx.ports.store, ctx.who.tenant);
   const labelled = LABELS.filter((l) => {

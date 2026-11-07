@@ -242,7 +242,7 @@ describe("setup-check-empty", () => {
     expect(fresh.code).toBe(0);
     expect(fresh.out).not.toContain("FAIL");
 
-    for (const collection of ["horizon-notes", "horizon-cases", "horizon-labels"]) {
+    for (const collection of ["horizon-notes", "horizon-cases", "horizon-labels", "horizon-conversation"]) {
       store(collection);
       const result = await capture(runCheckEmpty, ["--setup", "production", "--exclude", "personal"]);
       expect(result.code).toBe(1);

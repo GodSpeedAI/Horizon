@@ -1,7 +1,7 @@
 /**
  * `bun run scripts/setup-check-empty.ts --setup production [--exclude personal]`
  * Counts what production must not hold yet and exits 0 only if every count is zero: SEA-Forge cases,
- * `horizon-cases`, `horizon-notes`, `horizon-labels`, record repositories in the Horizon and workshop record dirs, and
+ * `horizon-cases`, `horizon-notes`, `horizon-labels`, `horizon-conversation`, record repositories in the Horizon and workshop record dirs, and
  * GitHub production items. The personal record is skipped only when excluded by name.
  */
 import { Database } from "bun:sqlite";
@@ -13,7 +13,7 @@ import { recordReader, type RecordReader } from "../src/adapters/realitytrace-ec
 import { recordSourcesOf, repoList } from "./setup-health.ts";
 
 type Env = Record<string, string | undefined>;
-const COLLECTIONS = ["horizon-cases", "horizon-notes", "horizon-labels"] as const;
+const COLLECTIONS = ["horizon-cases", "horizon-notes", "horizon-labels", "horizon-conversation"] as const;
 
 /** The setup's own rulebook folder, which every start enrolls with the record keeper. */
 export const isRulebookFolder = (path: string, setupRoot: string): boolean => path === `${setupRoot}/cell/realitytrace-repo-obligations`;
