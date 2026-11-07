@@ -22,6 +22,15 @@ export function governanceFromEnv() {
   return { mode: "off" };
 }
 
+// The real package's authority helpers, reduced to a request that carries the operation and a decision that refuses.
+// They exist only so modules that import them load; the fake governs nothing.
+export function buildAuthorityRequest(operation, worldRef, at, approval) {
+  return { operation, worldRef, at: at instanceof Date ? at.toISOString() : String(at), approval };
+}
+export function interpretDecision() {
+  return { decision: "deny", reason: "memory-only fake runtime" };
+}
+
 export async function createRuntime(options) {
   const storePath = typeof options.store === "string" ? options.store : options.store?.sqlite?.path ?? "/tmp/fake.sqlite";
   mkdirSync(dirname(storePath), { recursive: true });
