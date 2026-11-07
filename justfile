@@ -274,6 +274,8 @@ seed:
     #!/usr/bin/env bash
     set -euo pipefail
     set -a; eval "$(bun run scripts/setup-env.ts testing --service horizon)"; set +a
+    # A fresh test setup has no test board yet: make it first (sandbox repository only).
+    if [ ! -f "${HORIZON_SETUPS_BASE:-$HOME/.horizon/setups}/testing/github.json" ]; then bun run scripts/setup-github.ts --setup testing; fi
     bun run scripts/seed.ts
 
 # Prints each seeded part and whether it is present.
