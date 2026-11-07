@@ -137,12 +137,14 @@ export async function run(args: readonly string[], env: Record<string, string | 
     let biggest = -1;
     for (const repo of listed.repos) {
       const ledger = reader.ledger(repo.repo_id);
-      const size = ledger.ok ? JSON.stringify(ledger.rows).length : -1;
+      // Only a repository with dated agent events can be measured; among those, the biggest.
+      const dated = ledger.ok && ledger.rows.some((r) => typeof (r as { payload?: { extensions?: { agent_event?: { ts?: unknown } } } })?.payload?.extensions?.agent_event?.ts === "string");
+      const size = dated ? JSON.stringify(ledger.rows).length : -1;
       if (size > biggest) ((biggest = size), (repoId = repo.repo_id));
     }
   }
   if (!repoId) {
-    err("measure-timings: the record holds no repository");
+    err("measure-timings: no repository in this record source has dated agent events (try --source or --repo)");
     return 1;
   }
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
