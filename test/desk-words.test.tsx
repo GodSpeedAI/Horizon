@@ -7,6 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { economicsModel } from "../src/economics/model.ts";
+import { buildStructuralFrame } from "../src/domain/frame.ts";
 import { onboardingOf } from "../src/ui/workspace/model.ts";
 import { START, deskReducer, type UiState } from "../src/ui/desk/attention.ts";
 import { buildDecide } from "../src/ui/desk/decide-build.ts";
@@ -90,6 +91,17 @@ describe("no product names and no internal terms on screen", () => {
   test("Today, with first-run steps, a receipt, recent moves and the approval warning", () => {
     scan("today", draw({ ...START, data: base({ cases: [{ case_ref: "case:c1", purpose: "Case started 2026-11-07", opened_at: "2026-11-07T06:00:00Z", source: "case keeper", state: "Running" }] }) }));
     scan("today, no first-run", draw({ ...START, data: base({ home: { ...home, onboarding: { visible: false, skipped: true, steps: [] }, assurance: "unknown" } as never }) }));
+  });
+
+  test("Today, first-run step 3 with the first move button the real frame offers", () => {
+    const frame = buildStructuralFrame({ frameId: "f", observerRef: "os:test", world: { worldRef: "world:horizon@sha256:00" }, checkpointRef: "cp" });
+    const choice = frame.choices[0]!;
+    const ready = onboardingOf({ governed: true, realitytrace: true, caseOpen: true, committed: false, skipped: false });
+    const onboarding = { ...ready, steps: [...ready.steps] };
+    const firstMove = { action_id: "a1", operation: choice.operation_ref, frame_id: "f", frame_revision: "0", focus: frame.focus_ref, label: choice.label };
+    const html = draw({ ...START, firstMove, data: base({ home: { ...home, onboarding } as never }) });
+    expect(text(html)).toContain(choice.label);
+    scan("today, onboarding step 3", html);
   });
 
   test("Explore, with results", () => {

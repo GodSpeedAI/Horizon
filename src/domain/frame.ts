@@ -91,7 +91,7 @@ export function buildStructuralFrame(options: {
     choices: [
       {
         operation_ref: "horizon.health",
-        label: "Check the structural world and Cognate projection",
+        label: "Check that the rules and records are connected",
         assessment: { ...statusOf("horizon.health"), reversibility: "read_only" },
       },
       {
