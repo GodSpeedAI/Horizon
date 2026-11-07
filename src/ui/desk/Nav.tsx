@@ -5,15 +5,15 @@ import { interruptionsOf, type Action, type UiState } from "./attention.ts";
 import { VIEWS, dayLabel, type DeskState } from "./model.ts";
 
 export function Nav({ ui, data, dispatch }: { readonly ui: UiState; readonly data: DeskState | null; readonly dispatch: (action: Action) => void }): ReactNode {
-  const counts = interruptionsOf(data).counts;
+  const counts = { ...interruptionsOf(data).counts, conversation: ui.rows.filter((r) => r.status === "waiting").length };
   // On a phone the Days, Cases and Tags lists fold away so the composer stays within reach.
   const [open, setOpen] = useState(false);
   return (
     <nav className="nav" aria-label="Views and lists">
       <ul className="views">
-        {VIEWS.map((view, index) => (
+        {VIEWS.map((view) => (
           <li key={view.id}>
-            <button type="button" aria-current={ui.view === view.id ? "page" : undefined} data-view={view.id} title={`${view.asks} (Ctrl+${index + 1})`} onClick={() => dispatch({ type: "view", view: view.id })}>
+            <button type="button" aria-current={ui.view === view.id ? "page" : undefined} data-view={view.id} title={`${view.asks} (Ctrl+${view.key})`} onClick={() => dispatch({ type: "view", view: view.id })}>
               {view.label}
               {counts[view.id] > 0 ? <span className="count" data-count={view.id}> ({counts[view.id]})</span> : null}
             </button>

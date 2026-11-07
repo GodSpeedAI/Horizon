@@ -93,6 +93,16 @@ describe("no product names and no internal terms on screen", () => {
     scan("today, onboarding step 3", html);
   });
 
+  test("Conversation, with every kind of row, a waiting suggestion and an inspected row", () => {
+    const rows = (["note", "handoff", "handoff-proposal", "find", "decision", "panel", "answer"] as const).map((kind, n) => ({
+      row_id: `r${n}`, at: `2026-11-07T10:0${n}:00Z`, source: (n % 3 === 0 ? "you" : n % 3 === 1 ? "agent" : "page-agent") as "you" | "agent" | "page-agent", kind,
+      words: `A plain move ${n}`, outcome: "Nothing is sent until you confirm.", status: (["done", "waiting", "refused", "unseen"] as const)[n % 4]!, refs: { draft_id: "9b2f0c1e-0000-4000-8000-000000000000" },
+    }));
+    scan("conversation", draw({ ...START, view: "conversation", rows, data: base() }));
+    scan("conversation, row inspected", draw({ ...START, view: "conversation", rows, selection: "row:r1", data: base() }));
+    scan("conversation, empty", draw({ ...START, view: "conversation", data: base() }));
+  });
+
   test("Explore, with results", () => {
     const results: SearchResult = { q: "", day: null, tag: null, notes: [], cases: [{ case_ref: "case:c1", purpose: "Case started 2026-11-07", opened_at: "2026-11-07T06:00:00Z" }], days: [{ day: "2026-11-07", count: 1 }], tags: [], records: { name: "Records", connected: false, words: "Records not connected — sessions from other AI coding tools not shown", href: null } };
     scan("explore", draw(deskReducer({ ...START, view: "explore", data: base() }, { type: "results", results })));

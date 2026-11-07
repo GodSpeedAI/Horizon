@@ -36,7 +36,7 @@ export function isTyping(info: Pick<KeyInfo, "targetTag" | "editable">): boolean
   return info.editable || info.targetTag === "input" || info.targetTag === "textarea" || info.targetTag === "select";
 }
 
-const VIEW_KEYS: Readonly<Record<string, ViewId>> = { "1": "today", "2": "explore", "3": "decide", "4": "work" };
+const VIEW_KEYS: Readonly<Record<string, ViewId>> = { "1": "today", "2": "explore", "3": "decide", "4": "work", "5": "conversation" };
 
 export function resolveKey(info: KeyInfo, context: KeyContext = { decisionCard: false }): KeyAction | null {
   const mod = info.ctrlKey || info.metaKey;
@@ -68,7 +68,7 @@ export function resolveKey(info: KeyInfo, context: KeyContext = { decisionCard: 
 export const KEY_TABLE: readonly { readonly keys: string; readonly does: string }[] = [
   { keys: "Ctrl/Cmd+K", does: "Go to the composer" },
   { keys: "Ctrl/Cmd+P", does: "Quick menu: jump to a day, case or tag, or run any action" },
-  { keys: "Ctrl/Cmd+1 / 2 / 3 / 4", does: "Today, Explore, Decide, Work" },
+  { keys: "Ctrl/Cmd+1 / 2 / 3 / 4 / 5", does: "Today, Explore, Decide, Work, Conversation" },
   { keys: "Ctrl/Cmd+[ and ]", does: "Previous / next day" },
   { keys: "J / K", does: "Next / previous item" },
   { keys: "Enter", does: "Open the item in the inspector" },

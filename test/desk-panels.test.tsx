@@ -7,7 +7,7 @@ import { acceptanceBlocked, listAnswers, recordAnswer, routeAnswer, stopWaiting,
 import { START, type UiState } from "../src/ui/desk/attention.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";
 import { MAX_OPEN_PANELS, NO_PANELS, reduceAgent, reduceHuman, type Panels as PanelsState } from "../src/ui/desk/panels-model.ts";
-import { Panels } from "../src/ui/desk/Panels.tsx";
+import { PanelCard } from "../src/ui/desk/Panels.tsx";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { deskState } from "./support/desk-fixture.ts";
 import { quietIo } from "./support/desk-io.ts";
@@ -68,24 +68,32 @@ describe("panels from agents", () => {
   test("what an agent sends is mapped to Horizon's blocks and shown as text", () => {
     const state = must(reduceAgent(NO_PANELS, surface("x", { blocks: [{ type: "callout", id: "c", tone: "danger", text: "<script>alert(1)</script>" }, { type: "graph", id: "g" }, { type: "mystery", id: "z" }, { type: "ask", id: "bad", question: "one option", options: [{ option_id: "a", label: "A" }] }] })));
     expect(state.open[0]!.blocks.map((b) => b.kind)).toEqual(["text", "unavailable", "unavailable", "unavailable"]);
-    const html = renderToStaticMarkup(<Panels panels={{ ...state, waiting: [] } as never} waiting={[]} io={quietIo().panels} />);
+    const html = renderToStaticMarkup(<PanelCard panel={{ ...state.open[0]!, pinned: true }} io={quietIo().panels} />);
     expect(html).not.toContain("<script>");
     expect(text(html)).toContain("<script>alert(1)</script>");
-    expect(text(html)).toContain("cannot show yet");
+    expect(text(html)).toContain("cannot be shown");
   });
 
-  test("the panels view says what is open and what it is waiting for, in plain words", () => {
+  test("a card in the conversation says what is waiting, in plain words; the old list is gone", () => {
     let state = must(reduceAgent(NO_PANELS, { tool: "ask_human", panel: "release", ask, step: "signoff_release" }));
     state = must(reduceAgent(state, surface("notes")));
     const waiting = [{ step: "signoff_release", panel: "release" }];
-    const ui: UiState = { ...START, view: "decide", data: deskState({ panels: { ...state, waiting } }) };
+    const rows = [
+      { row_id: "r1", at: "2026-11-07T10:00:00Z", source: "agent" as const, kind: "panel" as const, words: "Ship it?", outcome: "An agent put this up.", status: "waiting" as const, refs: { panel_id: "release" } },
+      { row_id: "r2", at: "2026-11-07T10:01:00Z", source: "agent" as const, kind: "panel" as const, words: "notes", outcome: "An agent put this up.", status: "done" as const, refs: { panel_id: "notes" } },
+    ];
+    const ui: UiState = { ...START, view: "conversation", rows, data: deskState({ panels: { ...state, waiting } }) };
     const html = renderToStaticMarkup(<Desk ui={ui} dispatch={() => undefined} io={quietIo()} nowMs={Date.parse("2026-11-07T12:00:00Z")} />);
     const words = text(html);
-    expect(words).toContain("2 of 8 open");
+    expect(words).not.toContain("From agents");
+    expect(words).toContain("Needs you (1)");
     expect(words).toContain("Ship it?");
     expect(words).toContain("Waiting for the agent to reply");
     expect(words).toContain("Stop waiting");
     expect(html).toContain('aria-pressed="false"');
+    // The card with no open question folds to its title and summary.
+    expect(html).toMatch(/data-panel-id="notes"[^>]*data-folded="yes"/);
+    expect(html).toMatch(/data-panel-id="release"[^>]*data-folded="no"/);
   });
 });
 

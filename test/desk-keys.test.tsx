@@ -55,7 +55,8 @@ describe("desk keys", () => {
         expect(ui.view).toBe(view);
       }
     }
-    expect(resolveKey(key("5", { ctrlKey: true }))).toBeNull();
+    expect(resolveKey(key("5", { ctrlKey: true }))).toEqual({ type: "view", view: "conversation" });
+    expect(resolveKey(key("6", { ctrlKey: true }))).toBeNull();
     expect(resolveKey(key("[", { ctrlKey: true }))).toEqual({ type: "day", delta: -1 });
     expect(resolveKey(key("]", { metaKey: true }))).toEqual({ type: "day", delta: 1 });
     expect(resolveKey(key("p", { ctrlKey: true }))).toEqual({ type: "quick-menu" });

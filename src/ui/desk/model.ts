@@ -5,17 +5,19 @@
  */
 import type { NoteRevision, NoteView } from "../../capabilities/notes.ts";
 import type { Panels } from "./panels-model.ts";
+import type { ConversationRow } from "./conversation-model.ts";
 import type { WorkspaceBlocked, WorkspaceChoice, WorkspaceDebugger, WorkspaceMove, WorkspaceOnboardingStep, WorkspaceRetrieval } from "../workspace/model.ts";
 
 export const NOT_CONNECTED = "Not connected";
 export const POLL_MS = 2000;
 
-export type ViewId = "today" | "explore" | "decide" | "work";
-export const VIEWS: readonly { readonly id: ViewId; readonly label: string; readonly asks: string }[] = [
-  { id: "today", label: "Today", asks: "What am I doing?" },
-  { id: "explore", label: "Explore", asks: "What is here?" },
-  { id: "decide", label: "Decide", asks: "What needs me?" },
-  { id: "work", label: "Work", asks: "What is running and how did it go?" },
+export type ViewId = "today" | "conversation" | "explore" | "decide" | "work";
+export const VIEWS: readonly { readonly id: ViewId; readonly label: string; readonly asks: string; readonly key: string }[] = [
+  { id: "today", label: "Today", asks: "What am I doing?", key: "1" },
+  { id: "conversation", label: "Conversation", asks: "What has been done, and what is waiting for me?", key: "5" },
+  { id: "explore", label: "Explore", asks: "What is here?", key: "2" },
+  { id: "decide", label: "Decide", asks: "What needs me?", key: "3" },
+  { id: "work", label: "Work", asks: "What is running and how did it go?", key: "4" },
 ];
 
 export interface DeskPart {
@@ -248,7 +250,7 @@ export function activityReason(state: DeskState): string {
   return "No activity on this day.";
 }
 
-export type ItemKind = "note" | "case" | "day" | "tag" | "activity" | "card";
+export type ItemKind = "note" | "case" | "day" | "tag" | "activity" | "card" | "row";
 export interface ListItem {
   readonly id: string;
   readonly kind: ItemKind;
@@ -258,7 +260,8 @@ export interface ListItem {
 const firstLine = (text: string): string => (text.split("\n").find((l) => l.trim() !== "") ?? "").slice(0, 120);
 
 /** The items the keyboard cursor walks in the open view. */
-export function itemsOf(view: ViewId, state: DeskState | null, results: SearchResult | null): ListItem[] {
+export function itemsOf(view: ViewId, state: DeskState | null, results: SearchResult | null, rows: readonly ConversationRow[] = []): ListItem[] {
+  if (view === "conversation") return rows.map((r): ListItem => ({ id: `row:${r.row_id}`, kind: "row", label: r.words }));
   if (view === "today" && state) {
     return [
       ...state.notes.map((n): ListItem => ({ id: n.note_id, kind: "note", label: firstLine(n.body) })),

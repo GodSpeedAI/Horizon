@@ -2,17 +2,20 @@
 /**
  * The composer (design 5.3): one box. Before you send, the mode tag shows how your text will be taken. Tab changes it.
  * Write saves a note on today (and on the open case). Find searches in place. Ask says "Not connected" when there is no
- * reference library. Hand off turns your words into a step in a case: it shows a preview first, and nothing is sent until you confirm. Typing @ offers a link to a case, a day or a recent note.
+ * reference library. Hand off turns your words into a step in a case: it shows a preview first, and nothing is sent until you confirm. Typing @ offers a link to a case, a day or a recent note. A line starting with / runs a command (find, handoff, note, done, hold).
+ * This is the one composer for every view: the conversation (the stored record of moves) is drawn by Conversation.tsx and shares this box.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type Action, type Mode, type UiState } from "./attention.ts";
 import { NOT_CONNECTED, VIEWS, parseFind } from "./model.ts";
 import type { NoteIo } from "./NoteEditor.tsx";
 import { Words } from "./Words.tsx";
+import { COMMAND_HINTS, hintsFor, parseLine, unknownCommandWords, type CommandName } from "./commands.ts";
+import type { ConversationRow, RowStatus } from "./conversation-model.ts";
 
 const MODE_LABEL: Readonly<Record<Mode, string>> = { write: "Write", find: "Find", ask: "Ask", handoff: "Hand off" };
 const PLACEHOLDER: Readonly<Record<Mode, string>> = {
-  write: "Write a note. Enter saves it on today.",
+  write: "Write a note. Enter saves it on today. Type / for commands.",
   find: "Find notes, days, tags, cases. Try: invoice #urgent day:2026-11-04",
   ask: "Ask a question (needs a reference library)",
   handoff: "Say what you want done. It becomes a step in a case.",
@@ -143,32 +146,36 @@ export function HandoffPreviewCard({ pv, assign, outOfDate, busy, onCancel, onCo
   );
 }
 
-/** One turn of this page's conversation: what was sent, then how it went. Kept in memory only; notes and steps are saved elsewhere. */
-interface Turn {
-  readonly id: number;
-  readonly kind: "Note" | "Hand off" | "Find";
-  readonly text: string;
-  readonly tone: "ok" | "bad" | "wait" | "quiet";
-  readonly result: string;
-  readonly at: string;
-}
 const TRY: Readonly<Record<Mode, readonly string[]>> = {
   write: ["Call the supplier about the invoice", "Ideas for the Friday meeting", "Remember to renew the licence"],
   find: ["invoice #urgent", "day:2026-11-04", "rollback"],
   ask: [],
   handoff: ["Fix the checkout total", "Write the rollback note", "Check the release notes"],
 };
-const clock = (): string => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+/** A request from the conversation to the composer: show the hand-off preview for these words. `draftId` is set when the move already has a draft. */
+export interface ComposerRequest {
+  readonly n: number;
+  readonly words: string;
+  readonly draftId?: string;
+}
+
+const STATUS_TONE: Readonly<Record<RowStatus, "ok" | "bad" | "wait" | "quiet">> = { done: "ok", waiting: "wait", refused: "bad", unseen: "quiet" };
 
 export interface ComposerProps {
   readonly ui: UiState;
   readonly dispatch: (action: Action) => void;
   readonly io: NoteIo & { readonly handoff: HandoffIo };
+  /** Set by the conversation when you press Confirm on a waiting move. */
+  readonly request?: ComposerRequest | null;
 }
 
-export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
+export function Composer({ ui, dispatch, io, request = null }: ComposerProps): ReactNode {
   const { mode, text, selStart } = ui.composer;
   const data = ui.data;
+  const latest: ConversationRow | undefined = ui.rows[ui.rows.length - 1];
+  const waitingRows = ui.rows.filter((r) => r.status === "waiting").length;
+  const inConversation = ui.view === "conversation";
   const [active, setActive] = useState(0);
   const [busy, setBusy] = useState(false);
   const [noticeTone, setNoticeTone] = useState<"ok" | "bad">("bad");
@@ -190,27 +197,6 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
   const [reviewStep, setReviewStep] = useState("");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handoff = mode === "handoff";
-  const presenting = data?.status.presenting === true;
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [open, setOpen] = useState(true);
-  const [activeTurn, setActiveTurn] = useState<number | null>(null);
-  const turnSeq = useRef(0);
-  const threadRef = useRef<HTMLDivElement | null>(null);
-  const addTurn = (kind: Turn["kind"], text: string, tone: Turn["tone"], result: string): number => {
-    const id = ++turnSeq.current;
-    setTurns((all) => [...all, { id, kind, text, tone, result, at: clock() }]);
-    setOpen(true);
-    return id;
-  };
-  const patchTurn = (id: number | null, tone: Turn["tone"], result: string): void => {
-    if (id === null) return;
-    setTurns((all) => all.map((t) => (t.id === id ? { ...t, tone, result, at: clock() } : t)));
-  };
-  // Newest at the bottom: the thread follows new turns and a new preview.
-  useEffect(() => {
-    const el = threadRef.current;
-    if (el !== null) el.scrollTop = el.scrollHeight;
-  }, [turns, pv, outOfDate, open]);
   // Entering Hand off loads the draft: the same draft number comes back after a restart, with the words written so far.
   useEffect(() => {
     if (!handoff || draft !== null) return;
@@ -232,7 +218,9 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
   const keeperCases = (data?.cases ?? []).filter((c) => c.source === "case keeper" && (c.state === "Running" || c.state === "Waiting for your approval"));
   const at = atQuery(text, selStart);
   const suggestions = at && mode === "write" ? suggestionsFor(ui, at.query) : [];
-  const askBlocked = mode === "ask";
+  const hints = hintsFor(text);
+  const typed = parseLine(text);
+  const askBlocked = mode === "ask" && typed.kind === "plain";
   const empty = text.trim() === "";
   useEffect(() => {
     if (!empty) setTriedEmpty(false);
@@ -245,53 +233,57 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
         : handoff
           ? "Type what you want done first."
           : "Type what to look for first."
-      : handoff && keeperCases.length === 0
+      : handoff && keeperCases.length === 0 && typed.kind === "plain"
         ? "Cases are not connected or none is running, so there is no case to add a step to."
         : null;
 
   const hint = empty && !triedEmpty ? null : reasonOff;
 
-  const closePreview = (tone: Turn["tone"], result: string): void => {
-    patchTurn(activeTurn, tone, result);
-    setActiveTurn(null);
+  const closePreview = (): void => {
     setPv(null);
     setOutOfDate(false);
   };
-  const showPreview = async (refresh = false): Promise<void> => {
-    if (draft === null) {
+  /** The preview for these words. Nothing is sent: the person sees what would happen and presses Confirm. */
+  const showPreview = async (words: string = text, using: DraftInfo | null = draft): Promise<void> => {
+    let useDraft = using;
+    if (useDraft === null) {
+      useDraft = await io.handoff.draft();
+      if (useDraft !== null) setDraft(useDraft);
+    }
+    if (useDraft === null) {
       notify("The draft is not ready yet. Try again in a moment.");
       return;
     }
     setBusy(true);
     setOutOfDate(false);
-    const result = await io.handoff.preview({ draft_id: draft.draftId, text, ...(caseId !== "" ? { case_id: caseId } : {}), ...(reviewing ? { review: reviewStep !== "" ? { step_id: reviewStep } : {} } : {}) });
+    const result = await io.handoff.preview({ draft_id: useDraft.draftId, text: words, ...(caseId !== "" ? { case_id: caseId } : {}), ...(reviewing ? { review: reviewStep !== "" ? { step_id: reviewStep } : {} } : {}) });
     setBusy(false);
     if (result.ok) {
-      if (!refresh || activeTurn === null) {
-        if (activeTurn !== null) patchTurn(activeTurn, "quiet", "Replaced by a newer preview.");
-        setActiveTurn(addTurn("Hand off", text, "wait", "Waiting for your OK."));
-      } else patchTurn(activeTurn, "wait", "Waiting for your OK.");
       setPv(result.preview);
-      setPvText(text);
+      setPvText(words);
       setAssign(assign && result.preview.agent.offered);
       if (!result.preview.review) setReviewStep("");
       notify("");
     } else {
-      if (activeTurn !== null) patchTurn(activeTurn, "quiet", "Replaced by a newer try.");
-      setActiveTurn(null);
       setPv(null);
-      addTurn("Hand off", text, "bad", result.message);
       notify(result.message);
     }
   };
+  // The conversation asked for a preview (Confirm on a waiting move): the words go in the box in Hand off mode, then the preview shows.
+  useEffect(() => {
+    if (request === null) return;
+    dispatch({ type: "mode", mode: "handoff" });
+    dispatch({ type: "typing", text: request.words, selStart: request.words.length, selEnd: request.words.length });
+    const own: DraftInfo | null = request.draftId === undefined ? null : { draftId: request.draftId, text: request.words, mode: "handoff", agent: draft?.agent ?? { offered: false, words: "" } };
+    if (own !== null) setDraft(own);
+    void showPreview(request.words, own);
+  }, [request?.n]);
   const confirmHandoff = async (): Promise<void> => {
     if (pv === null || draft === null) return;
     setBusy(true);
     const result = await io.handoff.send({ draft_id: pv.draft_id, text: pvText, case_id: pv.case_id, plan_precondition: pv.plan_precondition, assign: assign && pv.agent.offered, ...(pv.review ? { review: { step_id: reviewStep } } : {}) });
     setBusy(false);
     if (result.ok) {
-      patchTurn(activeTurn, "ok", result.message);
-      setActiveTurn(null);
       setPv(null);
       setOutOfDate(false);
       setAssign(false);
@@ -300,15 +292,70 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
       notify(result.message, true);
     } else if (result.outcome === "preview_out_of_date") {
       setOutOfDate(true);
-      patchTurn(activeTurn, "bad", "Out of date. Nothing was sent.");
       notify(result.message);
     } else {
-      patchTurn(activeTurn, "bad", result.message);
       notify(result.message);
     }
   };
 
+  const saveWords = async (words: string): Promise<void> => {
+    setBusy(true);
+    const result = await io.saveNote({ body: words, case_ref: data?.status.openCase?.case_ref ?? null });
+    setBusy(false);
+    if (result.ok) {
+      dispatch({ type: "sent" });
+      notify("Saved.", true);
+    } else notify(result.message);
+  };
+  const findWords = (words: string): void => {
+    const parsed = parseFind(words);
+    dispatch({ type: "find", q: parsed.q, day: parsed.day, tag: parsed.tag, record: true });
+  };
+  /** /done and /hold open the same preview as the Decide buttons. Nothing happens until you confirm there. */
+  const decideCommand = (name: "done" | "hold", arg: string): void => {
+    const cards = (data?.decide.cards ?? []).filter((c) => c.held === null);
+    const n = /^\d+$/.test(arg) ? Number(arg) : 0;
+    const card = arg === "" ? undefined : n > 0 ? cards[n - 1] : cards.find((c) => c.id === arg || c.title.toLowerCase().includes(arg.toLowerCase()));
+    if (card === undefined) {
+      notify(arg === "" ? `Say which step, like /${name} 1. Open Decide to see what is waiting.` : `Nothing waiting matches "${arg}". Open Decide to see what is waiting.`);
+      return;
+    }
+    dispatch({ type: "view", view: "decide" });
+    dispatch({ type: "preview-open", cardId: card.id, choice: name === "done" ? "accept" : "hold" });
+    dispatch({ type: "sent" });
+    notify("");
+  };
+  const runCommand = async (name: CommandName, arg: string): Promise<void> => {
+    if (name === "done" || name === "hold") return decideCommand(name, arg);
+    if (arg === "") {
+      notify(name === "find" ? "Say what to look for, like /find invoice." : name === "note" ? "Say what to write, like /note Call the supplier." : "Say what you want done, like /handoff Fix the checkout total.");
+      return;
+    }
+    if (name === "find") {
+      findWords(arg);
+      dispatch({ type: "sent" });
+      notify("");
+    } else if (name === "note") await saveWords(arg);
+    else {
+      if (keeperCases.length === 0) {
+        notify("Cases are not connected or none is running, so there is no case to add a step to.");
+        return;
+      }
+      dispatch({ type: "mode", mode: "handoff" });
+      dispatch({ type: "typing", text: arg, selStart: arg.length, selEnd: arg.length });
+      await showPreview(arg);
+    }
+  };
+
   const send = async (): Promise<void> => {
+    if (typed.kind === "unknown") {
+      notify(unknownCommandWords(typed.name));
+      return;
+    }
+    if (typed.kind === "command") {
+      await runCommand(typed.name, typed.arg);
+      return;
+    }
     if (reasonOff !== null) {
       if (empty) setTriedEmpty(true);
       if (!askBlocked) notify(mode === "write" ? "A note needs some words. Type something, then press Enter." : "Type what to look for first.");
@@ -319,90 +366,47 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
       return;
     }
     if (mode === "find") {
-      const parsed = parseFind(text);
-      dispatch({ type: "find", q: parsed.q, day: parsed.day, tag: parsed.tag });
-      addTurn("Find", text, "quiet", "Results are in Explore.");
+      findWords(text);
       return;
     }
-    setBusy(true);
-    const result = await io.saveNote({ body: text, case_ref: data?.status.openCase?.case_ref ?? null });
-    setBusy(false);
-    if (result.ok) {
-      addTurn("Note", text, "ok", `Saved on today${data?.status.openCase ? " and on the open case" : ""}.`);
-      dispatch({ type: "sent" });
-      notify("Saved.", true);
-    } else {
-      addTurn("Note", text, "bad", result.message);
-      notify(result.message);
-    }
+    await saveWords(text);
   };
 
   const agentConnected = data?.status.parts.find((p) => p.name === "Agent work")?.connected === true;
-  const viewLabel = VIEWS.find((v) => v.id === ui.view)?.label ?? "";
   const openCase = data?.status.openCase?.purpose ?? "no case open";
   const sendLabel = mode === "write" ? "Save note" : mode === "find" ? "Find" : mode === "ask" ? "Ask" : "Preview hand off";
   const shownNotice = ui.notice !== null && ui.notice !== "" ? ui.notice : null;
   // The notice carries successes too (Saved, Handed off); only a problem is shown as an alert.
   const noticeIsGood = shownNotice !== null && noticeTone === "ok";
-  const statusText = busy ? "Sending…" : askBlocked ? "Ask is not connected: no reference library is set up." : hint ?? "Ready";
+  const statusText = busy ? "Sending…" : askBlocked ? "Ask is not connected: no reference library is set up." : hint ?? (latest !== undefined ? latest.outcome : "Ready");
   const stateWord = MODE_LABEL[mode];
-  const tone = busy ? "wait" : (shownNotice !== null && !noticeIsGood) || (hint !== null && !askBlocked) || askBlocked ? "bad" : "ok";
+  const tone = busy ? "wait" : (shownNotice !== null && !noticeIsGood) || (hint !== null && !askBlocked) || askBlocked ? "bad" : hint === null && latest !== undefined ? STATUS_TONE[latest.status] : "ok";
   const tries = TRY[mode];
   const tryOut = (phrase: string): void => {
     dispatch({ type: "typing", text: phrase, selStart: phrase.length, selEnd: phrase.length });
     dispatch({ type: "focus", target: "composer" });
   };
-  const shownTurns = turns.map((t) => ({ ...t, text: presenting ? "Hidden while Presenting is on." : t.text }));
+  const viewLabel = VIEWS.find((v) => v.id === ui.view)?.label ?? "";
   return (
-    <div className="convo" data-open={open ? "yes" : "no"}>
-      {turns.length > 0 ? (
-        <section className="cv-thread" aria-label="Conversation">
-          <div className="cv-thread-head">
-            <button type="button" className="cv-fold" aria-expanded={open} aria-controls="cv-thread-body" onClick={() => setOpen(!open)}>
-              <span aria-hidden="true">{open ? "▾" : "▸"}</span> Conversation ({turns.length})
-            </button>
-            <button type="button" className="cv-fold" onClick={() => { setTurns([]); setOpen(true); }} disabled={pv !== null}>
-              Clear
-            </button>
-          </div>
-          <div id="cv-thread-body" className="cv-thread-body" ref={threadRef} hidden={!open}>
-            <ol className="cv-turns">
-              {shownTurns.map((t) => (
-                <li key={t.id} className="cv-turn">
-                  <div className="cv-sent">
-                    <span className="cv-meta">You · {t.kind}</span>
-                    <p dir="auto">{t.text}</p>
-                  </div>
-                  {t.id === activeTurn && pv !== null ? (
-                    <HandoffPreviewCard
-                      pv={pv}
-                      assign={assign}
-                      outOfDate={outOfDate}
-                      busy={busy}
-                      reviewStep={reviewStep}
-                      onReviewStep={setReviewStep}
-                      onCancel={() => {
-                        closePreview("quiet", "Cancelled. Nothing was sent.");
-                        notify("");
-                      }}
-                      onConfirm={() => void confirmHandoff()}
-                      onRefresh={() => void showPreview(true)}
-                    />
-                  ) : (
-                    <p className="cv-result" data-tone={t.tone}>
-                      <span className="cv-dot" aria-hidden="true" />
-                      <span>
-                        <Words text={t.result} />
-                      </span>
-                      <span className="cv-meta">{t.at}</span>
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-      ) : tries.length > 0 && empty ? (
+    <div className="convo">
+      {pv !== null ? (
+        <div className="cv-pending">
+          <HandoffPreviewCard
+            pv={pv}
+            assign={assign}
+            outOfDate={outOfDate}
+            busy={busy}
+            reviewStep={reviewStep}
+            onReviewStep={setReviewStep}
+            onCancel={() => {
+              closePreview();
+              notify("");
+            }}
+            onConfirm={() => void confirmHandoff()}
+            onRefresh={() => void showPreview(pvText)}
+          />
+        </div>
+      ) : tries.length > 0 && empty && !inConversation ? (
         <p className="cv-try">
           <span className="cv-meta">Try</span>
           {tries.map((phrase) => (
@@ -437,7 +441,7 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
             <span className="cv-state">{stateWord}</span>
           </p>
         ) : (
-          <p role="status" className="cv-status" data-tone={tone}>
+          <p role="status" className="cv-status" data-tone={tone} data-latest={hint === null && latest !== undefined ? "yes" : undefined}>
             <span className="cv-dot" aria-hidden="true" />
             <span>{statusText}</span>
             <span className="cv-state">{stateWord}</span>
@@ -470,7 +474,7 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
             ) : null}
             {handoff ? (
               <label className="cv-chip cv-chip-check">
-                <input type="checkbox" checked={reviewing} onChange={(event) => { setReviewing(event.target.checked); setReviewStep(""); if (pv !== null) closePreview("quiet", "Preview closed."); }} /> Run a review of finished agent work
+                <input type="checkbox" checked={reviewing} onChange={(event) => { setReviewing(event.target.checked); setReviewStep(""); if (pv !== null) closePreview(); }} /> Run a review of finished agent work
               </label>
             ) : null}
           </div>
@@ -495,6 +499,12 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
                 if (t.selectionStart !== selStart) dispatch({ type: "typing", text: t.value, selStart: t.selectionStart, selEnd: t.selectionEnd });
               }}
               onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  // Esc leaves the box: focus goes back to the list.
+                  event.currentTarget.blur();
+                  dispatch({ type: "focus", target: "list" });
+                  return;
+                }
                 if (suggestions.length > 0 && at) {
                   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
                     event.preventDefault();
@@ -524,6 +534,17 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
             </button>
           </div>
         </div>
+        {hints.length > 0 ? (
+          <ul className="cv-hints" aria-label="Commands you can type">
+            {hints.map((h) => (
+              <li key={h.name}>
+                <button type="button" onClick={() => tryOut(`/${h.name} `)}>
+                  <code>{h.usage}</code> <span>{h.does}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {suggestions.length > 0 ? (
           <ul className="suggestions" role="listbox" aria-label="Link to…">
             {suggestions.map((s, index) => (
@@ -551,13 +572,19 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
               : handoff
                 ? `Turns your words into one step in a case. Enter shows a preview; nothing is sent until you confirm. ${agentConnected ? "An agent can take the step." : "Agent work: Not connected, so the step stays with you."}`
                 : `Ask: ${NOT_CONNECTED}. No reference library is set up, so questions cannot be answered. Use Find to search your own notes.`}{" "}
-          Tab changes the mode. Esc leaves the box.
+          Start a line with / to run a command: {COMMAND_HINTS.map((h) => h.usage).join(", ")}. Tab changes the mode. Esc leaves the box.
           {hint !== null && !askBlocked ? ` (${hint})` : ""}
         </p>
         <div className="cv-foot">
           <span className="cv-where">
             {data?.status.setup ?? "no setup"} · {openCase} · {viewLabel}
           </span>
+          {!inConversation ? (
+            <button type="button" className="cv-open" data-open-conversation onClick={() => dispatch({ type: "view", view: "conversation" })}>
+              Conversation ({waitingRows})
+              <span className="sr-only"> {waitingRows === 1 ? "1 item is" : `${waitingRows} items are`} waiting for you. Opens the full conversation.</span>
+            </button>
+          ) : null}
           <span className="cv-keys" aria-hidden="true">
             <kbd>Enter</kbd> send <span>·</span> <kbd>Shift</kbd>+<kbd>Enter</kbd> new line <span>·</span> <kbd>Tab</kbd> mode <span>·</span> <kbd>Esc</kbd> leave
           </span>

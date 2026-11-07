@@ -10,8 +10,9 @@ import type { RemoteIo } from "./RemotePanel.tsx";
 import type { SaveLabel } from "./LabelControl.tsx";
 import type { InspectIo } from "./Answers.tsx";
 import type { RecordPin } from "./model.ts";
-import { Composer, type HandoffIo } from "./Composer.tsx";
-import { Panels, type PanelsIo } from "./Panels.tsx";
+import { Composer, type ComposerRequest, type HandoffIo } from "./Composer.tsx";
+import { ConversationView, requestFor, type ConversationIo } from "./Conversation.tsx";
+import type { PanelsIo } from "./Panels.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { KEY_TABLE } from "./keys.ts";
 import { Nav } from "./Nav.tsx";
@@ -42,6 +43,8 @@ export interface DeskIo extends NoteIo, InspectIo {
   readonly handoff: HandoffIo;
   /** Answers, pins and closes on panels from agents (stage 4). */
   readonly panels: PanelsIo;
+  /** The stored conversation: discarding a waiting suggestion. */
+  readonly conversation: ConversationIo;
   /** Starts the steps of a case that were added and are waiting. */
   readonly startCase: (caseId: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
 }
@@ -127,6 +130,9 @@ export function Desk(props: DeskProps): ReactNode {
     void io.decide({ card_id: cardId, choice: "release", preview_code: "", records: [], reason: "" }).then((result) => dispatch({ type: "decision-result", ok: result.ok, message: result.message }));
   };
   const data = ui.data;
+  // One composer, one record: the conversation asks the composer for a preview through this request, never through a copy of its state.
+  const [request, setRequest] = useState<ComposerRequest | null>(null);
+  const ask = (words: string, draftId?: string): void => setRequest((r) => ({ n: (r?.n ?? 0) + 1, words, ...(draftId === undefined ? {} : { draftId }) }));
   const onLink: OpenLink = (kind: LinkKind, ref: string) => {
     if (kind === "day") dispatch({ type: "day", day: ref === data?.today ? null : ref });
     else dispatch({ type: "select", id: kind === "case" || kind === "note" ? ref : `${kind}:${ref}` });
@@ -134,6 +140,7 @@ export function Desk(props: DeskProps): ReactNode {
   const viewProps = { ui, data, dispatch, onLink };
   const view: Record<ViewId, ReactNode> = {
     today: <Today {...viewProps} />,
+    conversation: <ConversationView ui={ui} dispatch={dispatch} panels={io.panels} conversation={io.conversation} onConfirm={(row) => ask(requestFor(row).words, requestFor(row).draftId)} onPreviewWords={(words) => ask(words)} />,
     explore: <Explore {...viewProps} />,
     decide: <Decide {...viewProps} confirm={confirm} release={release} {...(props.nowMs === undefined ? {} : { nowMs: props.nowMs })} />,
     work: <Work {...viewProps} saveLabel={io.saveLabel} startCase={io.startCase} />,
@@ -149,8 +156,7 @@ export function Desk(props: DeskProps): ReactNode {
         <Nav ui={ui} data={data} dispatch={dispatch} />
         <main id="main" className="main" aria-label={VIEWS.find((v) => v.id === ui.view)?.label}>
           {view[ui.view]}
-          {data?.panels ? <Panels panels={data.panels} waiting={data.panels.waiting} io={io.panels} /> : null}
-          <Composer ui={ui} dispatch={dispatch} io={io} />
+          <Composer ui={ui} dispatch={dispatch} io={io} request={request} />
         </main>
         <Inspector ui={ui} dispatch={dispatch} io={io} onLink={onLink} />
       </div>

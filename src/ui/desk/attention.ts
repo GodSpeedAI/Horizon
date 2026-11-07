@@ -5,6 +5,7 @@
  * Rule 7: no record means "not recorded", counted as unchecked. Rule 9: a pin keeps its content and says when its source moved.
  */
 import { NOT_RECORDED } from "../workspace/compare-model.ts";
+import type { ConversationRow } from "./conversation-model.ts";
 import type { DeskState, InspectionAnswer, NextState, RecordPin, SearchResult, ViewId } from "./model.ts";
 import type { WorkData } from "./work-build.ts";
 
@@ -120,7 +121,7 @@ export interface Interruptions {
 export function interruptionsOf(data: DeskState | null): Interruptions {
   const cards = data?.decide.cards ?? [];
   return {
-    counts: { today: 0, explore: 0, decide: cards.filter((c) => c.held === null).length, work: 0 },
+    counts: { today: 0, conversation: 0, explore: 0, decide: cards.filter((c) => c.held === null).length, work: 0 },
     notices: data?.decide.notices ?? [],
     cardIds: cards.map((c) => c.id),
   };
@@ -170,7 +171,10 @@ export interface UiState {
   readonly focus: string;
   readonly composer: { readonly mode: Mode; readonly text: string; readonly selStart: number; readonly selEnd: number };
   readonly feed: Feed;
-  readonly find: { readonly q: string; readonly day: string | null; readonly tag: string | null };
+  /** `record` is set when the person submitted the find, so the conversation keeps it. Find-as-you-type never sets it. */
+  readonly find: { readonly q: string; readonly day: string | null; readonly tag: string | null; readonly record?: true };
+  /** The conversation: the newest stored moves, oldest first. One record for every view and the composer. */
+  readonly rows: readonly ConversationRow[];
   readonly results: SearchResult | null;
   readonly pins: readonly Pin[];
   readonly notice: string | null;
@@ -198,6 +202,7 @@ export const START: UiState = {
   composer: { mode: "write", text: "", selStart: 0, selEnd: 0 },
   feed: FEED_START,
   find: { q: "", day: null, tag: null },
+  rows: [],
   results: null,
   pins: [],
   notice: null,
@@ -226,7 +231,8 @@ export type Action =
   | { readonly type: "sent" }
   | { readonly type: "scrolled"; readonly atBottom: boolean; readonly total: number }
   | { readonly type: "jump-to-new" }
-  | { readonly type: "find"; readonly q: string; readonly day?: string | null; readonly tag?: string | null }
+  | { readonly type: "find"; readonly q: string; readonly day?: string | null; readonly tag?: string | null; readonly record?: boolean }
+  | { readonly type: "rows"; readonly rows: readonly ConversationRow[] }
   | { readonly type: "results"; readonly results: SearchResult }
   | { readonly type: "pin"; readonly pin: Omit<Pin, "pinned_at" | "changed">; readonly now: Date }
   | { readonly type: "unpin"; readonly id: string }
@@ -302,7 +308,9 @@ export function deskReducer(ui: UiState, action: Action): UiState {
     case "jump-to-new":
       return { ...ui, feed: FEED_START };
     case "find":
-      return { ...ui, view: "explore", cursor: 0, feed: FEED_START, find: { q: action.q, day: action.day ?? null, tag: action.tag ?? null } };
+      return { ...ui, view: "explore", cursor: 0, feed: FEED_START, find: { q: action.q, day: action.day ?? null, tag: action.tag ?? null, ...(action.record === true ? { record: true as const } : {}) } };
+    case "rows":
+      return { ...ui, rows: action.rows };
     case "results":
       return { ...ui, results: action.results };
     case "pin":
