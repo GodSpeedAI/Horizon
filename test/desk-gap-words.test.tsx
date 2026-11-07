@@ -1,0 +1,40 @@
+/** @jsxImportSource react */
+/** The word scan, extended to the text the gap fixes added. */
+import { describe, expect, test } from "bun:test";
+import { renderToStaticMarkup } from "react-dom/server";
+import { AGENT_READ_WORDS, NOT_RECORDED_WORDS, WRITE_TOKEN_WORDS } from "../src/app.ts";
+import { WITHHELD_WORDS } from "../src/ui/desk/agent-view.ts";
+import { BANNED, hasBannedWords } from "../src/ui/desk/banned-words.ts";
+import { START } from "../src/ui/desk/attention.ts";
+import { CONTROL_WORDS } from "../src/ui/desk/blocks/ask.tsx";
+import { STAGE_WORD, STATUS_WORD } from "../src/ui/desk/Conversation.tsx";
+import { TOO_MANY_PROPOSALS, type ConversationRow } from "../src/ui/desk/conversation-model.ts";
+import { Desk } from "../src/ui/desk/Desk.tsx";
+import { ANSWERED_CANNOT_CHANGE, QUESTION_CHANGED, REQUIRED_CANNOT_WITHDRAW } from "../src/ui/desk/panels-model.ts";
+import { INSPECT_WITHHELD } from "../src/ui/desk/webmcp-tools.ts";
+import { deskState } from "./support/desk-fixture.ts";
+import { quietIo } from "./support/desk-io.ts";
+
+const visible = (html: string): string => html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+const clean = (label: string, words: string): void => {
+  const hits = BANNED.filter((b) => b.pattern.test(words)).map((b) => b.name);
+  expect({ label, hits }).toEqual({ label, hits: [] });
+  expect({ label, flagged: hasBannedWords(words) }).toEqual({ label, flagged: false });
+};
+
+describe("new sentences are plain", () => {
+  test("every refusal and note", () => {
+    const all: Record<string, string> = { WRITE_TOKEN_WORDS, NOT_RECORDED_WORDS, TOO_MANY_PROPOSALS, QUESTION_CHANGED, ANSWERED_CANNOT_CHANGE, REQUIRED_CANNOT_WITHDRAW, AGENT_READ_WORDS, WITHHELD_WORDS, INSPECT_WITHHELD, ...CONTROL_WORDS, ...STATUS_WORD, ...STAGE_WORD };
+    for (const [label, words] of Object.entries(all)) clean(label, words);
+  });
+
+  test("a conversation with stages, a claimed route and a partly done hand off", () => {
+    const base = { at: "2026-11-07T10:00:00Z", source: "you" as const, refs: { case_id: "c1", step_id: "s1" } };
+    const rows: ConversationRow[] = [
+      { ...base, row_id: "r1", kind: "handoff", words: "Sort the inbox", outcome: "Handed off.", status: "partial", stages: [{ name: "Sent", status: "done", words: "The step was added to the case." }, { name: "Started", status: "refused", words: "It did not start: the case keeper could not start it.", recovery: "Try again" }, { name: "Given to an agent", status: "refused", words: "No agent has it: not connected.", recovery: "Open the step" }, { name: "Result seen", status: "unseen", words: "Not seen yet." }] },
+      { ...base, row_id: "r2", kind: "answer", words: "You answered: A", outcome: "The agent says it took it to: step one. Not checked: Horizon found no step with that name.", status: "claimed" },
+    ];
+    const html = renderToStaticMarkup(<Desk ui={{ ...START, view: "conversation", rows, data: deskState() }} dispatch={() => undefined} io={quietIo()} />);
+    clean("conversation", visible(html).replace(/Sort the inbox|You answered: A/g, ""));
+  });
+});
