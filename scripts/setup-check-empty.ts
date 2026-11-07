@@ -6,6 +6,7 @@
  */
 import { Database } from "bun:sqlite";
 import { existsSync, readFileSync } from "node:fs";
+import { listCases } from "../src/adapters/sea-forge-case.ts";
 import { argValue, setupMapping } from "../src/config/setup.ts";
 import { gh } from "./setup-github.ts";
 import { recordSourcesOf, repoList } from "./setup-health.ts";
@@ -13,7 +14,7 @@ import { recordSourcesOf, repoList } from "./setup-health.ts";
 type Env = Record<string, string | undefined>;
 const COLLECTIONS = ["horizon-cases", "horizon-notes", "horizon-labels"] as const;
 
-export function run(args: readonly string[], env: Env, out: (line: string) => void, err: (line: string) => void): number {
+export async function run(args: readonly string[], env: Env, out: (line: string) => void, err: (line: string) => void): Promise<number> {
   if (argValue(args, "setup") !== "production") {
     err("setup-check-empty: --setup production");
     return 2;
@@ -26,9 +27,13 @@ export function run(args: readonly string[], env: Env, out: (line: string) => vo
   const mapping = setupMapping("production", env);
   const counts: [string, number][] = [];
 
-  // Case keeper: its question is `case_list` over the socket. Horizon has no client for it yet, so a live socket
-  // cannot be answered here and is counted as one unanswered item rather than assumed empty.
-  counts.push(["SEA-Forge cases (socket present, case_list unanswered)", existsSync(mapping.socket) ? 1 : 0]);
+  // Case keeper: ask it (`case_list`). A socket that is not there holds no cases. A socket that is there but does not give a
+  // usable answer cannot be proven empty, so it counts as one unanswered item: the check fails safe.
+  if (existsSync(mapping.socket)) {
+    const listed = await listCases({ socketPath: mapping.socket, service: { actor_id: "cognate-service", role: "service" }, timeoutMs: 3_000 });
+    if (listed.kind === "ok") counts.push(["SEA-Forge cases", listed.value.cases.length + listed.value.unreadable.length]);
+    else counts.push([`SEA-Forge cases (not answered: ${listed.words})`, 1]);
+  } else counts.push(["SEA-Forge cases (no socket)", 0]);
 
   const store = `${mapping.cell}/app.sqlite`;
   for (const collection of COLLECTIONS) {
@@ -72,4 +77,4 @@ export function run(args: readonly string[], env: Env, out: (line: string) => vo
   return counts.every(([, n]) => n === 0) ? 0 : 1;
 }
 
-if (import.meta.main) process.exit(run(process.argv.slice(2), process.env, console.log, console.error));
+if (import.meta.main) process.exit(await run(process.argv.slice(2), process.env, console.log, console.error));

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { run as runClear } from "../scripts/setup-clear.ts";
 import { run as runCheckEmpty } from "../scripts/setup-check-empty.ts";
+import { fakeCaseKeeper, type FakeReply } from "./support/fake-case-keeper.ts";
 import { run as runEnv } from "../scripts/setup-env.ts";
 import { run as runGithub } from "../scripts/setup-github.ts";
 import { run as runHealth } from "../scripts/setup-health.ts";
@@ -240,6 +241,30 @@ describe("setup-check-empty", () => {
     const record = await capture(runCheckEmpty, ["--setup", "production", "--exclude", "personal"]);
     expect(record.code).toBe(1);
     expect(record.out).toContain("record repositories in horizon");
+  });
+
+  test("a live case keeper is asked (case_list): an empty one passes, one with a case fails, one that cannot answer fails safe", async () => {
+    await capture(runInit, ["--setup", "production"]);
+    let reply: FakeReply = { json: { cases: [], unreadable: [] } };
+    const keeper = fakeCaseKeeper(() => reply, production().socket);
+    try {
+      const empty = await capture(runCheckEmpty, ["--setup", "production", "--exclude", "personal"]);
+      expect(empty.code).toBe(0);
+      expect(empty.out).toContain("ok   SEA-Forge cases: 0");
+      expect(keeper.received[0]).toMatchObject({ verb: "case_list" });
+      reply = { json: { cases: [{ case_id: "case_1", case_state: "active", summary: "x", created_at: "t" }], unreadable: [] } };
+      const one = await capture(runCheckEmpty, ["--setup", "production", "--exclude", "personal"]);
+      expect(one.code).toBe(1);
+      expect(one.out).toContain("FAIL SEA-Forge cases: 1");
+      reply = { json: { cases: [], unreadable: ["case_bad"] } };
+      expect((await capture(runCheckEmpty, ["--setup", "production", "--exclude", "personal"])).out).toContain("FAIL SEA-Forge cases: 1");
+      reply = { raw: "garbage\n" };
+      const garbled = await capture(runCheckEmpty, ["--setup", "production", "--exclude", "personal"]);
+      expect(garbled.code).toBe(1);
+      expect(garbled.out).toContain("not answered");
+    } finally {
+      keeper.stop();
+    }
   });
 
   test("the personal record is skipped only when excluded by name", async () => {
