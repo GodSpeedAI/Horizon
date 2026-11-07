@@ -12,7 +12,7 @@ const statusText = (choice: WorkspaceChoice): string => (choice.available ? (cho
 function Choice({ choice, focus }: { readonly choice: WorkspaceChoice; readonly focus: string }): ReactNode {
   const review = choice.review === null ? null : (
     <details>
-      <summary>What this commitment means</summary>
+      <summary>What choosing this means</summary>
       <dl>
         <dt>Can it be undone</dt><dd>{choice.review.reversibility}</dd>
         <dt>Payment</dt><dd>{choice.review.payment}</dd>
@@ -55,7 +55,7 @@ export function NextDecision({ next }: { readonly next: NextState | null }): Rea
     );
   }
   const current = next.state === "ready" || next.state === "partial" || next.state === "blocked";
-  const unbound = next.choices.filter((c) => c.available && c.action_id === null);
+  // A choice that exists only at the terminal has no button here, so it is not listed.
   const shown = next.choices.filter((c) => !(c.available && c.action_id === null));
   return (
     <section aria-labelledby="next-h" data-next data-state={next.state}>
@@ -93,12 +93,7 @@ export function NextDecision({ next }: { readonly next: NextState | null }): Rea
               ))}
             </ol>
           )}
-          {unbound.length === 0 ? null : (
-            <p className="muted" data-unbound="true">
-              Also possible from the terminal: {unbound.map((c) => c.label).join(", ")}.
-            </p>
-          )}
-          {shown.length === 0 && next.blocked.length === 0 && unbound.length === 0 ? <p className="empty">Nothing is offered from this focus right now.</p> : null}
+          {shown.length === 0 && next.blocked.length === 0 ? <p className="empty">Nothing is offered from this focus right now.</p> : null}
         </>
       ) : null}
     </section>

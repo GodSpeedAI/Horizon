@@ -18,7 +18,7 @@ export function Today({ ui, data, dispatch, onLink }: ViewProps): ReactNode {
   if (data === null) {
     return (
       <section aria-labelledby="today-h">
-        <h1 id="today-h">Today</h1>
+        <h1 id="today-h" tabIndex={-1}>Today</h1>
         <p role="status">{emptyDayReason({} as DeskState, false)}</p>
       </section>
     );
@@ -31,7 +31,7 @@ export function Today({ ui, data, dispatch, onLink }: ViewProps): ReactNode {
   const reason = emptyDayReason(data, true);
   return (
     <section aria-labelledby="today-h" className="view" data-view-id="today">
-      <h1 id="today-h">{isToday ? "Today" : dayLabel(day)}</h1>
+      <h1 id="today-h" tabIndex={-1}>{isToday ? "Today" : dayLabel(day)}</h1>
       <p className="muted">
         {dayLabel(day)} ({data.timezone})
         {!isToday ? (

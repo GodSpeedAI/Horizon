@@ -3,11 +3,12 @@
  * Work (design 5.1): "What is running and how did it go?" Problems come first (rule 8): a contradicted record is the first item.
  * Below it: the comparison of what the agent said with the independent record, running cases, and what it cost.
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Action } from "../attention.ts";
 import { ComparisonView } from "../ComparisonView.tsx";
 import { LabelControl, type SaveLabel } from "../LabelControl.tsx";
 import { caseStateWords } from "../work-build.ts";
+import { caseTitle } from "../model.ts";
 import { Cost } from "./Cost.tsx";
 import type { ViewProps } from "./Today.tsx";
 
@@ -15,12 +16,16 @@ export interface WorkViewProps extends ViewProps {
   readonly saveLabel: SaveLabel;
 }
 
+/** A folder name, not a full path. */
+const folderOf = (path: string | null, id: string): string => (path === null ? id : (path.replace(/\/+$/, "").split("/").pop() || path));
+
 export function Work({ ui, dispatch, saveLabel }: WorkViewProps): ReactNode {
+  const [showTests, setShowTests] = useState(false);
   const work = ui.work;
   if (work === null) {
     return (
       <section aria-labelledby="work-h" className="view" data-view-id="work">
-        <h1 id="work-h">Work</h1>
+        <h1 id="work-h" tabIndex={-1}>Work</h1>
         <p role="status">Still loading.</p>
       </section>
     );
@@ -31,7 +36,7 @@ export function Work({ ui, dispatch, saveLabel }: WorkViewProps): ReactNode {
   const patch = (change: Partial<typeof query>): void => dispatch({ type: "work-query", patch: change } satisfies Action);
   return (
     <section aria-labelledby="work-h" className="view" data-view-id="work">
-      <h1 id="work-h">Work</h1>
+      <h1 id="work-h" tabIndex={-1}>Work</h1>
       <p className="muted">What is running, how it went, and what it cost. Problems come first.</p>
 
       <h2>Needs a look first</h2>
@@ -45,8 +50,15 @@ export function Work({ ui, dispatch, saveLabel }: WorkViewProps): ReactNode {
             const session = sessionById.get(item.id);
             return (
               <li key={item.id} data-work-item={item.id} data-outcome={item.outcome} data-first={index === 0 ? "true" : undefined} data-cursor={ui.cursor === index ? "true" : undefined} aria-current={ui.cursor === index ? "true" : undefined}>
-                <strong>{item.title}</strong> <span className="pill" data-outcome={item.outcome}>{item.outcome}</span>
-                <span className="muted"> {item.words}</span>
+                <strong>{item.title}</strong>{" "}
+                {item.kind === "case" ? (
+                  <span className="pill" data-outcome={item.outcome}>{item.words}</span>
+                ) : (
+                  <>
+                    <span className="pill" data-outcome={item.outcome}>{item.outcome}</span>
+                    <span className="muted"> {item.words}</span>
+                  </>
+                )}
                 {session ? (
                   <>
                     {" "}
@@ -84,11 +96,16 @@ export function Work({ ui, dispatch, saveLabel }: WorkViewProps): ReactNode {
         <label>
           Repository
           <select name="repo" defaultValue={compare.selection.repo ?? ""}>
-            {compare.repos.map((r) => (
-              <option key={r.repo_id} value={r.repo_id}>{r.path ?? r.repo_id}</option>
+            {compare.repos.filter((r) => showTests || r.temporary !== true || r.repo_id === compare.selection.repo).map((r) => (
+              <option key={r.repo_id} value={r.repo_id}>{folderOf(r.path, r.repo_id)}</option>
             ))}
           </select>
         </label>
+        {compare.repos.some((r) => r.temporary === true) ? (
+          <label className="inline">
+            <input type="checkbox" checked={showTests} onChange={(event) => setShowTests(event.target.checked)} /> Show test repositories ({compare.repos.filter((r) => r.temporary === true).length})
+          </label>
+        ) : null}
         <label>
           Day
           <input type="date" name="day" defaultValue={compare.selection.day} required />
@@ -102,7 +119,19 @@ export function Work({ ui, dispatch, saveLabel }: WorkViewProps): ReactNode {
         </label>
         <button type="submit">Show</button>
       </form>
-      {compare.notice !== null ? <p role="status" data-notice>{compare.notice}</p> : null}
+      {compare.notice !== null ? (
+        <p role="status" data-notice>
+          {compare.notice}
+          {compare.lastDay && compare.lastDay !== compare.selection.day ? (
+            <>
+              {" "}
+              <button type="button" onClick={() => patch({ day: compare.lastDay ?? null, session: null })}>
+                Go to {compare.lastDay}
+              </button>
+            </>
+          ) : null}
+        </p>
+      ) : null}
       {compare.view ? (
         <>
           <ComparisonView view={compare.view} />
@@ -128,7 +157,7 @@ export function Work({ ui, dispatch, saveLabel }: WorkViewProps): ReactNode {
         <ul className="activity" data-list="work-cases">
           {work.cases.items.map((c) => (
             <li key={c.case_id}>
-              <strong>{c.summary || c.case_id}</strong> <span className="state-word" data-state={c.case_state}>{caseStateWords(c.case_state)}</span>
+              <strong>{caseTitle(c.summary, c.created_at)}</strong> <span className="state-word" data-state={c.case_state}>{caseStateWords(c.case_state)}</span>
             </li>
           ))}
         </ul>

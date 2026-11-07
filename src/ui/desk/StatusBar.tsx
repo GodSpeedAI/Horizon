@@ -53,6 +53,9 @@ export function StatusBar({ status, onPresenting, remote = null }: StatusBarProp
           <summary>Settings</summary>
           <div className="settings-body">
             <RemotePanel remote={remote} />
+            <p>
+              <a href="/desk/setup-guide">Setup guide</a>
+            </p>
           </div>
         </details>
       </div>

@@ -24,7 +24,9 @@ export interface ComparePageProps {
   readonly presenting: boolean;
   readonly selection: CompareSelection;
   readonly sources: readonly string[];
-  readonly repos: readonly { readonly repo_id: string; readonly path: string | null }[];
+  readonly repos: readonly { readonly repo_id: string; readonly path: string | null; /** A test repository under the system temp folder; the desk hides these until asked. */ readonly temporary?: boolean }[];
+  /** The newest day the record holds a session for, so an empty day can say where to look. */
+  readonly lastDay?: string | null;
   readonly sessions: readonly (SessionSummary & { readonly label: RunLabel | null })[];
   readonly view: CompareView | null;
   readonly label: RunLabel | null;

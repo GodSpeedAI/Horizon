@@ -112,6 +112,8 @@ export interface InspectPanelProps {
   readonly inspection: { readonly operation: string; readonly query: string; readonly busy: boolean; readonly answer: InspectionAnswer | null; readonly problem: string | null } | null;
   readonly operations: readonly string[];
   readonly onAsk: (operation: string, query: string) => void;
+  /** Whether a reference library is connected. When it is not, the lookup box is switched off and says why. */
+  readonly libraryConnected?: boolean;
 }
 
 const QUESTIONS: Readonly<Record<string, string>> = {
@@ -125,10 +127,11 @@ const QUESTIONS: Readonly<Record<string, string>> = {
 };
 
 /** Ask one of the seven questions about the shared focus, optionally with a question to look up in the reference library. */
-export function InspectPanel({ inspection, operations, onAsk }: InspectPanelProps): ReactNode {
+export function InspectPanel({ inspection, operations, onAsk, libraryConnected = false }: InspectPanelProps): ReactNode {
   return (
     <section className="inspect-panel" aria-labelledby="inspect-h" data-inspect-panel>
       <h2 id="inspect-h">Ask about the focus</h2>
+      <p className="muted">Choose a question about what is in focus. The answer is shown as facts, each with where it came from.</p>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -146,8 +149,13 @@ export function InspectPanel({ inspection, operations, onAsk }: InspectPanelProp
         </label>
         <label>
           Look up in the reference library (optional)
-          <input type="text" name="query" defaultValue={inspection?.query ?? ""} />
+          <input type="text" name="query" defaultValue={inspection?.query ?? ""} disabled={!libraryConnected} aria-describedby="library-why" />
         </label>
+        {libraryConnected ? null : (
+          <p id="library-why" className="muted" data-library-off>
+            The reference library is Not connected, so nothing can be looked up. Questions are still answered from what is recorded.
+          </p>
+        )}
         <button type="submit" disabled={inspection?.busy === true}>{inspection?.busy ? "Asking…" : "Ask"}</button>
       </form>
       {inspection?.problem ? <p role="alert" className="error">{inspection.problem}</p> : null}

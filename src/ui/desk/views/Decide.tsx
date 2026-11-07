@@ -15,7 +15,7 @@ export function Decide({ ui, data, dispatch, confirm, release, nowMs }: DecideVi
   if (data === null) {
     return (
       <section aria-labelledby="decide-h" className="view" data-view-id="decide">
-        <h1 id="decide-h">Decide</h1>
+        <h1 id="decide-h" tabIndex={-1}>Decide</h1>
         <p role="status">Still loading.</p>
       </section>
     );
@@ -27,7 +27,7 @@ export function Decide({ ui, data, dispatch, confirm, release, nowMs }: DecideVi
   const current = Math.min(ui.cursor, Math.max(0, waiting.length - 1));
   return (
     <section aria-labelledby="decide-h" className="view" data-view-id="decide">
-      <h1 id="decide-h">Decide</h1>
+      <h1 id="decide-h" tabIndex={-1}>Decide</h1>
       <p className="muted">What needs you, oldest first. Nothing is decided until you confirm a preview.</p>
       {ui.decideNote !== null ? (
         <p role="status" className={ui.decideNote.ok ? "notice" : "error"} data-decide-note>

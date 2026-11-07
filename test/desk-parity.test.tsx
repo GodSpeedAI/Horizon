@@ -74,8 +74,8 @@ describe("desk parity with the old workspace", () => {
     const state = await stateAt();
     const html = text(draw(withData(state)));
     expect(html).toContain("Getting started");
-    expect(html).toContain("Missing: SEA-Forge governance is off and RealityTrace is not configured.");
-    expect(html).toContain("bun run ignite");
+    expect(html).toContain("Missing: the case keeper is off and the record keeper is not set up.");
+    expect(html).toContain("setup guide");
     expect(html).toContain("Recent moves");
     // The old words for the state of each part are all still shown somewhere on the page.
     expect(state.home.onboarding.steps.map((s) => s.id)).toEqual(["stack", "case", "move"]);
@@ -208,7 +208,9 @@ describe("desk parity with the old workspace", () => {
     const html = draw(withData(state, { view: "decide", next }));
     expect(html).toContain("data-next");
     expect(text(html)).toContain("The next decision");
-    for (const choice of next.choices.slice(0, 3)) expect(text(html)).toContain(choice.label);
+    // Choices that exist only at the terminal have no button here and are not listed.
+    for (const choice of next.choices.filter((c) => !(c.available && c.action_id === null)).slice(0, 3)) expect(text(html)).toContain(choice.label);
+    expect(html).not.toContain("Also possible from the terminal");
     for (const entry of next.blocked.slice(0, 3)) expect(text(html)).toContain(entry.reason);
     // An available choice posts to the same route as before; the page never decides for the operator.
     if (next.choices.some((c) => c.available && c.action_id !== null)) expect(html).toContain('action="/workspace/intent"');
@@ -233,11 +235,11 @@ describe("desk parity with the old workspace", () => {
     expect(receipt.home.receipt?.found).toBe(true);
     const receiptHtml = text(draw(withData(receipt)));
     expect(receiptHtml).toContain("Decision receipt");
-    expect(receiptHtml).toContain("Horizon policy only: SEA-Forge is off.");
-    expect(receiptHtml).toContain("Unavailable: RealityTrace is off.");
+    expect(receiptHtml).toContain("Horizon policy only: the case keeper is off.");
+    expect(receiptHtml).toContain("Unavailable: the record keeper is off.");
     // An unknown receipt says so and never echoes the query text.
     const unknown = text(draw(withData(await stateAt(`receipt=${encodeURIComponent("<script>alert(1)</script>")}`))));
-    expect(unknown).toContain("No such commit.");
+    expect(unknown).toContain("No such move.");
     expect(unknown).not.toContain("<script>alert(1)</script>");
     // The move is listed under Recent moves.
     expect((await stateAt()).home.moves.some((m) => m.intent_id === intentId)).toBe(true);

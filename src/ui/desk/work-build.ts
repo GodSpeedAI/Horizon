@@ -6,6 +6,7 @@ import type { EconomicsReadout } from "../../economics/readout.ts";
 import type { CaseModel } from "../../economics/model.ts";
 import type { ComparePageProps } from "../workspace/compare.tsx";
 import type { Outcome } from "../workspace/compare-model.ts";
+import { caseTitle } from "./model.ts";
 
 const NOT_RECORDED = "Not recorded";
 
@@ -53,7 +54,7 @@ export function caseItems(cases: readonly CaseLineData[]): WorkItem[] {
   return cases.map((c): WorkItem => ({
     id: `case:${c.case_id}`,
     kind: "case",
-    title: c.summary || c.case_id,
+    title: caseTitle(c.summary, c.created_at),
     outcome: c.case_state === "completed" ? "done" : c.case_state === "terminated" ? "stopped" : "waiting",
     words: caseStateWords(c.case_state),
     at: c.closed_at ?? c.created_at,

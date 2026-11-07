@@ -261,7 +261,8 @@ export function deskReducer(ui: UiState, action: Action): UiState {
       // Rule 2: an update from outside changes the numbers, list ends and inspector (all derived from `data`) and nothing else.
       return { ...ui, data: action.state, pins: checkPins(ui.pins, currentRevOf(action.state)) };
     case "view":
-      return { ...ui, view: action.view, cursor: 0, feed: FEED_START, focus: "list", decision: null };
+      // Focus lands on the view's heading, so the reader sees where they are and J/K starts from the top.
+      return { ...ui, view: action.view, cursor: 0, feed: FEED_START, focus: "heading", decision: null };
     case "day":
       return { ...ui, view: "today", day: action.day, cursor: 0, feed: FEED_START, focus: "list" };
     case "cursor": {

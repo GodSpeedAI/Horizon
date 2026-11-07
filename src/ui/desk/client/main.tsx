@@ -47,6 +47,7 @@ function initial(): UiState {
 function focusTarget(focus: string): HTMLElement | null {
   if (focus === "composer") return document.getElementById("composer-input");
   if (focus === "list") return document.querySelector<HTMLElement>('[data-focus="list"]');
+  if (focus === "heading") return document.querySelector<HTMLElement>(".view h1");
   if (focus === "decision") return document.querySelector<HTMLElement>("#decision-preview [data-autofocus]") ?? document.getElementById("decision-preview");
   if (focus.startsWith("layer:")) return document.querySelector<HTMLElement>(`#layer-${focus.slice(6)} [data-autofocus], #layer-${focus.slice(6)} button`);
   return null;
@@ -162,7 +163,7 @@ function App() {
 
   useEffect(() => {
     focusTarget(ui.focus)?.focus();
-  }, [ui.focus, ui.layers.length]);
+  }, [ui.focus, ui.layers.length, ui.view]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {

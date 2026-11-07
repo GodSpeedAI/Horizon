@@ -120,7 +120,7 @@ describe("the inbox as decision cards (Decide)", () => {
     const found = cards(null, { state: "unreachable", message: "SEA-Forge did not answer in time" });
     expect(found.cards).toEqual([]);
     expect(found.notices.join(" ")).toContain("did not list the decisions waiting for you");
-    expect(found.notices.join(" ")).toContain("SEA-Forge did not answer in time");
+    expect(found.notices.join(" ")).toContain("The case keeper did not answer in time");
   });
 
   test("an unconfigured approver is said in a notice and offers no decision", () => {

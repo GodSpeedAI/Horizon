@@ -21,7 +21,7 @@ export function Explore({ ui, data, dispatch, onLink }: ViewProps): ReactNode {
   };
   return (
     <section aria-labelledby="explore-h" className="view" data-view-id="explore">
-      <h1 id="explore-h">Explore</h1>
+      <h1 id="explore-h" tabIndex={-1}>Explore</h1>
       <p className="muted">
         {filters.length === 0 ? "Everything you may see. To search, press Ctrl+K, switch the box to Find and type." : `Looking for ${filters.join(", ")}.`}
         {filters.length > 0 ? (

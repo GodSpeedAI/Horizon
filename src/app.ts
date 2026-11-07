@@ -84,9 +84,9 @@ import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
 import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
 import { keyState } from "./adapters/workshop.ts";
-import { matches, partsOf, sourcesOf, type DeskCase, type DecideState, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
-import { buildDecide, waitingCount, type CaseApprovals } from "./ui/desk/decide-build.ts";
-import { approvalList, caseDigest, decide as caseKeeperDecide, listCases, type CaseKeeper } from "./adapters/sea-forge-case.ts";
+import { caseTitle, matches, partsOf, plainWords, sourcesOf, type DeskCase, type DecideState, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
+import { buildDecide, waitingCount, type CaseApprovals, type HumanStepInput } from "./ui/desk/decide-build.ts";
+import { approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
 import { activeHolds, checkReason, putHold, recordDecision } from "./capabilities/decisions.ts";
 import { caseItems, costSource, orderWork, sessionItems, type AcceptedKnowledge, type WorkData } from "./ui/desk/work-build.ts";
 import { readLedgerDay } from "./adapters/ledger-day.ts";
@@ -96,6 +96,7 @@ import { setupMapping } from "./config/setup.ts";
 import type { RecordSource } from "./config/types.ts";
 import { existsSync as fileExists, mkdirSync as makeDir, readFileSync as readFileText, writeFileSync as writeFileText } from "node:fs";
 import { dirname as dirOf, join as joinPath } from "node:path";
+import { tmpdir as tmpDir } from "node:os";
 import type { Server } from "bun";
 import { RemoteController, type RemoteStatus } from "./remote/server.ts";
 import { remoteSettings } from "./remote/settings.ts";
@@ -1310,7 +1311,8 @@ export async function createApplication(
     const presenting = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
     const day = dayOf(params.get("day"));
     const only = params.get("only") === "contradicted" ? ("contradicted" as const) : null;
-    let repos: { repo_id: string; path: string | null }[] = [];
+    let repos: { repo_id: string; path: string | null; temporary?: boolean }[] = [];
+    let lastDay: string | null = null;
     let notice: string | null = null;
     let repoId: string | null = params.get("repo");
     let view: CompareView | null = null;
@@ -1324,17 +1326,18 @@ export async function createApplication(
       const listed = reader.repos();
       if (!listed.ok) notice = `The record could not be listed: ${listed.message}`;
       else {
-        repos = [...listed.repos];
+        repos = listed.repos.map((r) => ({ ...r, temporary: r.path !== null && (r.path.startsWith(`${tmpDir().replace(/\/$/, "")}/`) || r.path.startsWith("/tmp/")) }));
         repoId = repoId ?? repos[0]?.repo_id ?? null;
         if (repoId === null) notice = "This record source holds no repositories yet, so there is nothing to compare.";
         else {
           const read = readLedgerDay(reader, { repoId, day, timeZone: deskTimeZone, cacheDir });
           if (!read.ok) notice = `The record could not be read: ${read.message}`;
           else {
+            lastDay = read.last_day;
             const all = listSessions(read.rows);
             const shown = only === "contradicted" ? onlyContradicted(all) : all;
             sessions = shown.map((summary) => ({ ...summary, label: labelOf(summary.session_id, summary.event_id) }));
-            if (shown.length === 0) notice = only ? "No contradicted session on this day." : "No sessions are recorded on this day.";
+            if (shown.length === 0) notice = `${only ? "No contradicted session on this day." : "No sessions are recorded on this day."}${read.last_day === null ? " The record holds no sessions on any day." : read.last_day === day ? "" : ` Last recorded session: ${read.last_day}.`}`;
             if (sessionId !== null) {
               view = compareSession({ rows: read.rows, sessionId, ...(loaded.config.workshop ? { workshopUrl: loaded.config.workshop.url } : {}), intact: { intact: read.intact, records: read.records, divergence: read.divergence } });
               if (view === null) notice = "That session is not in the record for this day.";
@@ -1348,6 +1351,7 @@ export async function createApplication(
       selection: { source: sourceName, repo: repoId, day, session: sessionId, only },
       sources: recordSources.map((each) => each.name),
       repos,
+      lastDay,
       sessions,
       view,
       label: view ? labelOf(view.session.session_id, view.session.event_id) : null,
@@ -1379,9 +1383,25 @@ export async function createApplication(
     return repoNameCache.names;
   }
 
+  /** The case keeper's cases, asked at most every two seconds so one poll and one view agree. */
+  let keeperCaseCache: { at: number; value: Awaited<ReturnType<typeof listCases>> } | null = null;
+  async function keeperCases(): Promise<Awaited<ReturnType<typeof listCases>> | null> {
+    if (caseKeeper === null) return null;
+    if (keeperCaseCache !== null && Date.now() - keeperCaseCache.at < 2_000) return keeperCaseCache.value;
+    const value = await listCases(caseKeeper);
+    keeperCaseCache = { at: Date.now(), value };
+    return value;
+  }
+  const isOpenCase = (c: CaseLine): boolean => c.case_state === "active" || c.case_state === "awaiting_approval";
+  const CASE_STATE_PLAIN: Record<string, string> = { active: "Running", awaiting_approval: "Waiting for your approval", completed: "Done", terminated: "Stopped" };
+
+  /** Horizon's own cases and the case keeper's, newest first. The status bar, the left list, Explore and Work all read this one list. */
   async function deskCases(): Promise<DeskCase[]> {
     const rows = await runtime.runtime.store.listRecords(CASE_COLLECTION, { tenant: caller.tenant });
-    return rows.map((row) => ({ case_ref: String(row.value.case_ref), purpose: String(row.value.purpose), opened_at: String(row.value.opened_at) })).sort((a, b) => (a.opened_at < b.opened_at ? 1 : -1));
+    const own = rows.map((row): DeskCase => ({ case_ref: String(row.value.case_ref), purpose: String(row.value.purpose), opened_at: String(row.value.opened_at), source: "horizon" }));
+    const listed = await keeperCases();
+    const theirs = listed?.kind === "ok" ? listed.value.cases.map((c): DeskCase => ({ case_ref: `case:${c.case_id}`, purpose: caseTitle(c.summary, c.created_at), opened_at: c.created_at, source: "case keeper", state: CASE_STATE_PLAIN[c.case_state] ?? "Unknown state" })) : [];
+    return [...own, ...theirs].sort((a, b) => (a.opened_at < b.opened_at ? 1 : -1));
   }
 
   async function deskState(params: URLSearchParams): Promise<DeskState> {
@@ -1391,6 +1411,9 @@ export async function createApplication(
     const day = dayOf(params.get("day"));
     const status = cockpitStatus();
     const openCaseNow = await latestCase(store, caller.tenant);
+    const casesNow = await deskCases();
+    // With no case opened in Horizon, the newest case still running at the case keeper is the open case.
+    const keeperOpen = casesNow.find((c) => c.source === "case keeper" && (c.state === "Running" || c.state === "Waiting for your approval")) ?? null;
     const presenting = await presentingOn(store, caller.tenant, caller.actor.id);
     const workshop = loaded.config.workshop ? keyState(loaded.config.workshop, now) : ({ state: "missing", days_left: null } as const);
     const health = partsOf({ rules: world.worldRef !== "", cases: status.governed, records: recordSources.length > 0 || status.realitytrace, workshop: { state: workshop.state, days_left: "days_left" in workshop ? workshop.days_left : null } });
@@ -1408,17 +1431,17 @@ export async function createApplication(
         org: caller.tenant,
         setup: loaded.setup ?? null,
         rules: world.worldRef === "" ? "" : statusOf({ worldRef: world.worldRef, governed: status.governed, realitytrace: status.realitytrace, approvals: status.approvals, operator: caller.actor.id }).world,
-        openCase: openCaseNow ? { case_ref: openCaseNow.case_ref, purpose: openCaseNow.purpose } : null,
+        openCase: openCaseNow ? { case_ref: openCaseNow.case_ref, purpose: openCaseNow.purpose } : keeperOpen ? { case_ref: keeperOpen.case_ref, purpose: keeperOpen.purpose } : null,
         waiting: waitingCount(decide),
         parts: health.parts,
         keyWarning: health.keyWarning,
         presenting,
       },
       days: await listDays(store, deskWho),
-      cases: await deskCases(),
+      cases: casesNow,
       tags: await listTags(store, deskWho),
       notes: await listDay(store, deskWho, day),
-      caseNotes: openCaseNow ? await listCase(store, deskWho, openCaseNow.case_ref) : [],
+      caseNotes: openCaseNow ?? keeperOpen ? await listCase(store, deskWho, (openCaseNow?.case_ref ?? keeperOpen!.case_ref)) : [],
       activity: moves
         .filter((move) => move.at !== null && new Intl.DateTimeFormat("en-CA", { timeZone: deskTimeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(move.at)) === day)
         .map((move) => ({ id: `move:${move.intent_id}`, at: move.at as string, source: "Cases" as const, text: `${move.operation_ref}: ${move.decided.text}` }))
@@ -1426,7 +1449,7 @@ export async function createApplication(
       sources,
       selected: selectedNote ? { note: selectedNote, history: await noteHistory(store, deskWho, selectedNote.note_id) } : null,
       decide,
-      home: await homeState(params, openCaseNow !== null, allMoves),
+      home: await homeState(params, openCaseNow !== null || keeperOpen !== null, allMoves),
     };
     const shown = presenting ? applyStandIns(base, presentingKey(), deskRepoNames()) : base;
     return { ...shown, rev: createHash("sha256").update(JSON.stringify(shown)).digest("hex").slice(0, 16) };
@@ -1462,7 +1485,30 @@ export async function createApplication(
       caseApprovals = listed.kind === "ok" ? { kind: "listed", approvals: listed.value.approvals, unreadable: listed.value.unreadable } : listed.kind === "stale" ? { kind: "none" } : { kind: "notice", words: listed.words };
     }
     const holds = await activeHolds(runtime.runtime.store, caller.tenant);
-    return buildDecide({ inbox, moves, caseApprovals, holds });
+    const human = await humanSteps();
+    return buildDecide({ inbox, moves, caseApprovals, holds, humanSteps: human.steps, extraNotices: human.notices });
+  }
+
+  /** Every human step that is running and not settled, in every open case at the case keeper. Each one waits for a person. */
+  async function humanSteps(): Promise<{ readonly steps: HumanStepInput[]; readonly notices: string[] }> {
+    const steps: HumanStepInput[] = [];
+    const notices: string[] = [];
+    if (caseKeeper === null) return { steps, notices };
+    const listed = await keeperCases();
+    if (listed === null) return { steps, notices };
+    if (listed.kind !== "ok") return { steps, notices: [`Steps waiting for you cannot be listed. ${listed.kind === "stale" ? REFUSED_OLD : listed.words}`] };
+    for (const c of listed.value.cases.filter(isOpenCase).slice(0, 20)) {
+      const horizon = await caseSteps(caseKeeper, c.case_id);
+      if (horizon.kind !== "ok") {
+        notices.push(`The steps of ${caseTitle(c.summary, c.created_at)} could not be read, so one waiting for you may be missing. ${horizon.kind === "stale" ? REFUSED_OLD : horizon.words}`);
+        continue;
+      }
+      const waiting = horizon.value.steps.filter((s) => /^human_?task$/i.test(s.item_kind) && s.execution === "active" && s.settlement === "unsettled");
+      if (waiting.length === 0) continue;
+      const overview = await caseDigest(caseKeeper, c.case_id);
+      for (const step of waiting) steps.push({ case_id: c.case_id, case_title: caseTitle(c.summary, c.created_at), plan_item_id: step.plan_item_id, name: step.name, last_event_at: step.last_event_at, digest: overview.kind === "ok" ? overview.value.digest : null });
+    }
+    return { steps, notices };
   }
 
   async function homeState(params: URLSearchParams, caseOpen: boolean, moves: readonly WorkspaceMove[]): Promise<HomeState> {
@@ -1574,6 +1620,27 @@ export async function createApplication(
       return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words);
     }
 
+    if (card.kind === "human_step") {
+      if (caseKeeper === null) return fail(503, "unreachable", "The case keeper is not set up, so this cannot be done.");
+      const [, caseId, itemId] = /^human:([^:]+):(.+)$/.exec(card.id) ?? [];
+      if (caseId === undefined || itemId === undefined) return fail(400, "unreadable", "That step is not one Horizon knows. Nothing was done.");
+      if (reason === null) return fail(400, "reason_needed", "Type a reason first. It is kept with the decision.");
+      // `human_task_complete` takes no preconditions, so the case keeper cannot refuse a stale request itself. Horizon reads the
+      // case's version again right now and refuses locally if it is not the one the card pinned.
+      const pinned = card.preview.records[0];
+      const fresh = await caseDigest(caseKeeper, caseId);
+      if (fresh.kind !== "ok") return fail(fresh.kind === "stale" ? 409 : fresh.kind === "refused" ? 409 : 502, fresh.kind, fresh.kind === "stale" ? REFUSED_OLD : fresh.words);
+      if (pinned === undefined || fresh.value.digest === null || fresh.value.digest.expected_digest !== pinned.expected_digest) return fail(409, "preview_out_of_date", "Preview out of date. This case changed after you looked at it. Nothing was done. Look at the new preview and decide again.");
+      const result = await humanTaskComplete(caseKeeper, { case_id: caseId, item_id: itemId, justification: reason, request_id: `horizon:human:${caseId}:${itemId}` });
+      if (result.kind === "ok") {
+        await audit("marked_done");
+        return Response.json({ ok: true, message: "Marked done. The case keeper recorded your reason." }, { headers: { "cache-control": "no-store" } });
+      }
+      await audit(result.kind);
+      if (result.kind === "stale") return fail(409, "stale", `The case keeper refused this: ${result.words}`);
+      return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words);
+    }
+
     // acceptance: the observe and rule steps of a committed move
     const cut = card.id.lastIndexOf(":");
     const phase = card.id.slice(cut + 1);
@@ -1615,6 +1682,7 @@ export async function createApplication(
   }
 
   const DESK_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon desk</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/desk/app.css"></head><body><div id="root"></div><noscript>The desk needs JavaScript to show live updates. Turn it on for this page.</noscript><script type="module" src="/desk/app.js"></script></body></html>`;
+  const SETUP_GUIDE_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon setup guide</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:1rem auto;padding:0 1rem}code{overflow-wrap:anywhere}</style></head><body><p><a href="/workspace">Back to the desk</a></p><h1>Setup guide</h1><h2>Start Horizon with the case keeper and record keeper</h2><p>Start the whole set with <code>bun run ignite</code> (see docs/IGNITION.md).</p><h2>Record what agent work costs</h2><ol><li>Install the agent tap with the record keeper: <code>te-agents install --with-realitytrace</code></li><li>Enroll each repository you want measured: <code>te-agents rt enroll &lt;repo&gt;</code></li><li>Point Horizon at the record keeper and the tap's store: set <code>HORIZON_ECONOMICS_REALITYTRACE_BIN</code> (and, if the tap does not use the default location, <code>HORIZON_ECONOMICS_DATA_HOME</code> and <code>HORIZON_ECONOMICS_STATE_HOME</code>), or add an <code>[economics]</code> table with <code>realitytrace_bin</code> to the Horizon config.</li></ol></body></html>`;
   const deskPage = (): Response => new Response(DESK_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": DESK_CSP, "x-content-type-options": "nosniff" } });
   const DESK_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
@@ -1803,6 +1871,10 @@ export async function createApplication(
           if (url.pathname === "/desk/decide" && request.method === "POST") return deskDecide(request);
           if (url.pathname === "/desk/work.json" && request.method === "GET") {
             return Response.json(await deskWork(url.searchParams), { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+          }
+          if (url.pathname === "/desk/setup-guide" && request.method === "GET") {
+            // The one page that may name programs, files and settings: the runbook behind the desk's Settings.
+            return new Response(SETUP_GUIDE_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" } });
           }
           if (url.pathname === "/desk/next.json" && request.method === "GET") {
             // The frame-based "next decision": read-only. It builds a frame, so the desk asks only when Decide is open.

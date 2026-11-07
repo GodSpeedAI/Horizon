@@ -5,7 +5,7 @@
  */
 import type { ReactNode } from "react";
 import type { Action, FirstMove } from "../attention.ts";
-import type { HomeState } from "../model.ts";
+import { plainWords, type HomeState } from "../model.ts";
 import type { WorkspaceMove } from "../../workspace/model.ts";
 
 const CASE_ERROR: Readonly<Record<string, string>> = {
@@ -27,11 +27,11 @@ export function ClaimRows({ move, prefix }: { readonly move: WorkspaceMove; read
         <div key={row.key} className="claim" data-claim={row.key} data-state={row.claim.state}>
           <dt>{row.label}</dt>
           <dd>
-            {row.claim.text}
+            {plainWords(row.claim.text)}
             {row.claim.raw === undefined ? null : (
               <details>
                 <summary>Recorded reason</summary>
-                <code>{row.claim.raw}</code>
+                <code>{plainWords(row.claim.raw)}</code>
               </details>
             )}
           </dd>
@@ -39,6 +39,20 @@ export function ClaimRows({ move, prefix }: { readonly move: WorkspaceMove; read
       ))}
     </dl>
   );
+}
+
+/** The first-run steps in the design's own words: case keeper, record keeper, step, check. */
+function plainStep(step: HomeState["onboarding"]["steps"][number]): { readonly label: string; readonly detail: string } {
+  if (step.id === "stack") {
+    return {
+      label: "Connect the case keeper and the record keeper",
+      detail: step.done ? "The case keeper decides and the record keeper watches." : plainWords(step.detail),
+    };
+  }
+  if (step.id === "move") {
+    return { label: "Make your first checked move", detail: "The case keeper decides whether the move goes ahead, and the record keeper writes down what happened." };
+  }
+  return { label: step.label, detail: plainWords(step.detail) };
 }
 
 export function GettingStarted({ home, firstMove }: { readonly home: HomeState; readonly firstMove: FirstMove | null | undefined }): ReactNode {
@@ -56,11 +70,15 @@ export function GettingStarted({ home, firstMove }: { readonly home: HomeState; 
         {steps.map((step, index) => (
           <li key={step.id} data-step={step.id} data-done={String(step.done)} aria-current={index === active ? "step" : undefined}>
             <p>
-              <span className="muted">Step {index + 1} of {steps.length}</span> <strong>{step.label}</strong>{" "}
+              <span className="muted">Step {index + 1} of {steps.length}</span> <strong>{plainStep(step).label}</strong>{" "}
               <span className="state-word">{step.done ? "Done" : index === active ? "To do" : "Later"}</span>
             </p>
-            <p>{step.detail}</p>
-            {step.fix === null ? null : <p>Fix: Start the cockpit with <code>bun run ignite</code> (see docs/IGNITION.md).</p>}
+            <p>{plainStep(step).detail}</p>
+            {step.fix === null ? null : (
+              <p>
+                Fix: start Horizon with its start-up tool. The steps are in the <a href="/desk/setup-guide">setup guide</a>.
+              </p>
+            )}
             {step.id === "case" && (!step.done || home.caseError !== null) ? (
               <form method="post" action="/workspace/case" className="case-form">
                 <label htmlFor="case-purpose">What are you trying to move forward?</label>
@@ -104,7 +122,7 @@ export function Receipt({ receipt, dispatch }: { readonly receipt: NonNullable<H
       <section id="receipt" tabIndex={-1} aria-labelledby="heading-receipt" data-receipt="missing">
         <h2 id="heading-receipt">Decision receipt</h2>
         <p>
-          <strong>No such commit.</strong> No move with this id is recorded. Check the link, or choose one under Recent moves.
+          <strong>No such move.</strong> No move with this id is recorded. Check the link, or choose one under Recent moves.
         </p>
       </section>
     );
@@ -120,7 +138,7 @@ export function Receipt({ receipt, dispatch }: { readonly receipt: NonNullable<H
       <ClaimRows move={move} prefix="receipt" />
       <div className="settlement" data-settlement={move.settlement.state}>
         <h3>Final sign-off</h3>
-        <p>{move.settlement.text}</p>
+        <p>{plainWords(move.settlement.text)}</p>
         {move.observable || move.settleable ? (
           <p>
             This move can be checked now.{" "}
@@ -159,11 +177,11 @@ export function Moves({ moves, assurance }: { readonly moves: readonly Workspace
       <h2 id="moves-h">Recent moves</h2>
       {assurance === "unisolated-development" ? (
         <p role="alert" data-assurance={assurance} className="error">
-          INSECURE (development only): approvals run without OS-isolated gateway protection and must not be treated as production-safe.
+          Development only: approvals run without protection from the operating system and must not be treated as safe for real work.
         </p>
       ) : assurance !== "governed" ? (
         <p role="status" data-assurance={assurance} className="muted">
-          Approval isolation: not verified.
+          Who is allowed to approve is not yet checked for this setup.
         </p>
       ) : null}
       {moves.length === 0 ? (

@@ -8,11 +8,23 @@
 import { createHash } from "node:crypto";
 import type { InboxItem, InboxReadout } from "../../domain/approval-inbox.ts";
 import type { WorkspaceMove } from "../workspace/model.ts";
-import type { CaseApprovalRow, ChoicePreview, DecideState, DecisionCardData, DecisionPreview, RecordPin } from "./model.ts";
+import { plainWords, type CaseApprovalRow, type ChoicePreview, type DecideState, type DecisionCardData, type DecisionPreview, type RecordPin } from "./model.ts";
 
 export type CaseApprovals = { readonly kind: "none" } | { readonly kind: "listed"; readonly approvals: readonly CaseApprovalRow[]; readonly unreadable: string | null } | { readonly kind: "notice"; readonly words: string };
 
+/** A step that waits for a person: a human task that is running and not yet settled, with the case version it was read at. */
+export interface HumanStepInput {
+  readonly case_id: string;
+  readonly case_title: string;
+  readonly plan_item_id: string;
+  readonly name: string;
+  readonly last_event_at: string | null;
+  readonly digest: { readonly ref: string; readonly expected_digest: string } | null;
+}
 export interface DecideInput {
+  readonly humanSteps?: readonly HumanStepInput[];
+  /** Notices from reading the steps (the case keeper did not answer). */
+  readonly extraNotices?: readonly string[];
   readonly inbox: InboxReadout;
   readonly moves: readonly WorkspaceMove[];
   readonly caseApprovals: CaseApprovals;
@@ -57,7 +69,7 @@ function escalationCard(item: InboxItem, move: WorkspaceMove | undefined): Decis
             { text: "Whether the move then succeeds is only known afterwards.", certainty: "only known afterwards" },
           ],
           undo: "An approval cannot be taken back, but it is used once. You can reject any later request.",
-          next: "The move is committed and its result appears under Work.",
+          next: "The move goes ahead and its result appears under Work.",
         }
       : null,
     reject: decidable
@@ -131,12 +143,51 @@ function caseTaskCard(row: CaseApprovalRow): DecisionCardData {
   };
 }
 
+/**
+ * A human step waiting for a person. "Mark done" needs a typed reason. The case keeper's `human_task_complete` takes no
+ * preconditions, so the version the card pins (`case:<id>`) is compared by Horizon itself, just before sending (src/app.ts).
+ */
+function humanStepCard(step: HumanStepInput): DecisionCardData {
+  const records: RecordPin[] = step.digest ? [{ ref: step.digest.ref, expected_digest: step.digest.expected_digest }] : [];
+  const body: Omit<PreviewBody, "hold"> = {
+    touches: [`The step "${step.name}" in the case "${step.case_title}"`],
+    who: "You. This step is waiting for a person, and only a person can mark it done.",
+    stops_if: "The case changes after you looked at it. Then nothing is sent and you are told so.",
+    limits: "This one step only.",
+    accept: records.length === 0
+      ? null
+      : {
+          kind: "changes things",
+          button: "Mark done",
+          effects: [
+            { text: "The case keeper records that you finished this step, with the reason you type.", certainty: "certain" },
+            { text: "The next steps that were waiting for it can start.", certainty: "follows from the rules" },
+          ],
+          undo: "A finished step cannot be un-finished here. Add a new step to redo the work.",
+          next: "The case moves on to what comes after this step.",
+        },
+    reject: null,
+    records: pins(records),
+  };
+  return {
+    id: `human:${step.case_id}:${step.plan_item_id}`,
+    kind: "human_step",
+    title: `${step.name}: ${step.case_title}`,
+    facts: [`Step: ${step.name}`, `Case: ${step.case_title}`, "Waiting for you to do it and mark it done"],
+    requested_at: step.last_event_at,
+    preview: preview(body),
+    held: null,
+    blocked: records.length === 0 ? "The case keeper did not give a version code for this case, so marking it done cannot be tied to what you see. Try again in a moment." : null,
+    reason_for_accept: true,
+  };
+}
+
 function acceptanceCard(move: WorkspaceMove): DecisionCardData | null {
   if (!move.observable && !move.settleable) return null;
   const finalStep = move.settleable;
-  const facts = [`Move ${move.operation_ref}`, `Decided: ${move.decided.text}`, `Recorded: ${move.recorded.text}`, `Observed: ${move.observed.text}`];
+  const facts = [`Move ${move.operation_ref}`, `Decided: ${plainWords(move.decided.text)}`, `Recorded: ${plainWords(move.recorded.text)}`, `Observed: ${plainWords(move.observed.text)}`];
   const body: Omit<PreviewBody, "hold"> = {
-    touches: [`The move "${move.operation_ref}" (${move.intent_id})`, move.settlement.text],
+    touches: [`The move "${move.operation_ref}" (${move.intent_id})`, plainWords(move.settlement.text)],
     who: finalStep ? "The case keeper rules on the evidence. You are asking it to rule now." : "The record keeper watches what was done and passes the evidence to the case keeper.",
     stops_if: finalStep ? "The case keeper refuses to rule, for example because evidence is missing." : "The record keeper cannot be reached. Nothing is recorded then.",
     limits: "This one move only.",
@@ -150,7 +201,7 @@ function acceptanceCard(move: WorkspaceMove): DecisionCardData | null {
             { text: "Whether it accepts the result is only known afterwards.", certainty: "only known afterwards" },
           ]
         : [
-            { text: "The record keeper reads the committed trace and sends the evidence to the case keeper.", certainty: "certain" },
+            { text: "The record keeper reads what was done and sends the evidence to the case keeper.", certainty: "certain" },
             { text: "The case keeper has not ruled yet.", certainty: "certain" },
           ],
       undo: finalStep ? "This cannot be undone. A later move can correct it, but the ruling stays in the record." : "The observation stays in the record, but it decides nothing by itself.",
@@ -177,16 +228,18 @@ export function buildDecide(input: DecideInput): DecideState {
   const cards: DecisionCardData[] = [];
   const moveOfApproval = new Map(input.moves.flatMap((m) => (m.approval_id ? [[m.approval_id, m] as const] : [])));
   if (input.inbox.state === "not_configured") notices.push("No approver is set up, so decisions that need an approver cannot be answered here.");
-  else if (input.inbox.state === "unreachable") notices.push(`The case keeper did not list the decisions waiting for you, so some may be missing. ${input.inbox.message}`);
+  else if (input.inbox.state === "unreachable") notices.push(plainWords(`The case keeper did not list the decisions waiting for you, so some may be missing. ${input.inbox.message}`));
   else {
     if (input.inbox.inbox.malformed > 0) notices.push(`${input.inbox.inbox.malformed} entries from the case keeper could not be read and are not shown.`);
     for (const item of input.inbox.inbox.waiting) cards.push(escalationCard(item, moveOfApproval.get(item.approval_id)));
   }
-  if (input.caseApprovals.kind === "notice") notices.push(input.caseApprovals.words);
+  if (input.caseApprovals.kind === "notice") notices.push(plainWords(input.caseApprovals.words));
   else if (input.caseApprovals.kind === "listed") {
-    if (input.caseApprovals.unreadable) notices.push(`The case keeper could not read its list of approvals (${input.caseApprovals.unreadable}), so some may be missing.`);
+    if (input.caseApprovals.unreadable) notices.push(`The case keeper could not read its list of approvals (${plainWords(input.caseApprovals.unreadable)}), so some may be missing.`);
     for (const row of input.caseApprovals.approvals) cards.push(caseTaskCard(row));
   }
+  notices.push(...(input.extraNotices ?? []).map(plainWords));
+  for (const step of input.humanSteps ?? []) cards.push(humanStepCard(step));
   for (const move of input.moves) {
     const card = acceptanceCard(move);
     if (card) cards.push(card);

@@ -75,10 +75,10 @@ describe("cost view", () => {
 
   test("honest states: not configured, unavailable, empty", () => {
     const off = draw({ state: "not_configured" });
-    expect(off).toContain("not set up");
-    expect(off).toContain("te-agents install --with-realitytrace");
-    expect(off).toContain("te-agents rt enroll");
-    expect(off).toContain("HORIZON_ECONOMICS_REALITYTRACE_BIN");
+    expect(off).toContain("Cost is not recorded yet");
+    expect(off).toContain("/desk/setup-guide");
+    expect(off).not.toContain("te-agents");
+    expect(off).not.toContain("HORIZON_ECONOMICS");
     const down = draw({ state: "unavailable", message: "realitytrace repo list failed (exit 2): boom" });
     expect(down).toContain("could not be read");
     expect(down).toContain("boom");

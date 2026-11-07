@@ -146,8 +146,8 @@ describe("first-run cockpit: case and onboarding", () => {
 
   test("the ungoverned stack names the missing pieces and the exact fix", async () => {
     const markup = await page();
-    expect(markup).toContain("Missing: SEA-Forge governance is off and RealityTrace is not configured.");
-    expect(markup).toContain("bun run ignite");
+    expect(markup).toContain("Missing: the case keeper is off and the record keeper is not set up.");
+    expect(markup).toContain("setup guide");
     expect(markup).toContain("Cases: Not connected");
     expect(markup).toContain("Records: Not connected");
     expect(markup).toContain('data-step="stack" data-done="false"');
@@ -180,10 +180,10 @@ describe("first-run cockpit: decision receipt and moves", () => {
     const markup = await page(`/workspace?receipt=${intentId}`);
     expect(markup).toContain('id="receipt"');
     expect(markup).toContain('tabindex="-1"');
-    expect(markup).toContain("Horizon policy only: SEA-Forge is off.");
+    expect(markup).toContain("Horizon policy only: the case keeper is off.");
     expect(markup).toContain("Recorded by Horizon, ");
-    expect(markup).toContain("Unavailable: RealityTrace is off.");
-    expect(markup).toContain("No expected outcome is named, so SEA-Forge can rule on the evidence but has no outcome to settle.");
+    expect(markup).toContain("Unavailable: the record keeper is off.");
+    expect(markup).toContain("No expected outcome is named, so the case keeper can rule on the evidence but has no outcome to settle.");
     // Ungoverned, nothing can observe or settle the commit, so the action is not offered.
     expect(markup).not.toContain("Go to Decide");
     expect(markup).toContain('data-claim="decided"');
@@ -200,7 +200,7 @@ describe("first-run cockpit: decision receipt and moves", () => {
 
   test("an unknown receipt says so, and never echoes the query text", async () => {
     const markup = await page("/workspace?receipt=%3Cscript%3Ealert(1)%3C%2Fscript%3E");
-    expect(markup).toContain("No such commit.");
+    expect(markup).toContain("No such move.");
     expect(markup).not.toContain("<script>alert(1)</script>");
   });
 });

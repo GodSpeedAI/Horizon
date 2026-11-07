@@ -42,6 +42,10 @@ export interface DeskCase {
   readonly case_ref: string;
   readonly purpose: string;
   readonly opened_at: string;
+  /** Where this case is recorded: Horizon's own notebook of cases, or the case keeper. */
+  readonly source?: "horizon" | "case keeper";
+  /** The case keeper's state words, for cases that come from it. */
+  readonly state?: string;
 }
 
 export interface ActivityItem {
@@ -101,7 +105,7 @@ export interface CaseApprovalRow {
   readonly expired: boolean;
   readonly digest: RecordPin | null;
 }
-export type CardKind = "escalation" | "case_task" | "acceptance";
+export type CardKind = "escalation" | "case_task" | "acceptance" | "human_step";
 export interface DecisionCardData {
   readonly id: string;
   readonly kind: CardKind;
@@ -295,6 +299,36 @@ export function dayLabel(day: string): string {
 
 export function timeLabel(iso: string, timeZone: string): string {
   return new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone }).format(new Date(iso));
+}
+
+/**
+ * Product names and internal terms never reach the screen (design section 1 and 2). Text that comes from a part is passed through
+ * here before it is drawn, so "SEA-Forge is off" reads "the case keeper is off".
+ */
+export function plainWords(text: string): string {
+  return text
+    .replace(/SEA-Forge governance is off/g, "the case keeper is off")
+    .replace(/RealityTrace is not configured/g, "the record keeper is not set up")
+    .replace(/SEA-Forge governs commits and RealityTrace observes them\./g, "The case keeper decides and the record keeper watches.")
+    .replace(/\bSEA-Forge\b/g, "the case keeper")
+    .replace(/\bRealityTrace\b/g, "the record keeper")
+    .replace(/\bCognate-Workbench\b|\bCognate\b/g, "the workshop")
+    .replace(/\bSFWP\b/g, "case keeper")
+    .replace(/\bgoverned\b/gi, "checked")
+    .replace(/\bledger\b/gi, "record")
+    .replace(/\bdigest\b/gi, "version code")
+    .replace(/\btenant\b/gi, "organization")
+    .replace(/\bwitness(es)?\b/gi, "record$1")
+    .replace(/\bcommit(s|ted)?\b/gi, (_m, tail: string | undefined) => (tail === "s" ? "steps" : tail === "ted" ? "done" : "step"))
+    .replace(/(^|\. )the (case|record) keeper/g, (_m, lead: string, word: string) => `${lead}The ${word} keeper`);
+}
+
+/** A case's title in plain words. A file path or a plan file name is never a title: it becomes "Case started <date>". */
+export function caseTitle(summary: string, createdAt: string): string {
+  const looksLikePath = /[\\/]|\.(json|ya?ml|toml)\b/i.test(summary) || /^execute plan\b/i.test(summary);
+  const text = summary.trim();
+  if (text === "" || looksLikePath) return `Case started ${createdAt.slice(0, 10) || "(date not recorded)"}`;
+  return plainWords(text);
 }
 
 /** "local:Yoga7i:testing" is a code; the bar shows the computer's name. Any other organization name is shown as it is. */

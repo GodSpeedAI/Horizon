@@ -9,6 +9,8 @@ import type { EconomicsRepo, EconomicsSkipped } from "../../../economics/readout
 import { RESIDUAL_KINDS, type CaseModel, type EconomicsModel, type JourneyCounts, type SessionModel, type Totals } from "../../../economics/model.ts";
 import { costLine, type CostPart } from "../work-build.ts";
 
+/** How sure a token count is, in words rather than the recorder's capitals. */
+const QUALITY_WORDS: Readonly<Record<string, string>> = { EXACT: "exact", DERIVED: "worked out", ESTIMATED: "estimated", UNAVAILABLE: "not available" };
 const fmt = (n: number): string => n.toLocaleString("en-US");
 const pct = (value: number | null): string => (value === null ? "Not recorded" : `${value.toFixed(1)}%`);
 const Observed = (): ReactNode => <span className="badge observed">observed</span>;
@@ -179,7 +181,7 @@ export function ModelView({ model, cost }: { readonly model: EconomicsModel; rea
                 <th scope="row">{session.runtime} <code>{session.native_session_id}</code></th>
                 <td><code>{lesson.event_id.slice(0, 12)}</code></td>
                 <td className="num">{lesson.attributed_input_tokens === null ? "Not recorded" : fmt(lesson.attributed_input_tokens)}</td>
-                <td>{lesson.token_quality ?? "Not recorded"}</td>
+                <td>{lesson.token_quality === null ? "Not recorded" : (QUALITY_WORDS[lesson.token_quality] ?? lesson.token_quality.toLowerCase())}</td>
                 <td><span className="badge none">no estimate recorded</span></td>
               </tr>
             ))
@@ -280,24 +282,26 @@ export function Cost({ cost }: { readonly cost: CostPart }): ReactNode {
       <h2 id="cost-h">What agent work cost</h2>
       <p className="muted">A read-only view of what the record keeper recorded about agent sessions. It never gates or allows anything.</p>
       {readout.state === "not_configured" ? (
-        <Notice title="Cost is not set up">
-          <p>Horizon reads this from the record keeper, read-only, and keeps nothing itself. Cost per accepted outcome: Not recorded, because there is no source for it. To set it up:</p>
-          <ol>
-            <li>Install the agent tap with the record keeper: <code>te-agents install --with-realitytrace</code></li>
-            <li>Enroll each repository you want measured: <code>te-agents rt enroll &lt;repo&gt;</code></li>
-            <li>Point Horizon at the record keeper and the tap&apos;s store: set <code>HORIZON_ECONOMICS_REALITYTRACE_BIN</code> (and, if the tap does not use the default location, <code>HORIZON_ECONOMICS_DATA_HOME</code> and <code>HORIZON_ECONOMICS_STATE_HOME</code>), or add an <code>[economics]</code> table with <code>realitytrace_bin</code> to the Horizon config.</li>
-          </ol>
+        <Notice title="Cost is not recorded yet">
+          <p>
+            The session recorder is not sending costs to Horizon. Cost per accepted outcome: Not recorded, because there is no source for it.
+            The setup steps are in the <a href="/desk/setup-guide">setup guide</a>.
+          </p>
         </Notice>
       ) : readout.state === "unavailable" ? (
         <Notice title="The record keeper could not be read">
           <p className="error" role="alert">{readout.message}</p>
-          <p>Cost per accepted outcome: Not recorded. Check that <code>HORIZON_ECONOMICS_REALITYTRACE_BIN</code> names a working <code>realitytrace</code> program, then reload.</p>
+          <p>
+            Cost per accepted outcome: Not recorded. Check the record keeper's setup in the <a href="/desk/setup-guide">setup guide</a>, then reload.
+          </p>
         </Notice>
       ) : (
         <>
           {readout.state === "empty" ? (
             <Notice title="No agent events recorded yet">
-              <p>Cost per accepted outcome: Not recorded. The record keeper is reachable, but no enrolled repository holds agent events yet. Enroll one with <code>te-agents rt enroll &lt;repo&gt;</code> and work in it with the tap installed.</p>
+              <p>
+                Cost per accepted outcome: Not recorded. The record keeper is reachable, but no repository it watches holds agent events yet. See the <a href="/desk/setup-guide">setup guide</a> to start measuring one.
+              </p>
             </Notice>
           ) : null}
           {readout.repos.map((repo) => (
@@ -306,7 +310,7 @@ export function Cost({ cost }: { readonly cost: CostPart }): ReactNode {
           <SkippedNote skipped={readout.skipped} />
         </>
       )}
-      <p className="muted">Figures come from the record keeper&apos;s ledger. &quot;Observed&quot; is recorded usage; &quot;estimate&quot; is never added to it.</p>
+      <p className="muted">Figures come from the record keeper&apos;s record. &quot;Observed&quot; is recorded usage; &quot;estimate&quot; is never added to it.</p>
     </section>
   );
 }

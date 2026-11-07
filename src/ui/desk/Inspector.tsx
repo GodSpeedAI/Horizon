@@ -101,6 +101,7 @@ export function Inspector({ ui, dispatch, io, onLink }: InspectorProps): ReactNo
       <InspectPanel
         inspection={ui.inspection}
         operations={DEBUGGER_QUESTIONS}
+        libraryConnected={data?.status.parts.find((part) => part.name === "Reference library")?.connected === true}
         onAsk={(operation, query) => {
           dispatch({ type: "inspect-start", operation, query });
           void (io.inspect?.(operation, query) ?? Promise.resolve({ ok: false as const, message: "Asking is not set up in this window." })).then((result) =>

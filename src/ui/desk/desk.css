@@ -66,6 +66,7 @@ li[data-cursor="true"]::before { content:"Current item"; position:absolute; widt
 
 @media (prefers-reduced-motion: no-preference) { button { transition:background .12s; } }
 
+.view h1:focus { outline:3px solid var(--focus); outline-offset:4px; border-radius:.2rem; }
 /* Decide (stage 3). Only the card under the cursor uses the highlight colour; the rest wait quietly. */
 .cards { display:grid; gap:.8rem; margin:.6rem 0; } .cards:focus-visible { outline-offset:4px; }
 .decision-card { border:1px solid var(--line); border-radius:.5rem; padding:.6rem .9rem; background:var(--panel); }
