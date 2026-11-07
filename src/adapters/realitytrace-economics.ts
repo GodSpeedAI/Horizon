@@ -12,6 +12,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import type { EconomicsConfig, RecordSource } from "../config/types.ts";
+import { redact } from "./redact.ts";
 import { economicsModel, type EconomicsModel } from "../economics/model.ts";
 
 export interface EconomicsRepo {
@@ -60,7 +61,7 @@ export const makeSpawnRunner = (timeoutMs = 60_000): Runner => (bin, args, env) 
 };
 const spawnRunner: Runner = makeSpawnRunner();
 
-const brief = (text: string): string => text.trim().replace(/\s+/g, " ").slice(0, 240);
+const brief = (text: string): string => redact(text).trim().replace(/\s+/g, " ").slice(0, 240);
 
 /** What a failure to start or finish the binary means, in words (the raw message follows for the curious). */
 function explain(error: string): string {
@@ -119,8 +120,10 @@ export function realityTraceEconomics(config: EconomicsConfig | undefined, run: 
         }
         // Residuals are a bonus: a failed projection export leaves them empty and says so, it never hides the ledger.
         const projection = call(["projections", "export", "--repo", repo_id, "--canonical-json"]);
-        const model = economicsModel(rows, projection.ok ? (rowsOf(projection.json) ?? []) : []);
-        repos.push({ repo_id, path, model, error: projection.ok ? null : `${projection.message} (residuals unavailable)` });
+        const residualRows = projection.ok ? rowsOf(projection.json) : null;
+        const model = economicsModel(rows, residualRows ?? []);
+        const error = !projection.ok ? `${projection.message} (residuals unavailable)` : residualRows === null ? "unavailable: unexpected answer from the record keeper (residuals unavailable)" : null;
+        repos.push({ repo_id, path, model, error });
       }
       return { state: repos.some((repo) => repo.model !== null) ? "ok" : "empty", repos, skipped };
     },

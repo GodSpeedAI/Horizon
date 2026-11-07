@@ -8,11 +8,12 @@
  * started_at and completed_at in its own ledger, where SEA-Forge reads them back. Horizon never writes an
  * outcome RealityTrace did not record.
  */
-import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExpectedOutcome } from "../domain/expectation.ts";
+import { redact } from "./redact.ts";
+import { runChild } from "./run-child.ts";
 
 export interface RealityTraceObligationConfig {
   readonly bin: string;
@@ -22,6 +23,8 @@ export interface RealityTraceObligationConfig {
   readonly repoDir: string;
   /** Each RealityTrace command is killed after this long. Default 120 s. */
   readonly timeoutMs?: number;
+  /** Largest answer read from any command, in bytes. Default 16 MB. */
+  readonly maxBytes?: number;
 }
 
 export interface DeclareInput {
@@ -73,44 +76,48 @@ export class RealityTraceObligation {
   private async sxr(args: readonly string[]): Promise<any> {
     const label = args.slice(0, 2).join(" ");
     const limitMs = this.config.timeoutMs ?? 120_000;
-    let proc: ReturnType<typeof Bun.spawn>;
+    let result;
     try {
-      proc = Bun.spawn([this.config.bin, ...args, "--json"], {
+      result = await runChild([this.config.bin, ...args, "--json"], {
         cwd: this.config.repoDir,
         env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME ?? "/", XDG_DATA_HOME: this.config.dataHome, XDG_STATE_HOME: this.config.stateHome },
-        stdout: "pipe",
-        stderr: "pipe",
+        timeoutMs: limitMs,
+        maxBytes: this.config.maxBytes ?? 16 * 1024 * 1024,
       });
     } catch (error) {
-      throw new RealityTraceError(`realitytrace ${label}: ${error instanceof Error ? error.message : String(error)}`);
+      throw new RealityTraceError(redact(`realitytrace ${label}: ${error instanceof Error ? error.message : String(error)}`));
     }
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      proc.kill("SIGKILL");
-    }, limitMs);
+    if (result.timedOut) throw new RealityTraceError(`realitytrace ${label} timed out after ${Math.round(limitMs / 1000)} s and was stopped`);
+    if (result.tooLarge) throw new RealityTraceError(`realitytrace ${label} answer was too large to read and the command was stopped`);
+    if (result.code !== 0) throw new RealityTraceError(redact(`realitytrace ${label} failed (exit ${result.code}): ${(result.stderr || result.stdout).trim()}`).slice(0, 600));
     try {
-      const [stdout, stderr] = await Promise.all([new Response(proc.stdout as ReadableStream).text(), new Response(proc.stderr as ReadableStream).text(), proc.exited]);
-      if (timedOut) throw new RealityTraceError(`realitytrace ${label} timed out after ${Math.round(limitMs / 1000)} s and was stopped`);
-      if (proc.exitCode !== 0) throw new RealityTraceError(`realitytrace ${label} failed (exit ${proc.exitCode}): ${(stderr || stdout).trim()}`);
-      try {
-        return JSON.parse(stdout);
-      } catch {
-        throw new RealityTraceError(`realitytrace ${label} printed no JSON`);
-      }
-    } finally {
-      clearTimeout(timer);
+      return JSON.parse(result.stdout);
+    } catch {
+      throw new RealityTraceError(`realitytrace ${label} printed no JSON`);
     }
+  }
+
+  /** One git command with no hooks, a time limit and a checked exit code. */
+  private async git(args: readonly string[]): Promise<{ code: number | null; text: string }> {
+    const result = await runChild(["git", "-c", "core.hooksPath=/dev/null", ...args], {
+      cwd: this.config.repoDir,
+      env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME ?? "/", GIT_TERMINAL_PROMPT: "0" },
+      timeoutMs: 30_000,
+      maxBytes: 1024 * 1024,
+    });
+    if (result.timedOut) throw new RealityTraceError(`git ${args[0]} timed out and was stopped`);
+    return { code: result.code, text: redact(`${result.stderr}${result.stdout}`.trim()).slice(0, 300) };
   }
 
   /** The enrolled repository, enrolling it once (an empty git repository is enough). */
   async repo(): Promise<string> {
     if (this.repoId !== null) return this.repoId;
     mkdirSync(this.config.repoDir, { recursive: true });
-    const git = (args: string[]) => spawnSync("git", args, { cwd: this.config.repoDir, encoding: "utf8" });
-    if (git(["rev-parse", "--git-dir"]).status !== 0) {
-      git(["init", "-q"]);
-      git(["-c", "user.email=horizon@localhost", "-c", "user.name=horizon", "commit", "--allow-empty", "-qm", "horizon realitytrace enrollment"]);
+    if ((await this.git(["rev-parse", "--git-dir"])).code !== 0) {
+      const init = await this.git(["init", "-q", "--template="]);
+      if (init.code !== 0) throw new RealityTraceError(`git init failed: ${init.text}`);
+      const commit = await this.git(["-c", "user.email=horizon@localhost", "-c", "user.name=horizon", "commit", "--allow-empty", "-qm", "horizon realitytrace enrollment"]);
+      if (commit.code !== 0) throw new RealityTraceError(`git commit failed: ${commit.text}`);
     }
     const listed = (await this.sxr(["repo", "list"])) as { repos?: { repo_id: string; path?: string; root?: string }[] };
     const known = (listed.repos ?? []).find((repo) => [repo.path, repo.root].includes(this.config.repoDir));
