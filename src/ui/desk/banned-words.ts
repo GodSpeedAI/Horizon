@@ -9,6 +9,8 @@ export const BANNED: readonly { readonly name: string; readonly pattern: RegExp 
   { name: "SFWP", pattern: /\bSFWP\b/i },
   { name: "ledger", pattern: /\bledgers?\b/i },
   { name: "digest", pattern: /\bdigests?\b/i },
+  { name: "subsystem", pattern: /\bsubsystems?\b/i },
+  { name: "structural world", pattern: /structural world/i },
   { name: "tenant", pattern: /\btenants?\b/i },
   { name: "witness", pattern: /\bwitness(es)?\b/i },
   { name: "governed", pattern: /\bgoverned\b/i },

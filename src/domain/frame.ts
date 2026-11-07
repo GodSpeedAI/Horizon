@@ -96,7 +96,7 @@ export function buildStructuralFrame(options: {
       },
       {
         operation_ref: "horizon.research.health",
-        label: "Check the optional Python research subsystem contract",
+        label: "Check that the optional research tools answer",
         assessment: { ...statusOf("horizon.research.health"), reversibility: "read_only" },
       },
       ...(options.bound ?? []),
