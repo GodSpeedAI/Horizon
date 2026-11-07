@@ -53,12 +53,23 @@ export type Runner = (bin: string, args: readonly string[], env: Record<string, 
 /** The only commands this reader may run; a test asserts nothing else is spawned. */
 export const READ_ONLY_COMMANDS = [["repo", "list"], ["ledger", "export"], ["projections", "export"], ["ledger", "verify"]] as const;
 
-const spawnRunner: Runner = (bin, args, env) => {
-  const result = spawnSync(bin, [...args], { env, encoding: "utf8", timeout: 60_000, maxBuffer: 512 * 1024 * 1024 });
+/** The real runner; `timeoutMs` exists so a test can prove a hung binary is stopped without waiting a minute. */
+export const makeSpawnRunner = (timeoutMs = 60_000): Runner => (bin, args, env) => {
+  const result = spawnSync(bin, [...args], { env, encoding: "utf8", timeout: timeoutMs, maxBuffer: 512 * 1024 * 1024 });
   return { status: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "", ...(result.error ? { error: result.error.message } : {}) };
 };
+const spawnRunner: Runner = makeSpawnRunner();
 
 const brief = (text: string): string => text.trim().replace(/\s+/g, " ").slice(0, 240);
+
+/** What a failure to start or finish the binary means, in words (the raw message follows for the curious). */
+function explain(error: string): string {
+  if (/ENOENT/.test(error)) return `the record keeper program was not found (${brief(error)})`;
+  if (/EACCES/.test(error)) return `the record keeper program cannot be run (${brief(error)})`;
+  if (/ETIMEDOUT/.test(error)) return `the record keeper did not answer in time and was stopped (${brief(error)})`;
+  if (/ENOBUFS|maxBuffer/i.test(error)) return `the record keeper's answer was too large to read (${brief(error)})`;
+  return brief(error);
+}
 
 export function realityTraceEconomics(config: EconomicsConfig | undefined, run: Runner = spawnRunner, pathExists: PathExists = existsSync): EconomicsSource {
   return {
@@ -71,7 +82,7 @@ export function realityTraceEconomics(config: EconomicsConfig | undefined, run: 
       const call = (args: string[]): { ok: true; json: unknown } | { ok: false; message: string } => {
         assertReadOnly(args);
         const result = run(config.realitytrace_bin, args, env);
-        if (result.error) return { ok: false, message: `realitytrace ${args.slice(0, 2).join(" ")}: ${brief(result.error)}` };
+        if (result.error) return { ok: false, message: `realitytrace ${args.slice(0, 2).join(" ")}: ${explain(result.error)}` };
         if (result.status !== 0) return { ok: false, message: `realitytrace ${args.slice(0, 2).join(" ")} failed (exit ${result.status}): ${brief(result.stderr || result.stdout)}` };
         try {
           return { ok: true, json: JSON.parse(result.stdout) };
@@ -82,7 +93,8 @@ export function realityTraceEconomics(config: EconomicsConfig | undefined, run: 
 
       const listed = call(["repo", "list", "--json"]);
       if (!listed.ok) return { state: "unavailable", message: listed.message };
-      const all = isObject(listed.json) && Array.isArray(listed.json.repos) ? listed.json.repos : [];
+      if (!isObject(listed.json) || !Array.isArray(listed.json.repos)) return { state: "unavailable", message: "realitytrace repo list answered in a shape Horizon does not know, so nothing is shown from it" };
+      const all = listed.json.repos;
       const enrolled = all.filter(isObject).filter((repo) => typeof repo.repo_id === "string" && (repo.state === undefined || repo.state === "enrolled"));
       const present = enrolled.filter((repo) => typeof repo.filesystem_path !== "string" || pathExists(repo.filesystem_path));
       const skipped = { without_agent_activity: 0, missing_folder: enrolled.length - present.length };
@@ -97,13 +109,17 @@ export function realityTraceEconomics(config: EconomicsConfig | undefined, run: 
           continue;
         }
         const rows = rowsOf(ledger.json);
+        if (rows === null) {
+          repos.push({ repo_id, path, model: null, error: "realitytrace ledger export answered in a shape Horizon does not know, so nothing is shown from it" });
+          continue;
+        }
         if (economicsModel(rows, []).audit.agent_events === 0) {
           skipped.without_agent_activity += 1;
           continue;
         }
         // Residuals are a bonus: a failed projection export leaves them empty and says so, it never hides the ledger.
         const projection = call(["projections", "export", "--repo", repo_id, "--canonical-json"]);
-        const model = economicsModel(rows, projection.ok ? rowsOf(projection.json) : []);
+        const model = economicsModel(rows, projection.ok ? (rowsOf(projection.json) ?? []) : []);
         repos.push({ repo_id, path, model, error: projection.ok ? null : `${projection.message} (residuals unavailable)` });
       }
       return { state: repos.some((repo) => repo.model !== null) ? "ok" : "empty", repos, skipped };
@@ -116,12 +132,13 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 /** `ledger export --json` may be a bare array or wrapped in a result object; take the array either way. */
-function rowsOf(json: unknown): unknown[] {
+function rowsOf(json: unknown): unknown[] | null {
   if (Array.isArray(json)) return json;
   if (isObject(json)) {
     for (const key of ["entries", "rows", "data"]) if (Array.isArray(json[key])) return json[key] as unknown[];
   }
-  return [];
+  // Valid JSON that is not a list of records is not an empty ledger: say so.
+  return null;
 }
 
 function assertReadOnly(args: readonly string[]): void {
@@ -148,7 +165,7 @@ export function recordReader(source: Pick<RecordSource, "data_home" | "state_hom
   const call = (args: string[]): { ok: true; json: unknown } | { ok: false; message: string } => {
     assertReadOnly(args);
     const result = run(bin, args, env);
-    if (result.error) return { ok: false, message: `realitytrace ${args.slice(0, 2).join(" ")}: ${brief(result.error)}` };
+    if (result.error) return { ok: false, message: `realitytrace ${args.slice(0, 2).join(" ")}: ${explain(result.error)}` };
     if (result.status !== 0) return { ok: false, message: `realitytrace ${args.slice(0, 2).join(" ")} failed (exit ${result.status}): ${brief(result.stderr || result.stdout)}` };
     try {
       return { ok: true, json: JSON.parse(result.stdout) };
@@ -160,8 +177,8 @@ export function recordReader(source: Pick<RecordSource, "data_home" | "state_hom
     repos() {
       const listed = call(["repo", "list", "--json"]);
       if (!listed.ok) return listed;
-      const all = isObject(listed.json) && Array.isArray(listed.json.repos) ? listed.json.repos : [];
-      const repos = all
+      if (!isObject(listed.json) || !Array.isArray(listed.json.repos)) return { ok: false, message: "realitytrace repo list answered in a shape Horizon does not know" };
+      const repos = listed.json.repos
         .filter(isObject)
         .filter((repo) => typeof repo.repo_id === "string" && (repo.state === undefined || repo.state === "enrolled"))
         .map((repo) => ({ repo_id: repo.repo_id as string, path: typeof repo.filesystem_path === "string" ? repo.filesystem_path : null }));
@@ -169,7 +186,9 @@ export function recordReader(source: Pick<RecordSource, "data_home" | "state_hom
     },
     ledger(repoId) {
       const out = call(["ledger", "export", "--repo", repoId, "--json"]);
-      return out.ok ? { ok: true, rows: rowsOf(out.json) } : out;
+      if (!out.ok) return out;
+      const rows = rowsOf(out.json);
+      return rows === null ? { ok: false, message: "realitytrace ledger export answered in a shape Horizon does not know" } : { ok: true, rows };
     },
     verify(repoId) {
       const out = call(["ledger", "verify", "--repo", repoId, "--json"]);
