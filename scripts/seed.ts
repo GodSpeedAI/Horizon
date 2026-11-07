@@ -602,7 +602,7 @@ function githubPort(root: string, env: Record<string, string | undefined>): Gith
   };
 }
 
-function recordsPort(mapping: SetupMapping, env: Record<string, string | undefined>): RecordsPort {
+export function recordsPort(mapping: SetupMapping, env: Record<string, string | undefined>): RecordsPort {
   const dataHome = env.COGNATE_REALITYTRACE_DATA_HOME?.trim() || mapping.horizonRecordData;
   const stateHome = env.COGNATE_REALITYTRACE_STATE_HOME?.trim() || mapping.horizonRecordState;
   for (const p of [dataHome, stateHome]) {
@@ -610,7 +610,8 @@ function recordsPort(mapping: SetupMapping, env: Record<string, string | undefin
   }
   const bin = realityTraceBin(env);
   const repoDir = join(mapping.cell, "realitytrace", "seed-repo");
-  const obligation = new RealityTraceObligation({ bin, dataHome, stateHome, repoDir });
+  // The rulebook is Horizon's own model, the same file the running app snapshots, so seeded runs carry the same snapshot id.
+  const obligation = new RealityTraceObligation({ bin, dataHome, stateHome, repoDir, rulebookEntry: join(here, "..", "domain", "interaction-model.sea") });
   const rt = async (args: readonly string[], stdin?: string): Promise<any> => {
     const result = await runChild([bin, ...args, "--json"], {
       cwd: repoDir,
@@ -666,7 +667,7 @@ function recordsPort(mapping: SetupMapping, env: Record<string, string | undefin
       const row = rows.find((r) => r.record_kind === "threshold.declared" && r.payload?.states?.[0]?.state_id === `t-${intentId}`);
       if (!row || row.ledger_id === undefined || row.append_ordinal === undefined) throw new SeedRefused(`threshold t-${intentId} is not in the record`);
       const threshold: DeclaredThreshold = { question_id: `q-${intentId}`, threshold_id: `t-${intentId}`, position: { ledger_id: row.ledger_id, ordinal: row.append_ordinal } };
-      await obligation.run(threshold, argv, [], 30, { target, snapshot: "snapshot:horizon" });
+      await obligation.run(threshold, argv, [], 30, { target, snapshot: await obligation.snapshot() });
     },
     async declareJourney(questionId, title) {
       const repo = await repoId();
@@ -678,7 +679,7 @@ function recordsPort(mapping: SetupMapping, env: Record<string, string | undefin
       const existing = (await ledger()).find((r) => r.record_kind === "run.started" && (r.payload?.provenance_refs ?? []).includes(`question:${questionId}`));
       const known = existing?.payload?.scope?.run_id;
       if (typeof known === "string") return known;
-      const begun = (await rt(["run", "begin", "--repo", repo, "--snapshot", "snapshot:horizon", "--question", questionId, "--threshold", `${questionId}:threshold`])) as { run_id: string };
+      const begun = (await rt(["run", "begin", "--repo", repo, "--snapshot", await obligation.snapshot(), "--question", questionId, "--threshold", `${questionId}:threshold`])) as { run_id: string };
       await rt(["plan", "create", "--run", begun.run_id, "--verifier", `agent-tap/${RECORD_RUNTIME}`, "--target", `${questionId}:threshold`]);
       return begun.run_id;
     },

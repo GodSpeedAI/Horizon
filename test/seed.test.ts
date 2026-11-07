@@ -349,3 +349,50 @@ describe("seed-clear", () => {
     expect(existsSync(join(s.root, "cell", "keep.txt"))).toBe(false);
   });
 });
+
+describe("seed records: runs begin on the rulebook snapshot id", () => {
+  /** A stand-in realitytrace program that logs every call and answers just enough for a run to begin. */
+  function fakeBin(dir: string, snapshotReply: string): { bin: string; log: string } {
+    const log = join(dir, "calls.log");
+    const bin = join(dir, "realitytrace");
+    writeFileSync(
+      bin,
+      `#!/bin/sh
+echo "$@" >> "${log}"
+case "$1 $2" in
+  "repo list") echo '{"repos":[]}';;
+  "repo enroll") echo '{"repo_id":"R1"}';;
+  "snapshot create") echo '${snapshotReply}';;
+  "run begin") echo '{"run_id":"run1"}';;
+  "ledger export") echo '[]';;
+  *) echo '{}';;
+esac
+`,
+    );
+    chmodSync(bin, 0o755);
+    return { bin, log };
+  }
+  async function beginOn(snapshotReply: string): Promise<string> {
+    const { root, env } = setups();
+    const { setupMapping } = await import("../src/config/setup.ts");
+    const { recordsPort } = await import("../scripts/seed.ts");
+    const mapping = setupMapping("testing", env);
+    mkdirSync(mapping.cell, { recursive: true });
+    const { bin, log } = fakeBin(root, snapshotReply);
+    const port = recordsPort(mapping, { ...env, REALITYTRACE_BIN: bin });
+    await port.openRun("journey-1");
+    const begin = readFileSync(log, "utf8").split("\n").find((l) => l.startsWith("run begin"))!;
+    return begin;
+  }
+
+  test("with the rulebook connected the run begins on the real snapshot id, not the fixed one", async () => {
+    const begin = await beginOn('{"snapshot_id":"sha256:abc123"}');
+    expect(begin).toContain("--snapshot sha256:abc123");
+    expect(begin).not.toContain("snapshot:horizon");
+  });
+
+  test("when the rulebook cannot be snapshotted the run begins on the genesis snapshot", async () => {
+    const begin = await beginOn("{}");
+    expect(begin).toContain("--snapshot snapshot:genesis");
+  });
+});
