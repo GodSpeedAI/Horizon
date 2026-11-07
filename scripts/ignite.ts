@@ -19,6 +19,7 @@ import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { loadWorld } from "../src/adapters/semantic.ts";
+import { DEFAULT_OPERATOR_REF } from "../src/config/load.ts";
 import { NAVIGATION_INTENT_COMMIT } from "../src/capabilities/navigation-intent.ts";
 import {
   UNISOLATED_MODE,
@@ -249,7 +250,10 @@ if (verdict.insecure) {
 
 // Read world_ref without loadConfig, which would also write a launch secret.
 const configPath = resolve(repo, process.env.HORIZON_CONFIG ?? "config/horizon.toml");
-const world = loadWorld((Bun.TOML.parse(readFileSync(configPath, "utf8")) as { world_ref: string }).world_ref);
+const configDoc = Bun.TOML.parse(readFileSync(configPath, "utf8")) as { world_ref: string; identity?: { operator_ref?: string } };
+const world = loadWorld(configDoc.world_ref);
+// The SEA-Forge approver must be the same identity Horizon is configured with (one identity, not two).
+const operatorRef = process.env.HORIZON_OPERATOR_REF?.trim() || configDoc.identity?.operator_ref || DEFAULT_OPERATOR_REF;
 console.log(`ignite: cell ${cell}`);
 console.log(`ignite: SEA-Forge ${server ?? "(run by the gateway service account)"} (log ${logPath})`);
 console.log(`ignite: RealityTrace ${rt}`);
@@ -268,7 +272,7 @@ const cockpit = spawn("bun", ["run", "src/main.ts"], {
     COGNATE_GOVERNANCE: "sea-forge",
     COGNATE_SEA_FORGE_SOCKET: socket,
     COGNATE_WORLD_REF: world.cognateWorldRef,
-    COGNATE_SEA_FORGE_OPERATOR: "operator", // logical actor id, a single-operator development default
+    COGNATE_SEA_FORGE_OPERATOR: operatorRef,
     HORIZON_APPROVAL_ASSURANCE: status.approvals,
     COGNATE_REALITYTRACE_BIN: rt,
     COGNATE_REALITYTRACE_DATA_HOME: rtData,
