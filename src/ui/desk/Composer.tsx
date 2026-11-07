@@ -53,6 +53,9 @@ export interface Suggestion {
 }
 
 /** The text after the last @ before the cursor, or null when the cursor is not in a link being typed. */
+/** Words are kept only under the desk's own draft id, never under the id a proposal brought along. */
+export const keepsDraft = (draftId: string, proposalDraftId: string | null): boolean => draftId !== proposalDraftId;
+
 export function atQuery(text: string, cursor: number): { readonly start: number; readonly query: string } | null {
   const before = text.slice(0, cursor);
   const match = /(?:^|\s)@([^\s@]*)$/.exec(before);
@@ -196,6 +199,8 @@ export function Composer({ ui, dispatch, io, request = null }: ComposerProps): R
   const [reviewing, setReviewing] = useState(false);
   const [reviewStep, setReviewStep] = useState("");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The draft id an agent's proposal came with. The desk keeps one draft of its own, so words under another id are not saved (the server refuses them). */
+  const proposalDraft = useRef<string | null>(null);
   const handoff = mode === "handoff";
   // Entering Hand off loads the draft: the same draft number comes back after a restart, with the words written so far.
   useEffect(() => {
@@ -208,7 +213,7 @@ export function Composer({ ui, dispatch, io, request = null }: ComposerProps): R
   }, [handoff]);
   // The words are kept as you type, a moment after you stop.
   useEffect(() => {
-    if (!handoff || draft === null) return;
+    if (!handoff || draft === null || !keepsDraft(draft.draftId, proposalDraft.current)) return;
     if (saveTimer.current !== null) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => io.handoff.saveDraft({ draft_id: draft.draftId, text }), 700);
     return () => {
@@ -274,6 +279,7 @@ export function Composer({ ui, dispatch, io, request = null }: ComposerProps): R
     if (request === null) return;
     dispatch({ type: "mode", mode: "handoff" });
     dispatch({ type: "typing", text: request.words, selStart: request.words.length, selEnd: request.words.length });
+    proposalDraft.current = request.draftId ?? null;
     const own: DraftInfo | null = request.draftId === undefined ? null : { draftId: request.draftId, text: request.words, mode: "handoff", agent: draft?.agent ?? { offered: false, words: "" } };
     if (own !== null) setDraft(own);
     void showPreview(request.words, own);

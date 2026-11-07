@@ -6,6 +6,7 @@ import { START, type UiState } from "../src/ui/desk/attention.ts";
 import { BANNED } from "../src/ui/desk/banned-words.ts";
 import { COMMANDS, hintsFor, parseLine, unknownCommandWords } from "../src/ui/desk/commands.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";
+import { keepsDraft } from "../src/ui/desk/Composer.tsx";
 import { requestFor, sourceBadge } from "../src/ui/desk/Conversation.tsx";
 import type { ConversationRow } from "../src/ui/desk/conversation-model.ts";
 import { itemsOf } from "../src/ui/desk/model.ts";
@@ -166,5 +167,13 @@ describe("plain words on the new view", () => {
       const region = text((draw(ui).split("cv-view")[1] ?? "").split("class=\"convo\"")[0]!);
       expect(region).not.toMatch(/\bask\b/i);
     }
+  });
+});
+
+describe("a confirmed proposal", () => {
+  test("its own draft id is never saved as the desk's draft (the server refuses it, which showed as a 409 in the console)", () => {
+    expect(keepsDraft("mine", "theirs")).toBe(true);
+    expect(keepsDraft("mine", null)).toBe(true);
+    expect(keepsDraft("theirs", "theirs")).toBe(false);
   });
 });
