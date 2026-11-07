@@ -122,6 +122,8 @@ suite("phone remote control, end to end in Chromium", () => {
     await page.getByRole("button", { name: "Confirm commit" }).click();
     await (page.locator("#moves details").first()).waitFor({ state: "visible", timeout: 20_000 });
     await desktopPage.goto(`${cockpitBase}/workspace`);
+    // The desk draws Recent moves after its first poll.
+    await desktopPage.locator("[data-intent]").first().waitFor({ state: "attached", timeout: 15_000 });
     expect(await desktopPage.locator("[data-intent]").count()).toBeGreaterThan(0);
   }, 90_000);
 

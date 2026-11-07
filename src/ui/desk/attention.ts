@@ -5,7 +5,8 @@
  * Rule 7: no record means "not recorded", counted as unchecked. Rule 9: a pin keeps its content and says when its source moved.
  */
 import { NOT_RECORDED } from "../workspace/compare-model.ts";
-import type { DeskState, SearchResult, ViewId } from "./model.ts";
+import type { DeskState, InspectionAnswer, NextState, RecordPin, SearchResult, ViewId } from "./model.ts";
+import type { WorkData } from "./work-build.ts";
 
 // ---- Rule 6: every state in words (design section 2) ----
 export const STATES = ["requested", "allowed", "queued", "running", "done", "recorded", "checked", "accepted"] as const;
@@ -107,6 +108,57 @@ export interface Layer {
 export type Mode = "write" | "find" | "ask";
 export const MODES: readonly Mode[] = ["write", "find", "ask"];
 
+// ---- Rule 4: three strengths of interruption ----
+export interface Interruptions {
+  /** A count beside a view name. */
+  readonly counts: Readonly<Record<ViewId, number>>;
+  /** Notices wait in Decide; they never take the screen. */
+  readonly notices: readonly string[];
+  /** Decision cards in the order shown: waiting, oldest first, then held. Each shows its age. */
+  readonly cardIds: readonly string[];
+}
+export function interruptionsOf(data: DeskState | null): Interruptions {
+  const cards = data?.decide.cards ?? [];
+  return {
+    counts: { today: 0, explore: 0, decide: cards.filter((c) => c.held === null).length, work: 0 },
+    notices: data?.decide.notices ?? [],
+    cardIds: cards.map((c) => c.id),
+  };
+}
+
+/** What the operator is looking at before confirming a choice on a decision card. */
+export interface OpenDecision {
+  readonly cardId: string;
+  readonly choice: "accept" | "reject" | "hold";
+  /** The preview code that was on screen when the preview opened. The confirm button works only while the card still has this code. */
+  readonly code: string;
+  readonly records: readonly RecordPin[];
+  readonly reason: string;
+  readonly busy: boolean;
+  /** A refusal or an error from the last attempt, in plain words. */
+  readonly problem: string | null;
+}
+export interface DecideNote {
+  readonly ok: boolean;
+  readonly message: string;
+}
+/** The one move the first-run path offers, as the fields a plain form posts. `null`: nothing can be submitted from here. */
+export interface FirstMove {
+  readonly action_id: string;
+  readonly operation: string;
+  readonly frame_id: string;
+  readonly frame_revision: string;
+  readonly focus: string;
+  readonly label: string;
+}
+export interface WorkQuery {
+  readonly source: string | null;
+  readonly repo: string | null;
+  readonly day: string | null;
+  readonly session: string | null;
+  readonly only: "contradicted" | null;
+}
+
 export interface UiState {
   readonly view: ViewId;
   /** The day the Today view shows; null means today. */
@@ -124,6 +176,16 @@ export interface UiState {
   readonly notice: string | null;
   readonly editing: string | null;
   readonly data: DeskState | null;
+  readonly decision: OpenDecision | null;
+  readonly decideNote: DecideNote | null;
+  readonly work: WorkData | null;
+  readonly workQuery: WorkQuery;
+  /** `undefined` until asked for. */
+  readonly firstMove?: FirstMove | null;
+  /** The next decision from the shared frame; null until read. */
+  readonly next: NextState | null;
+  /** The last debugger answer asked for in the inspector. */
+  readonly inspection: { readonly operation: string; readonly query: string; readonly busy: boolean; readonly answer: InspectionAnswer | null; readonly problem: string | null } | null;
 }
 
 export const START: UiState = {
@@ -141,6 +203,12 @@ export const START: UiState = {
   notice: null,
   editing: null,
   data: null,
+  decision: null,
+  decideNote: null,
+  work: null,
+  workQuery: { source: null, repo: null, day: null, session: null, only: null },
+  next: null,
+  inspection: null,
 };
 
 export type Action =
@@ -165,7 +233,18 @@ export type Action =
   | { readonly type: "pins"; readonly pins: readonly Pin[] }
   | { readonly type: "notice"; readonly text: string | null }
   | { readonly type: "edit"; readonly id: string | null }
-  | { readonly type: "draft"; readonly text: string };
+  | { readonly type: "draft"; readonly text: string }
+  | { readonly type: "preview-open"; readonly cardId: string; readonly choice: OpenDecision["choice"] }
+  | { readonly type: "preview-close" }
+  | { readonly type: "reason"; readonly text: string }
+  | { readonly type: "decision-busy" }
+  | { readonly type: "decision-result"; readonly ok: boolean; readonly message: string }
+  | { readonly type: "first-move"; readonly move: FirstMove | null }
+  | { readonly type: "next"; readonly next: NextState }
+  | { readonly type: "inspect-start"; readonly operation: string; readonly query: string }
+  | { readonly type: "inspect-result"; readonly answer: InspectionAnswer | null; readonly problem: string | null }
+  | { readonly type: "work"; readonly work: WorkData }
+  | { readonly type: "work-query"; readonly patch: Partial<WorkQuery> };
 
 export function currentRevOf(state: DeskState | null): (id: string) => string | null {
   return (id) => {
@@ -182,7 +261,8 @@ export function deskReducer(ui: UiState, action: Action): UiState {
       // Rule 2: an update from outside changes the numbers, list ends and inspector (all derived from `data`) and nothing else.
       return { ...ui, data: action.state, pins: checkPins(ui.pins, currentRevOf(action.state)) };
     case "view":
-      return { ...ui, view: action.view, cursor: 0, feed: FEED_START, focus: "list" };
+      // Focus lands on the view's heading, so the reader sees where they are and J/K starts from the top.
+      return { ...ui, view: action.view, cursor: 0, feed: FEED_START, focus: "heading", decision: null };
     case "day":
       return { ...ui, view: "today", day: action.day, cursor: 0, feed: FEED_START, focus: "list" };
     case "cursor": {
@@ -200,6 +280,7 @@ export function deskReducer(ui: UiState, action: Action): UiState {
         const top = ui.layers[ui.layers.length - 1]!;
         return { ...ui, layers: ui.layers.slice(0, -1), focus: top.returnFocus };
       }
+      if (ui.decision !== null) return { ...ui, decision: null, focus: "list" };
       if (ui.editing !== null) return { ...ui, editing: null, focus: "list" };
       if (ui.focus === "composer") return { ...ui, focus: "list" };
       return ui;
@@ -234,5 +315,32 @@ export function deskReducer(ui: UiState, action: Action): UiState {
       return { ...ui, notice: action.text };
     case "edit":
       return { ...ui, editing: action.id };
+    case "preview-open": {
+      // Opens a preview of what a choice will do. Nothing is decided here. Only the operator can open one (A, R, H or a click).
+      const card = ui.data?.decide.cards.find((c) => c.id === action.cardId);
+      if (!card) return ui;
+      return { ...ui, decision: { cardId: card.id, choice: action.choice, code: card.preview.code, records: card.preview.records, reason: "", busy: false, problem: null }, decideNote: null, focus: "decision" };
+    }
+    case "preview-close":
+      return { ...ui, decision: null, focus: "list" };
+    case "reason":
+      return ui.decision === null ? ui : { ...ui, decision: { ...ui.decision, reason: action.text } };
+    case "decision-busy":
+      return ui.decision === null ? ui : { ...ui, decision: { ...ui.decision, busy: true, problem: null } };
+    case "decision-result":
+      if (action.ok) return { ...ui, decision: null, decideNote: { ok: true, message: action.message }, focus: "list" };
+      return ui.decision === null ? { ...ui, decideNote: { ok: false, message: action.message } } : { ...ui, decision: { ...ui.decision, busy: false, problem: action.message } };
+    case "next":
+      return { ...ui, next: action.next };
+    case "inspect-start":
+      return { ...ui, inspection: { operation: action.operation, query: action.query, busy: true, answer: null, problem: null } };
+    case "inspect-result":
+      return ui.inspection === null ? ui : { ...ui, inspection: { ...ui.inspection, busy: false, answer: action.answer, problem: action.problem } };
+    case "first-move":
+      return { ...ui, firstMove: action.move };
+    case "work":
+      return { ...ui, work: action.work };
+    case "work-query":
+      return { ...ui, workQuery: { ...ui.workQuery, ...action.patch } };
   }
 }

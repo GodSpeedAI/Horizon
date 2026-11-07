@@ -6,8 +6,9 @@ import { START, type UiState } from "../src/ui/desk/attention.ts";
 import { Desk, type DeskIo } from "../src/ui/desk/Desk.tsx";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { deskState, note } from "./support/desk-fixture.ts";
+import { quietIo } from "./support/desk-io.ts";
 
-const io: DeskIo = { saveNote: async () => ({ ok: false, message: "x" }), setPresenting: () => undefined };
+const io: DeskIo = quietIo();
 const draw = (ui: UiState): string => renderToStaticMarkup(<Desk ui={ui} dispatch={() => undefined} io={io} />);
 const text = (html: string): string => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 const SECRET = "SecretClientApp";
@@ -102,7 +103,7 @@ describe("desk components", () => {
     const empty = deskState({ days: [], notes: [] });
     const html = text(draw({ ...START, data: empty }));
     expect(html).toContain("No notes yet today. Click the box below");
-    expect(html).toContain("Records not connected");
+    expect(html).toContain("Records are not connected");
     expect(html).toContain("No days yet. Write a note");
     expect(html).toContain("No tags yet");
     expect(html).toContain("Nothing is selected. Press J or K");

@@ -10,7 +10,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { RunLabel } from "../../capabilities/labels.ts";
 import { NOT_RECORDED, type CompareView, type SessionSummary } from "./compare-model.ts";
 import type { WorkspaceTheme } from "./model.ts";
-import { STYLE } from "./render.tsx";
 
 export interface CompareSelection {
   readonly source: string | null;
@@ -25,7 +24,9 @@ export interface ComparePageProps {
   readonly presenting: boolean;
   readonly selection: CompareSelection;
   readonly sources: readonly string[];
-  readonly repos: readonly { readonly repo_id: string; readonly path: string | null }[];
+  readonly repos: readonly { readonly repo_id: string; readonly path: string | null; /** A test repository under the system temp folder; the desk hides these until asked. */ readonly temporary?: boolean }[];
+  /** The newest day the record holds a session for, so an empty day can say where to look. */
+  readonly lastDay?: string | null;
   readonly sessions: readonly (SessionSummary & { readonly label: RunLabel | null })[];
   readonly view: CompareView | null;
   readonly label: RunLabel | null;
@@ -33,6 +34,17 @@ export interface ComparePageProps {
   readonly notice: string | null;
   readonly labelError: string | null;
 }
+
+const STYLE = `
+:root { --bg:#f8f8f6; --fg:#1b1d20; --muted:#4f545b; --line:#c9ccd1; --edge:#6b7280; --tint:#eceef2; --danger:#9b1c1c; --ok:#1d6b3a; --focus:#8a5200; color-scheme:light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#15171a; --fg:#eceef1; --muted:#b9bec6; --line:#363b42; --edge:#8b919a; --tint:#23272c; --danger:#f2a1a1; --ok:#8fd4a6; --focus:#f0c27b; color-scheme:dark; } }
+:root[data-theme="dark"] { --bg:#15171a; --fg:#eceef1; --muted:#b9bec6; --line:#363b42; --edge:#8b919a; --tint:#23272c; --danger:#f2a1a1; --ok:#8fd4a6; --focus:#f0c27b; color-scheme:dark; }
+body { margin:0 auto; max-width:72rem; padding:1rem; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, sans-serif; }
+.bar { display:flex; justify-content:space-between; align-items:baseline; gap:1rem; }
+.state { color:var(--muted); } .skip { position:absolute; left:-999px; } .skip:focus { left:.5rem; }
+button, select, input, textarea { font:inherit; } a { color:inherit; }
+:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+`;
 
 const EXTRA_STYLE = `
 .cmp { width:100%; border-collapse:collapse; margin:.6rem 0 1rem; }

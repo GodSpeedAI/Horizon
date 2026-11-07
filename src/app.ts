@@ -77,9 +77,6 @@ import { debuggerView, inspect, missingRetrieval } from "./ui/workspace/inspect.
 import type { ContextKernelAdapter, ContextReferenceAnswer } from "./adapters/context-kernel.ts";
 import { CONTEXT_REFERENCE } from "./capabilities/context.ts";
 import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type DebuggerOperation, type DebuggerSources } from "./domain/debugger.ts";
-import { renderWorkspacePage } from "./ui/workspace/render.tsx";
-import { renderEconomicsPage } from "./ui/workspace/economics.tsx";
-import { renderApprovalInboxPage } from "./ui/workspace/approval-inbox.tsx";
 import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare.tsx";
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
 import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
@@ -87,7 +84,11 @@ import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
 import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
 import { keyState } from "./adapters/workshop.ts";
-import { matches, partsOf, sourcesOf, type DeskCase, type DeskState, type SearchResult } from "./ui/desk/model.ts";
+import { caseTitle, matches, partsOf, plainWords, sourcesOf, type DeskCase, type DecideState, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
+import { buildDecide, waitingCount, type CaseApprovals, type HumanStepInput } from "./ui/desk/decide-build.ts";
+import { approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
+import { activeHolds, checkReason, putHold, recordDecision } from "./capabilities/decisions.ts";
+import { caseItems, costSource, orderWork, sessionItems, type AcceptedKnowledge, type WorkData } from "./ui/desk/work-build.ts";
 import { readLedgerDay } from "./adapters/ledger-day.ts";
 import { recordReader, type RecordReader } from "./adapters/realitytrace-economics.ts";
 import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
@@ -95,10 +96,11 @@ import { setupMapping } from "./config/setup.ts";
 import type { RecordSource } from "./config/types.ts";
 import { existsSync as fileExists, mkdirSync as makeDir, readFileSync as readFileText, writeFileSync as writeFileText } from "node:fs";
 import { dirname as dirOf, join as joinPath } from "node:path";
+import { tmpdir as tmpDir } from "node:os";
 import type { Server } from "bun";
 import { RemoteController, type RemoteStatus } from "./remote/server.ts";
 import { remoteSettings } from "./remote/settings.ts";
-import { remotePanelPage } from "./remote/panel.ts";
+import { qrSvg, remotePanelPage } from "./remote/panel.ts";
 
 type HttpServer = Server<unknown>;
 
@@ -1271,6 +1273,11 @@ export async function createApplication(
   const cacheDir = joinPath(deskRoot, "cache");
   const exportsDir = joinPath(deskRoot, "exports");
   const clock = options.now ?? (() => new Date());
+  /** The case keeper as a client: present when a socket is named. Reads go as the service; writes also name the operator. */
+  const caseKeeper: CaseKeeper | null =
+    delegationSocket === ""
+      ? null
+      : { socketPath: delegationSocket, service: serviceActor, ...(approvals ? { operator: approvals.operator } : {}), ...(approvals?.timeoutMs ? { timeoutMs: approvals.timeoutMs } : {}) };
   const economicsConfig = economicsFromEnv(process.env, loaded.config.economics);
   const rtBin = economicsConfig?.realitytrace_bin ?? "realitytrace";
   const recordSources: readonly RecordSource[] =
@@ -1304,7 +1311,8 @@ export async function createApplication(
     const presenting = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
     const day = dayOf(params.get("day"));
     const only = params.get("only") === "contradicted" ? ("contradicted" as const) : null;
-    let repos: { repo_id: string; path: string | null }[] = [];
+    let repos: { repo_id: string; path: string | null; temporary?: boolean }[] = [];
+    let lastDay: string | null = null;
     let notice: string | null = null;
     let repoId: string | null = params.get("repo");
     let view: CompareView | null = null;
@@ -1318,17 +1326,18 @@ export async function createApplication(
       const listed = reader.repos();
       if (!listed.ok) notice = `The record could not be listed: ${listed.message}`;
       else {
-        repos = [...listed.repos];
+        repos = listed.repos.map((r) => ({ ...r, temporary: r.path !== null && (r.path.startsWith(`${tmpDir().replace(/\/$/, "")}/`) || r.path.startsWith("/tmp/")) }));
         repoId = repoId ?? repos[0]?.repo_id ?? null;
         if (repoId === null) notice = "This record source holds no repositories yet, so there is nothing to compare.";
         else {
           const read = readLedgerDay(reader, { repoId, day, timeZone: deskTimeZone, cacheDir });
           if (!read.ok) notice = `The record could not be read: ${read.message}`;
           else {
+            lastDay = read.last_day;
             const all = listSessions(read.rows);
             const shown = only === "contradicted" ? onlyContradicted(all) : all;
             sessions = shown.map((summary) => ({ ...summary, label: labelOf(summary.session_id, summary.event_id) }));
-            if (shown.length === 0) notice = only ? "No contradicted session on this day." : "No sessions are recorded on this day.";
+            if (shown.length === 0) notice = `${only ? "No contradicted session on this day." : "No sessions are recorded on this day."}${read.last_day === null ? " The record holds no sessions on any day." : read.last_day === day ? "" : ` Last recorded session: ${read.last_day}.`}`;
             if (sessionId !== null) {
               view = compareSession({ rows: read.rows, sessionId, ...(loaded.config.workshop ? { workshopUrl: loaded.config.workshop.url } : {}), intact: { intact: read.intact, records: read.records, divergence: read.divergence } });
               if (view === null) notice = "That session is not in the record for this day.";
@@ -1342,6 +1351,7 @@ export async function createApplication(
       selection: { source: sourceName, repo: repoId, day, session: sessionId, only },
       sources: recordSources.map((each) => each.name),
       repos,
+      lastDay,
       sessions,
       view,
       label: view ? labelOf(view.session.session_id, view.session.event_id) : null,
@@ -1373,9 +1383,25 @@ export async function createApplication(
     return repoNameCache.names;
   }
 
+  /** The case keeper's cases, asked at most every two seconds so one poll and one view agree. */
+  let keeperCaseCache: { at: number; value: Awaited<ReturnType<typeof listCases>> } | null = null;
+  async function keeperCases(): Promise<Awaited<ReturnType<typeof listCases>> | null> {
+    if (caseKeeper === null) return null;
+    if (keeperCaseCache !== null && Date.now() - keeperCaseCache.at < 2_000) return keeperCaseCache.value;
+    const value = await listCases(caseKeeper);
+    keeperCaseCache = { at: Date.now(), value };
+    return value;
+  }
+  const isOpenCase = (c: CaseLine): boolean => c.case_state === "active" || c.case_state === "awaiting_approval";
+  const CASE_STATE_PLAIN: Record<string, string> = { active: "Running", awaiting_approval: "Waiting for your approval", completed: "Done", terminated: "Stopped" };
+
+  /** Horizon's own cases and the case keeper's, newest first. The status bar, the left list, Explore and Work all read this one list. */
   async function deskCases(): Promise<DeskCase[]> {
     const rows = await runtime.runtime.store.listRecords(CASE_COLLECTION, { tenant: caller.tenant });
-    return rows.map((row) => ({ case_ref: String(row.value.case_ref), purpose: String(row.value.purpose), opened_at: String(row.value.opened_at) })).sort((a, b) => (a.opened_at < b.opened_at ? 1 : -1));
+    const own = rows.map((row): DeskCase => ({ case_ref: String(row.value.case_ref), purpose: String(row.value.purpose), opened_at: String(row.value.opened_at), source: "horizon" }));
+    const listed = await keeperCases();
+    const theirs = listed?.kind === "ok" ? listed.value.cases.map((c): DeskCase => ({ case_ref: `case:${c.case_id}`, purpose: caseTitle(c.summary, c.created_at), opened_at: c.created_at, source: "case keeper", state: CASE_STATE_PLAIN[c.case_state] ?? "Unknown state" })) : [];
+    return [...own, ...theirs].sort((a, b) => (a.opened_at < b.opened_at ? 1 : -1));
   }
 
   async function deskState(params: URLSearchParams): Promise<DeskState> {
@@ -1385,12 +1411,16 @@ export async function createApplication(
     const day = dayOf(params.get("day"));
     const status = cockpitStatus();
     const openCaseNow = await latestCase(store, caller.tenant);
-    const inbox = await approvalInbox(now);
+    const casesNow = await deskCases();
+    // With no case opened in Horizon, the newest case still running at the case keeper is the open case.
+    const keeperOpen = casesNow.find((c) => c.source === "case keeper" && (c.state === "Running" || c.state === "Waiting for your approval")) ?? null;
     const presenting = await presentingOn(store, caller.tenant, caller.actor.id);
     const workshop = loaded.config.workshop ? keyState(loaded.config.workshop, now) : ({ state: "missing", days_left: null } as const);
     const health = partsOf({ rules: world.worldRef !== "", cases: status.governed, records: recordSources.length > 0 || status.realitytrace, workshop: { state: workshop.state, days_left: "days_left" in workshop ? workshop.days_left : null } });
     const sources = sourcesOf({ cases: status.governed, agentWork: workshop.state === "ok" || workshop.state === "expiring", records: recordSources.length > 0 || status.realitytrace });
-    const moves = status.governed ? await recentMoves() : [];
+    const allMoves = await recentMoves();
+    const moves = status.governed ? allMoves : [];
+    const decide = await decideState(allMoves);
     const noteId = params.get("note");
     const selectedNote = noteId ? await getNote(store, deskWho, noteId) : null;
     const base: Omit<DeskState, "rev"> = {
@@ -1400,24 +1430,26 @@ export async function createApplication(
       status: {
         org: caller.tenant,
         setup: loaded.setup ?? null,
-        rules: statusOf({ worldRef: world.worldRef, governed: status.governed, realitytrace: status.realitytrace, approvals: status.approvals, operator: caller.actor.id }).world,
-        openCase: openCaseNow ? { case_ref: openCaseNow.case_ref, purpose: openCaseNow.purpose } : null,
-        waiting: inbox.state === "listed" ? inbox.inbox.waiting.length : 0,
+        rules: world.worldRef === "" ? "" : statusOf({ worldRef: world.worldRef, governed: status.governed, realitytrace: status.realitytrace, approvals: status.approvals, operator: caller.actor.id }).world,
+        openCase: openCaseNow ? { case_ref: openCaseNow.case_ref, purpose: openCaseNow.purpose } : keeperOpen ? { case_ref: keeperOpen.case_ref, purpose: keeperOpen.purpose } : null,
+        waiting: waitingCount(decide),
         parts: health.parts,
         keyWarning: health.keyWarning,
         presenting,
       },
       days: await listDays(store, deskWho),
-      cases: await deskCases(),
+      cases: casesNow,
       tags: await listTags(store, deskWho),
       notes: await listDay(store, deskWho, day),
-      caseNotes: openCaseNow ? await listCase(store, deskWho, openCaseNow.case_ref) : [],
+      caseNotes: openCaseNow ?? keeperOpen ? await listCase(store, deskWho, (openCaseNow?.case_ref ?? keeperOpen!.case_ref)) : [],
       activity: moves
         .filter((move) => move.at !== null && new Intl.DateTimeFormat("en-CA", { timeZone: deskTimeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(move.at)) === day)
         .map((move) => ({ id: `move:${move.intent_id}`, at: move.at as string, source: "Cases" as const, text: `${move.operation_ref}: ${move.decided.text}` }))
         .sort((a, b) => (a.at < b.at ? -1 : 1)),
       sources,
       selected: selectedNote ? { note: selectedNote, history: await noteHistory(store, deskWho, selectedNote.note_id) } : null,
+      decide,
+      home: await homeState(params, openCaseNow !== null || keeperOpen !== null, allMoves),
     };
     const shown = presenting ? applyStandIns(base, presentingKey(), deskRepoNames()) : base;
     return { ...shown, rev: createHash("sha256").update(JSON.stringify(shown)).digest("hex").slice(0, 16) };
@@ -1444,7 +1476,214 @@ export async function createApplication(
     return (await presentingOn(store, caller.tenant, caller.actor.id)) ? applyStandIns(result, presentingKey(), deskRepoNames()) : result;
   }
 
-  const DESK_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon desk</title><link rel="stylesheet" href="/desk/app.css"></head><body><div id="root"></div><noscript>The desk needs JavaScript to show live updates. The older pages at /workspace work without it.</noscript><script type="module" src="/desk/app.js"></script></body></html>`;
+  // ---- Stage 3: Decide, Work, and the home panels that used to live on the old workspace page ----
+  async function decideState(moves: readonly WorkspaceMove[]): Promise<DecideState> {
+    const inbox = await approvalInbox(clock());
+    let caseApprovals: CaseApprovals = { kind: "none" };
+    if (caseKeeper !== null && approvals !== undefined) {
+      const listed = await approvalList(caseKeeper);
+      caseApprovals = listed.kind === "ok" ? { kind: "listed", approvals: listed.value.approvals, unreadable: listed.value.unreadable } : listed.kind === "stale" ? { kind: "none" } : { kind: "notice", words: listed.words };
+    }
+    const holds = await activeHolds(runtime.runtime.store, caller.tenant);
+    const human = await humanSteps();
+    return buildDecide({ inbox, moves, caseApprovals, holds, humanSteps: human.steps, extraNotices: human.notices });
+  }
+
+  /** Every human step that is running and not settled, in every open case at the case keeper. Each one waits for a person. */
+  async function humanSteps(): Promise<{ readonly steps: HumanStepInput[]; readonly notices: string[] }> {
+    const steps: HumanStepInput[] = [];
+    const notices: string[] = [];
+    if (caseKeeper === null) return { steps, notices };
+    const listed = await keeperCases();
+    if (listed === null) return { steps, notices };
+    if (listed.kind !== "ok") return { steps, notices: [`Steps waiting for you cannot be listed. ${listed.kind === "stale" ? REFUSED_OLD : listed.words}`] };
+    for (const c of listed.value.cases.filter(isOpenCase).slice(0, 20)) {
+      const horizon = await caseSteps(caseKeeper, c.case_id);
+      if (horizon.kind !== "ok") {
+        notices.push(`The steps of ${caseTitle(c.summary, c.created_at)} could not be read, so one waiting for you may be missing. ${horizon.kind === "stale" ? REFUSED_OLD : horizon.words}`);
+        continue;
+      }
+      const waiting = horizon.value.steps.filter((s) => /^human_?task$/i.test(s.item_kind) && s.execution === "active" && s.settlement === "unsettled");
+      if (waiting.length === 0) continue;
+      const overview = await caseDigest(caseKeeper, c.case_id);
+      for (const step of waiting) steps.push({ case_id: c.case_id, case_title: caseTitle(c.summary, c.created_at), plan_item_id: step.plan_item_id, name: step.name, last_event_at: step.last_event_at, digest: overview.kind === "ok" ? overview.value.digest : null });
+    }
+    return { steps, notices };
+  }
+
+  async function homeState(params: URLSearchParams, caseOpen: boolean, moves: readonly WorkspaceMove[]): Promise<HomeState> {
+    const store = runtime.runtime.store;
+    const status = cockpitStatus();
+    const committed = (await readIntentRecords(store)).some((entry) => entry.event.tenant === caller.tenant);
+    const skipped = await onboardingSkipped(store, caller.tenant, caller.actor.id);
+    const caseParam = params.get("case_error");
+    const receiptId = params.get("receipt");
+    const receipt = receiptId ? await receiptFor(receiptId) : null;
+    return {
+      onboarding: onboardingOf({ governed: status.governed, realitytrace: status.realitytrace, caseOpen, committed, skipped }),
+      caseError: caseParam === "empty" || caseParam === "too_long" ? caseParam : null,
+      moves,
+      receipt: receipt === null ? null : { intent_id: receipt.intent_id, found: receipt.found, move: receipt.move },
+      assurance: approvalAssuranceOf(process.env.HORIZON_APPROVAL_ASSURANCE),
+    };
+  }
+
+  const REFUSED_OLD = "That decision changed or is no longer waiting. Look at the new version and decide again.";
+
+  /** One decision from a card. The preview code the operator looked at must still be the card's, or nothing is done. */
+  async function deskDecide(request: Request): Promise<Response> {
+    const fail = (status: number, outcome: string, message: string): Response => Response.json({ ok: false, outcome, message }, { status, headers: { "cache-control": "no-store" } });
+    let body: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(await request.text());
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("not an object");
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return fail(400, "unreadable", "That decision could not be read. Nothing was done.");
+    }
+    const cardId = typeof body.card_id === "string" ? body.card_id : "";
+    const choice = body.choice;
+    const previewCode = typeof body.preview_code === "string" ? body.preview_code : "";
+    if (cardId === "" || (choice !== "accept" && choice !== "reject" && choice !== "hold" && choice !== "release")) return fail(400, "unreadable", "Choose accept, reject or hold on a card. Nothing was done.");
+    const store = runtime.runtime.store;
+    const now = clock();
+    const state = await decideState(await recentMoves());
+    const card = state.cards.find((candidate) => candidate.id === cardId);
+    if (card === undefined) return fail(404, "gone", "That decision is no longer waiting. It may have been answered somewhere else. Nothing was done.");
+    if (choice === "release") {
+      if (card.held === null) return fail(409, "not_held", "That card is not on hold.");
+      await putHold(store, { tenant: caller.tenant, card_id: card.id, reason: card.held.reason, released: true, now });
+      return Response.json({ ok: true, message: "Released. The card is back under Needs you." }, { headers: { "cache-control": "no-store" } });
+    }
+    if (card.held !== null) return fail(409, "held", "This one is on hold. Release the hold first.");
+    const sentRecords = Array.isArray(body.records) ? (body.records as unknown[]).flatMap((r) => (typeof r === "object" && r !== null && typeof (r as { ref?: unknown }).ref === "string" && typeof (r as { expected_digest?: unknown }).expected_digest === "string" ? [{ ref: (r as { ref: string }).ref, expected_digest: (r as { expected_digest: string }).expected_digest }] : [])) : [];
+    const sameRecords = JSON.stringify(sentRecords) === JSON.stringify(card.preview.records);
+    // The case keeper judges its own versions: for its approvals, what the operator saw is what gets sent to it.
+    const keeperJudges = card.kind === "case_task" && (choice === "accept" || choice === "reject");
+    if (previewCode !== card.preview.code && !(keeperJudges && !sameRecords)) return fail(409, "preview_out_of_date", "Preview out of date. What this decision shows changed while you were looking. Nothing was done. Look at the new preview and decide again.");
+    const needsReason = choice === "hold" || (choice === "accept" && card.reason_for_accept);
+    const reasonCheck = checkReason(body.reason);
+    if (needsReason && !reasonCheck.ok) return fail(400, "reason_needed", reasonCheck.message);
+    const reason = reasonCheck.ok ? reasonCheck.reason : null;
+    const audit = async (outcome: string): Promise<void> => {
+      try {
+        await recordDecision(store, { tenant: caller.tenant, operator: caller.actor.id, card_id: card.id, choice, reason, preview_code: previewCode, outcome, now });
+      } catch {
+        // The decision itself is already recorded where it counts; a missing audit row is not hidden by failing the answer.
+      }
+    };
+    if (choice === "hold") {
+      await putHold(store, { tenant: caller.tenant, card_id: card.id, reason: reason as string, released: false, now });
+      await audit("held");
+      return Response.json({ ok: true, message: "On hold. Nothing changed; the step keeps waiting. Release the hold to bring it back." }, { headers: { "cache-control": "no-store" } });
+    }
+    if (card.blocked !== null) return fail(409, "blocked", card.blocked);
+
+    if (card.kind === "escalation") {
+      const approvalId = card.id.slice("approval:".length);
+      try {
+        await resolveNavigationApproval({ approvalId, resolution: choice === "accept" ? "approved" : "rejected" });
+      } catch (error) {
+        // A rejected commit fails by design and is audited; anything else is refused here.
+        if (!(error instanceof Error && error.message.startsWith("INTENT: governed commit refused"))) {
+          await audit("refused");
+          return fail(409, "refused", error instanceof Error ? error.message : String(error));
+        }
+      }
+      await audit(choice === "accept" ? "approved" : "rejected");
+      const intentId = await intentIdForApproval(approvalId);
+      return Response.json({ ok: true, message: choice === "accept" ? "Approved. The case keeper checks the move again and runs it once." : "Rejected. The move stops and the refusal is recorded.", receipt: intentId }, { headers: { "cache-control": "no-store" } });
+    }
+
+    if (card.kind === "case_task") {
+      if (caseKeeper === null) return fail(503, "unreachable", "The case keeper is not set up, so this cannot be decided.");
+      const approvalId = card.id.slice("case-task:".length);
+      const listed = await approvalList(caseKeeper);
+      const row = listed.kind === "ok" ? listed.value.approvals.find((candidate) => candidate.approval_id === approvalId) : undefined;
+      if (listed.kind !== "ok") return fail(502, "unreachable", listed.kind === "stale" ? REFUSED_OLD : listed.words);
+      if (row === undefined) return fail(404, "gone", "That decision is no longer waiting. Nothing was done.");
+      if (sentRecords.length === 0) return fail(400, "unreadable", "This decision did not carry the version you looked at, so it was not sent. Nothing was done.");
+      const result = await caseKeeperDecide(caseKeeper, {
+        case_id: row.case_id,
+        approval_id: approvalId,
+        decision: choice === "accept" ? "approve" : "reject",
+        ...(reason ? { note: reason } : {}),
+        request_id: `horizon:decide:${approvalId}:${choice}`,
+        preconditions: { records: sentRecords },
+      });
+      if (result.kind === "ok") {
+        await audit(choice === "accept" ? "approved" : "rejected");
+        return Response.json({ ok: true, message: choice === "accept" ? "Approved. The case keeper recorded your decision." : "Rejected. The case keeper recorded your decision." }, { headers: { "cache-control": "no-store" } });
+      }
+      await audit(result.kind === "stale" ? "refused_as_stale" : result.kind);
+      if (result.kind === "stale") return fail(409, "stale", `The case keeper refused this: ${result.words}`);
+      return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words);
+    }
+
+    if (card.kind === "human_step") {
+      if (caseKeeper === null) return fail(503, "unreachable", "The case keeper is not set up, so this cannot be done.");
+      const [, caseId, itemId] = /^human:([^:]+):(.+)$/.exec(card.id) ?? [];
+      if (caseId === undefined || itemId === undefined) return fail(400, "unreadable", "That step is not one Horizon knows. Nothing was done.");
+      if (reason === null) return fail(400, "reason_needed", "Type a reason first. It is kept with the decision.");
+      // `human_task_complete` takes no preconditions, so the case keeper cannot refuse a stale request itself. Horizon reads the
+      // case's version again right now and refuses locally if it is not the one the card pinned.
+      const pinned = card.preview.records[0];
+      const fresh = await caseDigest(caseKeeper, caseId);
+      if (fresh.kind !== "ok") return fail(fresh.kind === "stale" ? 409 : fresh.kind === "refused" ? 409 : 502, fresh.kind, fresh.kind === "stale" ? REFUSED_OLD : fresh.words);
+      if (pinned === undefined || fresh.value.digest === null || fresh.value.digest.expected_digest !== pinned.expected_digest) return fail(409, "preview_out_of_date", "Preview out of date. This case changed after you looked at it. Nothing was done. Look at the new preview and decide again.");
+      const result = await humanTaskComplete(caseKeeper, { case_id: caseId, item_id: itemId, justification: reason, request_id: `horizon:human:${caseId}:${itemId}` });
+      if (result.kind === "ok") {
+        await audit("marked_done");
+        return Response.json({ ok: true, message: "Marked done. The case keeper recorded your reason." }, { headers: { "cache-control": "no-store" } });
+      }
+      await audit(result.kind);
+      if (result.kind === "stale") return fail(409, "stale", `The case keeper refused this: ${result.words}`);
+      return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words);
+    }
+
+    // acceptance: the observe and rule steps of a committed move
+    const cut = card.id.lastIndexOf(":");
+    const phase = card.id.slice(cut + 1);
+    const intentId = card.id.slice("settle:".length, cut);
+    if (phase !== "observe" && phase !== "rule") return fail(400, "unreadable", "That check is not one Horizon knows. Nothing was done.");
+    try {
+      await settleNavigationIntent(intentId, phase);
+    } catch (error) {
+      await audit("refused");
+      return fail(409, "refused", error instanceof Error ? error.message : String(error));
+    }
+    await audit(phase === "rule" ? "signed_off" : "observed");
+    return Response.json({ ok: true, message: phase === "rule" ? "Signed off. The case keeper ruled on the evidence and the answer is recorded." : "Checked. The record keeper observed the move and sent the evidence on.", receipt: intentId }, { headers: { "cache-control": "no-store" } });
+  }
+
+  async function deskWork(params: URLSearchParams): Promise<WorkData> {
+    const data = await compareData(params);
+    const presenting = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
+    let cases: WorkData["cases"] = { connected: false, words: "Cases are not connected, so running work cannot be shown.", items: [], unreadable: 0 };
+    let knowledge: AcceptedKnowledge = { kind: "unknown", why: "Cases are not connected, so no outcome can be counted as accepted." };
+    if (caseKeeper !== null) {
+      const listed = await listCases(caseKeeper);
+      if (listed.kind === "ok") {
+        cases = { connected: true, words: listed.value.cases.length === 0 ? "No cases yet." : `${listed.value.cases.length} ${listed.value.cases.length === 1 ? "case" : "cases"}.`, items: listed.value.cases, unreadable: listed.value.unreadable.length };
+        knowledge = listed.value.unreadable.length > 0 ? { kind: "unknown", why: "some cases could not be read, so the count of accepted outcomes cannot be trusted." } : { kind: "known", completed: listed.value.cases.filter((c) => c.case_state === "completed").map((c) => c.case_id) };
+      } else {
+        const words = listed.kind === "stale" ? REFUSED_OLD : listed.words;
+        cases = { connected: false, words, items: [], unreadable: 0 };
+        knowledge = { kind: "unknown", why: words };
+      }
+    }
+    const work: WorkData = {
+      compare: data.props,
+      items: orderWork([...sessionItems(data.props.sessions), ...caseItems(cases.items)]),
+      cases,
+      cost: costSource(economics.read(), knowledge),
+    };
+    return presenting ? applyStandIns(work, presentingKey(), data.repoNames) : work;
+  }
+
+  const DESK_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon desk</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/desk/app.css"></head><body><div id="root"></div><noscript>The desk needs JavaScript to show live updates. Turn it on for this page.</noscript><script type="module" src="/desk/app.js"></script></body></html>`;
+  const SETUP_GUIDE_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon setup guide</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:1rem auto;padding:0 1rem}code{overflow-wrap:anywhere}</style></head><body><p><a href="/workspace">Back to the desk</a></p><h1>Setup guide</h1><h2>Start Horizon with the case keeper and record keeper</h2><p>Start the whole set with <code>bun run ignite</code> (see docs/IGNITION.md).</p><h2>Record what agent work costs</h2><ol><li>Install the agent tap with the record keeper: <code>te-agents install --with-realitytrace</code></li><li>Enroll each repository you want measured: <code>te-agents rt enroll &lt;repo&gt;</code></li><li>Point Horizon at the record keeper and the tap's store: set <code>HORIZON_ECONOMICS_REALITYTRACE_BIN</code> (and, if the tap does not use the default location, <code>HORIZON_ECONOMICS_DATA_HOME</code> and <code>HORIZON_ECONOMICS_STATE_HOME</code>), or add an <code>[economics]</code> table with <code>realitytrace_bin</code> to the Horizon config.</li></ol></body></html>`;
+  const deskPage = (): Response => new Response(DESK_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": DESK_CSP, "x-content-type-options": "nosniff" } });
   const DESK_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
   async function deskAsset(name: "app.js" | "app.css"): Promise<Response> {
@@ -1607,9 +1846,7 @@ export async function createApplication(
               ? Response.json({ ok: true, intent: outcome.bound, committed: outcome.result })
               : Response.json({ ok: false, code: outcome.code, message: outcome.message }, { status: 409 });
           }
-          if (url.pathname === "/desk" && request.method === "GET") {
-            return new Response(DESK_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": DESK_CSP, "x-content-type-options": "nosniff" } });
-          }
+          if (url.pathname === "/desk" && request.method === "GET") return deskPage();
           if (url.pathname === "/desk/app.js" && request.method === "GET") return deskAsset("app.js");
           if (url.pathname === "/desk/app.css" && request.method === "GET") return deskAsset("app.css");
           if (url.pathname === "/desk/state.json" && request.method === "GET") {
@@ -1622,43 +1859,45 @@ export async function createApplication(
             return Response.json(await deskSearch(url.searchParams), { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
           }
           if (url.pathname === "/desk/note" && request.method === "POST") return deskSaveNote(request);
-          if (url.pathname === "/workspace" && request.method === "GET") {
-            const theme = themeOf(url.searchParams.get("theme"));
-            const evidenceRef = url.searchParams.get("evidence");
-            const data = await workspace({
-              ...(url.searchParams.get("focus") === null ? {} : { focusRef: url.searchParams.get("focus") as string }),
-              ...(evidenceRef === null ? {} : { evidenceRef }),
-              ...(theme === undefined ? {} : { theme }),
-            });
-            const caseParam = url.searchParams.get("case_error");
-            const chrome = await cockpitChrome({
-              caseError: caseParam === "empty" || caseParam === "too_long" ? caseParam : null,
-              receipt: url.searchParams.get("receipt"),
-            });
-            // An `operation=` on the page is answered server-side and rendered with the frame it
-            // was answered about, so the surface never shows an answer next to a different focus.
-            const inspectOperation = url.searchParams.get("operation");
-            const inspectQuery = url.searchParams.get("query");
-            const inspected = inspectOperation !== null && (DEBUGGER_OPERATIONS as readonly string[]).includes(inspectOperation)
-              ? await inspectFocus(inspectOperation, {
-                  ...(url.searchParams.get("focus") === null ? {} : { focusRef: url.searchParams.get("focus") as string }),
-                  ...(inspectQuery === null ? {} : { query: inspectQuery }),
-                })
-              : null;
-            const html = await renderWorkspacePage({
-              service: runtime.runtime.service,
-              caller,
-              frame: data.frame,
-              view: data.view,
-              current: data.current,
-              evidenceRef,
-              ...(theme === undefined ? {} : { theme }),
-              expectedObjects: data.objects.length,
-              debuggerAnswer: inspected?.debugger ?? null,
-              retrievalAnswer: inspected?.retrieval ?? null,
-              chrome,
-            });
-            return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+          if ((url.pathname === "/workspace" || url.pathname === "/workspace/approvals") && request.method === "GET") {
+            // The desk is the workspace: the page is a shell, and the browser bundle draws every view from /desk/*.json.
+            return deskPage();
+          }
+          if (url.pathname === "/desk/decide.json" && request.method === "GET") {
+            const state = await decideState(await recentMoves());
+            const shown = (await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id)) ? applyStandIns(state, presentingKey(), deskRepoNames()) : state;
+            return Response.json(shown, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+          }
+          if (url.pathname === "/desk/decide" && request.method === "POST") return deskDecide(request);
+          if (url.pathname === "/desk/work.json" && request.method === "GET") {
+            return Response.json(await deskWork(url.searchParams), { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+          }
+          if (url.pathname === "/desk/setup-guide" && request.method === "GET") {
+            // The one page that may name programs, files and settings: the runbook behind the desk's Settings.
+            return new Response(SETUP_GUIDE_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" } });
+          }
+          if (url.pathname === "/desk/next.json" && request.method === "GET") {
+            // The frame-based "next decision": read-only. It builds a frame, so the desk asks only when Decide is open.
+            const data = await workspace({});
+            const snap = data.snapshot;
+            return Response.json({ state: snap.state, state_message: snap.state_message, focus: snap.frame.focus_ref, choices: snap.choices, blocked: snap.blocked }, { headers: { "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/desk/first-move.json" && request.method === "GET") {
+            // The one move the first-run path offers. Computed only when asked for, because it builds a frame.
+            const data = await workspace({});
+            const submittable = data.snapshot.actions.filter((action) => action.submit);
+            const action = submittable.find((candidate) => candidate.operation === "horizon.health") ?? submittable[0] ?? null;
+            return Response.json(
+              action === null
+                ? { firstMove: null }
+                : { firstMove: { action_id: action.action_id, operation: action.operation, frame_id: data.frame.frame_id, frame_revision: String(data.frame.revision), focus: data.frame.focus_ref, label: action.label } },
+              { headers: { "cache-control": "no-store" } },
+            );
+          }
+          if (url.pathname === "/desk/remote.json" && request.method === "GET") {
+            await remote.checkReachable();
+            const link = remote.pairingLink();
+            return Response.json({ status: await remote.status(), link, qr: link === null ? null : qrSvg(link) }, { headers: { "cache-control": "no-store" } });
           }
           if (url.pathname === "/workspace.json" && request.method === "GET") {
             const theme = themeOf(url.searchParams.get("theme"));
@@ -1672,11 +1911,10 @@ export async function createApplication(
           }
           if (url.pathname === "/workspace/economics" && request.method === "GET") {
             // Read-only: RealityTrace is read through its CLI on every request; nothing is stored or written.
-            const readout = economics.read();
             if ((request.headers.get("accept") ?? "").includes("application/json")) {
-              return Response.json({ schema: ECONOMICS_SCHEMA, ...readout }, { headers: { "cache-control": "no-store" } });
+              return Response.json({ schema: ECONOMICS_SCHEMA, ...economics.read() }, { headers: { "cache-control": "no-store" } });
             }
-            return new Response(renderEconomicsPage(readout, themeOf(url.searchParams.get("theme"))), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+            return deskPage();
           }
           if (url.pathname === "/workspace/compare" && request.method === "GET") {
             // Read-only: RealityTrace is read through its allow-listed CLI; labels and the Presenting switch are Horizon's own records.
@@ -1702,8 +1940,10 @@ export async function createApplication(
               });
             } catch (error) {
               const code = error instanceof Error ? error.message.replace(/^LABEL: /, "") : "failed";
+              if ((request.headers.get("accept") ?? "").includes("application/json")) return Response.json({ ok: false, code, message: `The label was not saved: ${code}.` }, { status: 400 });
               return Response.redirect(`/workspace/compare?${back}${back ? "&" : ""}label_error=${encodeURIComponent(code)}`, 303);
             }
+            if ((request.headers.get("accept") ?? "").includes("application/json")) return Response.json({ ok: true });
             return Response.redirect(`/workspace/compare?${back}`, 303);
           }
           if (url.pathname === "/workspace/presenting" && request.method === "POST") {
@@ -1723,10 +1963,6 @@ export async function createApplication(
             const built = buildExport({ kind, labels: data.labels, comparison: data.view, standins: choice.standins, key: presentingKey(), names: data.repoNames, now: clock() });
             writeExport(exportsDir, built);
             return new Response(built.body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "content-disposition": `attachment; filename="${built.name}"` } });
-          }
-          if (url.pathname === "/workspace/approvals" && request.method === "GET") {
-            // Read-only listing. Decisions are POSTed to /workspace/approval, which SEA-Forge decides.
-            return new Response(renderApprovalInboxPage(await approvalInbox(), themeOf(url.searchParams.get("theme"))), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
           }
           if (url.pathname === "/workspace/inspect" && request.method === "GET") {
             // Read-only, deliberately: GET, no form, no commit. The operation is one of the seven
@@ -1822,42 +2058,6 @@ export async function createApplication(
           if (url.pathname === "/workspace/onboarding/resume" && request.method === "POST") {
             await setOnboardingSkipped(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, skipped: false, now: new Date() });
             return Response.redirect("/workspace#getting-started", 303);
-          }
-          if (url.pathname === "/workspace/approval" && request.method === "POST") {
-            const form = await request.formData().catch(() => null);
-            const approvalId = form?.get("approval_id");
-            const decision = form?.get("decision");
-            if (typeof approvalId !== "string" || approvalId === "" || (decision !== "approve" && decision !== "reject")) {
-              return Response.json({ code: "invalid_argument", message: "APPROVAL: approval_id and decision (approve or reject) are required" }, { status: 400 });
-            }
-            const intentId = await intentIdForApproval(approvalId);
-            if (intentId === null) return Response.json({ code: "not_found", message: "APPROVAL: no escalated commit waits on this approval" }, { status: 404 });
-            try {
-              await resolveNavigationApproval({ approvalId, resolution: decision === "approve" ? "approved" : "rejected" });
-            } catch (error) {
-              // A rejected commit fails by design and is audited; its receipt says so. Anything else is refused here.
-              if (!(error instanceof Error && error.message.startsWith("INTENT: governed commit refused"))) {
-                return Response.json({ code: "approval_refused", message: error instanceof Error ? error.message : String(error) }, { status: 409 });
-              }
-            }
-            return Response.redirect(`/workspace?receipt=${encodeURIComponent(intentId)}#receipt`, 303);
-          }
-          if (url.pathname === "/workspace/settle" && request.method === "POST") {
-            const form = await request.formData().catch(() => null);
-            const intentId = form?.get("intent_id");
-            if (typeof intentId !== "string" || intentId === "") {
-              return Response.json({ code: "invalid_argument", message: "SETTLEMENT: intent_id is required" }, { status: 400 });
-            }
-            const phase = form?.get("phase");
-            if (phase !== "observe" && phase !== "rule") {
-              return Response.json({ code: "invalid_argument", message: "SETTLEMENT: phase must be observe or rule" }, { status: 400 });
-            }
-            try {
-              await settleNavigationIntent(intentId, phase);
-            } catch (error) {
-              return Response.json({ code: "settlement_refused", message: error instanceof Error ? error.message : String(error) }, { status: 409 });
-            }
-            return Response.redirect(`/workspace?receipt=${encodeURIComponent(intentId)}#receipt`, 303);
           }
           if (url.pathname === "/workspace/remote" && request.method === "GET") {
             await remote.checkReachable();

@@ -7,7 +7,7 @@ import type { DurableStore } from "@godspeedai/cognate-events";
 import { Connector, type ConnectorConfig } from "../../connectors/github/index.ts";
 import { createGh, type GhOptions } from "../../connectors/github/gh.ts";
 import { emptyRest, installFakeGh, restIssue, type FakeGh, type FakeGhState, type FakeRestIssue } from "./fake-gh.ts";
-import { startFakeKeeper, type FakeKeeper } from "./fake-case-keeper.ts";
+import { startFakeKeeper, type FakeKeeper } from "./fake-case-keeper-stateful.ts";
 
 export const REPO = "GodSpeedAI/horizon-sandbox";
 

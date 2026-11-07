@@ -15,27 +15,8 @@ import type { EconomicsConfig, RecordSource } from "../config/types.ts";
 import { redact } from "./redact.ts";
 import { economicsModel, type EconomicsModel } from "../economics/model.ts";
 
-export interface EconomicsRepo {
-  readonly repo_id: string;
-  readonly path: string | null;
-  readonly model: EconomicsModel | null;
-  /** A brief error from RealityTrace for this repo, or null. */
-  readonly error: string | null;
-}
-
-export type EconomicsReadout =
-  | { readonly state: "not_configured" }
-  | { readonly state: "unavailable"; readonly message: string }
-  | { readonly state: "empty"; readonly repos: readonly EconomicsRepo[]; readonly skipped: EconomicsSkipped }
-  | { readonly state: "ok"; readonly repos: readonly EconomicsRepo[]; readonly skipped: EconomicsSkipped };
-
-/** Enrolled repositories left out of the view, counted so nothing disappears silently. */
-export interface EconomicsSkipped {
-  /** Enrolled, but the ledger holds no agent events (e.g. repos enrolled by other tools). */
-  readonly without_agent_activity: number;
-  /** Enrolled, but the folder no longer exists (e.g. temporary test repositories). */
-  readonly missing_folder: number;
-}
+export type { EconomicsReadout, EconomicsRepo, EconomicsSkipped } from "../economics/readout.ts";
+import type { EconomicsReadout, EconomicsRepo, EconomicsSkipped } from "../economics/readout.ts";
 
 export type PathExists = (path: string) => boolean;
 

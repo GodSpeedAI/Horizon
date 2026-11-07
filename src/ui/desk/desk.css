@@ -63,5 +63,52 @@ li[data-cursor="true"]::before { content:"Current item"; position:absolute; widt
 .quick-list { list-style:none; padding:0; margin:.6rem 0 0; } .quick-list button { width:100%; text-align:left; border-color:transparent; }
 .keys th { text-align:left; white-space:nowrap; padding:.2rem 1rem .2rem 0; vertical-align:top; } .keys td { padding:.2rem 0; }
 .revisions { padding-left:1.2rem; } .revisions li { margin:.6rem 0; border-top:1px solid var(--line); padding-top:.4rem; }
-@media (max-width: 60rem) { .desk-body { grid-template-columns:1fr; overflow:auto; } .desk { height:auto; } }
+
 @media (prefers-reduced-motion: no-preference) { button { transition:background .12s; } }
+
+.view h1:focus { outline:3px solid var(--focus); outline-offset:4px; border-radius:.2rem; }
+/* Decide (stage 3). Only the card under the cursor uses the highlight colour; the rest wait quietly. */
+.cards { display:grid; gap:.8rem; margin:.6rem 0; } .cards:focus-visible { outline-offset:4px; }
+.decision-card { border:1px solid var(--line); border-radius:.5rem; padding:.6rem .9rem; background:var(--panel); }
+.decision-card[data-highlight="true"] { border:2px solid var(--accent); background:var(--tint); }
+.decision-card[data-held="yes"] { border-style:dashed; }
+.card-flag { margin:0; font-size:.85rem; color:var(--muted); } .decision-card[data-highlight="true"] .card-flag { color:var(--fg); }
+.decision-card h3 { margin:.2rem 0; font-size:1.05rem; }
+.facts { margin:.2rem 0 .5rem; padding-left:1.1rem; color:var(--muted); }
+.choices { margin:.4rem 0; }
+.notices { border:1px solid var(--edge); border-radius:.4rem; padding:.2rem .8rem; margin:.5rem 0; background:var(--panel); } .notices h2 { margin:.3rem 0; }
+.preview { border:1px dashed var(--edge); border-radius:.4rem; padding:.5rem .8rem; margin-top:.6rem; background:var(--bg); }
+.preview[data-stale="yes"] { border-style:solid; border-color:var(--danger); }
+.preview h4 { margin:.1rem 0 .4rem; }
+.preview-grid { display:grid; grid-template-columns:max-content 1fr; gap:.25rem .9rem; margin:.3rem 0; } .preview-grid dt { color:var(--muted); } .preview-grid dd { margin:0; } .preview-grid ul { margin:0; padding-left:1.1rem; }
+.certainty { color:var(--muted); font-size:.85rem; }
+.reason { display:grid; gap:.2rem; font-size:.88rem; color:var(--muted); margin:.4rem 0; }
+/* Work and Cost */
+.pill { display:inline-block; border:1px solid var(--edge); border-radius:.7rem; padding:0 .5rem; font-weight:700; font-size:.82rem; }
+.pill[data-outcome="contradicted"] { color:var(--danger); border-width:2px; } .pill[data-outcome="matched"] { color:var(--ok); } .pill[data-outcome="not recorded"] { color:var(--muted); border-style:dashed; }
+.work-items > li[data-first="true"][data-outcome="contradicted"] { border-color:var(--danger); }
+.cmp { width:100%; border-collapse:collapse; margin:.6rem 0 1rem; } .cmp th, .cmp td, .cost-view th, .cost-view td { border:1px solid var(--line); padding:.35rem .55rem; text-align:left; vertical-align:top; overflow-wrap:anywhere; }
+.cmp thead th, .cost-view thead th { background:var(--tint); } .cmp td[data-state="not-recorded"], .cost-view td[data-state="not-recorded"] { color:var(--muted); font-style:italic; } .cmp .why { display:block; font-size:.85rem; font-style:normal; }
+.cost-view table { width:100%; border-collapse:collapse; margin:.6rem 0; } .cost-view td.num, .cost-view th.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.table-wrap { overflow-x:auto; } .cost-view .badge.estimate { border-style:dashed; } .cost-view tr.case-row th, .cost-view tr.case-row td { background:var(--tint); font-weight:700; }
+.empty-state { border:1px dashed var(--edge); border-radius:.5rem; padding:.6rem 1rem; }
+.cmp-bar { display:flex; flex-wrap:wrap; gap:.6rem 1.2rem; align-items:end; margin:.6rem 0; } .cmp-bar label, .label-form label { display:flex; flex-direction:column; font-size:.88rem; color:var(--muted); }
+.label-form { display:grid; gap:.5rem; max-width:40rem; border:1px solid var(--line); border-radius:.5rem; padding:.7rem 1rem; } .label-form textarea { min-height:4rem; }
+.claims { display:grid; gap:.2rem; margin:.3rem 0; } .claim { display:grid; grid-template-columns:6rem 1fr; gap:.5rem; } .claim dt { color:var(--muted); } .claim dd { margin:0; }
+.getting-started, #receipt { border:1px solid var(--line); border-radius:.5rem; padding:.2rem .9rem .6rem; margin:.6rem 0; background:var(--panel); } .steps { padding-left:1.1rem; } .moves { padding-left:1.1rem; }
+/* Settings and the phone remote */
+.settings { position:relative; } .settings-body { position:absolute; right:0; z-index:10; background:var(--panel); border:1px solid var(--edge); border-radius:.4rem; padding:.4rem .9rem; width:min(24rem, 86vw); }
+.qr { width:12rem; height:12rem; background:#fff; } .qr svg { display:block; width:100%; height:100%; }
+.nav-toggle { display:none; }
+/* Phones: the menu is one row, the lists fold away, and the composer stays within reach at the bottom. */
+@media (max-width: 60rem) {
+  .desk { height:auto; min-height:100vh; } .desk-body { grid-template-columns:1fr; }
+  .nav { border-right:0; border-bottom:1px solid var(--line); padding:.3rem .5rem; position:sticky; top:0; z-index:5; }
+  .nav .views { display:flex; gap:.25rem; overflow-x:auto; } .nav .views li { flex:0 0 auto; } .nav .views button { width:auto; white-space:nowrap; }
+  .nav-toggle { display:block; margin:.3rem 0; } .nav-lists { display:none; } .nav-lists[data-open="true"] { display:block; max-height:40vh; overflow:auto; }
+  .composer { position:sticky; bottom:0; z-index:6; border-top:2px solid var(--edge); }
+  .view { overflow:visible; } .inspector { border-left:0; border-top:1px solid var(--line); }
+  .preview-grid { grid-template-columns:1fr; }
+  .status-bar { padding:.3rem .5rem; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; scroll-behavior:auto !important; } }

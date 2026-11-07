@@ -1,17 +1,19 @@
-# workspace — GUI workspace model, server-rendered page, economics and inspection
+# workspace — GUI workspace model, comparison page and inspection
 
 ## Overview
 
-The human GUI surface (T09/T10). `model.ts` maps one navigation frame plus one closed `GuiView`
-into a fixed six-region document; `render.tsx` server-renders that document as semantic HTML with
-no client bundle; `economics.tsx` renders a read-only case-economics page; `approval-inbox.tsx`
-renders the SEA-Forge approval listing with the existing decision form on decidable items only; `inspect.ts` attaches two
+The human GUI model (T09/T10). `model.ts` maps one navigation frame plus one closed `GuiView`
+into a fixed six-region document and the read model behind `/workspace.json`; `inspect.ts` attaches two
 read-only observations (a world-debugger answer and cited Context Kernel retrieval) to the same
-frame the terminal and GUI already render.
+frame the terminal and GUI already render. The page itself is the desk (`src/ui/desk/`): its Today,
+Decide, Work and Inspector draw this model's moves, choices, debugger answer and citations
+(`views/Home.tsx`, `NextDecision.tsx`, `Answers.tsx`, `views/Cost.tsx`, `ComparisonView.tsx`).
+`compare.tsx` and `compare-model.ts` are the comparison model and its no-script server page.
+The old `render.tsx`, `economics.tsx` and `approval-inbox.tsx` pages were removed in stage 3.
 
 Owner pinning is structural, not a styling hint: the region list is a constant sequence and agent
 contributions are collected into one append-only region, so no input order can move the owner's
-decision. Every page is a pure function of stored facts and injected answers — the renderer cannot
+decision. Every view is a pure function of stored facts and injected answers — nothing drawn can
 enable an action, evaluate a gate or approve anything.
 
 ## Interface
@@ -35,11 +37,11 @@ enable an action, evaluate a gate or approve anything.
   `[model.ts:refusedBy]`, `[model.ts:refusalText]`.
 - `StoredMoveFacts`, `WorkspaceDebugger`, `WorkspaceReference`, `WorkspaceRetrieval`
   `[model.ts:StoredMoveFacts]`, `[model.ts:WorkspaceDebugger]`, `[model.ts:WorkspaceRetrieval]`.
-- Rendering: `WorkspaceProps`, `Workspace`, `STYLE`, `ProjectionWorkspaceProps`,
-  `ProjectionWorkspace`, `WorkspacePageInput`, `renderWorkspacePage(input)` `[render.tsx:Workspace]`,
-  `[render.tsx:ProjectionWorkspace]`, `[render.tsx:renderWorkspacePage]`.
-- Economics: `ModelView`, `EconomicsPage`, `renderEconomicsPage(readout, theme?)`
-  `[economics.tsx:EconomicsPage]`, `[economics.tsx:renderEconomicsPage]`.
+- Rendering moved to the desk: `NextDecision` (the frame's choices and blocked list), `DebuggerAnswer`,
+  `ReferenceCitations`, `InspectPanel`, `Cost`, `ComparisonView`, `GettingStarted`, `Receipt`, `Moves`
+  `[desk/NextDecision.tsx:NextDecision]`, `[desk/Answers.tsx:DebuggerAnswer]`,
+  `[desk/Answers.tsx:ReferenceCitations]`, `[desk/views/Cost.tsx:Cost]`.
+- Comparison: `ComparePage`, `renderComparePage(props)` `[compare.tsx:renderComparePage]`.
 - Inspection: `RetrievalAnswer`, `debuggerView(answer)`, `retrievalView(answer)`,
   `InspectionRuntime`, `InspectionRequest`, `inspect(request, runtime)`,
   `missingRetrieval(outcome, detail)` `[inspect.ts:debuggerView]`, `[inspect.ts:retrievalView]`,
@@ -86,49 +88,25 @@ enable an action, evaluate a gate or approve anything.
 - `buildWorkspace` and `loadingWorkspace` return frozen documents; `unresolved` is copied from
   `view.unresolved`, never recomputed `[model.ts:buildWorkspace]`.
 
-**Render — no client code, no widening**
+**Desk views — no widening**
 
-- The decision region is rendered only when `current` — i.e. state is `ready`, `partial` or `blocked`;
-  `loading`, `empty`, `unknown` and `error` show a status or alert paragraph instead
-  `[render.tsx:Workspace]`.
-- An available choice with `action_id === null` is removed from the submit list and rendered as plain
-  text prefixed `Also possible from the terminal:` `[render.tsx:Workspace]`.
-- Agent contributions are shown but unsubmittable: the branch renders text
-  `proposed by an agent; not offered to the human` for a `proposed` posture
-  `[render.tsx:Workspace]`.
-- Every submitted form posts `frame_id` (in `ActionForm`) or the operation plus `focus`, `evidence`
-  and `theme` back to the server; approval and settlement are separate posts to
-  `${basePath}/approval` and `${basePath}/settle` `[render.tsx:ActionForm]`, `[render.tsx:Receipt]`.
+- The next decision is drawn only when the frame's state is `ready`, `partial` or `blocked`;
+  `empty`, `unknown` and `error` show a status or alert paragraph instead
+  `[desk/NextDecision.tsx:NextDecision]`.
+- An available choice with `action_id === null` is plain text prefixed `Also possible from the
+  terminal:`; an available one with an action posts to `/workspace/intent` with the operation and
+  focus `[desk/NextDecision.tsx:Choice]`.
+- The debugger answer is a table of labelled facts with the class and source of each value, and it
+  restates "Grants no authority. Settles nothing." `[desk/Answers.tsx:DebuggerAnswer]`.
+- Cited reference material is quoted text marked not canonical; with no citation, or no question
+  asked, it says "No sources" and nothing is shown as fact `[desk/Answers.tsx:ReferenceCitations]`.
+- Approval and final sign-off are never one click: they are decision cards with a preview, and
+  sign-off needs a typed reason, posted to `/desk/decide` `[desk/DecisionCard.tsx:DecisionCard]`.
 - Case-form refusals use a fixed copy table keyed by a typed reason (`empty`, `too_long`); the
-  submitted text is never echoed `[render.tsx:CASE_ERROR]`.
-- Only the six owner regions carry `data-owner-pinned="true"`; the agent region carries
-  `data-owner-pinned="false"` `[render.tsx:Workspace]`.
-- `queryOf` produces a stable ordered query string, dropping a key when the override value is `null`
-  `[render.tsx:queryOf]`.
-- The theme link is an inversion: `THEME_LABEL` maps `light` → `"Dark"` and `dark` → `"Light"`
-  `[render.tsx:THEME_LABEL]`.
-- `ProjectionWorkspace` treats `useProjection` returning `undefined` as loading, not empty
-  `[render.tsx:ProjectionWorkspace]`.
-- A malformed projection row is recorded once as `invalid_object` / `invalid_link` and the first
-  error wins (`parseError ??= …`) `[render.tsx:ProjectionWorkspace]`.
-- `waitForProjection` resolves only when the store publishes at least `expectedObjects` rows and
-  rejects with `PROJECTION: <name> did not publish …` on timeout `[render.tsx:waitForProjection]`.
-
-**Economics — read-only, observed and estimate never summed**
-
-- The page contains no form and no action; the header states it "never gates or authorizes anything"
-  `[economics.tsx:EconomicsPage]`.
-- `Observed` and `Estimate` are separate badges, and the sessions table renders a per-case
-  `no estimate recorded` badge rather than a computed figure `[economics.tsx:ModelView]`.
-- `ModelView` renders six distinct tables (`cost`, `unattributed`, `lessons`, `journeys`,
-  `residuals`, `ablation`) so unattributed usage and lessons cannot hide inside a total
-  `[economics.tsx:ModelView]`.
-- Journey `undefined` is described as "neither a pass nor a failure" and the residual kind list is
-  `RESIDUAL_KINDS` plus any extra observed keys, sorted `[economics.tsx:ModelView]`.
-- Ablation renders `not run` when `model.ablation.run` is false rather than an empty table
-  `[economics.tsx:ModelView]`.
-- `SkippedNote` names how many enrolled repositories are not shown and returns `null` when none are
-  skipped `[economics.tsx:SkippedNote]`.
+  submitted text is never echoed `[desk/views/Home.tsx:CASE_ERROR]`.
+- Missing cost data says "Not recorded" with a reason, never 0; observed and estimate stay separate
+  badges and the detail tables (`cost`, `unattributed`, `lessons`, `journeys`, `residuals`,
+  `ablation`) are never folded into a total `[desk/views/Cost.tsx:ModelView]`.
 
 **Inspection — reference material cannot become a fact**
 
@@ -154,21 +132,15 @@ enable an action, evaluate a gate or approve anything.
 
 ## Side Effects
 
-- `render.tsx` and `economics.tsx` call `renderToStaticMarkup` from `react-dom/server` and emit an
-  HTML string; `renderWorkspacePage` additionally creates a Cognate client with
-  `createClient({ service, caller })` and always `await client.close()` in a `finally`
-  `[render.tsx:renderWorkspacePage]`.
-- `waitForProjection` subscribes to a projection store and installs a `setTimeout` that is cleared on
-  success — a real timer with a default 2000 ms budget `[render.tsx:waitForProjection]`.
-- `ProjectionWorkspace` reads shared runtime state through `useProjection("horizon.operational-objects")`
-  `[render.tsx:ProjectionWorkspace]`.
+- The desk components render in the browser bundle (`bun run build:desk`) and, in tests, through
+  `renderToStaticMarkup`; the server only supplies JSON (`/desk/*.json`).
 - `inspect` awaits an injected capability (`runtime.invoke`) and an injected checkpoint read
   (`runtime.readSnapshotAt`); both are caller-supplied and nothing here opens a transport itself
   `[inspect.ts:InspectionRuntime]`.
 - Environment-variable names (`COGNATE_SEA_FORGE_OPERATOR`, `HORIZON_ECONOMICS_REALITYTRACE_BIN`,
   `HORIZON_ECONOMICS_DATA_HOME`, `HORIZON_ECONOMICS_STATE_HOME`) appear only as user-facing
   instruction text in the rendered copy; no module in this directory reads the environment
-  `[render.tsx:Receipt]`, `[economics.tsx:Body]`.
+  `[desk/views/Cost.tsx:Cost]`.
 
 ## Verification
 

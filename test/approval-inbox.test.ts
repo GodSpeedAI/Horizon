@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listApprovals, type ApprovalAuthority } from "../src/adapters/sea-forge-approvals.ts";
 import { buildInbox, parseApproval } from "../src/domain/approval-inbox.ts";
-import { renderApprovalInboxPage } from "../src/ui/workspace/approval-inbox.tsx";
+import { buildDecide } from "../src/ui/desk/decide-build.ts";
 import { createApplication, selfApprovalRefusal } from "../src/app.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 
@@ -85,31 +85,55 @@ describe("buildInbox", () => {
   });
 });
 
-describe("renderApprovalInboxPage", () => {
-  test("offers the existing decision form only for a decidable item", () => {
+describe("the inbox as decision cards (Decide)", () => {
+  const cards = (inbox: ReturnType<typeof buildInbox> | null, readout: Parameters<typeof buildDecide>[0]["inbox"] | null = null) =>
+    buildDecide({ inbox: readout ?? { state: "listed", inbox: inbox! }, moves: [], caseApprovals: { kind: "none" }, holds: new Map() });
+
+  test("offers accept and reject only for a decidable item", () => {
     const inbox = buildInbox([row({ approval_id: "apr-a" }), row({ approval_id: "apr-b" })], { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR });
-    const html = renderApprovalInboxPage({ state: "listed", inbox });
-    expect(html.match(/action="\/workspace\/approval"/g)?.length).toBe(1);
-    expect(html).toContain('data-approval="apr-a" data-state="pending" data-decidable="yes"');
-    expect(html).toContain('data-approval="apr-b" data-state="pending" data-decidable="no"');
-    expect(html).toContain("no Horizon commit waits on it");
+    const { cards: found } = cards(inbox);
+    const a = found.find((c) => c.id === "approval:apr-a")!;
+    const b = found.find((c) => c.id === "approval:apr-b")!;
+    expect(a.preview.accept).not.toBeNull();
+    expect(a.preview.reject).not.toBeNull();
+    expect(a.blocked).toBeNull();
+    expect(b.preview.accept).toBeNull();
+    expect(b.preview.reject).toBeNull();
+    expect(b.blocked).toContain("no Horizon commit waits on it");
   });
-  test("escapes SEA-Forge-supplied text", () => {
+
+  test("the preview code changes when anything the preview shows changes", () => {
+    const make = (over: Record<string, unknown>) => cards(buildInbox([row({ approval_id: "apr-a", ...over })], { now: NOW, waitingApprovalIds: new Set(["apr-a"]), operatorRef: OPERATOR })).cards[0]!.preview.code;
+    expect(make({})).toBe(make({}));
+    expect(make({})).not.toBe(make({ resource_id: "res-8" }));
+    expect(make({})).not.toBe(make({ expires_at: "2026-11-02T14:00:00Z" }));
+  });
+
+  test("keeps SEA-Forge-supplied text as text (the markup layer escapes it)", () => {
     const inbox = buildInbox([row({ operation_name: "<script>x</script>" })], { now: NOW, waitingApprovalIds: new Set(), operatorRef: OPERATOR });
-    const html = renderApprovalInboxPage({ state: "listed", inbox });
-    expect(html).not.toContain("<script>x</script>");
-    expect(html).toContain("&lt;script&gt;");
+    const [card] = cards(inbox).cards;
+    expect(card!.title).toContain("<script>x</script>");
+    expect(card!.blocked).not.toBeNull();
   });
-  test("an unreachable SEA-Forge is said plainly, not shown as an empty inbox", () => {
-    const html = renderApprovalInboxPage({ state: "unreachable", message: "SEA-Forge did not answer in time" });
-    expect(html).toContain("did not list approvals");
-    expect(html).not.toContain("Nothing is waiting");
-    expect(html).not.toContain('action="/workspace/approval"');
+
+  test("an unreachable SEA-Forge is a notice, not an empty list of decisions", () => {
+    const found = cards(null, { state: "unreachable", message: "SEA-Forge did not answer in time" });
+    expect(found.cards).toEqual([]);
+    expect(found.notices.join(" ")).toContain("did not list the decisions waiting for you");
+    expect(found.notices.join(" ")).toContain("The case keeper did not answer in time");
   });
-  test("an unconfigured approver shows no decision form", () => {
-    const html = renderApprovalInboxPage({ state: "not_configured" });
-    expect(html).toContain("No approver is configured");
-    expect(html).not.toContain('action="/workspace/approval"');
+
+  test("an unconfigured approver is said in a notice and offers no decision", () => {
+    const found = cards(null, { state: "not_configured" });
+    expect(found.cards).toEqual([]);
+    expect(found.notices.join(" ")).toContain("No approver is set up");
+  });
+
+  test("rows that do not fit the shape are counted in a notice and never shown as decisions", () => {
+    const inbox = buildInbox([row(), { nonsense: true }], { now: NOW, waitingApprovalIds: new Set(["apr-cep:op-1"]), operatorRef: OPERATOR });
+    const found = cards(inbox);
+    expect(found.cards).toHaveLength(1);
+    expect(found.notices.join(" ")).toContain("1 entries from the case keeper could not be read");
   });
 });
 
@@ -153,7 +177,7 @@ describe("listApprovals over the SEA-Forge socket", () => {
   });
 });
 
-describe("GET /workspace/approvals through the application", () => {
+describe("GET /desk/decide.json through the application", () => {
   const dir = mkdtempSync(join(tmpdir(), "inbox-app-"));
   const socketPath = join(dir, "sea-forge.sock");
   let listed: unknown[] = [row({ approval_id: "apr-live-1" })];
@@ -190,23 +214,25 @@ describe("GET /workspace/approvals through the application", () => {
     }
   }
 
-  test("with no approver configured the page says so and offers no decision", async () => {
+  test("with no approver configured it says so and offers no decision", async () => {
     await withApp(undefined, async (base) => {
-      const response = await fetch(new URL("/workspace/approvals", base));
-      const html = await response.text();
+      const response = await fetch(new URL("/desk/decide.json", base));
+      const state = (await response.json()) as { notices: string[]; cards: unknown[] };
       expect(response.status).toBe(200);
-      expect(html).toContain("No approver is configured");
-      expect(html).not.toContain('action="/workspace/approval"');
+      expect(state.notices.join(" ")).toContain("No approver is set up");
+      expect(state.cards).toEqual([]);
     });
   });
 
-  test("with SEA-Forge listing a pending approval, it shows as waiting and is not decidable without a commit", async () => {
+  test("with SEA-Forge listing a pending approval, it is not decidable without a commit waiting on it", async () => {
     listed = [row({ approval_id: "apr-live-1" })];
     await withApp({ socketPath, service: { actor_id: "cognate-service", role: "service" }, operator: { actor_id: OPERATOR, role: "operator" }, timeoutMs: 2_000 }, async (base) => {
-      const html = await (await fetch(new URL("/workspace/approvals", base))).text();
-      expect(html).toContain('data-approval="apr-live-1" data-state="pending" data-decidable="no"');
-      expect(html).toContain("Waiting for a decision (1)");
-      expect(html).not.toContain('action="/workspace/approval"');
+      const state = (await (await fetch(new URL("/desk/decide.json", base))).json()) as { cards: { id: string; blocked: string | null; preview: { accept: unknown } }[] };
+      const card = state.cards.find((c) => c.id === "approval:apr-live-1")!;
+      expect(card.preview.accept).toBeNull();
+      expect(card.blocked).toContain("This cannot be decided here");
+      // The old decision form posts nowhere any more: there is no way to decide without a preview.
+      expect((await fetch(new URL("/workspace/approval", base), { method: "POST", body: new URLSearchParams({ approval_id: "apr-live-1", decision: "approve" }) })).status).toBe(404);
     });
   });
 });

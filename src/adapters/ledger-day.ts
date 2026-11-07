@@ -71,8 +71,22 @@ function readCache(path: string): LedgerCache | null {
   }
 }
 
+/** The newest local day that holds an agent event, or null when the record holds none. */
+export function latestDay(rows: readonly unknown[], timeZone: string): string | null {
+  let latest: string | null = null;
+  for (const row of rows) {
+    if (!isObject(row)) continue;
+    const payload = isObject(row.payload) ? row.payload : null;
+    const extensions = payload && isObject(payload.extensions) ? payload.extensions : null;
+    const event = extensions && isObject(extensions.agent_event) ? extensions.agent_event : null;
+    const day = event === null ? null : localDay(event.ts, timeZone);
+    if (day !== null && (latest === null || day > latest)) latest = day;
+  }
+  return latest;
+}
+
 export type DayRead =
-  | { readonly ok: true; readonly rows: unknown[]; readonly from_cache: boolean; readonly intact: boolean; readonly records: number | null; readonly divergence: string | null; readonly ledger_bytes: number }
+  | { readonly ok: true; readonly last_day: string | null; readonly rows: unknown[]; readonly from_cache: boolean; readonly intact: boolean; readonly records: number | null; readonly divergence: string | null; readonly ledger_bytes: number }
   | { readonly ok: false; readonly message: string };
 
 /**
@@ -85,7 +99,7 @@ export function readLedgerDay(reader: RecordReader, options: { readonly repoId: 
   const path = options.cacheDir ? cachePath(options.cacheDir, options.repoId) : null;
   const cached = path ? readCache(path) : null;
   if (cached && verified.records !== null && cached.last_record === verified.records && cached.repo_id === options.repoId) {
-    return { ok: true, rows: filterDay(cached.rows, options.day, options.timeZone), from_cache: true, intact: verified.intact, records: verified.records, divergence: verified.divergence, ledger_bytes: 0 };
+    return { ok: true, last_day: latestDay(cached.rows, options.timeZone), rows: filterDay(cached.rows, options.day, options.timeZone), from_cache: true, intact: verified.intact, records: verified.records, divergence: verified.divergence, ledger_bytes: 0 };
   }
   const ledger = reader.ledger(options.repoId);
   if (!ledger.ok) return { ok: false, message: ledger.message };
@@ -96,6 +110,6 @@ export function readLedgerDay(reader: RecordReader, options: { readonly repoId: 
     writeFileSync(tmp, JSON.stringify({ repo_id: options.repoId, last_record: verified.records, rows: reduced } satisfies LedgerCache), { mode: 0o600 });
     renameSync(tmp, path);
   }
-  return { ok: true, rows: filterDay(reduced, options.day, options.timeZone), from_cache: false, intact: verified.intact, records: verified.records, divergence: verified.divergence, ledger_bytes: JSON.stringify(ledger.rows).length };
+  return { ok: true, last_day: latestDay(reduced, options.timeZone), rows: filterDay(reduced, options.day, options.timeZone), from_cache: false, intact: verified.intact, records: verified.records, divergence: verified.divergence, ledger_bytes: JSON.stringify(ledger.rows).length };
 }
 

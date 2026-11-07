@@ -9,6 +9,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
 import { readIntentAttempts, readIntentRecords } from "../src/capabilities/navigation-intent.ts";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { START } from "../src/ui/desk/attention.ts";
+import { Desk } from "../src/ui/desk/Desk.tsx";
+import { quietIo } from "./support/desk-io.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 
@@ -43,8 +48,11 @@ async function post(path: string, fields: Record<string, string>, headers: Recor
   });
 }
 
+/** The page the operator sees: the desk drawn from the state the address asks for (`?receipt=`, `?case_error=`). */
 async function page(path = "/workspace"): Promise<string> {
-  return (await fetch(`${base}${path}`)).text();
+  const query = new URL(path, base).searchParams.toString();
+  const data = await (await fetch(`${base}/desk/state.json?${query}`)).json();
+  return renderToStaticMarkup(createElement(Desk, { ui: { ...START, data }, dispatch: () => undefined, io: quietIo() }));
 }
 
 /** The live surface fields a real GUI form would post for the one bound action. */
@@ -118,8 +126,7 @@ describe("first-run cockpit: case and onboarding", () => {
     const response = await post("/workspace/case", { purpose: "  Ship the first governed move  " });
     expect(response.status).toBe(303);
     const markup = await page();
-    expect(markup).toContain("Purpose: <strong>Ship the first governed move</strong>");
-    expect(markup).toContain("Open case: Ship the first governed move");
+    expect(markup).toContain("Case: Ship the first governed move");
     const current = await application.workspace({ focusRef: FOCUS });
     expect(current.frame.case_ref).toMatch(/^case:[0-9a-f-]{36}$/);
     expect(current.frame.case_ref).not.toBe(`case:${FOCUS}`);
@@ -139,11 +146,10 @@ describe("first-run cockpit: case and onboarding", () => {
 
   test("the ungoverned stack names the missing pieces and the exact fix", async () => {
     const markup = await page();
-    expect(markup).toContain("Missing: SEA-Forge governance is off and RealityTrace is not configured.");
-    expect(markup).toContain("bun run ignite");
-    expect(markup).toContain("SEA-Forge: off");
-    expect(markup).toContain("RealityTrace: off");
-    expect(markup).toContain("Approvals: not configured");
+    expect(markup).toContain("Missing: the case keeper is off and the record keeper is not set up.");
+    expect(markup).toContain("setup guide");
+    expect(markup).toContain("Cases: Not connected");
+    expect(markup).toContain("Records: Not connected");
     expect(markup).toContain('data-step="stack" data-done="false"');
   });
 
@@ -172,13 +178,14 @@ describe("first-run cockpit: decision receipt and moves", () => {
     expect(location.hash).toBe("#receipt");
 
     const markup = await page(`/workspace?receipt=${intentId}`);
-    expect(markup).toContain('id="receipt" tabindex="-1"');
-    expect(markup).toContain("Horizon policy only: SEA-Forge is off.");
+    expect(markup).toContain('id="receipt"');
+    expect(markup).toContain('tabindex="-1"');
+    expect(markup).toContain("Horizon policy only: the case keeper is off.");
     expect(markup).toContain("Recorded by Horizon, ");
-    expect(markup).toContain("Unavailable: RealityTrace is off.");
-    expect(markup).toContain("No expected outcome is named, so SEA-Forge can rule on the evidence but has no outcome to settle.");
+    expect(markup).toContain("Unavailable: the record keeper is off.");
+    expect(markup).toContain("No expected outcome is named, so the case keeper can rule on the evidence but has no outcome to settle.");
     // Ungoverned, nothing can observe or settle the commit, so the action is not offered.
-    expect(markup).not.toContain("Observe and settle");
+    expect(markup).not.toContain("Go to Decide");
     expect(markup).toContain('data-claim="decided"');
     expect(markup).toContain('data-claim="recorded"');
     expect(markup).toContain('data-claim="observed"');
@@ -193,7 +200,7 @@ describe("first-run cockpit: decision receipt and moves", () => {
 
   test("an unknown receipt says so, and never echoes the query text", async () => {
     const markup = await page("/workspace?receipt=%3Cscript%3Ealert(1)%3C%2Fscript%3E");
-    expect(markup).toContain("No such commit.");
+    expect(markup).toContain("No such move.");
     expect(markup).not.toContain("<script>alert(1)</script>");
   });
 });

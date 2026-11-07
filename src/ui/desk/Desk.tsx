@@ -5,6 +5,11 @@
  */
 import { useState, type ReactNode } from "react";
 import type { Action, UiState } from "./attention.ts";
+import { confirmOffReason } from "./Preview.tsx";
+import type { RemoteIo } from "./RemotePanel.tsx";
+import type { SaveLabel } from "./LabelControl.tsx";
+import type { InspectIo } from "./Answers.tsx";
+import type { RecordPin } from "./model.ts";
 import { Composer } from "./Composer.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { KEY_TABLE } from "./keys.ts";
@@ -12,19 +17,34 @@ import { Nav } from "./Nav.tsx";
 import { VIEWS, dayLabel, type ViewId } from "./model.ts";
 import { RevisionList, type NoteIo, type OpenLink } from "./NoteEditor.tsx";
 import { StatusBar } from "./StatusBar.tsx";
-import { Decide, Work } from "./views/Placeholder.tsx";
+import { Decide } from "./views/Decide.tsx";
+import { Work } from "./views/Work.tsx";
 import { Explore } from "./views/Explore.tsx";
 import { Today } from "./views/Today.tsx";
 import type { LinkKind } from "../../domain/note.ts";
 
-export interface DeskIo extends NoteIo {
+export interface DecideInput {
+  readonly card_id: string;
+  readonly choice: "accept" | "reject" | "hold" | "release";
+  readonly preview_code: string;
+  readonly records: readonly RecordPin[];
+  readonly reason: string;
+}
+
+export interface DeskIo extends NoteIo, InspectIo {
   readonly setPresenting: (on: boolean) => void;
+  /** Sends one decision. A refusal comes back as `ok: false` with the words to show; nothing throws. */
+  readonly decide: (input: DecideInput) => Promise<{ readonly ok: boolean; readonly message: string }>;
+  readonly saveLabel: SaveLabel;
+  readonly remote: RemoteIo | null;
 }
 
 export interface DeskProps {
   readonly ui: UiState;
   readonly dispatch: (action: Action) => void;
   readonly io: DeskIo;
+  /** For tests: the time used to say how long a card has waited. */
+  readonly nowMs?: number;
 }
 
 function Layer({ id, title, onClose, children }: { readonly id: string; readonly title: string; readonly onClose: () => void; readonly children: ReactNode }): ReactNode {
@@ -87,6 +107,18 @@ function QuickMenu({ ui, dispatch, io }: DeskProps): ReactNode {
 
 export function Desk(props: DeskProps): ReactNode {
   const { ui, dispatch, io } = props;
+  const confirm = (): void => {
+    const open = ui.decision;
+    const card = open === null ? undefined : ui.data?.decide.cards.find((c) => c.id === open.cardId);
+    if (open === null || card === undefined || confirmOffReason(card, open) !== null) return;
+    dispatch({ type: "decision-busy" });
+    void io
+      .decide({ card_id: card.id, choice: open.choice, preview_code: open.code, records: open.records, reason: open.reason })
+      .then((result) => dispatch({ type: "decision-result", ok: result.ok, message: result.message }));
+  };
+  const release = (cardId: string): void => {
+    void io.decide({ card_id: cardId, choice: "release", preview_code: "", records: [], reason: "" }).then((result) => dispatch({ type: "decision-result", ok: result.ok, message: result.message }));
+  };
   const data = ui.data;
   const onLink: OpenLink = (kind: LinkKind, ref: string) => {
     if (kind === "day") dispatch({ type: "day", day: ref === data?.today ? null : ref });
@@ -96,8 +128,8 @@ export function Desk(props: DeskProps): ReactNode {
   const view: Record<ViewId, ReactNode> = {
     today: <Today {...viewProps} />,
     explore: <Explore {...viewProps} />,
-    decide: <Decide {...viewProps} />,
-    work: <Work {...viewProps} />,
+    decide: <Decide {...viewProps} confirm={confirm} release={release} {...(props.nowMs === undefined ? {} : { nowMs: props.nowMs })} />,
+    work: <Work {...viewProps} saveLabel={io.saveLabel} />,
   };
   const history = data?.selected?.history ?? [];
   return (
@@ -105,7 +137,7 @@ export function Desk(props: DeskProps): ReactNode {
       <a className="skip" href="#main">
         Skip to the open view
       </a>
-      <StatusBar status={data?.status ?? null} onPresenting={io.setPresenting} />
+      <StatusBar status={data?.status ?? null} onPresenting={io.setPresenting} remote={io.remote} />
       <div className="desk-body">
         <Nav ui={ui} data={data} dispatch={dispatch} />
         <main id="main" className="main" aria-label={VIEWS.find((v) => v.id === ui.view)?.label}>

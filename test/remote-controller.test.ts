@@ -115,10 +115,18 @@ describe("remote control: off by default, started only from the cockpit", () => 
     expect(panelCsp).toContain("form-action 'self'");
   });
 
-  test("the cockpit's status rail links to the panel and shows the remote state in words", async () => {
-    const markup = await (await fetch(`${cockpitBase}/workspace`)).text();
-    expect(markup).toContain('href="/workspace/remote"');
-    expect(markup).toContain("Remote: off");
+  test("the desk's Settings holds the phone panel and says the remote state in words", async () => {
+    // The desk draws the panel under Settings; its state comes from /desk/remote.json, the same controller as the old panel page.
+    const info = (await (await fetch(`${cockpitBase}/desk/remote.json`)).json()) as { status: { state: string }; link: string | null };
+    expect(info.status.state).toBe("off");
+    expect(info.link).toBeNull();
+    const { RemotePanel } = await import("../src/ui/desk/RemotePanel.tsx");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const html = renderToStaticMarkup(createElement(RemotePanel, { remote: { load: async () => null, act: async () => undefined } }));
+    expect(html).toContain("Phone remote");
+    // The legacy panel page is kept, and still says it is off.
+    expect(await (await fetch(`${cockpitBase}/workspace/remote`)).text()).toContain("Remote control is off.");
   });
 });
 
@@ -258,7 +266,7 @@ describe("commands: one command id, one outcome; claims stay distinct", () => {
     const firstBody = await first.text();
     const retry = await postJson("/m/api/command", { command_id: id, kind: "open_case", purpose: "Open from the phone" });
     expect(await retry.text()).toBe(firstBody);
-    const cases = await (await fetch(`${cockpitBase}/workspace`)).text();
+    const cases = JSON.stringify(await (await fetch(`${cockpitBase}/desk/state.json`)).json());
     expect(cases).toContain("Open from the phone");
   });
 
@@ -297,10 +305,16 @@ describe("commands: one command id, one outcome; claims stay distinct", () => {
     const body = (await response.json()) as { accepted: boolean; outcome: { intent_id: string; receipt: { found: boolean } | null } };
     expect(body.accepted).toBe(true);
     expect(body.outcome.receipt?.found).toBe(true);
-    const desktop = await (await fetch(`${cockpitBase}/workspace?receipt=${body.outcome.intent_id}`)).text();
-    expect(desktop).toContain('id="receipt"');
-    expect(desktop).toContain('data-claim="decided"');
-    expect(desktop).toContain("Recorded by Horizon, ");
+    const desktop = (await (await fetch(`${cockpitBase}/desk/state.json?receipt=${body.outcome.intent_id}`)).json()) as { home: { receipt: { found: boolean } | null } };
+    expect(desktop.home.receipt?.found).toBe(true);
+    const { Desk } = await import("../src/ui/desk/Desk.tsx");
+    const { START } = await import("../src/ui/desk/attention.ts");
+    const { quietIo } = await import("./support/desk-io.ts");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const drawn = renderToStaticMarkup(createElement(Desk, { ui: { ...START, data: desktop as never }, dispatch: () => undefined, io: quietIo() }));
+    expect(drawn).toContain('data-claim="decided"');
+    expect(drawn).toContain("Recorded by Horizon, ");
   });
 });
 
