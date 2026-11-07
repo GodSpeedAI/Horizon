@@ -259,6 +259,6 @@ describe("setup-health", () => {
     env.REALITYTRACE_BIN = join(tmp, "missing-realitytrace");
     const bad = await capture(runHealth, ["--setup", "testing", "--only", "records"]);
     expect(bad.code).toBe(1);
-    expect((await capture(runHealth, ["--setup", "testing", "--only", "tap"])).code).toBe(2);
+    expect((await capture(runHealth, ["--setup", "testing", "--only", "nonsuch"])).code).toBe(2);
   });
 });

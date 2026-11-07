@@ -3,7 +3,10 @@
  * Health checks of the technical annex §D. Later stages add entries to CHECKS; with no `--only` every check that
  * exists for the current stage runs in order and the first failure stops the run (exit 1).
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { keyState } from "../src/adapters/workshop.ts";
 import { configFromDocument } from "../src/config/load.ts";
 import { SETUP_NAMES, argValue, setupMapping, type SetupMapping, type SetupName } from "../src/config/setup.ts";
 import type { RecordSource } from "../src/config/types.ts";
@@ -54,8 +57,43 @@ const recordsCheck: Check = (mapping, env) => {
     : { ok: false, detail: failed.join("; ") };
 };
 
-/** Stage 0 has one check; later stages append (workbench, horizon, seaforge, tap, connector). */
-export const CHECKS: Record<string, Check> = { records: recordsCheck };
+async function healthOf(url: string): Promise<{ ok: boolean; body: string }> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    return { ok: res.ok, body: await res.text() };
+  } catch (error) {
+    return { ok: false, body: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** Stage 1: the workshop answers `/health`, and the Horizon key exists with its expiry in the future (a warning inside 7 days). */
+const workbenchCheck: Check = async (mapping) => {
+  const health = await healthOf(`http://127.0.0.1:${mapping.workshopPort}/health`);
+  if (!health.ok) return { ok: false, detail: `workshop GET /health on port ${mapping.workshopPort} failed: ${health.body.slice(0, 120)}` };
+  const key = keyState({ url: "", key_path: mapping.workbenchKey });
+  if (key.state === "missing") return { ok: false, detail: `workshop is up; ${mapping.workbenchKey} is missing (operator step OP3: Settings > Connect Horizon)` };
+  if (key.state === "expired") return { ok: false, detail: `workshop key expired on ${key.expiresAt}` };
+  const when = key.expiresAt === null ? "expiry unknown" : `expires ${key.expiresAt}`;
+  return { ok: true, detail: `workshop /health ok; key present, ${when}${key.state === "expiring" ? " (expires within 7 days: issue a new one)" : ""}` };
+};
+
+/** Stage 1: Horizon answers `/health` with status ok. */
+const horizonCheck: Check = async (mapping) => {
+  const health = await healthOf(`http://127.0.0.1:${mapping.horizonPort}/health`);
+  if (!health.ok) return { ok: false, detail: `Horizon GET /health on port ${mapping.horizonPort} failed: ${health.body.slice(0, 120)}` };
+  return /"status"\s*:\s*"ok"/.test(health.body) ? { ok: true, detail: `Horizon /health ok on port ${mapping.horizonPort}` } : { ok: false, detail: "Horizon /health did not say status ok" };
+};
+
+/** Stage 1: the session copier ran in the last 24 hours. Only the file's modification time is read, never its content. */
+const tapCheck: Check = (_mapping, env) => {
+  const path = join(env.HOME?.trim() || homedir(), ".agents", "state", "rt", "drain-state.json");
+  if (!existsSync(path)) return { ok: false, detail: `${path} does not exist` };
+  const ageHours = (Date.now() - statSync(path).mtimeMs) / 3_600_000;
+  return ageHours <= 24 ? { ok: true, detail: `drain state modified ${ageHours.toFixed(1)} h ago` } : { ok: false, detail: `drain state is ${ageHours.toFixed(1)} h old (limit 24 h)` };
+};
+
+/** Stage 0 had records; stage 1 adds workbench, horizon and tap (seaforge and connector arrive in stages 3 and 4). */
+export const CHECKS: Record<string, Check> = { records: recordsCheck, workbench: workbenchCheck, horizon: horizonCheck, tap: tapCheck };
 
 export async function run(args: readonly string[], env: Env, out: (line: string) => void, err: (line: string) => void): Promise<number> {
   const name = argValue(args, "setup");

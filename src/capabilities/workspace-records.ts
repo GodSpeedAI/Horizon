@@ -85,3 +85,18 @@ export async function onboardingSkipped(store: DurableStore, tenant: string, ope
   const row = await store.getRecord(ONBOARDING_COLLECTION, onboardingId(tenant, operator));
   return row?.value.skipped === true;
 }
+
+/** Presenting switch (stage 1): `presenting:<tenant>:<operator>` -> `{on}` in `horizon-ui-state`. */
+export const UI_STATE_COLLECTION = "horizon-ui-state";
+const presentingId = (tenant: string, operator: string): string => `presenting:${tenant}:${operator}`;
+
+export async function setPresenting(store: DurableStore, options: { readonly tenant: string; readonly operator: string; readonly on: boolean }): Promise<void> {
+  const id = presentingId(options.tenant, options.operator);
+  const current = await store.getRecord(UI_STATE_COLLECTION, id);
+  await store.commit({ appends: [], records: [{ collection: UI_STATE_COLLECTION, id, expectedVersion: current?.version ?? 0, value: { on: options.on } }] });
+}
+
+export async function presentingOn(store: DurableStore, tenant: string, operator: string): Promise<boolean> {
+  const row = await store.getRecord(UI_STATE_COLLECTION, presentingId(tenant, operator));
+  return row?.value.on === true;
+}

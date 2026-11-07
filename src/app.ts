@@ -80,6 +80,18 @@ import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type Debugger
 import { renderWorkspacePage } from "./ui/workspace/render.tsx";
 import { renderEconomicsPage } from "./ui/workspace/economics.tsx";
 import { renderApprovalInboxPage } from "./ui/workspace/approval-inbox.tsx";
+import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare.tsx";
+import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
+import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
+import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
+import { presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
+import { readLedgerDay } from "./adapters/ledger-day.ts";
+import { recordReader, type RecordReader } from "./adapters/realitytrace-economics.ts";
+import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
+import { setupMapping } from "./config/setup.ts";
+import type { RecordSource } from "./config/types.ts";
+import { existsSync as fileExists, mkdirSync as makeDir, readFileSync as readFileText, writeFileSync as writeFileText } from "node:fs";
+import { dirname as dirOf, join as joinPath } from "node:path";
 import type { Server } from "bun";
 import { RemoteController, type RemoteStatus } from "./remote/server.ts";
 import { remoteSettings } from "./remote/settings.ts";
@@ -280,6 +292,12 @@ export async function createApplication(
      * `[economics]` config table / `HORIZON_ECONOMICS_REALITYTRACE_BIN`; unset, the view says it is not configured.
      */
     readonly economics?: EconomicsSource;
+    /** Stage 1: how a `[[records.sources]]` entry is read for the comparison view. Tests inject a fake; default runs `realitytrace`. */
+    readonly recordReader?: (source: RecordSource) => RecordReader;
+    /** Stage 1: folder for the comparison cache, exports and the Presenting key. Defaults to the setup root, else beside the store. */
+    readonly deskRoot?: string;
+    /** Stage 1: the clock for "today" and export names. */
+    readonly now?: () => Date;
     /** The SEA-Forge socket for `authority_closure`. Defaults to the approvals socket or `COGNATE_SEA_FORGE_SOCKET`. */
     readonly seaForgeSocket?: string;
     /**
@@ -1241,6 +1259,95 @@ export async function createApplication(
     return { ok: true };
   }
 
+
+  // ---- Stage 1: the comparison view, labels, Presenting and exports. Reads go through the allow-listed RealityTrace reader. ----
+  const setupName = loaded.setup;
+  const deskMapping = setupName === undefined ? undefined : setupMapping(setupName);
+  const deskRoot = options.deskRoot ?? deskMapping?.root ?? joinPath(dirOf(loaded.config.runtime_store), "desk");
+  const presentingKeyPath = deskMapping && options.deskRoot === undefined ? deskMapping.presentingKey : joinPath(deskRoot, "secrets", "presenting.key");
+  const cacheDir = joinPath(deskRoot, "cache");
+  const exportsDir = joinPath(deskRoot, "exports");
+  const clock = options.now ?? (() => new Date());
+  const economicsConfig = economicsFromEnv(process.env, loaded.config.economics);
+  const rtBin = economicsConfig?.realitytrace_bin ?? "realitytrace";
+  const recordSources: readonly RecordSource[] =
+    loaded.config.records?.sources ?? (economicsConfig ? [{ name: "default", kind: "personal", ...(economicsConfig.data_home ? { data_home: economicsConfig.data_home } : {}), ...(economicsConfig.state_home ? { state_home: economicsConfig.state_home } : {}) }] : []);
+  const readerFor = options.recordReader ?? ((source: RecordSource) => recordReader(source, rtBin));
+  const deskTimeZone = loaded.config.ui?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  /** The Presenting key: created once (32 random bytes, mode 0600) if the setup script has not made it. Never printed. */
+  function presentingKey(): Buffer {
+    if (!fileExists(presentingKeyPath)) {
+      makeDir(dirOf(presentingKeyPath), { recursive: true });
+      writeFileText(presentingKeyPath, randomBytes(32), { mode: 0o600, flag: "wx" });
+    }
+    return readFileText(presentingKeyPath);
+  }
+
+  function dayOf(param: string | null): string {
+    if (param && /^\d{4}-\d{2}-\d{2}$/.test(param)) return param;
+    return new Intl.DateTimeFormat("en-CA", { timeZone: deskTimeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(clock());
+  }
+
+  async function compareData(params: URLSearchParams): Promise<{ props: ComparePageProps; view: CompareView | null; repoNames: string[]; labels: RunLabel[] }> {
+    const sourceName = params.get("source") ?? recordSources[0]?.name ?? null;
+    const source = recordSources.find((candidate) => candidate.name === sourceName) ?? null;
+    const allRepos: { repo_id: string; path: string | null }[] = [];
+    for (const each of recordSources) {
+      const listed = readerFor(each).repos();
+      if (listed.ok) allRepos.push(...listed.repos);
+    }
+    const labels = await listLabels(runtime.runtime.store, caller.tenant);
+    const presenting = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
+    const day = dayOf(params.get("day"));
+    const only = params.get("only") === "contradicted" ? ("contradicted" as const) : null;
+    let repos: { repo_id: string; path: string | null }[] = [];
+    let notice: string | null = null;
+    let repoId: string | null = params.get("repo");
+    let view: CompareView | null = null;
+    let sessions: ComparePageProps["sessions"] = [];
+    const labelOf = (sessionId: string, eventId: string): RunLabel | null => labels.find((l) => l.session_id === sessionId && l.event_id === eventId) ?? null;
+    const sessionId = params.get("session");
+    if (source === null) {
+      notice = "No record source is configured, so there is nothing to compare. Add a [[records.sources]] table to the config.";
+    } else {
+      const reader = readerFor(source);
+      const listed = reader.repos();
+      if (!listed.ok) notice = `The record could not be listed: ${listed.message}`;
+      else {
+        repos = [...listed.repos];
+        repoId = repoId ?? repos[0]?.repo_id ?? null;
+        if (repoId === null) notice = "This record source holds no repositories yet, so there is nothing to compare.";
+        else {
+          const read = readLedgerDay(reader, { repoId, day, timeZone: deskTimeZone, cacheDir });
+          if (!read.ok) notice = `The record could not be read: ${read.message}`;
+          else {
+            const all = listSessions(read.rows);
+            const shown = only === "contradicted" ? onlyContradicted(all) : all;
+            sessions = shown.map((summary) => ({ ...summary, label: labelOf(summary.session_id, summary.event_id) }));
+            if (shown.length === 0) notice = only ? "No contradicted session on this day." : "No sessions are recorded on this day.";
+            if (sessionId !== null) {
+              view = compareSession({ rows: read.rows, sessionId, ...(loaded.config.workshop ? { workshopUrl: loaded.config.workshop.url } : {}), intact: { intact: read.intact, records: read.records, divergence: read.divergence } });
+              if (view === null) notice = "That session is not in the record for this day.";
+            }
+          }
+        }
+      }
+    }
+    const props: ComparePageProps = {
+      presenting,
+      selection: { source: sourceName, repo: repoId, day, session: sessionId, only },
+      sources: recordSources.map((each) => each.name),
+      repos,
+      sessions,
+      view,
+      label: view ? labelOf(view.session.session_id, view.session.event_id) : null,
+      notice,
+      labelError: params.get("label_error"),
+    };
+    return { props, view, repoNames: namesOfRepos(allRepos), labels };
+  }
+
   const remote = new RemoteController(remoteSettings(), {
     store: runtime.runtime.store,
     tenant: caller.tenant,
@@ -1431,6 +1538,52 @@ export async function createApplication(
               return Response.json({ schema: ECONOMICS_SCHEMA, ...readout }, { headers: { "cache-control": "no-store" } });
             }
             return new Response(renderEconomicsPage(readout, themeOf(url.searchParams.get("theme"))), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/workspace/compare" && request.method === "GET") {
+            // Read-only: RealityTrace is read through its allow-listed CLI; labels and the Presenting switch are Horizon's own records.
+            const data = await compareData(url.searchParams);
+            const props = data.props.presenting ? applyStandIns(data.props, presentingKey(), data.repoNames) : data.props;
+            const theme = themeOf(url.searchParams.get("theme"));
+            return new Response(renderComparePage({ ...props, ...(theme === undefined ? {} : { theme }) }), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+          }
+          if (url.pathname === "/workspace/label" && request.method === "POST") {
+            const form = await request.formData().catch(() => null);
+            if (form === null) return Response.json({ code: "invalid_argument", message: "LABEL: body is not a form" }, { status: 400 });
+            const back = safeReturn(form.get("return"));
+            try {
+              await putLabel(runtime.runtime.store, {
+                tenant: caller.tenant,
+                operator: caller.actor.id,
+                session_id: String(form.get("session") ?? ""),
+                event_id: String(form.get("event") ?? ""),
+                record_seq: form.get("record_seq") === null || form.get("record_seq") === "" ? null : Number(form.get("record_seq")),
+                verdict: form.get("verdict"),
+                first_failure: form.get("first_failure") ?? "",
+                now: clock(),
+              });
+            } catch (error) {
+              const code = error instanceof Error ? error.message.replace(/^LABEL: /, "") : "failed";
+              return Response.redirect(`/workspace/compare?${back}${back ? "&" : ""}label_error=${encodeURIComponent(code)}`, 303);
+            }
+            return Response.redirect(`/workspace/compare?${back}`, 303);
+          }
+          if (url.pathname === "/workspace/presenting" && request.method === "POST") {
+            const form = await request.formData().catch(() => null);
+            if (form === null) return Response.json({ code: "invalid_argument", message: "PRESENTING: body is not a form" }, { status: 400 });
+            await setPresenting(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, on: form.get("on") === "1" });
+            return Response.redirect(`/workspace/compare?${safeReturn(form.get("return"))}`, 303);
+          }
+          if (url.pathname === "/workspace/export" && request.method === "GET") {
+            const kind = url.searchParams.get("kind");
+            if (kind !== "labels" && kind !== "comparison") return Response.json({ code: "invalid_argument", message: "EXPORT: kind must be labels or comparison" }, { status: 400 });
+            const presenting = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
+            const choice = chooseStandIns(presenting, url.searchParams.get("standins"));
+            if (!choice.ok) return Response.json({ code: "invalid_argument", message: choice.message }, { status: choice.status });
+            const data = await compareData(url.searchParams);
+            if (kind === "comparison" && data.view === null) return Response.json({ code: "not_found", message: "EXPORT: no such session in the record" }, { status: 404 });
+            const built = buildExport({ kind, labels: data.labels, comparison: data.view, standins: choice.standins, key: presentingKey(), names: data.repoNames, now: clock() });
+            writeExport(exportsDir, built);
+            return new Response(built.body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "content-disposition": `attachment; filename="${built.name}"` } });
           }
           if (url.pathname === "/workspace/approvals" && request.method === "GET") {
             // Read-only listing. Decisions are POSTed to /workspace/approval, which SEA-Forge decides.
@@ -1641,6 +1794,12 @@ export async function createApplication(
 function remoteRailOf(status: RemoteStatus): { readonly state: string; readonly label: string } {
   const label = status.state === "off" ? "off" : status.state === "connected" ? "phone connected" : status.state === "restoring" ? "restoring" : "waiting";
   return { state: status.state, label: `Remote: ${label}` };
+}
+
+/** A `return` field is a query string for our own compare page, never a URL: no open redirect. */
+function safeReturn(value: FormDataEntryValue | null): string {
+  const text = typeof value === "string" ? value : "";
+  return /^[A-Za-z0-9_=&%.:\-+]*$/.test(text) ? text : "";
 }
 
 /** A theme is set only when the caller asked for one; otherwise the page follows the OS preference. */

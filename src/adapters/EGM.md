@@ -46,7 +46,7 @@ Two shapes are used consistently. Read adapters return a closed, typed observati
 - `realitytrace-economics.ts`: `realityTraceEconomics(config, run?, pathExists?)` returning
   `EconomicsSource { read(): EconomicsReadout }` where `EconomicsReadout.state` is one of
   `"not_configured" | "unavailable" | "empty" | "ok"` `[realitytrace-economics.ts:EconomicsReadout]`;
-  `READ_ONLY_COMMANDS` = `[["repo","list"],["ledger","export"],["projections","export"]]`
+  `READ_ONLY_COMMANDS` = `[["repo","list"],["ledger","export"],["projections","export"],["ledger","verify"]]`
   `[realitytrace-economics.ts:READ_ONLY_COMMANDS]`.
 - `realitytrace-obligation.ts`: `RealityTraceObligation` class with `repo()`, `declare(intentId,
   expectation): DeclaredThreshold` and `run(threshold, argv, launcher, timeoutS): VerifierRun`

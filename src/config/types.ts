@@ -40,7 +40,7 @@ export interface ContextKernelConfig {
  * It is NOT the obligation store: that one has its own data home. Absent means the view says how to enable it.
  */
 export interface EconomicsConfig {
-  /** The `realitytrace` binary. Only `repo list`, `ledger export` and `projections export` are ever run. */
+  /** The `realitytrace` binary. Only `repo list`, `ledger export`, `projections export` and `ledger verify` are ever run. */
   readonly realitytrace_bin: string;
   /** XDG_DATA_HOME of the store to read (the agent tap's). Absent: RealityTrace's own default location. */
   readonly data_home?: string;

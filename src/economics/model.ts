@@ -167,7 +167,7 @@ interface LedgerRow {
   readonly payload?: unknown;
 }
 
-interface AgentEvent {
+export interface AgentEvent {
   event_id: string;
   runtime: string;
   native_session_id: string;
@@ -188,7 +188,7 @@ const isObject = (value: unknown): value is Record<string, unknown> => value !==
 const str = (value: unknown): string | null => (typeof value === "string" && value.length > 0 ? value : null);
 const count = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null);
 
-function readEvent(raw: Record<string, unknown>): AgentEvent | null {
+export function readEvent(raw: Record<string, unknown>): AgentEvent | null {
   const event_id = str(raw.event_id);
   const runtime = str(raw.runtime);
   const native_session_id = str(raw.native_session_id);
