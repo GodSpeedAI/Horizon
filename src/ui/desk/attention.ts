@@ -319,6 +319,8 @@ export function deskReducer(ui: UiState, action: Action): UiState {
       // Opens a preview of what a choice will do. Nothing is decided here. Only the operator can open one (A, R, H or a click).
       const card = ui.data?.decide.cards.find((c) => c.id === action.cardId);
       if (!card) return ui;
+      // A choice the card does not offer cannot be opened (a key press must not get past a button that is not drawn).
+      if (action.choice !== "hold" && (card.preview[action.choice] === null || card.blocked !== null)) return { ...ui, decideNote: { ok: false, message: card.blocked ?? (action.choice === "accept" ? "Accepting is not available here." : "Rejecting is not available here.") } };
       return { ...ui, decision: { cardId: card.id, choice: action.choice, code: card.preview.code, records: card.preview.records, reason: "", busy: false, problem: null }, decideNote: null, focus: "decision" };
     }
     case "preview-close":
