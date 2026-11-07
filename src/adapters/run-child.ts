@@ -2,6 +2,7 @@
  * Run a child process with bounds that hold even when the child misbehaves:
  * - output is read as a stream and counted; past `maxBytes` the child is killed and the result says so (nothing is buffered beyond the cap);
  * - the child runs in its own process group, and on a timeout or an over-large answer the whole group is killed;
+ * - when the call finishes, however it ends, the whole group is killed, so no descendant outlives it;
  * - the call returns when the time is up, without waiting for the output pipes to close (a descendant may hold them).
  */
 export interface ChildOptions {
@@ -20,6 +21,23 @@ export interface ChildResult {
   readonly tooLarge: boolean;
 }
 
+/** Process groups of children still running, so a shutdown can kill what is in flight. */
+const liveGroups = new Set<number>();
+
+/** Kill every child group started by `runChild` that has not finished. Used when the program is stopping. */
+export function killAllChildren(): number {
+  let killed = 0;
+  for (const pid of liveGroups) {
+    try {
+      process.kill(-pid, "SIGKILL");
+      killed += 1;
+    } catch {
+      // already gone
+    }
+  }
+  return killed;
+}
+
 /** Throws (synchronously from Bun.spawn) when the program cannot be started, e.g. ENOENT. */
 export async function runChild(cmd: readonly string[], options: ChildOptions): Promise<ChildResult> {
   const proc = Bun.spawn([...cmd], {
@@ -30,6 +48,7 @@ export async function runChild(cmd: readonly string[], options: ChildOptions): P
     stderr: "pipe",
     detached: true,
   });
+  liveGroups.add(proc.pid);
   const killGroup = () => {
     try {
       process.kill(-proc.pid, "SIGKILL");
@@ -84,8 +103,10 @@ export async function runChild(cmd: readonly string[], options: ChildOptions): P
     return { code: proc.exitCode, stdout: decode(o), stderr: decode(e), timedOut: false, tooLarge: false };
   } finally {
     clearTimeout(timer);
+    // However the call ended, nothing it started may outlive it: a normal exit can leave a backgrounded descendant.
+    killGroup();
+    liveGroups.delete(proc.pid);
     if (tooLarge || timedOut) {
-      killGroup();
       // Let the killed child be reaped, but never wait long for it.
       await Promise.race([proc.exited, new Promise((r) => setTimeout(r, 1_000))]);
     }

@@ -37,7 +37,7 @@ export const READ_ONLY_COMMANDS = [["repo", "list"], ["ledger", "export"], ["pro
 
 /** The real runner; `timeoutMs` exists so a test can prove a hung binary is stopped without waiting a minute. */
 export const makeSpawnRunner = (timeoutMs = 60_000): Runner => (bin, args, env) => {
-  const result = spawnSync(bin, [...args], { env, encoding: "utf8", timeout: timeoutMs, maxBuffer: 512 * 1024 * 1024 });
+  const result = spawnSync(bin, [...args], { env, encoding: "utf8", timeout: timeoutMs, killSignal: "SIGKILL", maxBuffer: 512 * 1024 * 1024 });
   return { status: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "", ...(result.error ? { error: result.error.message } : {}) };
 };
 const spawnRunner: Runner = makeSpawnRunner();
