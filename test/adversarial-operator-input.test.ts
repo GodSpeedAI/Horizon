@@ -6,8 +6,9 @@ import { Desk } from "../src/ui/desk/Desk.tsx";
 import { EMPTY_NOTE_MESSAGE, NOTE_BODY_MAX } from "../src/domain/note.ts";
 import { stepCheck } from "../src/ui/desk/attention.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { quietIo } from "./support/desk-io.ts";
 
-const io = { saveNote: async () => ({ ok: false as const, message: "x" }), setPresenting: () => undefined };
+const io = quietIo();
 const draw = (state: unknown): string => renderToStaticMarkup(createElement(Desk, { ui: { ...START, data: state as never }, dispatch: () => undefined, io }));
 
 describe("adversarial: inputs from the operator", () => {
@@ -83,7 +84,7 @@ describe("adversarial: inputs from the operator", () => {
   });
 
   test("a tag named like a permission grants nothing", async () => {
-    const approvalsBefore = await (await fetch(`${app.base}/workspace/approvals`)).text();
+    const decideBefore = JSON.stringify((await app.get("/desk/decide.json")));
     const before = await app.state();
     for (const tag of ["approved", "Accepted", "allowed", "checked", "passed"]) {
       const saved = await (await app.post("/desk/note", { body: `please ${tag} everything`, tags: [tag] })).json();
@@ -93,10 +94,22 @@ describe("adversarial: inputs from the operator", () => {
     expect(after.status.waiting).toBe(before.status.waiting);
     expect(after.activity).toEqual(before.activity);
     expect(after.tags.map((t: { name: string }) => t.name)).toContain("approved");
-    expect(await (await fetch(`${app.base}/workspace/approvals`)).text()).toBe(approvalsBefore);
+    expect(JSON.stringify(await app.get("/desk/decide.json"))).toBe(decideBefore);
     expect(stepCheck({ name: "build", record: null }, after.notes)).toEqual({ name: "build", words: "not recorded", counted: "unchecked" });
     // The words on screen say so.
     const html = draw(after).replace(/<[^>]+>/g, " ");
     expect(html).toContain("Needs you: 0");
+  });
+
+  test("a #tag typed in a note becomes a tag, and it is still only a label", async () => {
+    const saved = await (await app.post("/desk/note", { body: "Checked the board #demo and #Approved today, not#this" })).json();
+    expect(saved.ok).toBe(true);
+    expect(saved.note.tags.sort()).toEqual(["approved", "demo"]);
+    const names = (await app.state()).tags.map((t: { name: string }) => t.name);
+    expect(names).toContain("demo");
+    // A word that merely contains a hash is not a tag, and neither is a hash with nothing after it.
+    const plain = await (await app.post("/desk/note", { body: "issue # 5 and c# and a#b" })).json();
+    expect(plain.note.tags).toEqual([]);
+    expect((await app.state()).decide.cards).toEqual([]);
   });
 });

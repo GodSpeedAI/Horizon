@@ -1,36 +1,36 @@
 /** @jsxImportSource react */
-// HC-06: the economics page and route. Figures in the HTML equal the model; the route needs no client script;
-// the adapter runs only RealityTrace's read-only commands; unconfigured and failing states are honest.
+// The cost view in the desk (ported from the stage 1 economics page, HC-06). Figures in the markup equal the model; the adapter runs only
+// the record keeper's read-only commands; unconfigured and failing states are honest; cost per accepted outcome is never invented.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { createApplication, type HorizonApplication } from "../src/app.ts";
+import { renderToStaticMarkup } from "react-dom/server";
 import { READ_ONLY_COMMANDS, realityTraceEconomics, type EconomicsReadout, type EconomicsSource, type Runner } from "../src/adapters/realitytrace-economics.ts";
 import { economicsFromEnv } from "../src/config/load.ts";
 import { economicsModel } from "../src/economics/model.ts";
-import { renderEconomicsPage } from "../src/ui/workspace/economics.tsx";
-import { horizonDocument, writeConfig } from "./support/config.ts";
+import { Cost } from "../src/ui/desk/views/Cost.tsx";
+import { costLine, type AcceptedKnowledge, type CostPart } from "../src/ui/desk/work-build.ts";
+import { startDeskApp } from "./support/desk-app.ts";
 import { residual, sampleLedger } from "./support/economics-fixture.ts";
 
 const projection = [residual("r1", "observed_undeclared"), residual("r2", "declared_unobserved"), residual("r3", "declared_unobserved")];
 const model = economicsModel(sampleLedger(), projection);
 const ok: EconomicsReadout = { state: "ok", repos: [{ repo_id: "repo-1", path: "/work/alpha", model, error: null }], skipped: { without_agent_activity: 0, missing_folder: 0 } };
 const fmt = (n: number) => n.toLocaleString("en-US");
+const unknown: AcceptedKnowledge = { kind: "unknown", why: "Cases are not connected, so no outcome can be counted as accepted." };
+const draw = (readout: EconomicsReadout, knowledge: AcceptedKnowledge = unknown): string => renderToStaticMarkup(<Cost cost={{ readout, knowledge } satisfies CostPart} />);
 
-describe("economics page", () => {
-  const html = renderEconomicsPage(ok);
+describe("cost view", () => {
+  const html = draw(ok);
 
-  test("semantic tables with captions and no script", () => {
+  test("semantic tables with captions and no script or form", () => {
     expect(html).not.toContain("<script");
     expect(html).not.toContain("<form");
-    for (const table of ["cost", "unattributed", "lessons", "journeys", "residuals", "ablation"]) {
-      expect(html).toMatch(new RegExp(`<table data-table="${table}"><caption>`));
+    for (const table of ["per-accepted", "cost", "unattributed", "lessons", "journeys", "residuals", "ablation"]) {
+      expect(html).toMatch(new RegExp(`<table data-table="${table}"[^>]*><caption>`));
     }
     expect(html).toContain('scope="col"');
   });
 
-  test("figures in the HTML equal the model", () => {
+  test("figures in the markup equal the model", () => {
     const cell = (scope: string, field: string) => {
       const row = html.slice(html.indexOf(scope));
       return new RegExp(`data-f="${field}">([^<]*)<`).exec(row)?.[1];
@@ -47,24 +47,42 @@ describe("economics page", () => {
   test("estimate is labelled estimate, savings say no estimate recorded, ablation says not run", () => {
     expect(html).toContain('<span class="badge estimate">estimate</span>');
     expect(html).toContain("no estimate recorded");
-    expect(html).toContain("Unbound");
-    const noArm = renderEconomicsPage({ state: "ok", repos: [{ repo_id: "r", path: null, model: economicsModel(sampleLedger().filter((r: any) => r.append_ordinal !== 20), []), error: null }], skipped: { without_agent_activity: 0, missing_folder: 0 } });
+    expect(html).toContain("Not tied to a case");
+    const noArm = draw({ state: "ok", repos: [{ repo_id: "r", path: null, model: economicsModel(sampleLedger().filter((r: any) => r.append_ordinal !== 20), []), error: null }], skipped: { without_agent_activity: 0, missing_folder: 0 } });
     expect(noArm).toContain("not run");
     expect(html).toContain("Arms recorded on events");
-    // the estimate badge never sits on the observed total header
     expect(html).toContain('Total <span class="badge observed">observed</span>');
   });
 
+  test("cost per accepted outcome shows not recorded without a source", () => {
+    // No source for acceptance: every row says Not recorded and why. It is never 0 and never a number.
+    expect(html).toContain("Not recorded: Cases are not connected, so no outcome can be counted as accepted.");
+    expect([...html.matchAll(/data-per-accepted="([^"]+)"/g)].map((m) => m[1]).every((v) => v === "not-recorded")).toBe(true);
+    expect(html).not.toMatch(/data-per-accepted="0"/);
+    for (const item of model.cases) expect(costLine(item, unknown)).toMatchObject({ accepted: null, per_accepted: null });
+    // A source that says the case is not done yet: still not recorded, with that reason.
+    const bound = model.cases.find((c) => c.case_id !== null)!;
+    expect(costLine(bound, { kind: "known", completed: [] })).toMatchObject({ accepted: 0, per_accepted: null });
+    expect(costLine(bound, { kind: "known", completed: [] }).words).toContain("no accepted outcome yet");
+    // The same case, accepted: a real number, tokens for one outcome.
+    expect(costLine(bound, { kind: "known", completed: [bound.case_id!] })).toMatchObject({ accepted: 1, per_accepted: bound.totals.observed.total });
+    // Work with no case can never be counted against an outcome.
+    const unbound = model.cases.find((c) => c.case_id === null)!;
+    expect(costLine(unbound, { kind: "known", completed: [bound.case_id!] }).per_accepted).toBeNull();
+    // Not configured at all also says Not recorded, not blank.
+    expect(draw({ state: "not_configured" })).toContain("Cost per accepted outcome: Not recorded");
+  });
+
   test("honest states: not configured, unavailable, empty", () => {
-    const off = renderEconomicsPage({ state: "not_configured" });
-    expect(off).toContain("not configured");
+    const off = draw({ state: "not_configured" });
+    expect(off).toContain("not set up");
     expect(off).toContain("te-agents install --with-realitytrace");
     expect(off).toContain("te-agents rt enroll");
     expect(off).toContain("HORIZON_ECONOMICS_REALITYTRACE_BIN");
-    const down = renderEconomicsPage({ state: "unavailable", message: "realitytrace repo list failed (exit 2): boom" });
+    const down = draw({ state: "unavailable", message: "realitytrace repo list failed (exit 2): boom" });
     expect(down).toContain("could not be read");
     expect(down).toContain("boom");
-    expect(renderEconomicsPage({ state: "empty", repos: [], skipped: { without_agent_activity: 0, missing_folder: 0 } })).toContain("No agent events recorded yet");
+    expect(draw({ state: "empty", repos: [], skipped: { without_agent_activity: 0, missing_folder: 0 } })).toContain("No agent events recorded yet");
   });
 });
 
@@ -131,7 +149,7 @@ describe("realityTraceEconomics adapter", () => {
     // no CLI call for the vanished folder, and no projection export for the quiet repo
     expect(calls.some((c) => c.includes("GONE"))).toBe(false);
     expect(calls.filter((c) => c.startsWith("projections"))).toEqual(["projections export --repo LIVE"]);
-    const html = renderEconomicsPage(out);
+    const html = renderToStaticMarkup(<Cost cost={{ readout: out, knowledge: { kind: "unknown", why: "test" } }} />);
     expect(html).toContain("Not shown: 1 enrolled repository has no agent events; 1 is enrolled at a folder that no longer exists.");
   });
 
@@ -142,66 +160,30 @@ describe("realityTraceEconomics adapter", () => {
   });
 });
 
-describe("GET /workspace/economics", () => {
-  let application: HorizonApplication;
-  let server: ReturnType<HorizonApplication["startServer"]>;
+describe("cost through the application", () => {
   let reads = 0;
   const source: EconomicsSource = { read: () => (reads++, ok) };
 
-  beforeAll(async () => {
-    const root = mkdtempSync(join(tmpdir(), "economics-route-"));
-    const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "e.sqlite"), secretPath: join(root, "launch.secret") }));
-    application = await createApplication({ configPath, economics: source });
-    server = application.startServer(0);
-  });
-  afterAll(async () => {
-    server?.stop();
-    await application?.close();
-  });
-
-  test("serves HTML, and JSON on request, from the same read", async () => {
-    const page = await fetch(new URL("/workspace/economics", server.url));
-    expect(page.status).toBe(200);
-    expect(page.headers.get("content-type")).toContain("text/html");
-    expect(await page.text()).toContain(fmt(model.totals.observed.total));
-    const json = await fetch(new URL("/workspace/economics", server.url), { headers: { accept: "application/json" } });
-    const body = (await json.json()) as any;
-    expect(body.schema).toBe("horizon.economics/1");
-    expect(body.state).toBe("ok");
-    expect(body.repos[0].model.totals.observed.total).toBe(model.totals.observed.total);
-    expect(reads).toBeGreaterThanOrEqual(2);
-  });
-
-  test("the workspace links to it, and a foreign Host is refused like other workspace routes", async () => {
-    const workspace = await (await fetch(new URL("/workspace", server.url))).text();
-    expect(workspace).toContain('href="/workspace/economics"');
-    const refused = await fetch(new URL("/workspace/economics", server.url), { headers: { host: "evil.example:80" } });
-    expect(refused.status).toBe(403);
-  });
-
-  test("POST is not a route", async () => {
-    const response = await fetch(new URL("/workspace/economics", server.url), { method: "POST" });
-    expect(response.status).not.toBe(200);
-  });
-});
-
-describe("unconfigured application", () => {
-  test("the view is an honest empty state, not an error", async () => {
-    const root = mkdtempSync(join(tmpdir(), "economics-off-"));
-    const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "e.sqlite"), secretPath: join(root, "launch.secret") }));
-    const saved = process.env.HORIZON_ECONOMICS_REALITYTRACE_BIN;
-    delete process.env.HORIZON_ECONOMICS_REALITYTRACE_BIN;
-    const app = await createApplication({ configPath });
-    const server = app.startServer(0);
+  test("the cost view reads the record keeper and cases not connected makes cost per accepted outcome not recorded", async () => {
+    const app = await startDeskApp({ economics: source });
     try {
-      const response = await fetch(new URL("/workspace/economics", server.url));
-      expect(response.status).toBe(200);
-      expect(await response.text()).toContain("Case economics is not configured");
-      expect(((await (await fetch(new URL("/workspace/economics", server.url), { headers: { accept: "application/json" } })).json()) as any).state).toBe("not_configured");
+      const work = await app.get("/desk/work.json");
+      expect(work.cost.readout.state).toBe("ok");
+      expect(work.cost.knowledge.kind).toBe("unknown");
+      expect(work.cases.connected).toBe(false);
+      expect(reads).toBeGreaterThanOrEqual(1);
+      // The old JSON route stays the read model.
+      const json = await fetch(`${app.base}/workspace/economics`, { headers: { accept: "application/json" } });
+      const body = (await json.json()) as any;
+      expect(body.schema).toBe("horizon.economics/1");
+      expect(body.repos[0].model.totals.observed.total).toBe(model.totals.observed.total);
+      // The HTML address opens the desk, not a second page.
+      const page = await fetch(`${app.base}/workspace/economics`);
+      expect(page.headers.get("content-type")).toContain("text/html");
+      expect(await page.text()).toContain('src="/desk/app.js"');
+      expect((await fetch(`${app.base}/workspace/economics`, { method: "POST" })).status).not.toBe(200);
     } finally {
-      server.stop();
-      await app.close();
-      if (saved !== undefined) process.env.HORIZON_ECONOMICS_REALITYTRACE_BIN = saved;
+      await app.stop();
     }
   });
 });

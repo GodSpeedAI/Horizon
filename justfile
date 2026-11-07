@@ -173,10 +173,10 @@ gate-t08: check-t08 teeth-t08 test check boundaries idm-integrity acceptance-cla
 # proposals, missing evidence and escaping.
 check-t09:
     bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/T09.prereg.yaml
-    bun test test/workspace-model.test.ts test/workspace-render.test.tsx
+    bun test test/workspace-model.test.ts test/desk-render.test.tsx
 
 teeth-t09:
-    bun test test/workspace-teeth.test.tsx
+    bun test test/desk-teeth.test.tsx
 
 gate-t09: check-t09 teeth-t09 test check boundaries idm-integrity acceptance-claims witness-claims contract-modals ledger wayfinder teeth
     @echo "gate-t09: ok — atomic GUI projection in Cognate React"

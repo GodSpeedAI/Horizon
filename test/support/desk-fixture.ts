@@ -33,6 +33,8 @@ export function deskState(over: Partial<DeskState> = {}, notes: readonly NoteVie
     activity: [],
     sources: sourcesOf({ cases: true, agentWork: false, records: false }),
     selected: null,
+    decide: { notices: [], cards: [] },
+    home: { onboarding: { visible: false, skipped: false, steps: [] }, caseError: null, moves: [], receipt: null, assurance: "governed" },
     ...over,
   };
 }

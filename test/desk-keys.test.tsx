@@ -5,6 +5,7 @@ import { START, deskReducer } from "../src/ui/desk/attention.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";
 import { resolveKey, type KeyInfo } from "../src/ui/desk/keys.ts";
 import { deskState } from "./support/desk-fixture.ts";
+import { quietIo } from "./support/desk-io.ts";
 
 const key = (k: string, over: Partial<KeyInfo> = {}): KeyInfo => ({ key: k, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, targetTag: "body", editable: false, ...over });
 const typing = { targetTag: "textarea" };
@@ -40,7 +41,7 @@ describe("desk keys", () => {
     const ui = deskReducer({ ...START, data: deskState() }, { type: "focus", target: "composer" });
     expect(ui.focus).toBe("composer");
     // The composer is in the page and reachable by its label.
-    const html = renderToStaticMarkup(<Desk ui={ui} dispatch={() => undefined} io={{ saveNote: async () => ({ ok: false, message: "x" }), setPresenting: () => undefined }} />);
+    const html = renderToStaticMarkup(<Desk ui={ui} dispatch={() => undefined} io={quietIo()} />);
     expect(html).toContain('id="composer-input"');
   });
 
