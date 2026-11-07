@@ -47,7 +47,7 @@ export interface ChangedRecord {
 export type Outcome<T> =
   | { readonly kind: "ok"; readonly value: T }
   | { readonly kind: "stale"; readonly changed: readonly ChangedRecord[]; readonly words: string }
-  | { readonly kind: "refused"; readonly error_class: string; readonly words: string; /** The case keeper's own message, with anything that looks like a secret removed. */ readonly reason: string | null }
+  | { readonly kind: "refused"; readonly error_class: string; readonly words: string; /** The case keeper's own words, error class and message, for a Details disclosure; never in `words`. */ readonly details: string; /** The case keeper's own message, with anything that looks like a secret removed. */ readonly reason: string | null }
   | { readonly kind: "unreachable"; readonly why: UnreachableWhy; readonly maybe_written: boolean; readonly words: string };
 
 export const STALE_WORDS = "This changed after you looked at it, so nothing was done. Look at the new version and decide again.";
@@ -97,13 +97,25 @@ export function reasonOf(reply: Record<string, unknown>): string | null {
   return text === "" ? null : text.length > 300 ? `${text.slice(0, 300)}…` : text;
 }
 
-function refusedWords(errorClass: string, reason: string | null): string {
-  const said = reason === null ? "" : ` It said: ${reason}`;
-  return refusedBase(errorClass) + said;
+/** The raw words behind a refusal, for a "Details" disclosure. Null for any answer that is not a refusal. */
+export function detailsOf(outcome: Outcome<unknown>): string | null {
+  return outcome.kind === "refused" ? outcome.details : null;
 }
 
-function refusedBase(errorClass: string): string {
+function refusedWords(errorClass: string, reason: string | null): string {
+  return refusedBase(errorClass, reason);
+}
+
+function refusedDetails(errorClass: string, reason: string | null): string {
+  return reason === null ? errorClass : `${errorClass}: ${reason}`;
+}
+
+function refusedBase(errorClass: string, reason: string | null = null): string {
+  if (errorClass === "authority_denied" || /does not grant/i.test(reason ?? "")) return "The rules for this setup do not allow this. Nothing was changed.";
+  if (errorClass === "missing_config_error" || /missing_config_error/.test(reason ?? "")) return "The case keeper's rules file is missing. Nothing was changed.";
   switch (errorClass) {
+    case "missing_config_error":
+      return "The case keeper's rules file is missing. Nothing was changed.";
     case "request_id_reused":
       return "That request number was already used for a different request, so the case keeper refused it. Nothing was changed.";
     case "invalid_decision":
@@ -111,7 +123,7 @@ function refusedBase(errorClass: string): string {
     case "durable_locator_required":
       return "The request had no request number, so the case keeper refused it. Nothing was changed.";
     default:
-      return `The case keeper refused this (${errorClass}). Nothing was changed.`;
+      return "The case keeper refused this. Nothing was changed.";
   }
 }
 
@@ -141,7 +153,7 @@ async function call<T>(keeper: CaseKeeper, request: Record<string, unknown>, wri
   if (refusedShape) {
     const errorClass = typeof reply.error_class === "string" ? reply.error_class : "error";
     const reason = reasonOf(reply);
-    return { kind: "refused", error_class: errorClass, words: refusedWords(errorClass, reason), reason };
+    return { kind: "refused", error_class: errorClass, words: refusedWords(errorClass, reason), details: refusedDetails(errorClass, reason), reason };
   }
   const value = read(reply);
   // Valid JSON of the wrong shape is not an answer: say so rather than show an empty list.

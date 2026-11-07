@@ -12,7 +12,7 @@ import type { RemoteInfo } from "../RemotePanel.tsx";
 import type { WorkData } from "../work-build.ts";
 import type { InspectionAnswer, NextState } from "../model.ts";
 import { resolveKey } from "../keys.ts";
-import { POLL_MS, itemsOf, shiftDay, type DeskState, type SearchResult } from "../model.ts";
+import { POLL_MS, itemsOf, shiftDay, withDetails, type DeskState, type SearchResult } from "../model.ts";
 
 const DRAFT_KEY = "horizon.desk.draft";
 const PINS_KEY = "horizon.desk.pins";
@@ -238,10 +238,10 @@ function App() {
     decide: async (input) => {
       try {
         const response = await fetch("/desk/decide", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
-        const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+        const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string };
         rev.current = "";
         void poll();
-        return { ok: response.ok && body.ok === true, message: body.message ?? (response.ok ? "Done." : "Horizon could not send that decision. Nothing was done.") };
+        return { ok: response.ok && body.ok === true, message: withDetails(body.message ?? (response.ok ? "Done." : "Horizon could not send that decision. Nothing was done."), body.details) };
       } catch {
         return { ok: false, message: "Horizon did not answer, so the decision may not have been sent. Check Decide before trying again." };
       }
@@ -315,8 +315,8 @@ function App() {
       preview: async (input) => {
         try {
           const response = await fetch("/desk/handoff/preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
-          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; preview?: never };
-          return response.ok && body.ok === true && body.preview ? { ok: true, preview: body.preview } : { ok: false, message: body.message ?? "Horizon could not show a preview. Nothing was sent." };
+          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string; preview?: never };
+          return response.ok && body.ok === true && body.preview ? { ok: true, preview: body.preview } : { ok: false, message: withDetails(body.message ?? "Horizon could not show a preview. Nothing was sent.", body.details) };
         } catch {
           return { ok: false, message: "Horizon did not answer, so there is no preview. Nothing was sent." };
         }
@@ -324,10 +324,10 @@ function App() {
       send: async (input) => {
         try {
           const response = await fetch("/desk/handoff", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
-          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; outcome?: string; draft_id?: string };
+          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string; outcome?: string; draft_id?: string };
           rev.current = "";
           void poll();
-          return response.ok && body.ok === true ? { ok: true, message: body.message ?? "Handed off.", draft_id: body.draft_id ?? "" } : { ok: false, outcome: body.outcome ?? "failed", message: body.message ?? "The hand off was not sent. Nothing was done." };
+          return response.ok && body.ok === true ? { ok: true, message: body.message ?? "Handed off.", draft_id: body.draft_id ?? "" } : { ok: false, outcome: body.outcome ?? "failed", message: withDetails(body.message ?? "The hand off was not sent. Nothing was done.", body.details) };
         } catch {
           return { ok: false, outcome: "unreachable", message: "Horizon did not answer, so the hand off may not have been sent. Press Confirm again: the same request is never applied twice." };
         }

@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type Action, type Mode, type UiState } from "./attention.ts";
 import { NOT_CONNECTED, parseFind } from "./model.ts";
 import type { NoteIo } from "./NoteEditor.tsx";
+import { Words } from "./Words.tsx";
 
 const MODE_LABEL: Readonly<Record<Mode, string>> = { write: "Write", find: "Find", ask: "Ask", handoff: "Hand off" };
 const PLACEHOLDER: Readonly<Record<Mode, string>> = {
@@ -390,7 +391,7 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
       </p>
       {ui.notice ? (
         <p role="alert" className="notice" data-notice>
-          {ui.notice}
+          <Words text={ui.notice} />
         </p>
       ) : null}
     </form>

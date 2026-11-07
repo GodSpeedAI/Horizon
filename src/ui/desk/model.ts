@@ -368,3 +368,9 @@ export function ageWords(since: string | null, nowMs: number): string {
   const days = Math.floor(hours / 24);
   return `waiting ${days} days`;
 }
+
+/** Marks where a message's raw words begin. The browser joins a reply's `message` and `details` with it; `Words` splits them again. */
+export const DETAILS_MARK = "\u0001";
+export function withDetails(message: string, details: string | undefined | null): string {
+  return details ? `${message}${DETAILS_MARK}${details}` : message;
+}

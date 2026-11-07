@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { DecisionCard } from "../DecisionCard.tsx";
 import { NextDecision } from "../NextDecision.tsx";
 import type { ViewProps } from "./Today.tsx";
+import { Words } from "../Words.tsx";
 
 export interface DecideViewProps extends ViewProps {
   readonly confirm: () => void;
@@ -31,7 +32,7 @@ export function Decide({ ui, data, dispatch, confirm, release, nowMs }: DecideVi
       <p className="muted">What needs you, oldest first. Nothing is decided until you confirm a preview.</p>
       {ui.decideNote !== null ? (
         <p role="status" className={ui.decideNote.ok ? "notice" : "error"} data-decide-note>
-          {ui.decideNote.message}
+          <Words text={ui.decideNote.message} />
         </p>
       ) : null}
       {data.decide.notices.length > 0 ? (

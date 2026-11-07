@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import type { OpenDecision } from "./attention.ts";
 import type { ChoicePreview, DecisionCardData } from "./model.ts";
 import { StateWord } from "./StateWord.tsx";
+import { Words } from "./Words.tsx";
 
 export interface PreviewProps {
   readonly card: DecisionCardData;
@@ -100,7 +101,7 @@ export function Preview({ card, decision, onReason, onConfirm, onCancel, onRefre
       ) : null}
       {decision.problem !== null ? (
         <p role="alert" className="error" data-problem>
-          {decision.problem}
+          <Words text={decision.problem} />
         </p>
       ) : null}
       <div className="row">

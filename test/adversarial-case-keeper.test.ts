@@ -172,7 +172,8 @@ describe("case keeper adversarial: the reason is shown", () => {
     if (result.kind === "refused") {
       expect(result.reason).toContain("item step_9 depends on a step that does not exist");
       expect(result.reason).toContain("unknown dependency: step_1");
-      expect(result.words).toContain("It said: item step_9 depends on a step that does not exist");
+      expect(result.words).toBe("The case keeper refused this. Nothing was changed.");
+      expect(result.details).toContain("validation_failed: item step_9 depends on a step that does not exist");
     }
   });
 
@@ -182,10 +183,12 @@ describe("case keeper adversarial: the reason is shown", () => {
     const result = await listCases(keeper);
     expect(result.kind).toBe("refused");
     if (result.kind === "refused") {
-      expect(result.words).not.toContain(secret);
-      expect(result.words).not.toContain("k".repeat(40));
-      expect(result.words).toContain("[hidden]");
-      expect(result.words).toContain("for actor x");
+      for (const shown of [result.words, result.details]) {
+        expect(shown).not.toContain(secret);
+        expect(shown).not.toContain("k".repeat(40));
+      }
+      expect(result.details).toContain("[hidden]");
+      expect(result.details).toContain("for actor x");
     }
   });
 });
@@ -337,6 +340,24 @@ describe("case keeper policy and refusal words", () => {
     expect(verbs).toEqual(["case_add_item", "case_add_item", "case_advance", "approval_decide", "human_task_complete"]);
     expect(CELL_POLICY).toBe("policy.yaml");
     for (const r of live!.received) expect(r.policy).toBe("policy.yaml");
+  });
+
+  test("refusals end in plain words; the raw class and message are only in the details", async () => {
+    const said = async (reply: Record<string, unknown>) => {
+      const keeper = start(() => ({ json: reply }));
+      const r = await listCases(keeper);
+      if (r.kind !== "refused") throw new Error("expected a refusal");
+      return r;
+    };
+    const denied = await said({ ok: false, error_class: "input_error", error: "authority decision does not grant this action" });
+    expect(denied.words).toBe("The rules for this setup do not allow this. Nothing was changed.");
+    expect(denied.details).toBe("input_error: authority decision does not grant this action");
+    const missing = await said({ ok: false, error_class: "missing_config_error", error: "cannot read policy.yaml (os error 2)" });
+    expect(missing.words).toBe("The case keeper's rules file is missing. Nothing was changed.");
+    expect(missing.details).toContain("os error 2");
+    const other = await said({ ok: false, error_class: "weird_class", error: "odd" });
+    expect(other.words).toBe("The case keeper refused this. Nothing was changed.");
+    for (const r of [denied, missing, other]) expect(r.words).not.toMatch(/_error|_class|os error|It said/);
   });
 
   test("a refusal keeps a file path readable and still hides a token", () => {

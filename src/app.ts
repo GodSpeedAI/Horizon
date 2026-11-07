@@ -92,7 +92,7 @@ import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, 
 import { readableTitle } from "./ui/desk/banned-words.ts";
 import { caseTitle, matches, partsOf, plainWords, sourcesOf, type DeskCase, type DecideState, type DecisionCardData, type PanelsData, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
 import { buildDecide, waitingCount, type CaseApprovals, type HumanStepInput } from "./ui/desk/decide-build.ts";
-import { addItem, advance as caseAdvance, entryOptions, approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
+import { addItem, advance as caseAdvance, detailsOf, entryOptions, approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
 import { activeHolds, checkReason, putHold, recordDecision } from "./capabilities/decisions.ts";
 import { caseItems, costSource, orderWork, sessionItems, type AcceptedKnowledge, type WorkData } from "./ui/desk/work-build.ts";
 import { readLedgerDay } from "./adapters/ledger-day.ts";
@@ -1602,7 +1602,7 @@ export async function createApplication(
   }
 
   async function deskDecide(request: Request): Promise<Response> {
-    const fail = (status: number, outcome: string, message: string): Response => Response.json({ ok: false, outcome, message }, { status, headers: { "cache-control": "no-store" } });
+    const fail = (status: number, outcome: string, message: string, details: string | null = null): Response => Response.json({ ok: false, outcome, message, ...(details === null ? {} : { details }) }, { status, headers: { "cache-control": "no-store" } });
     let body: Record<string, unknown>;
     try {
       const parsed: unknown = JSON.parse(await request.text());
@@ -1680,7 +1680,7 @@ export async function createApplication(
       const approvalId = card.id.slice("case-task:".length);
       const listed = await approvalList(caseKeeper);
       const row = listed.kind === "ok" ? listed.value.approvals.find((candidate) => candidate.approval_id === approvalId) : undefined;
-      if (listed.kind !== "ok") return fail(502, "unreachable", listed.kind === "stale" ? REFUSED_OLD : listed.words);
+      if (listed.kind !== "ok") return fail(502, "unreachable", listed.kind === "stale" ? REFUSED_OLD : listed.words, detailsOf(listed));
       if (row === undefined) return fail(404, "gone", "That decision is no longer waiting. Nothing was done.");
       if (sentRecords.length === 0) return fail(400, "unreadable", "This decision did not carry the version you looked at, so it was not sent. Nothing was done.");
       const decideBase = `horizon:decide:${approvalId}:${choice}`;
@@ -1700,7 +1700,7 @@ export async function createApplication(
       }
       await audit(result.kind === "stale" ? "refused_as_stale" : result.kind);
       if (result.kind === "stale") return fail(409, "stale", `The case keeper refused this: ${result.words}`);
-      return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words);
+      return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words, detailsOf(result));
     }
 
     if (card.kind === "human_step") {
@@ -1712,7 +1712,7 @@ export async function createApplication(
       // case's version again right now and refuses locally if it is not the one the card pinned.
       const pinned = card.preview.records[0];
       const fresh = await caseDigest(caseKeeper, caseId);
-      if (fresh.kind !== "ok") return fail(fresh.kind === "stale" ? 409 : fresh.kind === "refused" ? 409 : 502, fresh.kind, fresh.kind === "stale" ? REFUSED_OLD : fresh.words);
+      if (fresh.kind !== "ok") return fail(fresh.kind === "stale" ? 409 : fresh.kind === "refused" ? 409 : 502, fresh.kind, fresh.kind === "stale" ? REFUSED_OLD : fresh.words, detailsOf(fresh));
       if (pinned === undefined || fresh.value.digest === null || fresh.value.digest.expected_digest !== pinned.expected_digest) return fail(409, "preview_out_of_date", "Preview out of date. This case changed after you looked at it. Nothing was done. Look at the new preview and decide again.");
       const humanBase = `horizon:human:${caseId}:${itemId}`;
       const humanId = await requestIdFor(store, caller.tenant, humanBase);
@@ -1724,7 +1724,7 @@ export async function createApplication(
       }
       await audit(result.kind);
       if (result.kind === "stale") return fail(409, "stale", `The case keeper refused this: ${result.words}`);
-      return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words);
+      return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words, detailsOf(result));
     }
 
     // acceptance: the observe and rule steps of a committed move
@@ -1885,7 +1885,7 @@ export async function createApplication(
   /** Hand off (stage 4): `POST /desk/handoff/preview` shows the step that would be added; `POST /desk/handoff` adds it. */
   async function deskHandoff(request: Request, phase: "preview" | "send"): Promise<Response> {
     const headers = { "cache-control": "no-store" };
-    const fail = (status: number, outcome: string, message: string): Response => Response.json({ ok: false, outcome, message }, { status, headers });
+    const fail = (status: number, outcome: string, message: string, details: string | null = null): Response => Response.json({ ok: false, outcome, message, ...(details === null ? {} : { details }) }, { status, headers });
     if (caseKeeper === null) return fail(503, "unreachable", "Cases are not connected, so work cannot be handed off.");
     let body: Record<string, unknown>;
     try {
@@ -1903,7 +1903,7 @@ export async function createApplication(
     const store = runtime.runtime.store;
     // The case to add to: the one named, else the newest case that is still running.
     const listed = await listCases(caseKeeper);
-    if (listed.kind !== "ok") return fail(502, listed.kind, listed.kind === "stale" ? REFUSED_OLD : listed.words);
+    if (listed.kind !== "ok") return fail(502, listed.kind, listed.kind === "stale" ? REFUSED_OLD : listed.words, detailsOf(listed));
     const open = listed.value.cases.filter(isOpenCase).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
     const wanted = typeof body.case_id === "string" && body.case_id !== "" ? body.case_id.replace(/^case:/, "") : (open[0]?.case_id ?? "");
     const target = open.find((c) => c.case_id === wanted);
@@ -1915,7 +1915,7 @@ export async function createApplication(
     let reviewable: { step_id: string; name: string }[] = [];
     if (reviewAsked) {
       const horizon = await caseSteps(caseKeeper, target.case_id);
-      if (horizon.kind !== "ok") return fail(horizon.kind === "refused" || horizon.kind === "stale" ? 409 : 502, horizon.kind, horizon.kind === "stale" ? REFUSED_OLD : horizon.words);
+      if (horizon.kind !== "ok") return fail(horizon.kind === "refused" || horizon.kind === "stale" ? 409 : 502, horizon.kind, horizon.kind === "stale" ? REFUSED_OLD : horizon.words, detailsOf(horizon));
       reviewable = horizon.value.steps.filter((st) => st.execution === "completed").map((st) => ({ step_id: st.plan_item_id, name: st.name }));
       if (reviewStepId === "" && phase === "send") return fail(400, "no_review_target", "Choose which finished work to review first. Nothing was sent.");
       if (reviewStepId !== "" && !reviewable.some((st) => st.step_id === reviewStepId)) return fail(409, "not_finished", "That step has no finished work to review. Nothing was sent.");
@@ -1925,7 +1925,7 @@ export async function createApplication(
     if (phase === "preview") {
       await saveDraft(store, caller.tenant, caller.actor.id, { draftId, text, mode: "handoff" });
       const dry = await addItem(caseKeeper, { case_id: target.case_id, item, dry_run: true });
-      if (dry.kind !== "ok") return fail(dry.kind === "refused" ? 409 : dry.kind === "stale" ? 409 : 502, dry.kind, dry.kind === "stale" ? REFUSED_OLD : dry.words);
+      if (dry.kind !== "ok") return fail(dry.kind === "refused" ? 409 : dry.kind === "stale" ? 409 : 502, dry.kind, dry.kind === "stale" ? REFUSED_OLD : dry.words, detailsOf(dry));
       if (dry.value.plan_precondition === null) return fail(502, "unreadable", "The case keeper did not give a version code for this case, so the hand off cannot be tied to what you see. Try again in a moment.");
       return Response.json({ ok: true, preview: { draft_id: draftId, case_id: target.case_id, case_title: caseTitleNow, step_name: item.name, step_id: dry.value.plan_item_id, check: "The case keeper checked this step against the case and it fits.", plan_precondition: dry.value.plan_precondition, agent, review: reviewAsked ? { reviewable } : null } }, { headers });
     }
@@ -1946,7 +1946,7 @@ export async function createApplication(
     // A refusal is remembered by the case keeper under this id, so the next try gets a new one. A timeout keeps the id.
     if (sent.kind === "stale" || sent.kind === "refused") await attemptRefused(store, caller.tenant, handoffRequestId(draftId), sentId);
     if (sent.kind === "stale") return fail(409, "preview_out_of_date", "Preview out of date. This case changed after you looked at it. Nothing was sent. Look at the new preview and decide again.");
-    if (sent.kind !== "ok") return fail(sent.kind === "refused" ? 409 : 502, sent.kind, sent.words);
+    if (sent.kind !== "ok") return fail(sent.kind === "refused" ? 409 : 502, sent.kind, sent.words, detailsOf(sent));
     // A step that was added stays waiting until the case is advanced. If starting fails, the step is still there.
     const started = await startCase(target.case_id, `advance:${sentId}`);
     let assigned: { readonly done: boolean; readonly words: string } | null = null;

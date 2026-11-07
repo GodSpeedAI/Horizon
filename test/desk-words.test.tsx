@@ -15,6 +15,7 @@ import { buildDecide } from "../src/ui/desk/decide-build.ts";
 import { HandoffPreviewCard } from "../src/ui/desk/Composer.tsx";
 import { BANNED } from "../src/ui/desk/banned-words.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";
+import { withDetails } from "../src/ui/desk/model.ts";
 import type { DeskState, InspectionAnswer, NextState, SearchResult } from "../src/ui/desk/model.ts";
 import { orderWork, sessionItems, caseItems, type WorkData } from "../src/ui/desk/work-build.ts";
 import { deskState } from "./support/desk-fixture.ts";
@@ -170,6 +171,16 @@ describe("no product names and no internal terms on screen", () => {
     const html = draw({ ...START, data: base({ cases: [{ case_ref: "case:c9", purpose, opened_at: "2026-11-07T06:00:00Z", source: "case keeper", state: "Running" }] }) });
     expect(html).toContain(`title="${purpose}"`);
     expect(readFileSync(new URL("../src/ui/desk/desk.css", import.meta.url), "utf8")).toMatch(/\[data-list="cases"\] button \{[^}]*text-overflow:ellipsis/);
+  });
+
+  test("a refusal shows plain words, with the raw words only behind Details", () => {
+    const message = withDetails("The rules for this setup do not allow this. Nothing was changed.", "input_error: authority decision does not grant this action");
+    const html = draw({ ...START, view: "decide", data: base(), decideNote: { ok: false, message } });
+    expect(html).toContain("<details><summary>Details</summary><code>input_error: authority decision does not grant this action</code></details>");
+    expect(html.indexOf("do not allow this")).toBeLessThan(html.indexOf("<details>"));
+    const shown = text(html.replace(/<details>.*?<\/details>/g, ""));
+    expect(shown).toContain("The rules for this setup do not allow this.");
+    expect(shown).not.toContain("input_error");
   });
 
   test("the Inspector, the keys list and the quick menu", () => {
