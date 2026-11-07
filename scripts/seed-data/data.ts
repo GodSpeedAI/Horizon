@@ -3,9 +3,10 @@
  * which is how a second run finds that the entry is already there and changes nothing.
  * Everything here is labelled "Seed" in words a person reads, so seed rows are never mistaken for the operator's own work.
  */
+import { CELL_POLICY } from "../../src/adapters/sea-forge-case.ts";
 export const TEMPLATES = ["seed-release-signoff@0.1.0", "seed-triage@0.1.0"] as const;
 
-export const POLICY = "policy.yaml";
+export const POLICY = CELL_POLICY;
 export const SERVICE_ACTOR = { actor_id: "cognate-service", role: "service" } as const;
 export const OPERATOR_ACTOR = { actor_id: "operator", role: "operator" } as const;
 

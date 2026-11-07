@@ -18,6 +18,7 @@ import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, sta
 import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
+import { CELL_POLICY } from "../src/adapters/sea-forge-case.ts";
 import { loadWorld } from "../src/adapters/semantic.ts";
 import { DEFAULT_OPERATOR_REF } from "../src/config/load.ts";
 import { NAVIGATION_INTENT_COMMIT } from "../src/capabilities/navigation-intent.ts";
@@ -105,7 +106,7 @@ for (const f of files) {
   writeFileSync(join(cell, "worlds", f), readFileSync(join(domain, f)));
 }
 
-const policyPath = join(cell, "policy.yaml");
+const policyPath = join(cell, CELL_POLICY);
 if (!existsSync(policyPath)) {
   const approve = args.includes("--approve-commits");
   writeFileSync(
@@ -196,7 +197,7 @@ if (verdict.insecure) {
       gateway: { uid, actor: "cognate-service", delegable_actors: ["operator"] },
       cep_authority: {
         enabled: true,
-        policy: "policy.yaml",
+        policy: CELL_POLICY,
         worlds: [{ name: "horizon", base: "worlds", entry: "interaction-model.sea", files }],
         realitytrace: { bin: rt, data_home: rtData, state_home: rtState, require_corroboration: true },
       },

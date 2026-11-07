@@ -530,7 +530,7 @@ function keeperPort(socketPath: string): KeeperPort {
 function templatePort(cell: string): TemplatePort {
   const dir = join(cell, "templates");
   const source = join(here, "seed-data", "templates");
-  const policy = join(cell, "policy.yaml");
+  const policy = join(cell, POLICY);
   const file = (name: string) => `${name}.yaml`;
   return {
     present: () => TEMPLATES.filter((t) => existsSync(join(dir, file(t)))),

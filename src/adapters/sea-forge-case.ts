@@ -16,6 +16,9 @@
 import { seaForgeCall, type SeaForgeActor } from "./sea-forge-approvals.ts";
 import { redact } from "./redact.ts";
 
+/** The policy file the cell writes (ignite) and the case keeper must be told to read; its own default name is different. */
+export const CELL_POLICY = "policy.yaml";
+
 export interface RecordDigest {
   readonly ref: string;
   readonly expected_digest: string;
@@ -88,7 +91,7 @@ export function reasonOf(reply: Record<string, unknown>): string | null {
   if (Array.isArray(reply.errors)) parts.push(...reply.errors.filter((e): e is string => typeof e === "string"));
   // One shared masking helper for every message built from outside output; long opaque strings go too.
   const text = redact(parts.filter((p, i) => p.trim() !== "" && parts.indexOf(p) === i).join("; "))
-    .replace(/\b[A-Za-z0-9_+\/=-]{32,}\b/g, "[hidden]")
+    .replace(/(?<![A-Za-z0-9_\/.+=-])[A-Za-z0-9_-]{32,}(?![A-Za-z0-9_\/.+=-])/g, "[hidden]")
     .replace(/\s+/g, " ")
     .trim();
   return text === "" ? null : text.length > 300 ? `${text.slice(0, 300)}…` : text;
@@ -190,7 +193,7 @@ export function decide(
 ): Promise<Outcome<Record<string, unknown>>> {
   return call(
     keeper,
-    { verb: "approval_decide", case_id: request.case_id, approval_id: request.approval_id, decision: request.decision, ...(request.note ? { note: request.note } : {}), request_id: request.request_id, preconditions: request.preconditions },
+    { verb: "approval_decide", case_id: request.case_id, approval_id: request.approval_id, decision: request.decision, policy: CELL_POLICY, ...(request.note ? { note: request.note } : {}), request_id: request.request_id, preconditions: request.preconditions },
     true,
     (reply) => reply,
   );
@@ -213,7 +216,7 @@ export function addItem(
   const item = request.external_ref ? { ...request.item, external_ref: request.external_ref } : request.item;
   return call(
     keeper,
-    { verb: "case_add_item", case_id: request.case_id, item, ...(request.request_id ? { request_id: request.request_id } : {}), dry_run: request.dry_run, ...(request.preconditions ? { preconditions: request.preconditions } : {}) },
+    { verb: "case_add_item", case_id: request.case_id, item, ...(request.request_id ? { request_id: request.request_id } : {}), dry_run: request.dry_run, policy: CELL_POLICY, ...(request.preconditions ? { preconditions: request.preconditions } : {}) },
     !request.dry_run,
     (reply) =>
       typeof reply.case_id === "string" && typeof reply.plan_item_id === "string"
@@ -275,7 +278,7 @@ export function caseSteps(keeper: CaseKeeper, case_id: string): Promise<Outcome<
  * compare the case's digest itself before sending (see `src/app.ts`). The request id makes a retry replay, never double.
  */
 export function humanTaskComplete(keeper: CaseKeeper, request: { readonly case_id: string; readonly item_id: string; readonly justification: string; readonly request_id: string }): Promise<Outcome<Record<string, unknown>>> {
-  return call(keeper, { verb: "human_task_complete", case_id: request.case_id, item_id: request.item_id, justification: request.justification, request_id: request.request_id }, true, (reply) => reply);
+  return call(keeper, { verb: "human_task_complete", case_id: request.case_id, item_id: request.item_id, justification: request.justification, policy: CELL_POLICY, request_id: request.request_id }, true, (reply) => reply);
 }
 
 /** The `case:<id>` digest a decision preview pins ("nothing happened to this case since I looked"). */
@@ -303,7 +306,7 @@ export function entryOptions(keeper: CaseKeeper): Promise<Outcome<{ readonly tem
  * names one attempt (see `request-id.ts`); `policy` and `timeout` take the case keeper's defaults.
  */
 export function advance(keeper: CaseKeeper, case_id: string, request_id: string): Promise<Outcome<Record<string, unknown>>> {
-  return call(keeper, { verb: "case_advance", case_id, request_id }, true, (reply) => reply);
+  return call(keeper, { verb: "case_advance", case_id, policy: CELL_POLICY, request_id }, true, (reply) => reply);
 }
 
 export interface PendingApproval {

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addItem, approvalList, commit, decide, listCases, preflight, STALE_WORDS, type CaseKeeper } from "../src/adapters/sea-forge-case.ts";
+import { addItem, advance, approvalList, CELL_POLICY, commit, decide, humanTaskComplete, listCases, reasonOf, preflight, STALE_WORDS, type CaseKeeper } from "../src/adapters/sea-forge-case.ts";
 import { followEvents, type EventFrame } from "../src/adapters/sea-forge-events.ts";
 import { fakeCaseKeeper, type FakeKeeper, type FakeReply } from "./support/fake-case-keeper.ts";
 
@@ -320,5 +320,28 @@ describe("case keeper adversarial: the events stream", () => {
     } finally {
       follower.stop();
     }
+  });
+});
+
+describe("case keeper policy and refusal words", () => {
+  test("every write verb names the cell policy", async () => {
+    const keeper = start(() => ({ json: { ok: true, outcome: "applied", dry_run: false, case_id: "c1", plan_item_id: "p1" } }));
+    await addItem(keeper, { case_id: "c1", item: { title: "x" }, request_id: "r1", dry_run: true });
+    await addItem(keeper, { case_id: "c1", item: { title: "x" }, request_id: "r2", dry_run: false });
+    await advance(keeper, "c1", "r3");
+    await decide(keeper, { case_id: "c1", approval_id: "a1", decision: "approve" as never, request_id: "r4", preconditions: pre });
+    await humanTaskComplete(keeper, { case_id: "c1", item_id: "i1", justification: "done", request_id: "r5" });
+    const verbs = live!.received.map((r) => r.verb);
+    expect(verbs).toEqual(["case_add_item", "case_add_item", "case_advance", "approval_decide", "human_task_complete"]);
+    expect(CELL_POLICY).toBe("policy.yaml");
+    for (const r of live!.received) expect(r.policy).toBe("policy.yaml");
+  });
+
+  test("a refusal keeps a file path readable and still hides a token", () => {
+    const path = "/home/sprime01/.horizon/setups/testing/cell/sea-forge-policy.yaml";
+    const token = "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8";
+    const said = reasonOf({ error: `missing_config_error: cannot read ${path}; key ${token}` })!;
+    expect(said).toContain(path);
+    expect(said).not.toContain(token);
   });
 });
