@@ -122,6 +122,9 @@ ${approve ? "    requires_approval: true\n" : ""}    actor_role: service
   - { name: horizon-capabilities, verdict: allow, actor_role: service, operation_kind: cognate_capability }
   - { name: horizon-actions, verdict: allow, actor_role: service, operation_kind: cognate_action }
   - { name: operator-approves, verdict: allow, actor_role: operator, operation_kind: approval_resolution }
+  # proposed steps still need a person to finish them
+  - { name: operator-adds-steps, verdict: allow, actor_role: operator, operation_kind: discretionary_task_add }
+  - { name: agents-propose-steps, verdict: allow, actor_role: service, operation_kind: discretionary_task_add }
   - { name: evidence, verdict: allow, actor_role: service, operation_kind: evidence_mutation }
   - { name: settlement, verdict: allow, actor_role: service, operation_kind: settlement_declaration }
 `,

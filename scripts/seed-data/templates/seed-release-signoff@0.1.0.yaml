@@ -1,0 +1,20 @@
+# Seed data for the Horizon test setup only. A case with one human sign-off step.
+# The step is active as soon as the case is committed, so Decide shows a card for the operator.
+name: seed-release-signoff
+version: 0.1.0
+description: >-
+  Seed: weekly release. One human sign-off step that waits for the operator.
+parameters:
+  release_name:
+    type: string
+    required: false
+    default: "weekly release"
+plan:
+  items:
+    - plan_item_id: signoff_release_notes
+      name: "Seed: sign off the weekly release notes"
+      item_kind: human_task
+      markers:
+        required: true
+      settlement_criteria:
+        require_approval: true

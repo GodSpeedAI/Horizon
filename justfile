@@ -266,3 +266,30 @@ gateway-install binary="" sha256="" bun="" bun_sha256="":
 # gateway-check: read-only ownership, mode, membership and socket-access check. Expects the agent to be denied the socket.
 gateway-check:
     scripts/install-sea-forge-gateway.sh --check
+
+# Seed data for the TEST setup only (technical annex J.2). Each recipe loads the test setup's environment first;
+# the script itself refuses anything but HORIZON_SETUP=testing with the test setup's SETUP.json marker.
+# Everything is made through real interfaces (case keeper, realitytrace CLI, the Horizon store, gh on the sandbox repository).
+seed:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    set -a; eval "$(bun run scripts/setup-env.ts testing --service horizon)"; set +a
+    bun run scripts/seed.ts
+
+# Prints each seeded part and whether it is present.
+seed-status:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    set -a; eval "$(bun run scripts/setup-env.ts testing --service horizon)"; set +a
+    bun run scripts/seed.ts --status
+
+# Records cannot be removed one by one: this clears the whole TEST setup. It shows the full list, asks you to type yes
+# (or pass --yes), clears, then runs setup-init so the setup is empty again. Stop the test setup first.
+seed-clear *flags:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    set -a; eval "$(bun run scripts/setup-env.ts testing --service horizon)"; set +a
+    bun run scripts/seed.ts --clear {{flags}}
+
+# seed-clear, then seed. The test setup must be stopped for the clear and started again before the seed.
+seed-reset *flags: (seed-clear flags) seed

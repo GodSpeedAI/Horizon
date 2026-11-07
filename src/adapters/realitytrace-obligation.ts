@@ -8,7 +8,7 @@
  * started_at and completed_at in its own ledger, where SEA-Forge reads them back. Horizon never writes an
  * outcome RealityTrace did not record.
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExpectedOutcome } from "../domain/expectation.ts";
@@ -119,8 +119,17 @@ export class RealityTraceObligation {
       const commit = await this.git(["-c", "user.email=horizon@localhost", "-c", "user.name=horizon", "commit", "--allow-empty", "-qm", "horizon realitytrace enrollment"]);
       if (commit.code !== 0) throw new RealityTraceError(`git commit failed: ${commit.text}`);
     }
-    const listed = (await this.sxr(["repo", "list"])) as { repos?: { repo_id: string; path?: string; root?: string }[] };
-    const known = (listed.repos ?? []).find((repo) => [repo.path, repo.root].includes(this.config.repoDir));
+    const listed = (await this.sxr(["repo", "list"])) as { repos?: { repo_id: string; filesystem_path?: string; path?: string; root?: string }[] };
+    const real = (p: string | undefined): string | undefined => {
+      if (p === undefined) return undefined;
+      try {
+        return realpathSync(p);
+      } catch {
+        return p;
+      }
+    };
+    const want = real(this.config.repoDir);
+    const known = (listed.repos ?? []).find((repo) => [repo.filesystem_path, repo.path, repo.root].some((p) => p !== undefined && real(p) === want));
     this.repoId = known?.repo_id ?? ((await this.sxr(["repo", "enroll", this.config.repoDir])) as { repo_id: string }).repo_id;
     return this.repoId;
   }

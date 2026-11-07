@@ -2,7 +2,7 @@
 // The rule each test proves: the honest state in plain words, never stale data shown as current, never a lost or
 // doubled write, never a leaked key.
 import { afterAll, describe, expect, test } from "bun:test";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RealityTraceError, RealityTraceObligation } from "../src/adapters/realitytrace-obligation.ts";
@@ -116,6 +116,19 @@ describe("record keeper: the program itself", () => {
     // the writer side: an answer missing what it needs is refused, not guessed.
     const d = fake(`case "$1 $2" in "repo list") echo '{"repos":[]}';; "repo enroll") echo '{"repo_id":"R1"}';; *) echo '{}';; esac`);
     await expect(d.obligation().declare({ intentId: "i", statement: "s", target: "t", criteria: { minimum_relevance: "low", minimum_reliability: "low" } })).rejects.toThrow("returned no ledger position");
+  });
+});
+
+describe("record keeper: enrolling", () => {
+  test("an existing repo is found by its filesystem path, not enrolled again", async () => {
+    const f = fake(`case "$1 $2" in
+  "repo list") echo '{"repos":[{"repo_id":"R7","filesystem_path":"'"$(dirname "$0")"'/repo","state":"enrolled"}]}';;
+  "repo enroll") echo enrolled >> "$0.enrolled"; echo '{"repo_id":"R9"}';;
+  *) echo '{}';;
+esac`);
+    expect(await f.obligation().repo()).toBe("R7");
+    expect(await f.obligation().repo()).toBe("R7");
+    expect(existsSync(`${f.bin}.enrolled`)).toBe(false);
   });
 });
 

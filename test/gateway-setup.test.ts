@@ -523,6 +523,13 @@ describe("server.yaml and policy.yaml (rendered from the runtime account's uid, 
     for (const k of keys) expect(ignite.includes(`${k}:`) || ignite.includes(`${k},`) || ignite.includes(`${k} `)).toBe(true);
   });
 
+  test("the cell policy ignite writes lets the operator and agents add steps", () => {
+    const ignite = readFileSync(join(repoRoot, "scripts", "ignite.ts"), "utf8");
+    expect(ignite).toContain("{ name: operator-adds-steps, verdict: allow, actor_role: operator, operation_kind: discretionary_task_add }");
+    expect(ignite).toContain("{ name: agents-propose-steps, verdict: allow, actor_role: service, operation_kind: discretionary_task_add }");
+    expect(ignite).toContain("proposed steps still need a person to finish them");
+  });
+
   test("validation refuses a duplicate uid, a uid on the operator, an unbound or duplicate delegable actor, the gateway as delegable, and root", () => {
     const base = () => JSON.parse(render(4242)) as ReturnType<typeof serverConfig>;
     const dupUid = base();
