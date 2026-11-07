@@ -535,3 +535,34 @@ No builds or test suites were run while writing this. One compile at a time appl
 - **Built and passing:** 19 new tests and the 13 existing config tests pass, and the type check is clean after one fix in `scripts/setup-init.ts`. `~/.horizon/setups/testing` was created. The test board is GitHub board #2 in `GodSpeedAI/horizon-sandbox`, and sub-issues are confirmed.
 - **Carried to stage 3:** `setup-check-empty.ts` has no case-keeper client yet, so it treats a live case-keeper socket as "one unanswered case". M (stage 3): call `case_list` through `src/adapters/sea-forge-case.ts` once it exists. Until then, the check fails safe: it never reports empty wrongly.
 - **Accepted as built:** the record check counts repositories in a record dir (a fresh dir has none). `setup-clear` deletes every issue in the sandbox repository, which is test-only by definition.
+
+## J. Added by the operator (2026-11-06): adversarial tests and seed data
+
+### J.1 Adversarial tests for every outside service
+
+Every adapter that talks to an outside service gets a test file named `test/adversarial-<service>.test.ts` (Horizon) or the repo's equivalent. Each file drives a fake of the service, or the real CLI with injected failures, through every case below. The rule each test proves: **Horizon shows the honest state in words, never shows stale data as current, never loses or doubles a write, and never leaks a key.**
+
+| Service | Cases (each one is a named test) |
+| --- | --- |
+| Record keeper (`realitytrace` CLI) | binary missing; non-zero exit; timeout (hang longer than the limit); output that is not JSON; valid JSON of the wrong shape; a truncated ledger; a broken chain (one row edited); 50MB output; an unknown record kind; record dir not readable |
+| Case keeper (SFWP socket) | socket missing; connection refused; reply never arrives (timeout); garbage frame; an error reply; `request_id_reused`; a stale `plan:` digest; the socket closing mid-reply; the events stream dropping, then resuming from the cursor with no gap and no duplicate |
+| Workshop (Connect RPC) | down; `401` from an expired key; `401` from a revoked key; key file missing, world-readable (refused unless the mode is 0600) or empty; slow reply; a duplicate assignment id; an unknown session id in a deep link |
+| GitHub (`gh api`, through the fake `gh`) | `gh` missing; not logged in; scope missing; rate-limited (`403` plus reset); `5xx`; `404` on the repo; an issue deleted on GitHub; an issue closed on GitHub (the step stays not accepted); the same webhook or poll seen 3 times; title or body with markdown and script injection (shown as text, never run); a body of 1MB or more; offline, then back: writes replayed in order exactly once |
+| Reference service (Ask) | not configured; down; slow; an answer with no sources (shown as "no sources", never as fact) |
+| Presenting | a project name inside an issue title, note, file path, export or error message: none leaks with Presenting on |
+| Inputs from the operator | composer text with HTML or script (escaped); a 100KB note; unicode and right-to-left text; an empty note; a tag named like a permission ("approved") grants nothing |
+
+The record of each stage lists its adversarial tests and their results.
+
+### J.2 Seed data, made through the real interfaces
+
+Seed data lets the operator see every screen working. It is made **only in the test setup**, and **only through the real interfaces**: case-keeper calls, the record keeper's CLI, the Horizon store and `gh` against the test repository. Nothing is drawn onto a screen directly. The seed is therefore an honest demonstration of the system, not a mock-up.
+
+| Recipe | What it does |
+| --- | --- |
+| `just seed` | Refuses unless `HORIZON_SETUP=testing` and the test setup exists. Creates a seeded organization's cases with steps (including one from a GitHub test issue, one handed off and one agent proposal). Creates expectations and observations in the **test** record covering: matched, contradicted, expected but not seen, and seen but not expected. Creates notes on several days, tags, links and three labels. Creates one decision waiting for the operator. The demo issues in `GodSpeedAI/horizon-sandbox` are added to the test board. Running it twice changes nothing: every write carries a fixed request id. |
+| `just seed-status` | Prints what the seed created and whether each part is present. |
+| `just seed-clear` | Records cannot be removed one by one, so this clears the whole test setup (`setup-clear --setup testing`), shows the list, asks for confirmation, then re-creates it empty (`setup-init`). It never touches production or the personal record. |
+| `just seed-reset` | `seed-clear`, then `seed`. |
+
+The seed script is `scripts/seed.ts`, with its data in `scripts/seed-data/`. It is built in the stage where each piece first exists: records and labels in stage 1, notes in 2, decisions in 3, steps from GitHub and hand off in 4. Each stage extends it.
