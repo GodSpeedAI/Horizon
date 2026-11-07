@@ -112,9 +112,9 @@ export function PanelCard({ panel, io, presenting = false, onAction = () => unde
     </>
   );
   const heading = (
-    <h3 id={`${panel.id}-ph`} className="cv-card-title">
+    <h2 id={`${panel.id}-ph`} className="cv-card-title">
       {panel.title}
-    </h3>
+    </h2>
   );
   return (
     <article className="cv-card panel-card" data-panel-id={panel.id} data-pinned={panel.pinned ? "yes" : "no"} data-needs-you={needsYou ? "yes" : "no"} data-folded={needsYou || panel.pinned ? "no" : "yes"} aria-labelledby={`${panel.id}-ph`}>

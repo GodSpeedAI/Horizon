@@ -32,7 +32,7 @@ export function Frame({ block, title, children }: { readonly block: Raw; readonl
     <section className="hb" data-block={str(block.type)} data-from-agent={agent ? "yes" : "no"} aria-label={title ? shown(title) : undefined}>
       {title || agent ? (
         <header className="hb-head">
-          {title ? <h4 className="hb-title">{shown(title)}</h4> : null}
+          {title ? <h3 className="hb-title">{shown(title)}</h3> : null}
           {agent ? <span className="hb-tag">{AGENT_TAG}</span> : null}
         </header>
       ) : null}

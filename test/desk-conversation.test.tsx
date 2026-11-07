@@ -91,7 +91,7 @@ describe("cards from agents", () => {
     expect(html).toMatch(/data-panel-id="release"[^>]*data-folded="no"/);
     expect(html).toMatch(/data-panel-id="notes"[^>]*data-folded="yes"/);
     expect(html).toContain("<details>");
-    expect(html).toMatch(/<h3[^>]*>Release notes<\/h3>/);
+    expect(html).toMatch(/<h2[^>]*>Release notes<\/h2>/);
     const words = text(html);
     expect(words).toContain("Needs you");
     expect(words).toContain("Ship it?");
@@ -188,5 +188,15 @@ describe("a wide part on a phone", () => {
 describe("a chart on a phone", () => {
   test("its hidden table is contained by the chart, so it cannot make the page scroll sideways (seen live at 390 px)", () => {
     expect(readFileSync(new URL("../src/ui/desk/blocks/blocks.css", import.meta.url), "utf8")).toMatch(/\.hb-chart \{ position:relative; overflow:hidden; \}/);
+  });
+});
+
+describe("headings and landmarks in the conversation", () => {
+  test("a waiting card is a heading level 2 in an article, not a named region, so two of them do not clash and levels do not skip", () => {
+    const html = convo([row(1, { status: "waiting", source: "page-agent", kind: "handoff-proposal", words: "Fix totals", refs: { draft_id: "d1" } }), row(2, { status: "waiting", source: "page-agent", kind: "handoff-proposal", words: "Fix tax", refs: { draft_id: "d2" } })]);
+    expect((html.match(/<article[^>]*data-waiting-move/g) ?? []).length).toBe(2);
+    expect(html).not.toMatch(/<section[^>]*data-waiting-move/);
+    expect(html).toMatch(/<h2[^>]*>Hand off this work\?<\/h2>/);
+    expect(html).not.toMatch(/<h3[^>]*cv-card-title/);
   });
 });

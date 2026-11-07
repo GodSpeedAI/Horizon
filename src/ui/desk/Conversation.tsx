@@ -58,11 +58,11 @@ function MoveCard({ row, onConfirm, onDiscard, busy }: { readonly row: Conversat
   const fromAgent = row.source !== "you";
   const headId = `${row.row_id}-h`;
   return (
-    <section className="cv-card move-card" aria-labelledby={headId} data-waiting-move={row.kind}>
+    <article className="cv-card move-card" aria-labelledby={headId} data-waiting-move={row.kind}>
       <p className="cv-eyebrow">{fromAgent ? "An agent suggests" : "Needs your OK"}</p>
-      <h3 id={headId} className="cv-card-title">
+      <h2 id={headId} className="cv-card-title">
         {fromAgent ? "Hand off this work?" : "Finish this hand off?"}
-      </h3>
+      </h2>
       <p className="cv-words" dir="auto">
         {row.words}
       </p>
@@ -76,7 +76,7 @@ function MoveCard({ row, onConfirm, onDiscard, busy }: { readonly row: Conversat
         </button>
       </div>
       <p className="cv-note muted">Confirm shows you exactly what will happen first. Nothing is sent until you confirm there.</p>
-    </section>
+    </article>
   );
 }
 
