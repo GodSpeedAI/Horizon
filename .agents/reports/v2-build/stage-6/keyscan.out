@@ -1,0 +1,9 @@
+tracked files: 4 matches
+test/adapter-hardening.test.ts:23
+test/adversarial-github.test.ts:235
+test/connector-hardening.test.ts:276
+test/connector-reaudit.test.ts:291
+lines added on this branch since main: 4 matches
+reports and seed data: 0 matches
+secret-named files tracked: 0
+test setup and logs: 2 files

@@ -1,0 +1,222 @@
+bun run scripts/check-t05-boundaries.ts
+inspected .agents/reports/2026-11-05-t1-authority-mediation/evidence/phase-f/adversarial.ts
+inspected .agents/reports/2026-11-05-t1-authority-mediation/evidence/release/live-reject.ts
+inspected .agents/reports/2026-11-05-t1-authority-mediation/evidence/release/live-roundtrip-readback.ts
+inspected .agents/reports/2026-11-05-t1-authority-mediation/evidence/stage0/live-listing-probe.ts
+inspected .agents/reports/v2-build/stage-3/look-stage3.ts
+inspected .agents/reports/v2-build/stage-6/live-agent-handoff.ts
+inspected .agents/reports/v2-build/stage-6/live-done.ts
+inspected .agents/reports/v2-build/stage-6/live-handoff.ts
+inspected .agents/reports/v2-build/stage-6/pagekey.ts
+inspected .agents/reports/v2-build/stage-6/present.ts
+inspected .agents/reports/v2-build/stage-6/walk.ts
+inspected cognate.config.ts
+inspected connectors/github/board.ts
+inspected connectors/github/cursor.ts
+inspected connectors/github/gh.ts
+inspected connectors/github/index.ts
+inspected connectors/github/lock.ts
+inspected connectors/github/mapping.ts
+inspected connectors/github/sea-events.ts
+inspected scripts/build-desk.ts
+inspected scripts/build-verifier.ts
+inspected scripts/check-boundaries.ts
+inspected scripts/check-prereg-shape.ts
+inspected scripts/check-t05-boundaries.ts
+inspected scripts/check-t05-prereg-coverage.ts
+inspected scripts/check-t06-prereg-coverage.ts
+inspected scripts/check-t07-prereg-coverage.ts
+inspected scripts/check.ts
+inspected scripts/gateway-identity.ts
+inspected scripts/gateway-setup.ts
+inspected scripts/ignite.ts
+inspected scripts/measure-timings.ts
+inspected scripts/presenting-scan.ts
+inspected scripts/probe-runtime.ts
+inspected scripts/probe-world.ts
+inspected scripts/rollback-guard.ts
+inspected scripts/seed-data/data.ts
+inspected scripts/seed.ts
+inspected scripts/setup-check-empty.ts
+inspected scripts/setup-clear.ts
+inspected scripts/setup-env.ts
+inspected scripts/setup-github.ts
+inspected scripts/setup-health.ts
+inspected scripts/setup-init.ts
+inspected scripts/teeth-t05-boundaries.ts
+inspected scripts/teeth-t05-equivalence.ts
+inspected scripts/teeth-t05-mutation.ts
+inspected scripts/teeth-t05-prereg-coverage.ts
+inspected scripts/teeth-t06-mutation.ts
+inspected scripts/teeth-t06-shape.ts
+inspected scripts/teeth-t07-mutation.ts
+inspected scripts/teeth-t10-mutation.ts
+inspected scripts/teeth.ts
+inspected scripts/walkthrough-capture.ts
+inspected src/adapters/context-kernel.ts
+inspected src/adapters/delegating-authority.ts
+inspected src/adapters/ledger-day.ts
+inspected src/adapters/navigation.ts
+inspected src/adapters/operational-objects.ts
+inspected src/adapters/realitytrace-economics.ts
+inspected src/adapters/realitytrace-obligation.ts
+inspected src/adapters/redact.ts
+inspected src/adapters/request-id.ts
+inspected src/adapters/research.ts
+inspected src/adapters/run-child.ts
+inspected src/adapters/sea-forge-approvals.ts
+inspected src/adapters/sea-forge-case.ts
+inspected src/adapters/sea-forge-events.ts
+inspected src/adapters/semantic.ts
+inspected src/adapters/settlement.ts
+inspected src/adapters/workshop.ts
+inspected src/agents/health.ts
+inspected src/agents/navigation-commit.ts
+inspected src/app.ts
+inspected src/capabilities/capacity-ledger.ts
+inspected src/capabilities/context.ts
+inspected src/capabilities/contract-upgrade.ts
+inspected src/capabilities/decisions.ts
+inspected src/capabilities/handoff.ts
+inspected src/capabilities/labels.ts
+inspected src/capabilities/lessons.ts
+inspected src/capabilities/navigation-intent.ts
+inspected src/capabilities/navigation-settlement.ts
+inspected src/capabilities/notes.ts
+inspected src/capabilities/panel-answers.ts
+inspected src/capabilities/pending-intent.ts
+inspected src/capabilities/pending-reconcile.ts
+inspected src/capabilities/remote-records.ts
+inspected src/capabilities/semantic.ts
+inspected src/capabilities/workspace-records.ts
+inspected src/config/load.ts
+inspected src/config/setup.ts
+inspected src/config/types.ts
+inspected src/domain/approval-inbox.ts
+inspected src/domain/debugger.ts
+inspected src/domain/expectation.ts
+inspected src/domain/frame.ts
+inspected src/domain/intent.ts
+inspected src/domain/navigation.ts
+inspected src/domain/note.ts
+inspected src/domain/operational.ts
+inspected src/domain/payment.ts
+inspected src/economics/model.ts
+inspected src/economics/readout.ts
+inspected src/exports/export.ts
+inspected src/main.ts
+inspected src/projections/navigation-context.ts
+inspected src/projections/operational-objects.ts
+inspected src/remote/cbor.ts
+inspected src/remote/identity-store.ts
+inspected src/remote/operators.ts
+inspected src/remote/pairing.ts
+inspected src/remote/panel.ts
+inspected src/remote/phone.ts
+inspected src/remote/server.ts
+inspected src/remote/sessions.ts
+inspected src/remote/settings.ts
+inspected src/remote/vendor/qrcodegen.ts
+inspected src/remote/webauthn.ts
+inspected src/runtime/create.ts
+inspected src/runtime/required-cognate.ts
+inspected src/settlement/obligation.ts
+inspected src/settlement/settle-awaiting-closure.ts
+inspected src/settlement/snapshot.ts
+inspected src/ui/desk/Answers.tsx
+inspected src/ui/desk/attention.ts
+inspected src/ui/desk/banned-words.ts
+inspected src/ui/desk/client/main.tsx
+inspected src/ui/desk/ComparisonView.tsx
+inspected src/ui/desk/Composer.tsx
+inspected src/ui/desk/decide-build.ts
+inspected src/ui/desk/DecisionCard.tsx
+inspected src/ui/desk/Desk.tsx
+inspected src/ui/desk/Inspector.tsx
+inspected src/ui/desk/keys.ts
+inspected src/ui/desk/LabelControl.tsx
+inspected src/ui/desk/model.ts
+inspected src/ui/desk/Nav.tsx
+inspected src/ui/desk/NextDecision.tsx
+inspected src/ui/desk/NoteEditor.tsx
+inspected src/ui/desk/panels-model.ts
+inspected src/ui/desk/Panels.tsx
+inspected src/ui/desk/Preview.tsx
+inspected src/ui/desk/RemotePanel.tsx
+inspected src/ui/desk/StateWord.tsx
+inspected src/ui/desk/StatusBar.tsx
+inspected src/ui/desk/views/Cost.tsx
+inspected src/ui/desk/views/Decide.tsx
+inspected src/ui/desk/views/Explore.tsx
+inspected src/ui/desk/views/Home.tsx
+inspected src/ui/desk/views/Today.tsx
+inspected src/ui/desk/views/Work.tsx
+inspected src/ui/desk/Words.tsx
+inspected src/ui/desk/work-build.ts
+inspected src/ui/sequential/controller.ts
+inspected src/ui/sequential/terminal.tsx
+inspected src/ui/sequential/vendor/terminal-ui/components/confirm/confirm.tsx
+inspected src/ui/sequential/vendor/terminal-ui/components/index.ts
+inspected src/ui/sequential/vendor/terminal-ui/components/prompt/prompt.tsx
+inspected src/ui/sequential/vendor/terminal-ui/components/select/select.tsx
+inspected src/ui/sequential/vendor/terminal-ui/hooks/hints.ts
+inspected src/ui/sequential/vendor/terminal-ui/hooks/use-available-width.ts
+inspected src/ui/sequential/vendor/terminal-ui/hooks/use-prompt-keys.ts
+inspected src/ui/sequential/vendor/terminal-ui/hooks/use-prompt-state.ts
+inspected src/ui/sequential/vendor/terminal-ui/index.ts
+inspected src/ui/sequential/vendor/terminal-ui/primitives/index.ts
+inspected src/ui/sequential/vendor/terminal-ui/primitives/label.tsx
+inspected src/ui/sequential/vendor/terminal-ui/primitives/rail.tsx
+inspected src/ui/sequential/vendor/terminal-ui/theme/ascii.ts
+inspected src/ui/sequential/vendor/terminal-ui/theme/base.ts
+inspected src/ui/sequential/vendor/terminal-ui/theme/clack.ts
+inspected src/ui/sequential/vendor/terminal-ui/theme/context.ts
+inspected src/ui/sequential/vendor/terminal-ui/theme/high-contrast.ts
+inspected src/ui/sequential/vendor/terminal-ui/theme/index.ts
+inspected src/ui/sequential/vendor/terminal-ui/theme/state.ts
+inspected src/ui/sequential/vendor/terminal-ui/theme/types.ts
+inspected src/ui/sequential/vendor/terminal-ui/utils/style.ts
+inspected src/ui/sequential/vendor/terminal-ui/utils/text.ts
+inspected src/ui/surface.ts
+inspected src/ui/surface2/binder.ts
+inspected src/ui/surface2/equivalent.ts
+inspected src/ui/surface2/grammar.ts
+inspected src/ui/surface2/panel-blocks.ts
+inspected src/ui/surface2/project.ts
+inspected src/ui/surface2/reducer.ts
+inspected src/ui/surface2/render.ts
+inspected src/ui/workspace/compare-model.ts
+inspected src/ui/workspace/compare.tsx
+inspected src/ui/workspace/inspect.ts
+inspected src/ui/workspace/model.ts
+inspected src/ui/workspace/presenting.ts
+inspected src/verifiers/intent-recorded.ts
+T05 boundaries: ok (192 files)
+bun run scripts/check-t05-prereg-coverage.ts
+  ok   PE-06: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-07: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-08: registered in the frozen file only as text (confirmation_condition); recovered by .agents/prereg/horizon/T05.prereg.interpretation.yaml
+  ok   PE-01: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon.surface/2, .strict()]
+  ok   PE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [horizon:<source>, semantic:<ref>, file:<allowed root>/..., agent:<ref>, agent-supplied]
+  ok   PE-03: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [(state, op) -> {state, result}]
+  ok   PE-04: 'PE-04/NE-10 serves no unescaped markup under the horizon.gui-view/1 pr…' names [horizon.gui-view/1]
+  ok   PE-05: 'PE-05/NE-10 carries an ActorAttribution with on_behalf_of_ref on every…' names [ActorAttribution, acting_for]
+  ok   NE-01: 'NE-01 rejects <script>alert(1)</script> and other executable markup at…' names [<script>alert(1)</script>]
+  ok   NE-02: 'NE-02/PE-01 rejects an <iframe> block type and the jsx / onclick field…' names [iframe, jsx, onclick]
+  ok   NE-03: covered by 'NE-03 refuses an unauthorized action in a block — an unoffered or non-union operation, and an agent-offered human decision (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   NE-04: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [javascript:..., file:../../etc/passwd, horizon:]
+  ok   NE-05: 'NE-05/PE-03 keeps the reducer pure — (state, op) -> {state, result} wi…' names [view.move, view.pin, surface.put, human.approve]
+  ok   NE-06: covered by 'PE-01 NE-06 lets no second surface schema validate a route (falsifier PE-01)' (no literal anchors to re-check)
+  ok   NE-07: 'NE-04/NE-07 PE-02 refuses javascript: and file: traversal, an unknown …' names [human]
+  ok   NE-08: covered by 'NE-08 PE-02 reports an unanswered authority as blocked, never as a value (falsifier PE-02)' (no literal anchors to re-check)
+  ok   NE-09: covered by 'NE-09 PE-04 does not treat a divergent GUI/CLI/MCP intent as equivalent (falsifier PE-04)' (no literal anchors to re-check)
+  ok   NE-10: 'NE-10 escapes an <img onerror=...> value that arrives from an observed…' names [<img onerror=...>]
+  ok   PE-06: covered by 'NE-04/PE-06 refuses a human-authority op for the agent role (falsifier PE-03/PE-06)' (no literal anchors to re-check)
+  ok   PE-07: proven by 'just gate-t05' (target exists)
+  ok   PE-07: proven by 'just verify' (target exists)
+  ok   PE-08: proven by 'just check-t05', which invokes [check-t05-boundaries.ts]
+
+T05 prereg linkage: ok (18 registered expectations, each named by a test that names its anchors)
+  NOTE: linkage only. Whether the assertions reject a violating implementation is
+        proven separately by `bun run scripts/teeth-t05-mutation.ts`.
+check-t05 rc=0

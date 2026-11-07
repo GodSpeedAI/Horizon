@@ -1,0 +1,37 @@
+blocked missing-cognate-dependency: exit=1
+STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
+blocked in-memory-runtime: exit=1
+22 |   throw new RuntimeBoundaryError(`RUNTIME: ${message}`);
+RuntimeBoundaryError: RUNTIME: local_operator forbids an in-memory runtime; a durable SQLite store is required
+blocked competing-product-model: exit=1
+BOUNDARY: competing canonical model/authority store at product-model/process.yaml
+blocked duplicate-semantic-authority: exit=1
+BOUNDARY: duplicate semantic authority at other/model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+baseline canonical-closure-control: exit=0
+blocked duplicate-canonical-subtree: exit=1
+BOUNDARY: duplicate semantic authority at .sea/alternative/interaction-model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked false-world-ref: exit=1
+19 |   throw new SemanticAdapterError(`SEMANTIC: ${message}`);
+SemanticAdapterError: SEMANTIC: world identity mismatch: expected world:horizon@sha256:0000000000000000000000000000000000000000000000000000000000000000, observed world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b
+baseline isolated-tree-real-runtime: exit=0, passed=9
+blocked fake-runtime-substitution: exit=1, failing=7
+  fails: structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen
+  fails: structural walking skeleton > HORIZON_OPERATOR_REF names the operator the cockpit header and approvals use, and an invalid one refuses startup
+  fails: structural walking skeleton > a spoofed observer is refused, the committed observer is the configured operator, and the attempt is auditable
+  fails: structural walking skeleton > an intent id commits exactly once: the same intent again returns the first record, a different one is duplicate_intent
+blocked missing-cognate-dependency-metadata: exit=1
+STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
+BOUNDARY: duplicate semantic authority at domain/research-artifacts.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+BOUNDARY: duplicate semantic authority at domain/product-integration-contract.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked missing-cognate-dependency-e2e: exit=1, failing=1
+
+teeth: all attacks blocked
+BASELINE clean tree verifies
+BLOCKED  frozen ledger edited after freeze -> FAIL: ledger content does not match its freeze_hash (hand edit after freeze?)
+BLOCKED  frozen ledger reverted to candidate -> FAIL: ledger freeze_hash is not frozen: 'candidate'
+BLOCKED  wayfinder body hand-edited -> FAIL: committed wayfinder body is not the projection its generator produces (hand edit?)
+BLOCKED  wayfinder unfrozen -> FAIL: wayfinder validation failed
+BLOCKED  hashed input drifted (ledger policy) -> FAIL: wayfinder validation failed
+BLOCKED  ledger row removed after freeze (ledger structure / projection) -> FAIL: requirement ledger validation failed
+
+teeth: 6 blocked, 0 missed

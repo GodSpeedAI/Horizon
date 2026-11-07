@@ -1,0 +1,36 @@
+{
+  "measured_at": "2026-11-07T17:42:10.387Z",
+  "setup": "testing",
+  "base": "http://127.0.0.1:4339",
+  "budget_ms": 1000,
+  "rule": "pass when p95_ms <= budget_ms",
+  "items": [
+    {
+      "item": "day view",
+      "path": "/desk/state.json",
+      "n": 15,
+      "median_ms": 9,
+      "p95_ms": 13.1,
+      "budget_ms": 1000,
+      "pass": true
+    },
+    {
+      "item": "record lookup",
+      "path": "/desk/search?q=record",
+      "n": 15,
+      "median_ms": 2.6,
+      "p95_ms": 3.7,
+      "budget_ms": 1000,
+      "pass": true
+    },
+    {
+      "item": "comparison view",
+      "path": "/workspace/compare",
+      "n": 15,
+      "median_ms": 611.6,
+      "p95_ms": 756.2,
+      "budget_ms": 1000,
+      "pass": true
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+project scope: present
+repository: GodSpeedAI/horizon-sandbox
+board: Horizon testing (#3)
+sub-issues: true
+wrote /home/sprime01/.horizon/setups/testing/github.json
+Seeding the test setup:
+  templates: installed seed-release-signoff@0.1.0, seed-triage@0.1.0
+  policy: operator may add steps
+  case Seed: weekly release: case_20261107T175938Z_7f48e9
+  case Seed: triage inbox: case_20261107T175938Z_64f15c
+  GitHub issue: https://github.com/GodSpeedAI/horizon-sandbox/issues/8
+  hand off step: handoff:seed-3f6c1a52-8d0b-4e7a-9a41-5b2d7c9e1f10
+  agent proposal step: propose:seed-r1:rollback_note
+  triage case advanced: the added steps are started
+  record obligation-matched: matched
+  record obligation-contradicted: contradicted
+  record obligation-unseen: expected but not seen
+  record seed-matched: matched
+  record seed-contradicted: contradicted
+  record seed-unexpected: seen but not expected
+  record journey:J-SEED:release:3: expected but not seen
+  notes: 6 on 5 days
+  labels: seed-matched=pass, seed-contradicted=fail, seed-unexpected=fail
+  workshop agent: set up "Horizon demo helper" with the workspace /home/sprime01/.horizon/setups/testing/workbench-demo-workspace/demo-1 and recorded both in horizon.toml
+  workshop agent: restart the desk so it picks up the new settings.
+  workshop agent: the workshop needs a model set (workshop Settings > Models) before an agent can run.
+Done. Running it again changes nothing.
+rc=0

@@ -1,0 +1,11 @@
+wide:Today: axe none; hscroll false
+wide:Explore: axe none; hscroll false
+wide:Decide: axe none; hscroll false
+wide:Work: axe none; hscroll false
+wide:console_errors: 0
+phone:Today: axe none; hscroll false
+phone:Explore: axe none; hscroll false
+phone:Decide: axe none; hscroll false
+phone:Work: axe none; hscroll false
+phone:console_errors: 0
+keyboard: {"tab_stops":60,"distinct":35,"without_focus_ring":0}

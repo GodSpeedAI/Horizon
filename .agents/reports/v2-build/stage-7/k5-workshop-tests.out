@@ -1,0 +1,43 @@
+bun test v1.4.0 (34cbb9a40)
+
+test/J-EXPERT-memory.test.ts:
+[domain] loaded 291 semantic objects (digest sha256:8bf041d5939e2e745a42ecabe02d2f71f3d514da293079e8e156e7ac8940a520) from /home/sprime01/projects/cognate-workbench-horizon/.sea/interaction/interaction-model.sea
+[cognate-workbench] dev auth ARMED: client-claimed bearer identities are trusted; never use this posture in production
+[domain] loaded 291 semantic objects (digest sha256:8bf041d5939e2e745a42ecabe02d2f71f3d514da293079e8e156e7ac8940a520) from /home/sprime01/projects/cognate-workbench-horizon/.sea/interaction/interaction-model.sea
+[cognate-workbench] dev auth ARMED: client-claimed bearer identities are trusted; never use this posture in production
+[domain] loaded 291 semantic objects (digest sha256:8bf041d5939e2e745a42ecabe02d2f71f3d514da293079e8e156e7ac8940a520) from /home/sprime01/projects/cognate-workbench-horizon/.sea/interaction/interaction-model.sea
+[cognate-workbench] dev auth ARMED: client-claimed bearer identities are trusted; never use this posture in production
+[domain] loaded 291 semantic objects (digest sha256:8bf041d5939e2e745a42ecabe02d2f71f3d514da293079e8e156e7ac8940a520) from /home/sprime01/projects/cognate-workbench-horizon/.sea/interaction/interaction-model.sea
+[cognate-workbench] dev auth ARMED: client-claimed bearer identities are trusted; never use this posture in production
+[domain] loaded 291 semantic objects (digest sha256:8bf041d5939e2e745a42ecabe02d2f71f3d514da293079e8e156e7ac8940a520) from /home/sprime01/projects/cognate-workbench-horizon/.sea/interaction/interaction-model.sea
+[cognate-workbench] dev auth ARMED: client-claimed bearer identities are trusted; never use this posture in production
+
+test/ui-desktop-bridge.test.tsx:
+wbShell: no handler for action "navigate-to-view"
+wbShell: no handler for action ""
+wbShell: refusing malformed dispatch
+wbShell: refusing malformed dispatch
+wbShell: refusing malformed dispatch
+wbShell: refusing malformed dispatch
+
+test/J-AUTH-CONNECT-HORIZON.test.ts:
+[domain] loaded 291 semantic objects (digest sha256:8bf041d5939e2e745a42ecabe02d2f71f3d514da293079e8e156e7ac8940a520) from /home/sprime01/projects/cognate-workbench-horizon/.sea/interaction/interaction-model.sea
+[domain] loaded 291 semantic objects (digest sha256:8bf041d5939e2e745a42ecabe02d2f71f3d514da293079e8e156e7ac8940a520) from /home/sprime01/projects/cognate-workbench-horizon/.sea/interaction/interaction-model.sea
+[domain] loaded 291 semantic objects (digest sha256:8bf041d5939e2e745a42ecabe02d2f71f3d514da293079e8e156e7ac8940a520) from /home/sprime01/projects/cognate-workbench-horizon/.sea/interaction/interaction-model.sea
+
+test/E2E-desktop-bridge.test.ts:
+[domain] loaded 291 semantic objects (digest sha256:8bf041d5939e2e745a42ecabe02d2f71f3d514da293079e8e156e7ac8940a520) from /home/sprime01/projects/cognate-workbench-horizon/.sea/interaction/interaction-model.sea
+[cognate-workbench] dev auth ARMED: client-claimed bearer identities are trusted; never use this posture in production
+
+test/J-RT-realitytrace.test.ts:
+[domain] loaded 291 semantic objects (digest sha256:8bf041d5939e2e745a42ecabe02d2f71f3d514da293079e8e156e7ac8940a520) from /home/sprime01/projects/cognate-workbench-horizon/.sea/interaction/interaction-model.sea
+[cognate-workbench] dev auth ARMED: client-claimed bearer identities are trusted; never use this posture in production
+[domain] loaded 291 semantic objects (digest sha256:8bf041d5939e2e745a42ecabe02d2f71f3d514da293079e8e156e7ac8940a520) from /home/sprime01/projects/cognate-workbench-horizon/.sea/interaction/interaction-model.sea
+[cognate-workbench] realitytrace: SXR binary not found; observations stay queued (dev tools unaffected)
+[cognate-workbench] dev auth ARMED: client-claimed bearer identities are trusted; never use this posture in production
+
+ 58 pass
+ 0 fail
+ 272 expect() calls
+Ran 58 tests across 11 files. [38.76s]
+rc=0

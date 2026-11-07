@@ -1,0 +1,63 @@
+{
+  "wide:Today": {
+    "axe": [],
+    "horizontal_scroll": false,
+    "words": 2944
+  },
+  "wide:Explore": {
+    "axe": [],
+    "horizontal_scroll": false,
+    "words": 3493
+  },
+  "wide:Decide": {
+    "axe": [],
+    "horizontal_scroll": false,
+    "words": 5945
+  },
+  "wide:Work": {
+    "axe": [],
+    "horizontal_scroll": false,
+    "words": 3043
+  },
+  "wide:console_errors": [],
+  "phone:Today": {
+    "axe": [],
+    "horizontal_scroll": false,
+    "words": 2587
+  },
+  "phone:Explore": {
+    "axe": [],
+    "horizontal_scroll": false,
+    "words": 3136
+  },
+  "phone:Decide": {
+    "axe": [],
+    "horizontal_scroll": false,
+    "words": 5588
+  },
+  "phone:Work": {
+    "axe": [],
+    "horizontal_scroll": false,
+    "words": 2686
+  },
+  "phone:console_errors": [],
+  "keyboard": {
+    "tab_stops": 60,
+    "distinct": 35,
+    "without_focus_ring": 0,
+    "first": [
+      "a:Skip to the open view",
+      "button:Presenting: off",
+      "summary:Settings",
+      "button:Today",
+      "button:Explore",
+      "button:Decide (7)",
+      "button:Work",
+      "button:2026-11-07 (2)",
+      "button:2026-11-06 (1)",
+      "button:2026-11-05 (1)",
+      "button:2026-11-04 (1)",
+      "button:2026-11-03 (1)"
+    ]
+  }
+}
