@@ -45,7 +45,7 @@ export function Nav({ ui, data, dispatch }: { readonly ui: UiState; readonly dat
         <ul className="lists" data-list="cases">
           {data.cases.slice(0, 12).map((c) => (
             <li key={c.case_ref}>
-              <button type="button" onClick={() => dispatch({ type: "select", id: c.case_ref })}>
+              <button type="button" title={c.purpose} onClick={() => dispatch({ type: "select", id: c.case_ref })}>
                 {c.purpose}
               </button>
             </li>

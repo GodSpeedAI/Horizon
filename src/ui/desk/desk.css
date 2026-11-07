@@ -28,6 +28,8 @@ input[type="text"], textarea { background:var(--bg); border:1px solid var(--edge
 .nav h2, .inspector h2 { font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:.9rem 0 .3rem; }
 .nav ul { list-style:none; margin:0; padding:0; } .nav li button { width:100%; text-align:left; border-color:transparent; background:transparent; }
 .nav li button:hover { background:var(--tint); }
+.nav [data-list="cases"] button { display:block; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.nav [data-list="cases"] button:focus-visible { white-space:normal; overflow:visible; }
 .nav button[aria-current] { background:var(--tint); border-color:var(--edge); font-weight:700; }
 .nav button[aria-current="page"]::before { content:"▸ "; }
 .count { color:var(--muted); font-weight:400; }

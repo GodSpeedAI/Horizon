@@ -89,6 +89,7 @@ import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.t
 import { acceptanceBlocked, listAnswers, markReplied, recordAnswer, stopWaiting, checkValue, OUTCOMES, WAITING_WORDS, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { NO_PANELS, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
+import { readableTitle } from "./ui/desk/banned-words.ts";
 import { caseTitle, matches, partsOf, plainWords, sourcesOf, type DeskCase, type DecideState, type DecisionCardData, type PanelsData, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
 import { buildDecide, waitingCount, type CaseApprovals, type HumanStepInput } from "./ui/desk/decide-build.ts";
 import { addItem, advance as caseAdvance, entryOptions, approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
@@ -1409,10 +1410,6 @@ export async function createApplication(
   const caseTemplate = new Map<string, string | null>();
   const templateWords = new Map<string, string | null>();
   let templatesAt = 0;
-  const humanise = (ref: string): string => {
-    const words = ref.split("@")[0]!.replace(/[-_.]+/g, " ").trim();
-    return words === "" ? "" : words[0]!.toUpperCase() + words.slice(1);
-  };
   async function titleOf(c: CaseLine): Promise<string> {
     const fallback = caseTitle(c.summary, c.created_at);
     if (caseKeeper === null) return fallback;
@@ -1429,8 +1426,7 @@ export async function createApplication(
       if (options.kind === "ok") for (const t of options.value.templates) templateWords.set(t.template_ref, t.description);
     }
     const description = templateWords.get(ref);
-    const oneLine = description ? description.replace(/\s+/g, " ").slice(0, 90) : "";
-    return oneLine !== "" ? oneLine : humanise(ref) || fallback;
+    return readableTitle(description, ref) ?? fallback;
   }
   const isOpenCase = (c: CaseLine): boolean => c.case_state === "active" || c.case_state === "awaiting_approval";
   const CASE_STATE_PLAIN: Record<string, string> = { active: "Running", awaiting_approval: "Waiting for your approval", completed: "Done", terminated: "Stopped" };

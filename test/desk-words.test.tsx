@@ -5,6 +5,7 @@
  * name programs and settings, so it is not drawn here.
  */
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { economicsModel } from "../src/economics/model.ts";
 import { buildStructuralFrame } from "../src/domain/frame.ts";
@@ -12,6 +13,7 @@ import { onboardingOf } from "../src/ui/workspace/model.ts";
 import { START, deskReducer, type UiState } from "../src/ui/desk/attention.ts";
 import { buildDecide } from "../src/ui/desk/decide-build.ts";
 import { HandoffPreviewCard } from "../src/ui/desk/Composer.tsx";
+import { BANNED } from "../src/ui/desk/banned-words.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";
 import type { DeskState, InspectionAnswer, NextState, SearchResult } from "../src/ui/desk/model.ts";
 import { orderWork, sessionItems, caseItems, type WorkData } from "../src/ui/desk/work-build.ts";
@@ -19,20 +21,6 @@ import { deskState } from "./support/desk-fixture.ts";
 import { quietIo } from "./support/desk-io.ts";
 import { residual, sampleLedger } from "./support/economics-fixture.ts";
 
-const BANNED: readonly { readonly name: string; readonly pattern: RegExp }[] = [
-  { name: "SEA-Forge", pattern: /SEA-Forge/i },
-  { name: "RealityTrace", pattern: /RealityTrace/i },
-  { name: "Cognate", pattern: /Cognate/i },
-  { name: "SFWP", pattern: /\bSFWP\b/i },
-  { name: "ledger", pattern: /\bledgers?\b/i },
-  { name: "digest", pattern: /\bdigests?\b/i },
-  { name: "tenant", pattern: /\btenants?\b/i },
-  { name: "witness", pattern: /\bwitness(es)?\b/i },
-  { name: "governed", pattern: /\bgoverned\b/i },
-  { name: "commit (as a noun)", pattern: /\bcommits?\b/i },
-  { name: "environment variable", pattern: /[A-Z_]{6,}=?/ },
-  { name: "a path under /tmp", pattern: /\/tmp\b/ },
-];
 
 const text = (html: string): string => html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/\s+/g, " ");
 const draw = (ui: UiState): string => renderToStaticMarkup(<Desk ui={ui} dispatch={() => undefined} io={quietIo()} nowMs={Date.parse("2026-11-07T12:00:00Z")} />);
@@ -175,6 +163,13 @@ describe("no product names and no internal terms on screen", () => {
     scan("work, waiting to start", html);
     expect(text(html)).toContain("Waiting to start (1)");
     expect(text(html)).toContain("Sort the new bug reports");
+  });
+
+  test("the Cases list clips a long title to one line and keeps the full title on hover", () => {
+    const purpose = "Review the plan and write the release note for the next version of the product";
+    const html = draw({ ...START, data: base({ cases: [{ case_ref: "case:c9", purpose, opened_at: "2026-11-07T06:00:00Z", source: "case keeper", state: "Running" }] }) });
+    expect(html).toContain(`title="${purpose}"`);
+    expect(readFileSync(new URL("../src/ui/desk/desk.css", import.meta.url), "utf8")).toMatch(/\[data-list="cases"\] button \{[^}]*text-overflow:ellipsis/);
   });
 
   test("the Inspector, the keys list and the quick menu", () => {
