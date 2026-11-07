@@ -1,0 +1,144 @@
+/** @jsxImportSource react */
+/**
+ * The desk layout (design 5.1): status bar, left column, the open view, inspector and composer.
+ * `Desk` only draws what `ui` holds; every change goes through `dispatch`, so nothing an agent sends can move the reader.
+ */
+import { useState, type ReactNode } from "react";
+import type { Action, UiState } from "./attention.ts";
+import { Composer } from "./Composer.tsx";
+import { Inspector } from "./Inspector.tsx";
+import { KEY_TABLE } from "./keys.ts";
+import { Nav } from "./Nav.tsx";
+import { VIEWS, dayLabel, type ViewId } from "./model.ts";
+import { RevisionList, type NoteIo, type OpenLink } from "./NoteEditor.tsx";
+import { StatusBar } from "./StatusBar.tsx";
+import { Decide, Work } from "./views/Placeholder.tsx";
+import { Explore } from "./views/Explore.tsx";
+import { Today } from "./views/Today.tsx";
+import type { LinkKind } from "../../domain/note.ts";
+
+export interface DeskIo extends NoteIo {
+  readonly setPresenting: (on: boolean) => void;
+}
+
+export interface DeskProps {
+  readonly ui: UiState;
+  readonly dispatch: (action: Action) => void;
+  readonly io: DeskIo;
+}
+
+function Layer({ id, title, onClose, children }: { readonly id: string; readonly title: string; readonly onClose: () => void; readonly children: ReactNode }): ReactNode {
+  return (
+    <div className="layer-backdrop">
+      <div className="layer" role="dialog" aria-modal="true" aria-labelledby={`${id}-h`} id={`layer-${id}`}>
+        <div className="layer-head">
+          <h2 id={`${id}-h`}>{title}</h2>
+          <button type="button" onClick={onClose}>
+            Close (Esc)
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function QuickMenu({ ui, dispatch, io }: DeskProps): ReactNode {
+  const [filter, setFilter] = useState("");
+  const data = ui.data;
+  type Entry = { readonly label: string; readonly run: () => void };
+  const close = (): void => dispatch({ type: "escape" });
+  const entries: Entry[] = [
+    ...VIEWS.map((v): Entry => ({ label: `Go to ${v.label}`, run: () => dispatch({ type: "view", view: v.id }) })),
+    ...(data?.days ?? []).slice(0, 14).map((d): Entry => ({ label: `Day: ${d.day}`, run: () => dispatch({ type: "day", day: d.day === data?.today ? null : d.day }) })),
+    ...(data?.cases ?? []).map((c): Entry => ({ label: `Case: ${c.purpose}`, run: () => dispatch({ type: "select", id: c.case_ref }) })),
+    ...(data?.tags ?? []).map((t): Entry => ({ label: `Tag: ${t.name}`, run: () => dispatch({ type: "find", q: "", tag: t.name }) })),
+    { label: "Show all keys", run: () => dispatch({ type: "open-layer", kind: "keys" }) },
+    { label: `Turn Presenting ${data?.status.presenting ? "off" : "on"}`, run: () => io.setPresenting(!data?.status.presenting) },
+  ];
+  const shown = entries.filter((e) => e.label.toLowerCase().includes(filter.toLowerCase()));
+  const pick = (e: Entry | undefined): void => {
+    if (!e) return;
+    close();
+    e.run();
+  };
+  return (
+    <Layer id="quick" title="Quick menu" onClose={close}>
+      <label>
+        Jump to a day, case or tag, or run an action
+        <input type="text" data-autofocus value={filter} onChange={(event) => setFilter(event.target.value)} onKeyDown={(event) => event.key === "Enter" && pick(shown[0])} />
+      </label>
+      {shown.length === 0 ? (
+        <p className="empty">Nothing matches “{filter}”. Clear the box to see everything.</p>
+      ) : (
+        <ul className="quick-list">
+          {shown.map((e) => (
+            <li key={e.label}>
+              <button type="button" onClick={() => pick(e)}>
+                {e.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Layer>
+  );
+}
+
+export function Desk(props: DeskProps): ReactNode {
+  const { ui, dispatch, io } = props;
+  const data = ui.data;
+  const onLink: OpenLink = (kind: LinkKind, ref: string) => {
+    if (kind === "day") dispatch({ type: "day", day: ref === data?.today ? null : ref });
+    else dispatch({ type: "select", id: kind === "case" || kind === "note" ? ref : `${kind}:${ref}` });
+  };
+  const viewProps = { ui, data, dispatch, onLink };
+  const view: Record<ViewId, ReactNode> = {
+    today: <Today {...viewProps} />,
+    explore: <Explore {...viewProps} />,
+    decide: <Decide {...viewProps} />,
+    work: <Work {...viewProps} />,
+  };
+  const history = data?.selected?.history ?? [];
+  return (
+    <div className="desk" data-presenting={data?.status.presenting ? "on" : "off"} data-setup={data?.status.setup ?? "none"}>
+      <a className="skip" href="#main">
+        Skip to the open view
+      </a>
+      <StatusBar status={data?.status ?? null} onPresenting={io.setPresenting} />
+      <div className="desk-body">
+        <Nav ui={ui} data={data} dispatch={dispatch} />
+        <main id="main" className="main" aria-label={VIEWS.find((v) => v.id === ui.view)?.label}>
+          {view[ui.view]}
+          <Composer ui={ui} dispatch={dispatch} io={io} />
+        </main>
+        <Inspector ui={ui} dispatch={dispatch} io={io} onLink={onLink} />
+      </div>
+      {ui.layers.map((layer, index) =>
+        layer.kind === "quick" ? (
+          <QuickMenu key={index} {...props} />
+        ) : layer.kind === "keys" ? (
+          <Layer key={index} id="keys" title="All keys" onClose={() => dispatch({ type: "escape" })}>
+            <table className="keys">
+              <tbody>
+                {KEY_TABLE.map((row) => (
+                  <tr key={row.keys}>
+                    <th scope="row">{row.keys}</th>
+                    <td>{row.does}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Layer>
+        ) : (
+          <Layer key={index} id="history" title="Earlier wording" onClose={() => dispatch({ type: "escape" })}>
+            {history.length === 0 ? <p className="empty">{ui.selection === null ? "Select a note first." : "Loading the earlier wording…"}</p> : <RevisionList history={history} timeZone={data?.timezone ?? "UTC"} onLink={onLink} />}
+          </Layer>
+        ),
+      )}
+      <p className="sr-only" aria-live="polite" data-live>
+        {data === null ? "" : `${dayLabel(ui.day ?? data.today)}. ${data.status.waiting} waiting for you.`}
+      </p>
+    </div>
+  );
+}

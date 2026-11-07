@@ -1,5 +1,5 @@
 import { reconcilePending } from "./capabilities/pending-reconcile.ts";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createIdentityService, type IdentityService } from "@godspeed/identity";
 import { delegatingAuthority, delegationSender } from "./adapters/delegating-authority.ts";
@@ -84,7 +84,10 @@ import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
 import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
 import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
-import { presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
+import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
+import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
+import { keyState } from "./adapters/workshop.ts";
+import { matches, partsOf, sourcesOf, type DeskCase, type DeskState, type SearchResult } from "./ui/desk/model.ts";
 import { readLedgerDay } from "./adapters/ledger-day.ts";
 import { recordReader, type RecordReader } from "./adapters/realitytrace-economics.ts";
 import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
@@ -1348,6 +1351,127 @@ export async function createApplication(
     return { props, view, repoNames: namesOfRepos(allRepos), labels };
   }
 
+
+  // ---- Stage 2: the notebook and the live desk. Notes are the operator's own writing and are not sent to the record keeper. ----
+  const deskWho: Who = { tenant: caller.tenant, operator: caller.actor.id };
+  const deskDist = joinPath(import.meta.dir, "..", "dist", "desk");
+  let repoNameCache: { at: number; names: string[] } = { at: 0, names: [] };
+
+  /** Repository names to hide while Presenting is on. The record keeper is asked at most once a minute. */
+  function deskRepoNames(): string[] {
+    if (clock().getTime() - repoNameCache.at < 60_000 && repoNameCache.at !== 0) return repoNameCache.names;
+    const all: { repo_id: string; path: string | null }[] = [];
+    for (const each of recordSources) {
+      try {
+        const listed = readerFor(each).repos();
+        if (listed.ok) all.push(...listed.repos);
+      } catch {
+        // A record keeper that cannot be asked contributes no names; the desk still hides the ones it knows.
+      }
+    }
+    repoNameCache = { at: clock().getTime(), names: namesOfRepos(all) };
+    return repoNameCache.names;
+  }
+
+  async function deskCases(): Promise<DeskCase[]> {
+    const rows = await runtime.runtime.store.listRecords(CASE_COLLECTION, { tenant: caller.tenant });
+    return rows.map((row) => ({ case_ref: String(row.value.case_ref), purpose: String(row.value.purpose), opened_at: String(row.value.opened_at) })).sort((a, b) => (a.opened_at < b.opened_at ? 1 : -1));
+  }
+
+  async function deskState(params: URLSearchParams): Promise<DeskState> {
+    const store = runtime.runtime.store;
+    const now = clock();
+    const today = dayOf(null);
+    const day = dayOf(params.get("day"));
+    const status = cockpitStatus();
+    const openCaseNow = await latestCase(store, caller.tenant);
+    const inbox = await approvalInbox(now);
+    const presenting = await presentingOn(store, caller.tenant, caller.actor.id);
+    const workshop = loaded.config.workshop ? keyState(loaded.config.workshop, now) : ({ state: "missing", days_left: null } as const);
+    const health = partsOf({ rules: world.worldRef !== "", cases: status.governed, records: recordSources.length > 0 || status.realitytrace, workshop: { state: workshop.state, days_left: "days_left" in workshop ? workshop.days_left : null } });
+    const sources = sourcesOf({ cases: status.governed, agentWork: workshop.state === "ok" || workshop.state === "expiring", records: recordSources.length > 0 || status.realitytrace });
+    const moves = status.governed ? await recentMoves() : [];
+    const noteId = params.get("note");
+    const selectedNote = noteId ? await getNote(store, deskWho, noteId) : null;
+    const base: Omit<DeskState, "rev"> = {
+      today,
+      day,
+      timezone: deskTimeZone,
+      status: {
+        org: caller.tenant,
+        setup: loaded.setup ?? null,
+        rules: statusOf({ worldRef: world.worldRef, governed: status.governed, realitytrace: status.realitytrace, approvals: status.approvals, operator: caller.actor.id }).world,
+        openCase: openCaseNow ? { case_ref: openCaseNow.case_ref, purpose: openCaseNow.purpose } : null,
+        waiting: inbox.state === "listed" ? inbox.inbox.waiting.length : 0,
+        parts: health.parts,
+        keyWarning: health.keyWarning,
+        presenting,
+      },
+      days: await listDays(store, deskWho),
+      cases: await deskCases(),
+      tags: await listTags(store, deskWho),
+      notes: await listDay(store, deskWho, day),
+      caseNotes: openCaseNow ? await listCase(store, deskWho, openCaseNow.case_ref) : [],
+      activity: moves
+        .filter((move) => move.at !== null && new Intl.DateTimeFormat("en-CA", { timeZone: deskTimeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(move.at)) === day)
+        .map((move) => ({ id: `move:${move.intent_id}`, at: move.at as string, source: "Cases" as const, text: `${move.operation_ref}: ${move.decided.text}` }))
+        .sort((a, b) => (a.at < b.at ? -1 : 1)),
+      sources,
+      selected: selectedNote ? { note: selectedNote, history: await noteHistory(store, deskWho, selectedNote.note_id) } : null,
+    };
+    const shown = presenting ? applyStandIns(base, presentingKey(), deskRepoNames()) : base;
+    return { ...shown, rev: createHash("sha256").update(JSON.stringify(shown)).digest("hex").slice(0, 16) };
+  }
+
+  async function deskSearch(params: URLSearchParams): Promise<SearchResult> {
+    const store = runtime.runtime.store;
+    const q = (params.get("q") ?? "").trim();
+    const day = params.get("day") || null;
+    const tag = params.get("tag") || null;
+    const filtered = day !== null || tag !== null;
+    const notes = await searchNotes(store, deskWho, { q, ...(day ? { day } : {}), ...(tag ? { tag } : {}) });
+    const records = sourcesOf({ cases: true, agentWork: false, records: recordSources.length > 0 || cockpitStatus().realitytrace })[2]!;
+    const result: SearchResult = {
+      q,
+      day,
+      tag,
+      notes,
+      cases: filtered ? [] : (await deskCases()).filter((c) => matches(c.purpose, q)),
+      days: filtered ? [] : (await listDays(store, deskWho)).filter((d) => matches(d.day, q)),
+      tags: filtered ? [] : (await listTags(store, deskWho)).filter((t) => matches(t.name, q)),
+      records,
+    };
+    return (await presentingOn(store, caller.tenant, caller.actor.id)) ? applyStandIns(result, presentingKey(), deskRepoNames()) : result;
+  }
+
+  const DESK_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon desk</title><link rel="stylesheet" href="/desk/app.css"></head><body><div id="root"></div><noscript>The desk needs JavaScript to show live updates. The older pages at /workspace work without it.</noscript><script type="module" src="/desk/app.js"></script></body></html>`;
+  const DESK_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+
+  async function deskAsset(name: "app.js" | "app.css"): Promise<Response> {
+    const path = joinPath(deskDist, name);
+    if (!fileExists(path)) return new Response("The desk has not been built yet. Run: bun run build:desk", { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } });
+    return new Response(Bun.file(path), { headers: { "content-type": name === "app.js" ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8", "cache-control": "no-cache", "x-content-type-options": "nosniff" } });
+  }
+
+  async function deskSaveNote(request: Request): Promise<Response> {
+    const text = await request.text();
+    if (text.length > 1_000_000) return Response.json({ ok: false, message: "That note is too large to save. Split it into smaller notes." }, { status: 413 });
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return Response.json({ ok: false, message: "That note could not be read. Try typing it again." }, { status: 400 });
+    }
+    try {
+      const note = await saveNote(runtime.runtime.store, { ...deskWho, input: body, now: clock(), timeZone: deskTimeZone });
+      return Response.json({ ok: true, note }, { headers: { "cache-control": "no-store" } });
+    } catch (error) {
+      if (error instanceof NoteRefused) return Response.json({ ok: false, message: error.message }, { status: 400 });
+      if (error instanceof Error && /conflict|expectedVersion|version/i.test(error.name + error.message)) return Response.json({ ok: false, message: "Another change to this note was saved at the same moment. Reload and try again." }, { status: 409 });
+      return Response.json({ ok: false, message: "The note was not saved. Nothing was changed. Try again." }, { status: 500 });
+    }
+  }
+
   const remote = new RemoteController(remoteSettings(), {
     store: runtime.runtime.store,
     tenant: caller.tenant,
@@ -1483,6 +1607,21 @@ export async function createApplication(
               ? Response.json({ ok: true, intent: outcome.bound, committed: outcome.result })
               : Response.json({ ok: false, code: outcome.code, message: outcome.message }, { status: 409 });
           }
+          if (url.pathname === "/desk" && request.method === "GET") {
+            return new Response(DESK_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": DESK_CSP, "x-content-type-options": "nosniff" } });
+          }
+          if (url.pathname === "/desk/app.js" && request.method === "GET") return deskAsset("app.js");
+          if (url.pathname === "/desk/app.css" && request.method === "GET") return deskAsset("app.css");
+          if (url.pathname === "/desk/state.json" && request.method === "GET") {
+            const state = await deskState(url.searchParams);
+            const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
+            if (url.searchParams.get("since") === state.rev) return Response.json({ unchanged: true, rev: state.rev }, { headers });
+            return Response.json(state, { headers });
+          }
+          if (url.pathname === "/desk/search" && request.method === "GET") {
+            return Response.json(await deskSearch(url.searchParams), { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+          }
+          if (url.pathname === "/desk/note" && request.method === "POST") return deskSaveNote(request);
           if (url.pathname === "/workspace" && request.method === "GET") {
             const theme = themeOf(url.searchParams.get("theme"));
             const evidenceRef = url.searchParams.get("evidence");
