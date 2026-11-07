@@ -26,6 +26,8 @@ export interface SetupMapping {
   readonly horizonPort: number;
   readonly phonePort: number;
   readonly workshopPort: number;
+  /** The workshop's database instance (pg0). It lives outside the setup folder, so the clear drops it by name. */
+  readonly workshopDatabase: string;
   readonly cell: string;
   readonly workbench: string;
   readonly secrets: string;
@@ -76,6 +78,7 @@ export function setupMapping(name: SetupName, env: SetupEnvSource = process.env)
     horizonPort: testing ? 4339 : 4319,
     phonePort: testing ? 4340 : 4320,
     workshopPort: testing ? 3190 : 3180,
+    workshopDatabase: `horizon-${name}`,
     cell,
     workbench,
     secrets,
@@ -117,6 +120,7 @@ export function setupEnv(name: SetupName, service?: SetupService, env: SetupEnvS
   const workbench: Record<string, string> = {
     COGNATE_WORKBENCH_HOME: m.workbench,
     PORT: String(m.workshopPort),
+    COGNATE_PG0_NAME: m.workshopDatabase,
     ...(Bun.which("realitytrace") ? { SXR_BIN: Bun.which("realitytrace")! } : {}),
   };
   const horizon: Record<string, string> = {

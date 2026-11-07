@@ -30,7 +30,11 @@ beforeEach(() => {
     '#!/bin/sh\nif [ -n "$XDG_DATA_HOME" ] && [ -e "$XDG_DATA_HOME/has-repo" ]; then echo \'{"repos":[{"id":"r"}]}\'; else echo \'{"repos":[]}\'; fi\n',
   );
   chmodSync(rtBin, 0o755);
-  env = { ...gh.env(process.env), HORIZON_SETUPS_BASE: join(tmp, "setups"), REALITYTRACE_BIN: rtBin };
+  // A stand-in pg0, so no test can ever reach a real database instance. It lists horizon-testing and logs every call.
+  const pg0Bin = join(tmp, "fake", "bin", "pg0");
+  writeFileSync(pg0Bin, `#!/bin/sh\necho "$@" >> "${join(tmp, "pg0.log")}"\nif [ "$1" = list ]; then echo "  horizon-testing (running) - port 5434"; echo "  other-instance (running) - port 5435"; fi\n`);
+  chmodSync(pg0Bin, 0o755);
+  env = { ...gh.env(process.env), HORIZON_SETUPS_BASE: join(tmp, "setups"), REALITYTRACE_BIN: rtBin, PG0_BIN: pg0Bin };
   delete env.HORIZON_SETUP;
 });
 
@@ -122,6 +126,18 @@ describe("setup-clear", () => {
     const calls = gh.calls().map((c) => c.join(" "));
     expect(calls.some((c) => /repo delete|delete_repo|deleteRepository/.test(c))).toBe(false);
     expect(calls.every((c) => !c.startsWith("repo ") || c.startsWith("repo view"))).toBe(true);
+  });
+
+  test("setup-clear drops the test setup's own workshop database and no other", async () => {
+    await capture(runInit, ["--setup", "testing"]);
+    const listed = await capture(runClear, ["--setup", "testing"]);
+    expect(listed.out).toContain('Workshop database "horizon-testing"');
+    expect(existsSync(join(tmp, "pg0.log"))).toBe(false);
+    const result = await capture(runClear, ["--setup", "testing", "--yes"]);
+    expect(result.code).toBe(0);
+    expect(result.out).toContain('Dropped the workshop database "horizon-testing".');
+    const calls = readFileSync(join(tmp, "pg0.log"), "utf8").trim().split("\n");
+    expect(calls).toEqual(["list", "drop --name horizon-testing --force"]);
   });
 
   test("setup-clear refuses production", async () => {

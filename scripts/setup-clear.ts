@@ -79,6 +79,7 @@ export function run(args: readonly string[], env: Record<string, string | undefi
   out(`Board "${github.board}": ${boards.length}${projectsList.code === 0 ? "" : " (could not list)"}`);
   for (const b of boards) out(`  #${b.number} ${b.title}`);
   out(`The repository ${github.repo} itself is never deleted.`);
+  out(`Workshop database "${mapping.workshopDatabase}" (pg0, outside the folder): dropped too, if it exists.`);
 
   if (!args.includes("--yes")) {
     out("Nothing deleted. Re-run with --yes to delete the items above.");
@@ -96,6 +97,23 @@ export function run(args: readonly string[], env: Record<string, string | undefi
   }
   rmSync(mapping.root, { recursive: true, force: false });
   out(`Deleted ${mapping.root}${failed ? ` (${failed} GitHub item(s) failed)` : ""}`);
+  // The workshop keeps its database outside the folder, under its own name for this setup.
+  const pg0 = env.PG0_BIN?.trim() || Bun.which("pg0", { PATH: env.PATH ?? process.env.PATH ?? "" });
+  if (!pg0) {
+    out(`The workshop database "${mapping.workshopDatabase}" was not checked: pg0 is not on PATH. Remove it with: pg0 drop --name ${mapping.workshopDatabase} --force`);
+  } else {
+    const listed = Bun.spawnSync([pg0, "list"], { stdout: "pipe", stderr: "pipe" });
+    const present = listed.stdout.toString().split("\n").some((line) => line.trim().split(/\s+/)[0] === mapping.workshopDatabase);
+    if (!present) out(`The workshop database "${mapping.workshopDatabase}" does not exist; nothing to drop.`);
+    else {
+      const dropped = Bun.spawnSync([pg0, "drop", "--name", mapping.workshopDatabase, "--force"], { stdout: "pipe", stderr: "pipe" });
+      if (dropped.exitCode === 0) out(`Dropped the workshop database "${mapping.workshopDatabase}".`);
+      else {
+        failed++;
+        err(`setup-clear: could not drop the workshop database "${mapping.workshopDatabase}". Stop the workshop and run: pg0 drop --name ${mapping.workshopDatabase} --force`);
+      }
+    }
+  }
   return failed ? 1 : 0;
 }
 
