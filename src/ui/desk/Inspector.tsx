@@ -9,7 +9,7 @@ import { NoteBody, NoteEditor, TagList, type NoteIo, type OpenLink } from "./Not
 import { StateWord } from "./StateWord.tsx";
 import type { ConversationRow } from "./conversation-model.ts";
 import type { WorkspaceMove } from "../workspace/model.ts";
-import { STATUS_WORD, sourceBadge, timeOf } from "./Conversation.tsx";
+import { statusWord, sourceBadge, timeOf } from "./Conversation.tsx";
 
 export type Selected =
   | { readonly kind: "note"; readonly note: NoteView }
@@ -199,7 +199,7 @@ function RowInspector({ row, move }: { readonly row: ConversationRow; readonly m
       <p>
         <span className="cv-mark" data-status={row.status}>
           <span className="cv-dot" aria-hidden="true" />
-          <span className="cv-mark-word">{STATUS_WORD[row.status]}</span>
+          <span className="cv-mark-word">{statusWord(row)}</span>
         </span>{" "}
         <span className="cv-badge" data-source={row.source}>
           {sourceBadge(row)}

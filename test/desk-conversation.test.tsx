@@ -8,7 +8,7 @@ import { BANNED } from "../src/ui/desk/banned-words.ts";
 import { COMMANDS, hintsFor, parseLine, unknownCommandWords } from "../src/ui/desk/commands.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";
 import { keepsDraft } from "../src/ui/desk/Composer.tsx";
-import { requestFor, sourceBadge } from "../src/ui/desk/Conversation.tsx";
+import { requestFor, sourceBadge, statusWord } from "../src/ui/desk/Conversation.tsx";
 import type { ConversationRow } from "../src/ui/desk/conversation-model.ts";
 import { itemsOf } from "../src/ui/desk/model.ts";
 import { NO_PANELS, reduceAgent } from "../src/ui/desk/panels-model.ts";
@@ -198,5 +198,14 @@ describe("headings and landmarks in the conversation", () => {
     expect(html).not.toMatch(/<section[^>]*data-waiting-move/);
     expect(html).toMatch(/<h2[^>]*>Hand off this work\?<\/h2>/);
     expect(html).not.toMatch(/<h3[^>]*cv-card-title/);
+  });
+});
+
+describe("who an entry is waiting on", () => {
+  test("your answer waits on the agent, everything else waiting waits on you", () => {
+    expect(statusWord({ status: "waiting", kind: "answer" })).toBe("Waiting for the agent");
+    expect(statusWord({ status: "waiting", kind: "panel" })).toBe("Waiting for you");
+    expect(statusWord({ status: "waiting", kind: "handoff-proposal" })).toBe("Waiting for you");
+    expect(statusWord({ status: "done", kind: "answer" })).toBe("Done");
   });
 });

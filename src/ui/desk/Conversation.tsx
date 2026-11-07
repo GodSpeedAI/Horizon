@@ -11,6 +11,10 @@ import { PanelCard, type PanelsIo } from "./Panels.tsx";
 import type { BlockCtx } from "./blocks/index.tsx";
 
 export const STATUS_WORD: Readonly<Record<RowStatus, string>> = { done: "Done", waiting: "Waiting for you", refused: "Refused", unseen: "Not seen yet" };
+/** An answer you gave waits on the agent, not on you. */
+export function statusWord(row: { readonly status: RowStatus; readonly kind: string }): string {
+  return row.status === "waiting" && row.kind === "answer" ? "Waiting for the agent" : STATUS_WORD[row.status];
+}
 export const DEFAULT_PAGE_AGENT = "Agent on this page";
 
 /** Who made the move, in words: You, Agent (with its name), or Agent on this page. */
@@ -45,11 +49,11 @@ export interface ConversationViewProps {
   readonly onPreviewWords: (words: string) => void;
 }
 
-function StatusMark({ status }: { readonly status: RowStatus }): ReactNode {
+function StatusMark({ status, kind }: { readonly status: RowStatus; readonly kind: string }): ReactNode {
   return (
     <span className="cv-mark" data-status={status}>
       <span className="cv-dot" aria-hidden="true" />
-      <span className="cv-mark-word">{STATUS_WORD[status]}</span>
+      <span className="cv-mark-word">{statusWord({ status, kind })}</span>
     </span>
   );
 }
@@ -181,7 +185,7 @@ export function ConversationView({ ui, dispatch, panels, conversation, onConfirm
               return (
                 <li key={row.row_id} className="cv-row" data-row-kind={row.kind} data-status={row.status} data-cursor={ui.cursor === index && ui.focus === "list" ? "true" : undefined}>
                   <button type="button" className="cv-line" aria-current={selected ? "true" : undefined} onClick={() => dispatch({ type: "select", id: `row:${row.row_id}` })} data-row-select>
-                    <StatusMark status={row.status} />
+                    <StatusMark status={row.status} kind={row.kind} />
                     <span className="cv-words" dir="auto">
                       {row.words}
                     </span>
