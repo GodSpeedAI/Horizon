@@ -9,10 +9,27 @@ import { existsSync, readFileSync } from "node:fs";
 import { listCases } from "../src/adapters/sea-forge-case.ts";
 import { argValue, setupMapping } from "../src/config/setup.ts";
 import { gh } from "./setup-github.ts";
+import { recordReader, type RecordReader } from "../src/adapters/realitytrace-economics.ts";
 import { recordSourcesOf, repoList } from "./setup-health.ts";
 
 type Env = Record<string, string | undefined>;
 const COLLECTIONS = ["horizon-cases", "horizon-notes", "horizon-labels"] as const;
+
+/** The setup's own rulebook folder, which every start enrolls with the record keeper. */
+export const isRulebookFolder = (path: string, setupRoot: string): boolean => path === `${setupRoot}/cell/realitytrace-repo-obligations`;
+/** What a start writes there: the folder's enrollment trace and one rulebook snapshot per start. Anything else is data. */
+export function onlyStartRecords(rows: readonly unknown[], folder: string): boolean {
+  return rows.every((row) => {
+    const r = row as { payload?: Record<string, unknown> } & Record<string, unknown>;
+    const p = (r.payload ?? r) as { envelope_kind?: unknown; scope?: { filesystem_path?: unknown } };
+    if (p.envelope_kind === "semantic_snapshot") return true;
+    return p.envelope_kind === "execution_trace" && p.scope?.filesystem_path === folder;
+  });
+}
+const emptyLedger = (reader: RecordReader, repoId: string, folder: string): boolean => {
+  const ledger = reader.ledger(repoId);
+  return ledger.ok && onlyStartRecords(ledger.rows, folder);
+};
 
 export async function run(args: readonly string[], env: Env, out: (line: string) => void, err: (line: string) => void): Promise<number> {
   if (argValue(args, "setup") !== "production") {
@@ -55,7 +72,17 @@ export async function run(args: readonly string[], env: Env, out: (line: string)
     for (const source of recordSourcesOf(mapping)) {
       if (source.kind === "personal" && exclude === "personal") continue;
       const result = repoList(source, env);
-      counts.push([`record repositories in ${source.name}${result.ok ? "" : ` (unreadable: ${result.error})`}`, result.ok ? result.repos.length : 1]);
+      if (!result.ok) {
+        counts.push([`record repositories in ${source.name} (unreadable: ${result.error})`, 1]);
+        continue;
+      }
+      // Every start enrolls the setup's own rulebook folder. It is machinery, not data, so it is left out while it holds only what a start writes.
+      const reader = recordReader(source, env.REALITYTRACE_BIN?.trim() || "realitytrace");
+      const listed = reader.repos();
+      // Count from the raw list, so an entry in a shape the reader does not know still counts; subtract only a rulebook folder that is positively identified.
+      const startOnly = listed.ok ? listed.repos.filter((r) => r.path !== null && isRulebookFolder(r.path, mapping.root) && emptyLedger(reader, r.repo_id, r.path)).length : 0;
+      const counted = Math.max(0, result.repos.length - startOnly);
+      counts.push([`record repositories in ${source.name}`, counted]);
     }
   }
 
