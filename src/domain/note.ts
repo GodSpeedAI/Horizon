@@ -22,6 +22,8 @@ export const NoteInput = z
     links: z.array(NoteLink).max(100).optional(),
     /** Present when this save edits an existing note. */
     note_id: z.string().min(1).max(100).optional(),
+    /** The person lets agents read this note. Only the person sets it; the default is no. */
+    shared_with_agents: z.boolean().optional(),
   })
   .strict();
 export type NoteInput = z.infer<typeof NoteInput>;
@@ -30,7 +32,7 @@ export const EMPTY_NOTE_MESSAGE = "A note needs some words. Type something, then
 export const TOO_LONG_MESSAGE = `This note is longer than ${NOTE_BODY_MAX.toLocaleString("en-US")} characters. Split it into two notes.`;
 
 export type NoteCheck =
-  | { readonly ok: true; readonly body: string; readonly tags: readonly string[]; readonly links: readonly NoteLink[]; readonly case_ref: string | null; readonly note_id: string | null }
+  | { readonly ok: true; readonly body: string; readonly tags: readonly string[]; readonly links: readonly NoteLink[]; readonly case_ref: string | null; readonly note_id: string | null; readonly shared_with_agents: boolean | null }
   | { readonly ok: false; readonly message: string };
 
 /** A tag is lower-case words joined by dashes; "Approved" and "approved " are the same tag. It is a label and nothing more. */
@@ -80,5 +82,5 @@ export function checkNote(raw: unknown): NoteCheck {
   if (tags.length > TAGS_MAX) return { ok: false, message: `A note can carry ${TAGS_MAX} tags at most. This one has ${tags.length}.` };
   const links = new Map<string, NoteLink>();
   for (const link of [...extractLinks(input.body), ...(input.links ?? [])]) links.set(`${link.kind}:${link.ref}`, link);
-  return { ok: true, body: input.body, tags, links: [...links.values()], case_ref: input.case_ref ?? null, note_id: input.note_id ?? null };
+  return { ok: true, body: input.body, tags, links: [...links.values()], case_ref: input.case_ref ?? null, note_id: input.note_id ?? null, shared_with_agents: input.shared_with_agents ?? null };
 }

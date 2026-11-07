@@ -93,6 +93,7 @@ import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
 import { NO_PANELS, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { readableTitle } from "./ui/desk/banned-words.ts";
+import { agentRowsOf, agentSearchOf, agentStateOf, WITHHELD_WORDS } from "./ui/desk/agent-view.ts";
 import { caseTitle, matches, partsOf, plainWords, sourcesOf, type DeskCase, type DecideState, type DecisionCardData, type PanelsData, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
 import { confirmedDecision, failedDecision } from "./ui/desk/decision-words.ts";
 import { buildDecide, waitingCount, type CaseApprovals, type HumanStepInput } from "./ui/desk/decide-build.ts";
@@ -2063,6 +2064,26 @@ export async function createApplication(
     return Response.json(result.ok ? { ok: true, message: "Started. The waiting steps are under way." } : { ok: false, message: `It did not start: ${result.words}` }, { status: result.ok ? 200 : 502, headers });
   }
 
+  /** Step names for the cases an agent may see, from the case keeper. Names only. */
+  async function agentSteps(cases: readonly DeskCase[]): Promise<Map<string, string[]>> {
+    const out = new Map<string, string[]>();
+    if (caseKeeper === null) return out;
+    for (const c of cases.filter((x) => x.source === "case keeper").slice(0, 10)) {
+      try {
+        const horizon = await caseSteps(caseKeeper, c.case_ref.replace(/^case:/, ""));
+        if (horizon.kind === "ok") out.set(c.case_ref, horizon.value.steps.map((st) => st.name));
+      } catch {
+        // No step names for this case.
+      }
+    }
+    return out;
+  }
+
+  /** What an agent reads goes out with stand-ins too, while Presenting is on. */
+  async function agentJson(body: unknown, headers: Record<string, string>): Promise<Response> {
+    return presentedJson(body, headers);
+  }
+
   /** A hand off answer that shows case and step names: while Presenting is on, repository names in it get their stand-ins. */
   async function presentedJson(body: unknown, headers: Record<string, string>): Promise<Response> {
     const on = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
@@ -2425,6 +2446,8 @@ export async function createApplication(
           if (url.pathname === "/desk/state.json" && request.method === "GET") {
             const state = await deskState(url.searchParams);
             const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
+            // An agent on the page reads a summary only: titles, step names, open items, counts and its own suggestions.
+            if (page !== null) return agentJson(agentStateOf(state, await listConversation(runtime.runtime.store, deskWho), await agentSteps(state.cases)), headers);
             if (url.searchParams.get("since") === state.rev) return Response.json({ unchanged: true, rev: state.rev }, { headers });
             return Response.json(state, { headers });
           }
@@ -2435,9 +2458,11 @@ export async function createApplication(
             if (asked !== "" && (url.searchParams.get("record") === "1" || page !== null)) {
               await logRow({ source: page ? "page-agent" : "you", ...(page?.name === undefined ? {} : { agent_name: page.name }), kind: "find", words: `Find: ${asked}`, outcome: `${found.notes.length} notes, ${found.cases.length} cases, ${found.days.length} days, ${found.tags.length} tags.`, status: "done" });
             }
+            if (page !== null) return agentJson(agentSearchOf(found), { "cache-control": "no-store", "x-content-type-options": "nosniff" });
             return Response.json(found, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
           }
           if (url.pathname === "/desk/conversation" && request.method === "GET") {
+            if (page !== null) return agentJson({ rows: agentRowsOf(await listConversation(runtime.runtime.store, deskWho)), withheld: WITHHELD_WORDS }, { "cache-control": "no-store", "x-content-type-options": "nosniff" });
             return presentedJson({ rows: await observeResults(await listConversation(runtime.runtime.store, deskWho)) }, { "cache-control": "no-store", "x-content-type-options": "nosniff" });
           }
           if (url.pathname === "/desk/conversation/discard" && request.method === "POST") {
@@ -2789,8 +2814,11 @@ export const AGENT_NOTE_WORDS = "An agent can suggest a note; you save it.";
 export const AGENT_REFUSAL_WORDS = "Only you can confirm this. The agent's suggestion is waiting in the conversation.";
 
 /** Null when an agent on the page may make the call. Reads and the hand off preview pass; every other write is refused with 403. */
+export const AGENT_READS: ReadonlySet<string> = new Set(["/desk", "/workspace", "/desk/app.js", "/desk/app.css", "/desk/state.json", "/desk/search", "/desk/conversation", "/desk/panels/catalogue"]);
+export const AGENT_READ_WORDS = "An agent on the page can read the summary, a find and the conversation. Other parts of the desk are for you.";
+
 export function pageAgentRefusal(method: string, pathname: string): Response | null {
-  if (method === "GET" || method === "HEAD") return null;
+  if (method === "GET" || method === "HEAD") return AGENT_READS.has(pathname) ? null : Response.json({ ok: false, outcome: "agent_refused", message: AGENT_READ_WORDS }, { status: 403, headers: { "cache-control": "no-store" } });
   if (method === "POST" && pathname === "/desk/handoff/preview") return null;
   const message = pathname === "/desk/note" ? AGENT_NOTE_WORDS : AGENT_REFUSAL_WORDS;
   return Response.json({ ok: false, outcome: "agent_refused", message }, { status: 403, headers: { "cache-control": "no-store" } });

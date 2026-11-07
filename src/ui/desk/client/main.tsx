@@ -14,7 +14,7 @@ import type { InspectionAnswer, NextState } from "../model.ts";
 import { resolveKey } from "../keys.ts";
 import type { ConversationRow } from "../conversation-model.ts";
 import { startDeskTools } from "../webmcp.ts";
-import type { DeskAgentInvoker } from "../webmcp-tools.ts";
+import { inspectForAgent, type DeskAgentInvoker } from "../webmcp-tools.ts";
 import { POLL_MS, itemsOf, shiftDay, withDetails, type DeskState, type SearchResult } from "../model.ts";
 
 const DRAFT_KEY = "horizon.desk.draft";
@@ -145,9 +145,7 @@ function App() {
         const listed = (await call("/desk/conversation")) as { rows?: ConversationRow[] };
         const row = listed.rows?.find((r) => r.row_id === rowId);
         if (row === undefined) throw new Error("No such item in the conversation.");
-        const intent = row.refs.intent_id;
-        const move = intent === undefined ? null : (latest.current.data?.home.moves.find((m) => m.intent_id === intent) ?? null);
-        return { row, decided: move?.decided ?? null, recorded: move?.recorded ?? null, observed: move?.observed ?? null };
+        return inspectForAgent(row);
       },
       proposeHandoff: (words, caseId) =>
         call("/desk/handoff/preview", { method: "POST", body: JSON.stringify({ draft_id: crypto.randomUUID(), text: words, ...(caseId === undefined ? {} : { case_id: caseId }) }) })
