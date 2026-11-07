@@ -128,6 +128,10 @@ export function workshopFailure(error: unknown, options: { readonly write: boole
     return { kind: "unreachable", why: "slow", maybe_done: options.write, words: options.write ? "The workshop did not answer in time (it may be down or slow). The work may or may not have been handed over. Try again: the same step is never given out twice." : "The workshop did not answer in time (it may be down or slow)." };
   }
   if (/permission_denied|forbidden|\b403\b/i.test(text)) return { kind: "refused", words: `The workshop did not allow this.${tail}` };
+  // The workshop answered but would not start the work. Known reasons get their own words; the rest say so plainly.
+  if (/configure a model|select a model route/i.test(text)) return { kind: "refused", words: `The workshop has no AI model set up, so the agent cannot start. Choose a model in the workshop settings, then hand the step off again.${tail}` };
+  if (/active expert not found/i.test(text)) return { kind: "refused", words: `The agent named in Horizon's settings is not in the workshop (or it was archived). Check the agent in Horizon's settings.${tail}` };
+  if (/failed_precondition|invalid_argument/i.test(text)) return { kind: "refused", words: `The workshop answered but would not start this work.${tail}` };
   return { kind: "unreachable", why: "down", maybe_done: false, words: `The workshop is not answering, so agent work cannot be reached.${tail}` };
 }
 

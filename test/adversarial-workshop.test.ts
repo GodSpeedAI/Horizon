@@ -123,6 +123,22 @@ describe("adversarial: the workshop", () => {
     }
   });
 
+  test("the workshop answers but refuses: the words name the reason, never 'not answering'", async () => {
+    const refusing = (code: string, message: string): Access => ({ kind: "ready", client: { invoke: async () => { throw Object.assign(new Error(`invocation of expert.converse failed: {"kind":"failed","message":"${message}"}`), { code }); } } });
+    const noModel = await assign(refusing("failed_precondition", "Configure a model in Settings or select a model route for this Expert"), request);
+    const noAgent = await assign(refusing("failed_precondition", "Active Expert not found"), request);
+    const other = await assign(refusing("failed_precondition", `something with ${TOKEN}`), request);
+    expect(noModel.kind).toBe("refused");
+    expect(noAgent.kind).toBe("refused");
+    expect(other.kind).toBe("refused");
+    if (noModel.kind === "refused") expect(noModel.words).toContain("no AI model set up");
+    if (noAgent.kind === "refused") expect(noAgent.words).toContain("not in the workshop");
+    if (other.kind === "refused") expect(other.words).toBe("The workshop answered but would not start this work. Nothing was handed over.");
+    for (const r of [noModel, noAgent, other]) {
+      noSecret(r);
+      expect(JSON.stringify(r)).not.toContain("not answering");
+    }
+  });
   test("a duplicate assignment id: said in words, never a second assignment", async () => {
     const access: Access = { kind: "ready", client: { invoke: async () => { throw new Error("Assignment identity already exists"); } } };
     const result = await assign(access, request);
