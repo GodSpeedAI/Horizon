@@ -10,14 +10,14 @@ bun test v1.4.0 (34cbb9a40)
 test/gateway-installer.test.ts:
 skipped: setfattr missing or user xattrs unsupported on this filesystem
 
- 966 pass
+ 977 pass
  16 skip
  0 fail
- 5382 expect() calls
-Ran 982 tests across 94 files. [55.06s]
+ 5451 expect() calls
+Ran 993 tests across 95 files. [77.85s]
 uv run --project research pytest -q
 ....                                                                     [100%]
-4 passed in 0.05s
+4 passed in 0.07s
 python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
 ledger: 0 error(s) in ledger.yaml
   ok: 105 requirements, 105 acceptance contracts
@@ -26,7 +26,7 @@ python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py 
 wayfinder: 0 error(s)
 ./scripts/check-ledger-freeze.sh
 bun run scripts/teeth-t05-boundaries.ts
-ok   NE-B0 real tree passes (223 files, 8 in the authority)
+ok   NE-B0 real tree passes (224 files, 8 in the authority)
 ok   NE-B1 second schema version outside the authority
 ok   NE-B2 second block vocabulary outside the authority
 ok   NE-B2c a block-kind record is a vocabulary copy
@@ -51,39 +51,56 @@ teeth-t05: ok (21 checks)
 bun run scripts/teeth.ts
 blocked missing-cognate-dependency: exit=1
 STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
-BOUNDARY: the wire scan read no files under src/; it would pass vacuously
 blocked in-memory-runtime: exit=1
 22 |   throw new RuntimeBoundaryError(`RUNTIME: ${message}`);
 RuntimeBoundaryError: RUNTIME: local_operator forbids an in-memory runtime; a durable SQLite store is required
 blocked competing-product-model: exit=1
-BOUNDARY: the wire scan read no files under src/; it would pass vacuously
 BOUNDARY: competing canonical model/authority store at product-model/process.yaml
 blocked duplicate-semantic-authority: exit=1
-BOUNDARY: the wire scan read no files under src/; it would pass vacuously
 BOUNDARY: duplicate semantic authority at other/model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
-BROKEN canonical-closure-control: exit=1
+baseline canonical-closure-control: exit=0
 blocked duplicate-canonical-subtree: exit=1
-BOUNDARY: the wire scan read no files under src/; it would pass vacuously
 BOUNDARY: duplicate semantic authority at .sea/alternative/interaction-model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
 blocked false-world-ref: exit=1
 19 |   throw new SemanticAdapterError(`SEMANTIC: ${message}`);
 SemanticAdapterError: SEMANTIC: world identity mismatch: expected world:horizon@sha256:0000000000000000000000000000000000000000000000000000000000000000, observed world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b
 baseline isolated-tree-real-runtime: exit=0, passed=9
-LEAKED fake-runtime-substitution: exit=1, failing=0
-
-
- 0 pass
- 1 fail
- 1 error
-Ran 1 test across 1 file. [88.00ms]
+blocked fake-runtime-substitution: exit=1, failing=7
+  fails: structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen
+  fails: structural walking skeleton > HORIZON_OPERATOR_REF names the operator the cockpit header and approvals use, and an invalid one refuses startup
+  fails: structural walking skeleton > a spoofed observer is refused, the committed observer is the configured operator, and the attempt is auditable
+  fails: structural walking skeleton > an intent id commits exactly once: the same intent again returns the first record, a different one is duplicate_intent
 blocked missing-cognate-dependency-metadata: exit=1
 STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
 BOUNDARY: duplicate semantic authority at domain/research-artifacts.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
 BOUNDARY: duplicate semantic authority at domain/product-integration-contract.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
 blocked missing-cognate-dependency-e2e: exit=1, failing=1
 
-teeth: 2 leak(s)
-- canonical-closure-control: the unmodified canonical closure must pass before its attack means anything
-- fake-runtime-substitution: the structural E2E passed against the memory-only fake runtime
-error: recipe `teeth` failed on line 105 with exit code 1
-EXIT 1
+teeth: all attacks blocked
+bash scripts/teeth-ledger-freeze.sh
+BASELINE clean tree verifies
+BLOCKED  frozen ledger edited after freeze -> FAIL: ledger content does not match its freeze_hash (hand edit after freeze?)
+BLOCKED  frozen ledger reverted to candidate -> FAIL: ledger freeze_hash is not frozen: 'candidate'
+BLOCKED  wayfinder body hand-edited -> FAIL: committed wayfinder body is not the projection its generator produces (hand edit?)
+BLOCKED  wayfinder unfrozen -> FAIL: wayfinder validation failed
+BLOCKED  hashed input drifted (ledger policy) -> FAIL: wayfinder validation failed
+BLOCKED  ledger row removed after freeze (ledger structure / projection) -> FAIL: requirement ledger validation failed
+
+teeth: 6 blocked, 0 missed
+python3 scripts/teeth-domainforge-gate.py
+null: exit=0 exit=0 Validation succeeded: 0 violations total
+dangling: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: dangling .sea accepted with no violation
+duplicate: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: duplicate .sea accepted with no violation
+control: exit=1 exit=1 Error: Parse failed for /tmp/tmpwtn2dhye/.sea/interaction/interaction-model.sea: resolved closure failed graph co
+
+tooth: gate discriminates (control fails, and the two blind spots are proven)
+python3 scripts/teeth-idm-integrity.py
+null: exit=0 exit=0 check-idm-integrity: OK (12 requirement references, 0 tolerated as recorded debt, 12 invariant ids uniq
+dangling: exit=1 exit=1 - .sea/interaction/interaction-model.sea:inv_intent_idempotent requirement_ref 'REQ-DOES-NOT-EXIST-999'
+duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmprlspgjyb/.sea/interaction/interaction-m
+
+tooth: referential integrity is enforced (dangling and duplicate both fail)
+verify: ok (active frozen artifacts: requirements/ledger.yaml + .wayfinder/answer-key.md)
+EXIT 0

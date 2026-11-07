@@ -24,13 +24,16 @@ The desk branch already carried an earlier, pre-review copy of the gateway work 
 - src/ui/desk/decide-build.ts, test/desk-teeth.test.tsx (not conflicts, but needed): `inbox.malformed` is now `inbox.excluded`.
 - Several desk tests and `connectors/github/index.ts`: import `ApprovalAuthority` / `seaForgeActorOf` from `sea-forge-config.ts`.
 
-## Decision I made that needs your eye
+## Operator decisions applied afterwards
 
-Upstream added a boundary check (INV2): `src/` may not open the SEA-Forge socket. The desk's case keeper client and event follower need raw socket calls the SDK does not offer (`case_*`, `human_task_*`, event stream). I put the desk's `seaForgeCall` in `src/adapters/sea-forge-wire.ts` and made `scripts/check-boundaries.ts` allow exactly that file and `sea-forge-events.ts`. Governance verbs all use the SDK client. If you would rather keep INV2 absolute, the case keeper needs a different home or an SDK feature.
+1. Raw-socket exception (commit f3b39fe): the two files `src/adapters/sea-forge-wire.ts` and `src/adapters/sea-forge-events.ts` are named exceptions in `scripts/check-boundaries.ts`, with a plain-words comment there and a line in `src/adapters/EGM.md`. `scripts/teeth-inv2-mutation.ts` gained a fifth planted case (an allowed file name in the wrong directory) and now checks the planted path itself; any other `src/` file that opens the socket still fails (5 of 5 caught).
+2. Attack tests (commit 71bea02): `scripts/teeth.ts` gives each synthetic root a clean `src/` so the wire scan has something to read; the fake runtime under `scripts/t04-attacks/fake-runtime/` now exports a refusing `SeaForgeAuthority`, so it loads and fails on behaviour (7 failing tests in the isolated tree). `teeth.ts` reports all attacks blocked; nothing was loosened.
+3. Old pages (commit dd5a9f5), ported into the desk's plain words (`src/ui/desk/decision-words.ts`, `decide-build.ts`, `Decide.tsx`, `src/app.ts`, tests in `test/desk-decision-words.test.ts`):
+   - Ported from #25: after an answer, the desk reads the case keeper's own list and says Done only when the list shows what you chose, with the resolver; otherwise "Not confirmed" with the listed state; a refusal says nothing changed unless the list shows the request decided; unreachable or unknown failures say to check the list; a later failing step is named and not mistaken for a failed decision; a "Already decided" list shows state and resolver.
+   - Ported from #14: the older move with no verified approval is a notice in Decide (it was already on Today).
+   - Already in the desk before the merge, so nothing to port: decided / recorded / observed claims and the observe-then-rule steps (acceptance cards), the assurance banner (Today), one next action (NextDecision), the unverified-approval text on Today.
+   - Not ported: the old page's raw details list (world, request ref, subject) and its Approve/Reject form, because the desk's cards and typed-reason previews replace them and show those words in plain form; the primary-action panel text, because the desk's NextDecision does that job.
 
-## Checks
+## Final checks
 
-- `bun install`, `tsc --noEmit`: 0.
-- `just verify`: stops at `teeth` (scripts/teeth.ts), two leaks: `canonical-closure-control` and `fake-runtime-substitution`. These fail identically on a clean checkout of origin/main (checked in a throwaway worktree), so they are an upstream problem: the synthetic roots in teeth.ts have no `src/`, which upstream's new wire scan treats as a vacuous scan, and the fake runtime fails at import. I did not edit teeth.ts. Everything in verify before it passed (check, boundaries, idm, 966 tests pass / 0 fail / 16 skip, pytest, ledger, wayfinder); the recipes after it were run by hand and pass.
-- check-t05, teeth-t05, build:desk: pass.
-- Frozen files: upstream's changes to requirements/ledger.yaml and .wayfinder/answer-key.md merged without conflict (taken as upstream wrote them); ledger and wayfinder validators report 0 errors.
+`just verify` exit 0 (977 pass, 16 skip, 0 fail; output in verify.out), `just check-t05`, `just teeth-t05` and `bun run build:desk` all exit 0 (other-checks.out).
