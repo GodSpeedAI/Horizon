@@ -43,7 +43,7 @@ export interface ChangedRecord {
 export type Outcome<T> =
   | { readonly kind: "ok"; readonly value: T }
   | { readonly kind: "stale"; readonly changed: readonly ChangedRecord[]; readonly words: string }
-  | { readonly kind: "refused"; readonly error_class: string; readonly words: string }
+  | { readonly kind: "refused"; readonly error_class: string; readonly words: string; /** The case keeper's own message, with anything that looks like a secret removed. */ readonly reason: string | null }
   | { readonly kind: "unreachable"; readonly why: UnreachableWhy; readonly maybe_written: boolean; readonly words: string };
 
 export const STALE_WORDS = "This changed after you looked at it, so nothing was done. Look at the new version and decide again.";
@@ -80,7 +80,26 @@ function unreachableWords(why: UnreachableWhy, write: boolean): string {
   }
 }
 
-function refusedWords(errorClass: string): string {
+/** The case keeper's own words for a refusal, shortened, with anything that looks like a token or key taken out. */
+export function reasonOf(reply: Record<string, unknown>): string | null {
+  const parts: string[] = [];
+  for (const key of ["error", "message"]) if (typeof reply[key] === "string") parts.push(reply[key] as string);
+  if (Array.isArray(reply.errors)) parts.push(...reply.errors.filter((e): e is string => typeof e === "string"));
+  const text = parts.filter((p, i) => p.trim() !== "" && parts.indexOf(p) === i).join("; ")
+    .replace(/\bBearer\s+\S+/gi, "[hidden]")
+    .replace(/\bwbs1\.\S+/g, "[hidden]")
+    .replace(/\b[A-Za-z0-9_+\/=-]{32,}\b/g, "[hidden]")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text === "" ? null : text.length > 300 ? `${text.slice(0, 300)}…` : text;
+}
+
+function refusedWords(errorClass: string, reason: string | null): string {
+  const said = reason === null ? "" : ` It said: ${reason}`;
+  return refusedBase(errorClass) + said;
+}
+
+function refusedBase(errorClass: string): string {
   switch (errorClass) {
     case "request_id_reused":
       return "That request number was already used for a different request, so the case keeper refused it. Nothing was changed.";
@@ -99,7 +118,7 @@ function digestOf(value: unknown): RecordDigest | null {
   return isRecord(value) && typeof value.ref === "string" && typeof value.expected_digest === "string" ? { ref: value.ref, expected_digest: value.expected_digest } : null;
 }
 
-async function call<T>(keeper: CaseKeeper, request: Record<string, unknown>, write: boolean, read: (reply: Record<string, unknown>) => T | null): Promise<Outcome<T>> {
+async function call<T>(keeper: CaseKeeper, request: Record<string, unknown>, write: boolean, read: (reply: Record<string, unknown>) => T | null, passOkFalse = false): Promise<Outcome<T>> {
   let reply: unknown;
   try {
     reply = await seaForgeCall(keeper.socketPath, { ...request, actor: keeper.service, ...(write && keeper.operator ? { on_behalf_of: keeper.operator } : {}) }, keeper.timeoutMs ?? 5_000);
@@ -114,9 +133,12 @@ async function call<T>(keeper: CaseKeeper, request: Record<string, unknown>, wri
     );
     return { kind: "stale", changed, words: STALE_WORDS };
   }
-  if (reply.ok === false || typeof reply.error === "string" || typeof reply.error_class === "string") {
+  // A preflight that says `ok: false` is a valid preview with errors, not a refusal: the errors are the point.
+  const refusedShape = (reply.ok === false && !passOkFalse) || typeof reply.error === "string" || typeof reply.error_class === "string";
+  if (refusedShape) {
     const errorClass = typeof reply.error_class === "string" ? reply.error_class : "error";
-    return { kind: "refused", error_class: errorClass, words: refusedWords(errorClass) };
+    const reason = reasonOf(reply);
+    return { kind: "refused", error_class: errorClass, words: refusedWords(errorClass, reason), reason };
   }
   const value = read(reply);
   // Valid JSON of the wrong shape is not an answer: say so rather than show an empty list.
@@ -150,7 +172,7 @@ export function preflight(keeper: CaseKeeper, template_ref: string, params: Read
       precondition: digestOf(reply.precondition),
       plan_precondition: digestOf(reply.plan_precondition),
     };
-  });
+  }, true);
 }
 
 export function commit(
@@ -226,6 +248,34 @@ export function listCases(keeper: CaseKeeper): Promise<Outcome<CaseListValue>> {
     const unreadable = [...(Array.isArray(reply.unreadable) ? reply.unreadable.map(String) : []), ...Array.from({ length: malformed }, () => "(unreadable case row)")];
     return { cases, unreadable };
   });
+}
+
+export interface HorizonStep {
+  readonly plan_item_id: string;
+  readonly name: string;
+  readonly item_kind: string;
+  readonly execution: string;
+  readonly settlement: string;
+  readonly last_event_at: string | null;
+}
+
+/** The steps of one case, each with where it stands (`case_get_horizon`). */
+export function caseSteps(keeper: CaseKeeper, case_id: string): Promise<Outcome<{ readonly case_state: string; readonly steps: readonly HorizonStep[] }>> {
+  return call(keeper, { verb: "case_get_horizon", case_id }, false, (reply) => {
+    if (typeof reply.case_state !== "string" || !Array.isArray(reply.items)) return null;
+    const steps = reply.items.flatMap((item): HorizonStep[] =>
+      isRecord(item) && typeof item.plan_item_id === "string" ? [{ plan_item_id: item.plan_item_id, name: String(item.name ?? item.plan_item_id), item_kind: String(item.item_kind ?? ""), execution: String(item.execution ?? ""), settlement: String(item.settlement ?? ""), last_event_at: typeof item.last_event_at === "string" ? item.last_event_at : null }] : [],
+    );
+    return { case_state: reply.case_state, steps };
+  });
+}
+
+/**
+ * Mark a human step done, with the person's reason. `human_task_complete` takes no preconditions, so the caller must
+ * compare the case's digest itself before sending (see `src/app.ts`). The request id makes a retry replay, never double.
+ */
+export function humanTaskComplete(keeper: CaseKeeper, request: { readonly case_id: string; readonly item_id: string; readonly justification: string; readonly request_id: string }): Promise<Outcome<Record<string, unknown>>> {
+  return call(keeper, { verb: "human_task_complete", case_id: request.case_id, item_id: request.item_id, justification: request.justification, request_id: request.request_id }, true, (reply) => reply);
 }
 
 /** The `case:<id>` digest a decision preview pins ("nothing happened to this case since I looked"). */

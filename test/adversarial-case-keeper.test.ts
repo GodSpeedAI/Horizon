@@ -152,6 +152,44 @@ describe("case keeper adversarial: refusals", () => {
   });
 });
 
+describe("case keeper adversarial: the reason is shown", () => {
+  test("preflight with a missing parameter shows the reason", async () => {
+    const keeper = start(() => ({ json: { ok: false, errors: ["missing required template parameter: change_summary"], items: [], template_ref: "e2e-signoff-gate@0.1.0" } }));
+    const result = await preflight(keeper, "e2e-signoff-gate@0.1.0", {});
+    // A preflight that says ok:false is a valid preview with errors, not a refusal.
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.value.ok).toBe(false);
+      expect(result.value.errors).toEqual(["missing required template parameter: change_summary"]);
+      expect(result.value.plan_precondition).toBeNull();
+    }
+  });
+
+  test("a refusal shows the case keeper's reason", async () => {
+    const keeper = start(() => ({ json: { ok: false, error_class: "validation_failed", error: "item step_9 depends on a step that does not exist", errors: ["unknown dependency: step_1"] } }));
+    const result = await addItem(keeper, { case_id: "c1", item: { plan_item_id: "step_9" }, request_id: "r1", dry_run: false });
+    expect(result.kind).toBe("refused");
+    if (result.kind === "refused") {
+      expect(result.reason).toContain("item step_9 depends on a step that does not exist");
+      expect(result.reason).toContain("unknown dependency: step_1");
+      expect(result.words).toContain("It said: item step_9 depends on a step that does not exist");
+    }
+  });
+
+  test("a refusal's reason never carries a token or a long key", async () => {
+    const secret = "wbs1.AbCdEf0123456789AbCdEf0123456789AbCdEf";
+    const keeper = start(() => ({ json: { ok: false, error_class: "identity_refused", message: `bad Bearer ${secret} and key ${"k".repeat(40)} for actor x` } }));
+    const result = await listCases(keeper);
+    expect(result.kind).toBe("refused");
+    if (result.kind === "refused") {
+      expect(result.words).not.toContain(secret);
+      expect(result.words).not.toContain("k".repeat(40));
+      expect(result.words).toContain("[hidden]");
+      expect(result.words).toContain("for actor x");
+    }
+  });
+});
+
 describe("case keeper adversarial: a write is never lost or doubled", () => {
   test("a reply that never arrives, then a retry with the same request id, makes exactly one write", async () => {
     const applied = new Map<string, unknown>();
