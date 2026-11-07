@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, test } from "bun:test";
@@ -260,5 +260,21 @@ describe("setup-health", () => {
     const bad = await capture(runHealth, ["--setup", "testing", "--only", "records"]);
     expect(bad.code).toBe(1);
     expect((await capture(runHealth, ["--setup", "testing", "--only", "nonsuch"])).code).toBe(2);
+  });
+
+  test("--only connector needs a heartbeat file touched in the last 30 s", async () => {
+    await capture(runInit, ["--setup", "testing"]);
+    const beat = join(setupMapping("testing", env).run, "connector.heartbeat");
+    const none = await capture(runHealth, ["--setup", "testing", "--only", "connector"]);
+    expect(none.code).toBe(1);
+    expect(none.out).toContain("does not exist");
+    mkdirSync(join(beat, ".."), { recursive: true });
+    writeFileSync(beat, "{}");
+    expect((await capture(runHealth, ["--setup", "testing", "--only", "connector"])).code).toBe(0);
+    const old = new Date(Date.now() - 60_000);
+    utimesSync(beat, old, old);
+    const stale = await capture(runHealth, ["--setup", "testing", "--only", "connector"]);
+    expect(stale.code).toBe(1);
+    expect(stale.out).toContain("limit 30 s");
   });
 });

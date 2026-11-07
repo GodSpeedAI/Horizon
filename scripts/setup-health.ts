@@ -92,8 +92,16 @@ const tapCheck: Check = (_mapping, env) => {
   return ageHours <= 24 ? { ok: true, detail: `drain state modified ${ageHours.toFixed(1)} h ago` } : { ok: false, detail: `drain state is ${ageHours.toFixed(1)} h old (limit 24 h)` };
 };
 
-/** Stage 0 had records; stage 1 adds workbench, horizon and tap (seaforge and connector arrive in stages 3 and 4). */
-export const CHECKS: Record<string, Check> = { records: recordsCheck, workbench: workbenchCheck, horizon: horizonCheck, tap: tapCheck };
+/** Stage 4: the GitHub connector wrote its heartbeat file in the last 30 s. Only the file's modification time is read. */
+const connectorCheck: Check = (mapping) => {
+  const path = join(mapping.run, "connector.heartbeat");
+  if (!existsSync(path)) return { ok: false, detail: `${path} does not exist (is the connector running?)` };
+  const ageS = (Date.now() - statSync(path).mtimeMs) / 1000;
+  return ageS <= 30 ? { ok: true, detail: `connector heartbeat ${ageS.toFixed(0)} s ago` } : { ok: false, detail: `connector heartbeat is ${ageS.toFixed(0)} s old (limit 30 s); it is stopped or stuck` };
+};
+
+/** Stage 0 had records; stage 1 adds workbench, horizon and tap (seaforge arrives in stage 3; connector in stage 4). */
+export const CHECKS: Record<string, Check> = { records: recordsCheck, workbench: workbenchCheck, horizon: horizonCheck, tap: tapCheck, connector: connectorCheck };
 
 export async function run(args: readonly string[], env: Env, out: (line: string) => void, err: (line: string) => void): Promise<number> {
   const name = argValue(args, "setup");
