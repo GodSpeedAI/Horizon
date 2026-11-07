@@ -77,7 +77,9 @@ Both doors call the same desk operations (`/desk/note`, `/desk/handoff/preview`,
 - **Ask inputs:** add `confirm`, `multiselect` and `text` to the existing select. Options gain `consequence`. An ask gains `resolves` (the step or decision it settles). This is a grammar change, so it goes through the grammar's own version: `horizon.surface/2` becomes `/3`, still 15 blocks.
 - **The agent must say where each answer went** (`routed_as`, at least 6 characters): for example "step handoff_0a49 in Seed: triage inbox", or "no action: <why>". An answer without that stays marked "waiting for the agent" in the conversation and in Needs you. It keeps blocking step acceptance, as today.
 - **Eviction:** a panel with an open ask is never removed by the cap of 8. The agent can withdraw an ask, with a reason that is shown.
-- **Unknown blocks:** a block type Horizon does not draw keeps today's plain "This part cannot be shown here" line. Drawing the other 10 block types is out of scope (section 6).
+- **Every block is drawn (operator's question, 2026-11-07).** The cockpit's point is that agents put together their own screen from typed parts, which gives them wide room while never letting them write page code. So the desk draws all 15 blocks of the grammar, not 5: callout, metric, table, tree, timeline, graph, chart, compare, document, media, entity, progress, preflight, ask and form. Each block is drawn from a closed list of drawers, each sits in its own error guard, text is built as page elements (never as raw HTML), and data the agent supplied inline is marked "from the agent". A `form`, and any action button inside a block, only fills in or open the same preview as the desk's own buttons; nothing sends without your Confirm.
+- **Agents learn the parts:** a plain-words catalogue of the blocks (when to use each, when not to, a short example), like the cockpit's `protocol/catalog.ts`, is offered to agents through the server panel tools, so an agent can choose parts well.
+- **Unknown blocks:** a block type outside the grammar keeps today's plain "This part cannot be shown here" line.
 
 ### 3.4 WebMCP: the page offers its actions to agents
 
@@ -135,7 +137,6 @@ The stage-7 per-page thread is removed.
 
 ## 6. Out of scope
 
-- Drawing the 10 block types the desk does not draw yet: chart, graph, compare, form, preflight and the rest.
 - Streaming agent text.
 - Consuming outside WebMCP tools: the gs-term consumption seam.
 - A docked tab layout.
@@ -185,7 +186,9 @@ Each step is small enough for one agent. Steps 1-3 can run in parallel; 4 needs 
    - **Files:** `src/ui/desk/webmcp-tools.ts` (descriptors), `src/ui/desk/webmcp.ts` (the only registration).
    - **Wiring:** start it from the desk client.
    - **Tests:** descriptors, input checks, "never offered" list, and the architecture test.
-6. **Panels inline.**
+6. **Panels inline, every block drawn.**
+   - **Drawers:** one drawer per block for all 15 (`src/ui/desk/blocks/`), a closed list, an error guard per block, the agent tag on inline data. Charts and graphs as plain SVG, no new chart library.
+   - **Catalogue:** the block catalogue for agents, next to the grammar.
    - **Placement:** draw panels as conversation rows and fold closed ones. Remove the separate "From agents" list, but keep its keyboard reach.
    - **Asks:** the new inputs and the routed echo.
    - **Tests:** render, and the answer flow.
