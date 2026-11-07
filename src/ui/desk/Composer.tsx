@@ -171,6 +171,12 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
   const data = ui.data;
   const [active, setActive] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [noticeTone, setNoticeTone] = useState<"ok" | "bad">("bad");
+  /** Shows words in the status line; a problem unless said otherwise. */
+  const notify = (text: string, good = false): void => {
+    setNoticeTone(good ? "ok" : "bad");
+    dispatch({ type: "notice", text });
+  };
   // The "type something first" hint shows only after an empty box was sent, never because the box is empty again after a success.
   const [triedEmpty, setTriedEmpty] = useState(false);
   const [draft, setDraft] = useState<DraftInfo | null>(null);
@@ -253,7 +259,7 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
   };
   const showPreview = async (refresh = false): Promise<void> => {
     if (draft === null) {
-      dispatch({ type: "notice", text: "The draft is not ready yet. Try again in a moment." });
+      notify("The draft is not ready yet. Try again in a moment.");
       return;
     }
     setBusy(true);
@@ -269,13 +275,13 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
       setPvText(text);
       setAssign(assign && result.preview.agent.offered);
       if (!result.preview.review) setReviewStep("");
-      dispatch({ type: "notice", text: "" });
+      notify("");
     } else {
       if (activeTurn !== null) patchTurn(activeTurn, "quiet", "Replaced by a newer try.");
       setActiveTurn(null);
       setPv(null);
       addTurn("Hand off", text, "bad", result.message);
-      dispatch({ type: "notice", text: result.message });
+      notify(result.message);
     }
   };
   const confirmHandoff = async (): Promise<void> => {
@@ -291,21 +297,21 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
       setAssign(false);
       setDraft({ ...draft, draftId: result.draft_id || draft.draftId, text: "" });
       dispatch({ type: "sent" });
-      dispatch({ type: "notice", text: result.message });
+      notify(result.message, true);
     } else if (result.outcome === "preview_out_of_date") {
       setOutOfDate(true);
       patchTurn(activeTurn, "bad", "Out of date. Nothing was sent.");
-      dispatch({ type: "notice", text: result.message });
+      notify(result.message);
     } else {
       patchTurn(activeTurn, "bad", result.message);
-      dispatch({ type: "notice", text: result.message });
+      notify(result.message);
     }
   };
 
   const send = async (): Promise<void> => {
     if (reasonOff !== null) {
       if (empty) setTriedEmpty(true);
-      if (!askBlocked) dispatch({ type: "notice", text: mode === "write" ? "A note needs some words. Type something, then press Enter." : "Type what to look for first." });
+      if (!askBlocked) notify(mode === "write" ? "A note needs some words. Type something, then press Enter." : "Type what to look for first.");
       return;
     }
     if (handoff) {
@@ -324,10 +330,10 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
     if (result.ok) {
       addTurn("Note", text, "ok", `Saved on today${data?.status.openCase ? " and on the open case" : ""}.`);
       dispatch({ type: "sent" });
-      dispatch({ type: "notice", text: "Saved." });
+      notify("Saved.", true);
     } else {
       addTurn("Note", text, "bad", result.message);
-      dispatch({ type: "notice", text: result.message });
+      notify(result.message);
     }
   };
 
@@ -336,9 +342,11 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
   const openCase = data?.status.openCase?.purpose ?? "no case open";
   const sendLabel = mode === "write" ? "Save note" : mode === "find" ? "Find" : mode === "ask" ? "Ask" : "Preview hand off";
   const shownNotice = ui.notice !== null && ui.notice !== "" ? ui.notice : null;
+  // The notice carries successes too (Saved, Handed off); only a problem is shown as an alert.
+  const noticeIsGood = shownNotice !== null && noticeTone === "ok";
   const statusText = busy ? "Sending…" : askBlocked ? "Ask is not connected: no reference library is set up." : hint ?? "Ready";
   const stateWord = MODE_LABEL[mode];
-  const tone = busy ? "wait" : shownNotice !== null || (hint !== null && !askBlocked) || askBlocked ? "bad" : "ok";
+  const tone = busy ? "wait" : (shownNotice !== null && !noticeIsGood) || (hint !== null && !askBlocked) || askBlocked ? "bad" : "ok";
   const tries = TRY[mode];
   const tryOut = (phrase: string): void => {
     dispatch({ type: "typing", text: phrase, selStart: phrase.length, selEnd: phrase.length });
@@ -375,7 +383,7 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
                       onReviewStep={setReviewStep}
                       onCancel={() => {
                         closePreview("quiet", "Cancelled. Nothing was sent.");
-                        dispatch({ type: "notice", text: "" });
+                        notify("");
                       }}
                       onConfirm={() => void confirmHandoff()}
                       onRefresh={() => void showPreview(true)}
@@ -412,7 +420,15 @@ export function Composer({ ui, dispatch, io }: ComposerProps): ReactNode {
           void send();
         }}
       >
-        {shownNotice !== null ? (
+        {shownNotice !== null && noticeIsGood ? (
+          <p role="status" className="cv-status" data-notice data-tone="ok">
+            <span className="cv-dot" aria-hidden="true" />
+            <span>
+              <Words text={shownNotice} />
+            </span>
+            <span className="cv-state">{stateWord}</span>
+          </p>
+        ) : shownNotice !== null ? (
           <p role="alert" className="cv-status notice" data-notice data-tone="bad">
             <span className="cv-dot" aria-hidden="true" />
             <span>
