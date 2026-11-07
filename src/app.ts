@@ -1858,7 +1858,7 @@ export async function createApplication(
 
   /**
    * The agents' door for panels: `POST /agent/panels` (one AgentOp), `GET /agent/panels/answers`, `GET /agent/panels/catalogue`.
-   * It needs `Authorization: Bearer <the launch key>`: the key Horizon writes (mode 0600) to its secrets file at every start.
+   * It needs `Authorization: Bearer <the agent key>`: a key Horizon keeps (mode 0600) in the setup's secrets folder as agent.key, the same across restarts.
    * The page-agent header is not a key and is refused here. Only agent tools pass; the person's operations never do.
    */
   const AGENT_TOOLS = ["show_surface", "ask_human", "arrange", "annotate", "read_responses", "ask.withdraw", "answer.route"] as const;
@@ -1867,8 +1867,8 @@ export async function createApplication(
     const refuse = (status: number, message: string): Response => Response.json({ ok: false, message }, { status, headers });
     const given = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
     const a = Buffer.from(given);
-    const b = Buffer.from(loaded.launchSecret);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return refuse(401, "This door needs the agent key. Send it as: Authorization: Bearer <key>. The key is in Horizon's secrets file.");
+    const b = Buffer.from(loaded.agentKey);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return refuse(401, "This door needs the agent key. Send it as: Authorization: Bearer <key>. The key is in the setup's secrets folder, in agent.key.");
     if (pageAgentOf(request) !== null) return refuse(403, "An agent on the page cannot use this door.");
     const name = cleanAgentName(request.headers.get("x-horizon-agent-name"));
     if (pathname === "/agent/panels/catalogue" && request.method === "GET") return Response.json({ schema: SURFACE_SCHEMA, vocabulary: vocabulary(), blocks: CATALOGUE }, { headers });

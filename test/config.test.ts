@@ -1,5 +1,5 @@
-import { beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, statSync } from "node:fs";
+import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import { horizonDocument, writeConfig } from "./support/config.ts";
@@ -10,6 +10,18 @@ import {
   loadConfig,
   operatorPrincipal,
 } from "../src/config/load.ts";
+
+// Every loadConfig here writes the agent key somewhere: point the default at a temp dir so tests never touch .cognate/.
+const agentKeyRoot = mkdtempSync(join(tmpdir(), "horizon-agent-key-default-"));
+let savedAgentKeyFile: string | undefined;
+beforeEach(() => {
+  savedAgentKeyFile = process.env.HORIZON_AGENT_KEY_FILE;
+  process.env.HORIZON_AGENT_KEY_FILE = join(agentKeyRoot, "agent.key");
+});
+afterEach(() => {
+  if (savedAgentKeyFile === undefined) delete process.env.HORIZON_AGENT_KEY_FILE;
+  else process.env.HORIZON_AGENT_KEY_FILE = savedAgentKeyFile;
+});
 
 function fixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -74,6 +86,63 @@ describe("local_operator configuration", () => {
     const second = loadConfig(configPath);
     expect(first.launchSecret).not.toBe(second.launchSecret);
     expect(statSync(secretPath).mode & 0o777).toBe(0o600);
+  });
+});
+
+describe("the agent key is stable across loads", () => {
+  const configFor = (root: string): string => {
+    const configPath = join(root, "horizon.toml");
+    writeFileSync(configPath, `${toToml(fixture({ secrets: { mode: "per_launch", path: join(root, "launch.secret") }, runtime_store: join(root, "app.sqlite") }))}\n`);
+    return configPath;
+  };
+
+  test("the key file is created 0600 with 64 hex characters", () => {
+    const root = mkdtempSync(join(tmpdir(), "horizon-agent-key-"));
+    const keyPath = join(root, "secrets", "agent.key");
+    process.env.HORIZON_AGENT_KEY_FILE = keyPath;
+    const loaded = loadConfig(configFor(root));
+    expect(loaded.agentKeyPath).toBe(keyPath);
+    expect(statSync(keyPath).mode & 0o777).toBe(0o600);
+    expect(loaded.agentKey).toMatch(/^[0-9a-f]{64}$/);
+    expect(loaded.agentKey).not.toBe(loaded.launchSecret);
+  });
+
+  test("a second load returns the same key and does not rewrite the file", async () => {
+    const root = mkdtempSync(join(tmpdir(), "horizon-agent-key-"));
+    const keyPath = join(root, "agent.key");
+    process.env.HORIZON_AGENT_KEY_FILE = keyPath;
+    const configPath = configFor(root);
+    const first = loadConfig(configPath);
+    const before = statSync(keyPath).mtimeMs;
+    const contentBefore = readFileSync(keyPath, "utf8");
+    await Bun.sleep(20);
+    const second = loadConfig(configPath);
+    expect(second.agentKey).toBe(first.agentKey);
+    expect(readFileSync(keyPath, "utf8")).toBe(contentBefore);
+    expect(statSync(keyPath).mtimeMs).toBe(before);
+    expect(first.launchSecret).not.toBe(second.launchSecret);
+  });
+
+  test("HORIZON_AGENT_KEY_FILE overrides the default path", () => {
+    const root = mkdtempSync(join(tmpdir(), "horizon-agent-key-"));
+    const override = join(root, "custom", "door.key");
+    process.env.HORIZON_AGENT_KEY_FILE = override;
+    const loaded = loadConfig(configFor(root));
+    expect(loaded.agentKeyPath).toBe(override);
+    expect(existsSync(override)).toBe(true);
+    expect(readFileSync(override, "utf8").trim()).toBe(loaded.agentKey);
+  });
+
+  test("an invalid key file is replaced with a new valid key", () => {
+    const root = mkdtempSync(join(tmpdir(), "horizon-agent-key-"));
+    const keyPath = join(root, "agent.key");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(keyPath, "not-a-key\n");
+    process.env.HORIZON_AGENT_KEY_FILE = keyPath;
+    const loaded = loadConfig(configFor(root));
+    expect(loaded.agentKey).toMatch(/^[0-9a-f]{64}$/);
+    expect(readFileSync(keyPath, "utf8").trim()).toBe(loaded.agentKey);
+    expect(statSync(keyPath).mode & 0o777).toBe(0o600);
   });
 });
 

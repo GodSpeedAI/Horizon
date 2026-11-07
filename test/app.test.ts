@@ -33,7 +33,15 @@ async function configuredApplication(
     join(root, "horizon.toml"),
     horizonDocument({ storePath: join(root, "app.sqlite"), secretPath: join(root, "launch.secret"), ...overrides }),
   );
-  return createApplication({ configPath });
+  // The agent key lives in the temp root, never in .cognate/ or ~/.horizon.
+  const savedAgentKeyFile = process.env.HORIZON_AGENT_KEY_FILE;
+  process.env.HORIZON_AGENT_KEY_FILE = join(root, "agent.key");
+  try {
+    return await createApplication({ configPath });
+  } finally {
+    if (savedAgentKeyFile === undefined) delete process.env.HORIZON_AGENT_KEY_FILE;
+    else process.env.HORIZON_AGENT_KEY_FILE = savedAgentKeyFile;
+  }
 }
 
 async function readAllEvents(path: string): Promise<StoredEvent[]> {

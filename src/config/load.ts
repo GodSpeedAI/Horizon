@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { assertVerifierTemplate } from "../domain/expectation.ts";
 import { assertAllowance, assertPaymentEntry } from "../domain/payment.ts";
 import { REVERSIBILITY_CLASSES } from "../domain/navigation.ts";
@@ -23,7 +23,7 @@ import type {
   UiConfig,
   WorkshopConfig,
 } from "./types.ts";
-import { parseSetup, setupMapping, setupTenant } from "./setup.ts";
+import { parseSetup, setupMapping, setupTenant, type SetupName } from "./setup.ts";
 
 export class ConfigError extends Error {
   override readonly name = "ConfigError";
@@ -365,6 +365,8 @@ export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.
   const withStore = { ...(store ? { ...config, runtime_store: store } : config), identity: identityWithOperator };
   const secretPath = process.env.HORIZON_SECRET_FILE ?? withStore.secrets.path;
   const launchSecret = writeLaunchSecret(secretPath);
+  const agentKeyPath = resolve(agentKeyFileOf(setup));
+  const agentKey = agentKeyAt(agentKeyPath);
   return {
     config: withStore,
     operator: {
@@ -373,8 +375,45 @@ export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.
     },
     launchSecret,
     secretPath: resolve(secretPath),
+    agentKey,
+    agentKeyPath,
     ...(setup === undefined ? {} : { setup }),
   };
+}
+
+const AGENT_KEY = /^[0-9a-f]{64}$/;
+
+/**
+ * Where the agent door's key lives: `HORIZON_AGENT_KEY_FILE`, else the active setup's `secrets/agent.key`
+ * (the setup root, from `setupMapping`), else `.cognate/agent.key`.
+ */
+function agentKeyFileOf(setup: SetupName | undefined): string {
+  const override = process.env.HORIZON_AGENT_KEY_FILE?.trim();
+  if (override) return override;
+  if (setup !== undefined) return join(setupMapping(setup, process.env).root, "secrets", "agent.key");
+  return ".cognate/agent.key";
+}
+
+/**
+ * The agent door's key. It is kept across starts: an existing valid key (64 hex characters) is read
+ * and never rewritten. A missing or invalid file gets a new key, written once with mode 0600.
+ */
+function agentKeyAt(path: string): string {
+  if (existsSync(path)) {
+    let kept = "";
+    try {
+      kept = readFileSync(path, "utf8").trim();
+    } catch {
+      kept = "";
+    }
+    if (AGENT_KEY.test(kept)) return kept;
+  }
+  const key = randomBytes(32).toString("hex");
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${key}\n`, { encoding: "utf8", mode: 0o600 });
+  chmodSync(path, 0o600);
+  if (!existsSync(path)) bounded(`could not create the agent key at ${path}`);
+  return key;
 }
 
 /** `HORIZON_SETUP`: refuses unknown names, and a named setup whose `SETUP.json` marker is missing. */

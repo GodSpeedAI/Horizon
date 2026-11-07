@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { readFileSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
+import { loadConfig } from "../src/config/load.ts";
 import { conversationWaiting, START, type UiState } from "../src/ui/desk/attention.ts";
 import { answerEcho } from "../src/ui/desk/conversation-model.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";
@@ -15,7 +18,7 @@ let app: DeskApp;
 let key: string;
 beforeAll(async () => {
   app = await startDeskApp();
-  key = app.application.loaded.launchSecret;
+  key = app.application.loaded.agentKey;
 });
 afterAll(async () => app.stop());
 
@@ -36,6 +39,20 @@ describe("the agent door", () => {
 
   test("a page agent cannot use the door even with the key", async () => {
     expect((await door("/agent/panels", { tool: "read_responses" }, `Bearer ${key}`, { "x-horizon-source": "page-agent" })).status).toBe(403);
+  });
+
+  test("a second loadConfig in the same test does not change the agent key the running desk accepts", async () => {
+    const keyPath = app.application.loaded.agentKeyPath;
+    const contentBefore = readFileSync(keyPath, "utf8");
+    const mtimeBefore = statSync(keyPath).mtimeMs;
+    await Bun.sleep(20);
+    // A second process (a test run, a second start) loads config from the same setup.
+    const second = loadConfig(join(dirname(keyPath), "horizon.toml"));
+    expect(second.agentKey).toBe(key);
+    expect(readFileSync(keyPath, "utf8")).toBe(contentBefore);
+    expect(statSync(keyPath).mtimeMs).toBe(mtimeBefore);
+    expect((await door("/agent/panels/catalogue")).status).toBe(200);
+    expect((await door("/agent/panels", { tool: "read_responses" })).status).toBe(200);
   });
 
   test("an authenticated put shows in the desk state and the conversation, as the agent", async () => {

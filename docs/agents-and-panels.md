@@ -17,7 +17,7 @@ The door is on the desk's own address (for example `http://127.0.0.1:<port>`). E
 
     Authorization: Bearer <key>
 
-The key is the launch key Horizon writes to its secrets file (the path set under `[secrets]` in the Horizon config, or `HORIZON_SECRET_FILE`). The file is private to you (mode 0600) and the key changes at every start. Read it in your script; never print it, log it or paste it into a panel. A call with no key or a wrong key gets 401 and changes nothing. The page-agent header is not a key and is refused here.
+The key is in the setup's secrets folder, in `agent.key`: `~/.horizon/setups/<setup>/secrets/agent.key`. (Without a setup it is `.cognate/agent.key`; `HORIZON_AGENT_KEY_FILE` names another file.) Horizon creates the key once and keeps it, so it stays the same across restarts. The file is private to you (mode 0600). Only you can read it. Read it in your script; never print it, log it or paste it into a panel. Clearing the setup removes the file with the rest of the setup's folder, and the next start creates a new key. A call with no key or a wrong key gets 401 and changes nothing. The page-agent header is not a key and is refused here.
 
 Optional header `x-horizon-agent-name: <your name>` (60 characters at most). The Conversation shows it on your entries.
 

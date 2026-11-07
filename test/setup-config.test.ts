@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { horizonDocument, writeConfig } from "./support/config.ts";
 import { loadConfig } from "../src/config/load.ts";
 import { SETUP_SERVICES, parseSetup, setupEnv, setupMapping } from "../src/config/setup.ts";
 
-const KEYS = ["HORIZON_SETUP", "HORIZON_SETUPS_BASE", "HORIZON_STORE", "HORIZON_SECRET_FILE", "HORIZON_OPERATOR_REF"] as const;
+const KEYS = ["HORIZON_SETUP", "HORIZON_SETUPS_BASE", "HORIZON_STORE", "HORIZON_SECRET_FILE", "HORIZON_OPERATOR_REF", "HORIZON_AGENT_KEY_FILE"] as const;
 
 describe("setup configuration", () => {
   let base: string;
@@ -19,6 +19,7 @@ describe("setup configuration", () => {
     base = mkdtempSync(join(tmpdir(), "horizon-setup-config-"));
     process.env.HORIZON_SETUPS_BASE = join(base, "setups");
     process.env.HORIZON_SECRET_FILE = join(base, "launch.secret");
+    process.env.HORIZON_AGENT_KEY_FILE = join(base, "agent.key");
     configPath = await writeConfig(join(base, "horizon.toml"), horizonDocument({ storePath: join(base, "app.sqlite"), secretPath: join(base, "unused.secret") }));
   });
 
@@ -55,6 +56,17 @@ describe("setup configuration", () => {
     expect(loadConfig(configPath).operator.tenant).toBe(`local:${hostname()}:testing`);
     process.env.HORIZON_SETUP = "production";
     expect(loadConfig(configPath).operator.tenant).toBe(`local:${hostname()}`);
+  });
+
+  test("the agent key sits in the setup's secrets folder when a setup is active", () => {
+    delete process.env.HORIZON_AGENT_KEY_FILE;
+    markSetup("testing");
+    process.env.HORIZON_SETUP = "testing";
+    const loaded = loadConfig(configPath);
+    const expected = join(base, "setups", "testing", "secrets", "agent.key");
+    expect(loaded.agentKeyPath).toBe(expected);
+    expect(existsSync(expected)).toBe(true);
+    expect(readFileSync(expected, "utf8").trim()).toBe(loaded.agentKey);
   });
 
   test("HORIZON_STORE overrides config/horizon.toml runtime_store", () => {
