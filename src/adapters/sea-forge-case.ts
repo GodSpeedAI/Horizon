@@ -214,9 +214,12 @@ export function addItem(
   request: { readonly case_id: string; readonly item: Readonly<Record<string, unknown>>; readonly request_id?: string; readonly external_ref?: { readonly kind: string; readonly id: string; readonly url?: string }; readonly dry_run: boolean; readonly preconditions?: Preconditions },
 ): Promise<Outcome<AddItemValue>> {
   const item = request.external_ref ? { ...request.item, external_ref: request.external_ref } : request.item;
+  // The case keeper records the proposer inside the step, so the preview is made for the same operator as the real add.
+  // Otherwise the preview's version code never matches and every confirm is refused as out of date.
+  const forOperator = request.dry_run && keeper.operator ? { on_behalf_of: keeper.operator } : {};
   return call(
     keeper,
-    { verb: "case_add_item", case_id: request.case_id, item, ...(request.request_id ? { request_id: request.request_id } : {}), dry_run: request.dry_run, policy: CELL_POLICY, ...(request.preconditions ? { preconditions: request.preconditions } : {}) },
+    { verb: "case_add_item", ...forOperator, case_id: request.case_id, item, ...(request.request_id ? { request_id: request.request_id } : {}), dry_run: request.dry_run, policy: CELL_POLICY, ...(request.preconditions ? { preconditions: request.preconditions } : {}) },
     !request.dry_run,
     (reply) =>
       typeof reply.case_id === "string" && typeof reply.plan_item_id === "string"

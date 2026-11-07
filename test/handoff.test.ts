@@ -24,6 +24,9 @@ const advances: Record<string, unknown>[] = [];
 
 const digestOf = (ids: string[]): string => `sha256:${ids.join(",")}`;
 const resulting = (id: string): string[] => (plan.includes(id) ? plan : [...plan, id]);
+// Like the real case keeper: the step records who proposed it (the operator a write is made for, else the caller), and that is part of the digest.
+const proposerOf = (r: Record<string, unknown>): string => String((r.on_behalf_of as { actor_id?: string } | undefined)?.actor_id ?? (r.actor as { actor_id?: string } | undefined)?.actor_id ?? "");
+const planDigest = (r: Record<string, unknown>, id: string): string => digestOf([...resulting(id), `proposed_by:${proposerOf(r)}`]);
 
 const workshop = (): Access =>
   connected
@@ -53,7 +56,7 @@ beforeAll(async () => {
         return { json: { cases: [{ case_id: CASE, case_state: "active", summary: "Ship the checkout fix", created_at: "2026-11-07T06:13:12.793Z" }], unreadable: [] } };
       case "case_add_item": {
         const item = r.item as { plan_item_id: string };
-        if (r.dry_run === true) return { json: { ok: true, dry_run: true, outcome: "would_add", case_id: r.case_id, plan_item_id: item.plan_item_id, proposed_by: "operator_local", item, plan_precondition: { ref: `plan:${CASE}`, expected_digest: digestOf(resulting(item.plan_item_id)) } } };
+        if (r.dry_run === true) return { json: { ok: true, dry_run: true, outcome: "would_add", case_id: r.case_id, plan_item_id: item.plan_item_id, proposed_by: "operator_local", item, plan_precondition: { ref: `plan:${CASE}`, expected_digest: planDigest(r, item.plan_item_id) } } };
         const requestId = String(r.request_id);
         if (replies.has(requestId)) return { json: replies.get(requestId) };
         if (hangNextAdd) {
@@ -61,9 +64,9 @@ beforeAll(async () => {
           return { hang: true };
         }
         const pre = (r.preconditions as { records: { expected_digest: string }[] } | undefined)?.records[0];
-        if (pre === undefined || pre.expected_digest !== digestOf(resulting(item.plan_item_id))) {
+        if (pre === undefined || pre.expected_digest !== planDigest(r, item.plan_item_id)) {
           // Like the real case keeper: a refusal is remembered under its request id and replayed.
-          const stale = { outcome: "rejected_as_stale", code: "precondition_failed", changed_records: [{ ref: `plan:${CASE}`, expected_digest: pre?.expected_digest ?? "", current_digest: digestOf(resulting(item.plan_item_id)) }] };
+          const stale = { outcome: "rejected_as_stale", code: "precondition_failed", changed_records: [{ ref: `plan:${CASE}`, expected_digest: pre?.expected_digest ?? "", current_digest: planDigest(r, item.plan_item_id) }] };
           replies.set(requestId, stale);
           return { json: stale };
         }

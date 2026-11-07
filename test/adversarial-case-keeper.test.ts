@@ -223,10 +223,12 @@ describe("case keeper adversarial: a write is never lost or doubled", () => {
     const keeper = start((request) => (request.dry_run === true ? { json: { ok: true, dry_run: true, outcome: "would_add", case_id: "c1", plan_item_id: "s1", proposed_by: "operator_local", plan_precondition: { ref: "plan:c1", expected_digest: "sha256:p1" } } } : { json: { ok: true, case_id: "c1", plan_item_id: "s1", proposed_by: "operator_local" } }));
     const preview = await addItem(keeper, { case_id: "c1", item: { plan_item_id: "s1", name: "Fix" }, dry_run: true });
     expect(preview).toMatchObject({ kind: "ok", value: { dry_run: true, plan_precondition: { ref: "plan:c1", expected_digest: "sha256:p1" } } });
-    expect(live!.received[0]).not.toHaveProperty("on_behalf_of");
+    // The preview is made for the same operator as the real add: the case keeper puts the proposer in the digest.
     expect(live!.received[0]).not.toHaveProperty("request_id");
     const real = await addItem(keeper, { case_id: "c1", item: { plan_item_id: "s1", name: "Fix" }, external_ref: { kind: "github_issue", id: "o/r#7", url: "https://github.com/o/r/issues/7" }, request_id: "handoff:1", dry_run: false, preconditions: { records: [(preview as { value: { plan_precondition: { ref: string; expected_digest: string } } }).value.plan_precondition] } });
     expect(real.kind).toBe("ok");
+    expect(live!.received[0]?.on_behalf_of).toEqual(operator);
+    expect(live!.received[1]?.on_behalf_of).toEqual(operator);
     expect(live!.received[1]).toMatchObject({ verb: "case_add_item", dry_run: false, request_id: "handoff:1", item: { external_ref: { kind: "github_issue" } }, preconditions: { records: [{ ref: "plan:c1" }] } });
   });
 
