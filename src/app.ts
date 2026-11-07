@@ -82,7 +82,7 @@ import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
 import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
 import { answerRowOf, appendRow, discardRow, listConversation, panelRowOf, settleDraftRow, updateRow } from "./capabilities/conversation.ts";
-import { answerEcho, cleanAgentName, WAITING_FOR_AGENT, type ConversationRow, type RowSource, type RowStage } from "./ui/desk/conversation-model.ts";
+import { answerEcho, cleanAgentName, MAX_WAITING_PROPOSALS, TOO_MANY_PROPOSALS, WAITING_FOR_AGENT, type ConversationRow, type RowSource, type RowStage } from "./ui/desk/conversation-model.ts";
 import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
 import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
@@ -2112,6 +2112,17 @@ export async function createApplication(
     const source: RowSource = page ? "page-agent" : "you";
     const named = page?.name === undefined ? {} : { agent_name: page.name };
     const response = await deskHandoffCore(request, phase, true);
+    // An agent may leave at most 20 suggestions waiting on one case; asking again about the same draft changes the same row.
+    if (page && phase === "preview" && response.ok) {
+      const made = (await response.clone().json().catch(() => null)) as Record<string, any> | null;
+      const caseOf = made?.preview?.case_id;
+      if (typeof caseOf === "string") {
+        const rows = await listConversation(runtime.runtime.store, deskWho);
+        const same = rows.some((r) => r.kind === "handoff-proposal" && r.status === "waiting" && r.refs.draft_id === draftId);
+        const waiting = rows.filter((r) => r.kind === "handoff-proposal" && r.status === "waiting" && r.refs.case_id === caseOf).length;
+        if (!same && waiting >= MAX_WAITING_PROPOSALS) return Response.json({ ok: false, outcome: "too_many_waiting", message: TOO_MANY_PROPOSALS }, { status: 409, headers: { "cache-control": "no-store" } });
+      }
+    }
     // The answer goes out with stand-ins when Presenting is on; the row keeps the real words and shows them the same way.
     const body = (await response.clone().json().catch(() => null)) as Record<string, any> | null;
     const outcomeWords = typeof body?.message === "string" ? body.message : "That did not work.";

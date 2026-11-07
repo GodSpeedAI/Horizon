@@ -27,7 +27,7 @@ describe("the conversation reducer", () => {
     expect(next).toHaveLength(1);
     expect(next[0]).toMatchObject({ row_id: first[0]!.row_id, words: "Plan v2", status: "done" });
   });
-  test("the window keeps the newest 200, oldest first", () => {
+  test("the window keeps the newest 200 when nothing is waiting, oldest first", () => {
     const rows = Array.from({ length: 250 }, (_, i) => row(i));
     const w = windowOf([...rows].reverse());
     expect(w).toHaveLength(CONVERSATION_WINDOW);
