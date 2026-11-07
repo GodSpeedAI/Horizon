@@ -10,6 +10,7 @@ import { economicsModel } from "../src/economics/model.ts";
 import { onboardingOf } from "../src/ui/workspace/model.ts";
 import { START, deskReducer, type UiState } from "../src/ui/desk/attention.ts";
 import { buildDecide } from "../src/ui/desk/decide-build.ts";
+import { HandoffPreviewCard } from "../src/ui/desk/Composer.tsx";
 import { Desk } from "../src/ui/desk/Desk.tsx";
 import type { DeskState, InspectionAnswer, NextState, SearchResult } from "../src/ui/desk/model.ts";
 import { orderWork, sessionItems, caseItems, type WorkData } from "../src/ui/desk/work-build.ts";
@@ -113,6 +114,41 @@ describe("no product names and no internal terms on screen", () => {
       { readout: { state: "ok", repos: [{ repo_id: "R1", path: "/work/alpha", model, error: null }], skipped: { without_agent_activity: 0, missing_folder: 0 } }, knowledge: { kind: "known", completed: [] } },
     ];
     for (const [i, cost] of states.entries()) scan(`work ${i}`, draw({ ...START, view: "work", data: base(), work: work(cost) }));
+  });
+
+  test("Hand off, in every state of the composer and its preview", () => {
+    const keeperCase = { case_ref: "case:c1", purpose: "Case started 2026-11-07", opened_at: "2026-11-07T06:00:00Z", source: "case keeper" as const, state: "Running" };
+    scan("hand off, no case", draw({ ...START, data: base(), composer: { ...START.composer, mode: "handoff" } }));
+    scan("hand off, typed", draw({ ...START, data: base({ cases: [keeperCase, { ...keeperCase, case_ref: "case:c2", purpose: "Ship the fix" }] }), composer: { ...START.composer, mode: "handoff", text: "Fix the checkout total" } }));
+    const pv = { draft_id: "d", case_id: "c1", case_title: "Case started 2026-11-07", step_name: "Fix the checkout total", step_id: "s", check: "The case keeper checked this step against the case and it fits.", plan_precondition: { ref: "plan:c1", expected_digest: "sha256:1" }, agent: { offered: true, words: "An agent can take this step." } };
+    const card = (over: Partial<Parameters<typeof HandoffPreviewCard>[0]> = {}) => renderToStaticMarkup(<HandoffPreviewCard pv={pv} assign={false} outOfDate={false} busy={false} onAssign={() => undefined} onCancel={() => undefined} onConfirm={() => undefined} onRefresh={() => undefined} {...over} />);
+    scan("hand off preview", card());
+    scan("hand off preview, out of date", card({ outOfDate: true }));
+    const notConnected = { ...pv, agent: { offered: false, words: "Agent work: Not connected. There is no access key yet. Make one in the workshop settings." } };
+    scan("hand off preview, agent work not connected", card({ pv: notConnected }));
+    expect(text(card({ pv: notConnected }))).toContain("Not connected");
+    expect(card({ pv: notConnected })).not.toContain("checkbox");
+  });
+
+  test("Panels from agents, with questions, notes, a pinned panel and a wait", () => {
+    const panels = {
+      max: 8,
+      waiting: [{ step: "signoff_release", panel: "release" }],
+      open: [
+        { id: "release", title: "Release check", step: "signoff_release", pinned: true, notes: [{ text: "Checked the build.", tone: "success" as const }], blocks: [{ kind: "text" as const, id: "c", tone: "warning" as const, label: null, text: "Two checks are still running." }, { kind: "text" as const, id: "m", tone: "neutral" as const, label: "Checks passed", text: "8 of 10" }, { kind: "rows" as const, id: "t", columns: ["Check", "Result"], rows: [["build", "passed"]] }, { kind: "question" as const, id: "q1", question: "Ship it?", why_needed: "The release is waiting.", options: [{ option_id: "yes", label: "Yes" }, { option_id: "no", label: "No" }], answered: null }, { kind: "question" as const, id: "q2", question: "Tell QA?", why_needed: "", options: [{ option_id: "yes", label: "Yes" }, { option_id: "no", label: "No" }], answered: { outcome: "answered", value: "yes", note: null } }, { kind: "unavailable" as const, id: "u" }] },
+        { id: "empty", title: "Opened by you", step: null, pinned: false, notes: [], blocks: [] },
+      ],
+    };
+    scan("panels", draw({ ...START, view: "decide", data: base({ panels }) }));
+  });
+
+  test("Work, with steps waiting to start", () => {
+    const w = work({ readout: { state: "not_configured" }, knowledge: { kind: "unknown", why: "x" } });
+    const withWaiting: WorkData = { ...w, cases: { ...w.cases, items: [{ ...w.cases.items[0]!, title: "Sort the new bug reports", waiting: [{ plan_item_id: "s1", name: "Check the rollback note" }] }] } };
+    const html = draw({ ...START, view: "work", data: base(), work: withWaiting });
+    scan("work, waiting to start", html);
+    expect(text(html)).toContain("Waiting to start (1)");
+    expect(text(html)).toContain("Sort the new bug reports");
   });
 
   test("the Inspector, the keys list and the quick menu", () => {

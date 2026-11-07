@@ -121,9 +121,46 @@ describe("decision cards and previews", () => {
     expect(card!.blocked).toContain("version code");
     expect(card!.preview.accept).toBeNull();
     const html = draw(withCards([card!]));
-    expect(html).toMatch(/<button[^>]*\sdisabled=""[^>]*data-choice="accept"|<button[^>]*data-choice="accept"[^>]*\sdisabled=""/);
+    // A choice that is not available is not drawn at all; one line says why instead.
+    expect(html).not.toMatch(/data-choice="accept"/);
+    expect(html).not.toMatch(/data-choice="reject"/);
+    expect(text(html)).toContain("version code");
     expect(html).toMatch(/data-choice="hold"/);
     expect(html).not.toMatch(/data-choice="hold"[^>]*\sdisabled=""/);
+  });
+});
+
+describe("a human step", () => {
+  const stepCard = (): DecisionCardData =>
+    buildDecide({
+      inbox: { state: "not_configured" },
+      moves: [],
+      caseApprovals: { kind: "listed", approvals: [], unreadable: null },
+      holds: new Map(),
+      humanSteps: [{ case_id: "case_1", case_title: "Case started 2026-11-07", plan_item_id: "s1", name: "operator sign-off", last_event_at: null, digest: { ref: "case:case_1", expected_digest: "sha256:o" } }],
+    }).cards[0] as DecisionCardData;
+
+  test("a human step offers mark done and hold only", () => {
+    const card = stepCard();
+    expect(card.kind).toBe("human_step");
+    const html = draw(withCards([card]));
+    const choices = [...html.matchAll(/data-choice="([a-z]+)"/g)].map((m) => m[1]);
+    expect(choices.sort()).toEqual(["accept", "hold"]);
+    const labels = [...html.matchAll(/<button[^>]*data-choice="[a-z]+"[^>]*>([^<]*)</g)].map((m) => m[1]!.trim());
+    expect(labels.sort()).toEqual(["Hold… (H)", "Mark done… (A)"]);
+    const words = text(html);
+    expect(words).not.toContain("Reject");
+    expect(words).not.toContain("Rejecting is not available");
+    expect(words).not.toContain("Accept");
+    expect(words).toContain("Only a person can do this step");
+  });
+
+  test("a key press cannot open a choice the card does not offer", () => {
+    const card = stepCard();
+    const ui = deskReducer(withCards([card]), { type: "preview-open", cardId: card.id, choice: "reject" });
+    expect(ui.decision).toBeNull();
+    expect(ui.decideNote?.ok).toBe(false);
+    expect(deskReducer(withCards([card]), { type: "preview-open", cardId: card.id, choice: "accept" }).decision?.choice).toBe("accept");
   });
 });
 
@@ -189,6 +226,7 @@ describe("decisions through the application and a fake case keeper", () => {
     const sent = keeper.received.filter((r) => r.verb === "approval_decide");
     expect(sent.length).toBe(before + 1);
     expect(sent.at(-1)).toMatchObject({ approval_id: "ap1", decision: "approve", preconditions: { records: [{ ref: "approval:ap1", expected_digest: "sha256:d1" }] } });
+    expect(sent.at(-1)!.request_id).toBe("horizon:decide:ap1:accept");
     expect(decided).toHaveLength(0);
     expect((await app.state()).decide.cards).toHaveLength(1);
   });
@@ -201,7 +239,7 @@ describe("decisions through the application and a fake case keeper", () => {
     expect(ok.status).toBe(200);
     expect(ok.body.ok).toBe(true);
     expect(decided).toHaveLength(1);
-    expect(decided[0]).toMatchObject({ verb: "approval_decide", case_id: "case_1", decision: "approve", note: "looks right", request_id: "horizon:decide:ap1:accept", on_behalf_of: { actor_id: "actor:operator" } });
+    expect(decided[0]).toMatchObject({ verb: "approval_decide", case_id: "case_1", decision: "approve", note: "looks right", request_id: "horizon:decide:ap1:accept:a1", on_behalf_of: { actor_id: "actor:operator" } });
     // It is no longer waiting, so a second press does nothing and says so.
     const again = await send({ card_id: card.id, choice: "accept", preview_code: card.preview.code, records: card.preview.records });
     expect(again.status).toBe(404);

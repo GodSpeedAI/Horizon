@@ -63,7 +63,7 @@ describe("workshop key secrecy", () => {
     const config = { url: "http://127.0.0.1:1", key_path: join(dir, "none.key") };
     expect(keyState(config).state).toBe("missing");
     expect(connectWorkshop(config, { actor: { id: "o", kind: "user" }, tenant: "t" } as never)).toBeNull();
-    writeFileSync(config.key_path, TOKEN);
+    writeFileSync(config.key_path, TOKEN, { mode: 0o600 });
     writeFileSync(`${config.key_path}.json`, JSON.stringify({ sessionId: "s", expiresAt: "2026-11-10T00:00:00Z" }));
     expect(keyState(config, new Date("2026-11-06T00:00:00Z")).state).toBe("expiring");
     writeFileSync(`${config.key_path}.json`, JSON.stringify({ sessionId: "s", expiresAt: "2026-11-01T00:00:00Z" }));

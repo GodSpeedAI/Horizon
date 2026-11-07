@@ -287,6 +287,29 @@ describe("setup-health", () => {
     expect((await capture(runHealth, ["--setup", "testing", "--only", "nonsuch"])).code).toBe(2);
   });
 
+  test("--only seaforge needs the socket to answer case_list", async () => {
+    await capture(runInit, ["--setup", "testing"]);
+    const socket = testing().socket;
+    const none = await capture(runHealth, ["--setup", "testing", "--only", "seaforge"]);
+    expect(none.code).toBe(1);
+    expect(none.out).toContain("did not answer case_list");
+    const keeper = fakeCaseKeeper((request) => (request.verb === "case_list" ? { json: { cases: [{ case_id: "c1", case_state: "active" }] } } : { json: { error: "no" } }), socket);
+    try {
+      const ok = await capture(runHealth, ["--setup", "testing", "--only", "seaforge"]);
+      expect(ok.code).toBe(0);
+      expect(ok.out).toContain("1 case");
+      expect(keeper.received.map((r) => r.verb)).toContain("case_list");
+    } finally {
+      keeper.stop();
+    }
+    const odd = fakeCaseKeeper(() => ({ json: { ok: true } }), socket);
+    try {
+      expect((await capture(runHealth, ["--setup", "testing", "--only", "seaforge"])).code).toBe(1);
+    } finally {
+      odd.stop();
+    }
+  });
+
   test("--only connector needs a heartbeat file touched in the last 30 s", async () => {
     await capture(runInit, ["--setup", "testing"]);
     const beat = join(setupMapping("testing", env).run, "connector.heartbeat");

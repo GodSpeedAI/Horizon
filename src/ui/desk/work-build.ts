@@ -46,6 +46,10 @@ export interface CaseLineData {
   readonly summary: string;
   readonly created_at: string;
   readonly closed_at: string | null;
+  /** What the case is for, from its template. Absent: the title is made from the summary. */
+  readonly title?: string;
+  /** Steps that were added and have not started. */
+  readonly waiting?: readonly { readonly plan_item_id: string; readonly name: string }[];
 }
 const CASE_STATE_WORDS: Readonly<Record<string, string>> = { active: "Running", awaiting_approval: "Waiting for your approval", completed: "Done", terminated: "Stopped" };
 export const caseStateWords = (state: string): string => CASE_STATE_WORDS[state] ?? `Unknown state (${state})`;
@@ -54,7 +58,7 @@ export function caseItems(cases: readonly CaseLineData[]): WorkItem[] {
   return cases.map((c): WorkItem => ({
     id: `case:${c.case_id}`,
     kind: "case",
-    title: caseTitle(c.summary, c.created_at),
+    title: c.title ?? caseTitle(c.summary, c.created_at),
     outcome: c.case_state === "completed" ? "done" : c.case_state === "terminated" ? "stopped" : "waiting",
     words: caseStateWords(c.case_state),
     at: c.closed_at ?? c.created_at,

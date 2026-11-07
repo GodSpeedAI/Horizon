@@ -279,8 +279,31 @@ export function humanTaskComplete(keeper: CaseKeeper, request: { readonly case_i
 }
 
 /** The `case:<id>` digest a decision preview pins ("nothing happened to this case since I looked"). */
-export function caseDigest(keeper: CaseKeeper, case_id: string): Promise<Outcome<{ readonly digest: RecordDigest | null; readonly case_state: string }>> {
-  return call(keeper, { verb: "case_get_overview", case_id }, false, (reply) => (typeof reply.case_state === "string" ? { digest: digestOf(reply.digest), case_state: reply.case_state } : null));
+export function caseDigest(keeper: CaseKeeper, case_id: string): Promise<Outcome<{ readonly digest: RecordDigest | null; readonly case_state: string; readonly template_ref: string | null }>> {
+  return call(keeper, { verb: "case_get_overview", case_id }, false, (reply) =>
+    typeof reply.case_state === "string" ? { digest: digestOf(reply.digest), case_state: reply.case_state, template_ref: typeof reply.template_ref === "string" && reply.template_ref !== "" ? reply.template_ref : null } : null,
+  );
+}
+
+export interface TemplateLine {
+  readonly template_ref: string;
+  readonly description: string | null;
+}
+
+/** The templates cases can start from, each with its own description (`case_entry_options`). */
+export function entryOptions(keeper: CaseKeeper): Promise<Outcome<{ readonly templates: readonly TemplateLine[] }>> {
+  return call(keeper, { verb: "case_entry_options" }, false, (reply) => {
+    if (!Array.isArray(reply.templates)) return null;
+    return { templates: reply.templates.flatMap((t): TemplateLine[] => (isRecord(t) && typeof t.template_ref === "string" ? [{ template_ref: t.template_ref, description: typeof t.description === "string" && t.description.trim() !== "" ? t.description.trim() : null }] : [])) };
+  });
+}
+
+/**
+ * Start a case's waiting steps (`case_advance`). A step added to a case stays pending until the case is advanced. The request id
+ * names one attempt (see `request-id.ts`); `policy` and `timeout` take the case keeper's defaults.
+ */
+export function advance(keeper: CaseKeeper, case_id: string, request_id: string): Promise<Outcome<Record<string, unknown>>> {
+  return call(keeper, { verb: "case_advance", case_id, request_id }, true, (reply) => reply);
 }
 
 export interface PendingApproval {

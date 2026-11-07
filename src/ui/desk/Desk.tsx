@@ -10,7 +10,8 @@ import type { RemoteIo } from "./RemotePanel.tsx";
 import type { SaveLabel } from "./LabelControl.tsx";
 import type { InspectIo } from "./Answers.tsx";
 import type { RecordPin } from "./model.ts";
-import { Composer } from "./Composer.tsx";
+import { Composer, type HandoffIo } from "./Composer.tsx";
+import { Panels, type PanelsIo } from "./Panels.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { KEY_TABLE } from "./keys.ts";
 import { Nav } from "./Nav.tsx";
@@ -37,6 +38,12 @@ export interface DeskIo extends NoteIo, InspectIo {
   readonly decide: (input: DecideInput) => Promise<{ readonly ok: boolean; readonly message: string }>;
   readonly saveLabel: SaveLabel;
   readonly remote: RemoteIo | null;
+  /** Hand off: words become a step in a case (stage 4). */
+  readonly handoff: HandoffIo;
+  /** Answers, pins and closes on panels from agents (stage 4). */
+  readonly panels: PanelsIo;
+  /** Starts the steps of a case that were added and are waiting. */
+  readonly startCase: (caseId: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
 }
 
 export interface DeskProps {
@@ -129,7 +136,7 @@ export function Desk(props: DeskProps): ReactNode {
     today: <Today {...viewProps} />,
     explore: <Explore {...viewProps} />,
     decide: <Decide {...viewProps} confirm={confirm} release={release} {...(props.nowMs === undefined ? {} : { nowMs: props.nowMs })} />,
-    work: <Work {...viewProps} saveLabel={io.saveLabel} />,
+    work: <Work {...viewProps} saveLabel={io.saveLabel} startCase={io.startCase} />,
   };
   const history = data?.selected?.history ?? [];
   return (
@@ -142,6 +149,7 @@ export function Desk(props: DeskProps): ReactNode {
         <Nav ui={ui} data={data} dispatch={dispatch} />
         <main id="main" className="main" aria-label={VIEWS.find((v) => v.id === ui.view)?.label}>
           {view[ui.view]}
+          {data?.panels ? <Panels panels={data.panels} waiting={data.panels.waiting} io={io.panels} /> : null}
           <Composer ui={ui} dispatch={dispatch} io={io} />
         </main>
         <Inspector ui={ui} dispatch={dispatch} io={io} onLink={onLink} />

@@ -14,13 +14,16 @@ import type { ViewProps } from "./Today.tsx";
 
 export interface WorkViewProps extends ViewProps {
   readonly saveLabel: SaveLabel;
+  /** Starts the steps of a case that were added and are waiting. */
+  readonly startCase?: (caseId: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
 }
 
 /** A folder name, not a full path. */
 const folderOf = (path: string | null, id: string): string => (path === null ? id : (path.replace(/\/+$/, "").split("/").pop() || path));
 
-export function Work({ ui, dispatch, saveLabel }: WorkViewProps): ReactNode {
+export function Work({ ui, dispatch, saveLabel, startCase }: WorkViewProps): ReactNode {
   const [showTests, setShowTests] = useState(false);
+  const [startNote, setStartNote] = useState<string | null>(null);
   const work = ui.work;
   if (work === null) {
     return (
@@ -157,11 +160,27 @@ export function Work({ ui, dispatch, saveLabel }: WorkViewProps): ReactNode {
         <ul className="activity" data-list="work-cases">
           {work.cases.items.map((c) => (
             <li key={c.case_id}>
-              <strong>{caseTitle(c.summary, c.created_at)}</strong> <span className="state-word" data-state={c.case_state}>{caseStateWords(c.case_state)}</span>
+              <strong>{c.title ?? caseTitle(c.summary, c.created_at)}</strong> <span className="state-word" data-state={c.case_state}>{caseStateWords(c.case_state)}</span>
+              {c.waiting && c.waiting.length > 0 ? (
+                <div data-waiting-to-start>
+                  <p className="muted">Waiting to start ({c.waiting.length}):</p>
+                  <ul>
+                    {c.waiting.map((w) => (
+                      <li key={w.plan_item_id}>{w.name}</li>
+                    ))}
+                  </ul>
+                  {startCase ? (
+                    <button type="button" onClick={() => void startCase(c.case_id).then((r) => setStartNote(r.message))} data-start-case>
+                      Start it
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>
       )}
+      {startNote !== null ? <p role="status" data-start-note>{startNote}</p> : null}
       {work.cases.unreadable > 0 ? <p className="error" role="alert">{work.cases.unreadable} {work.cases.unreadable === 1 ? "case" : "cases"} could not be read, so the list above may be incomplete.</p> : null}
 
       <Cost cost={work.cost} />

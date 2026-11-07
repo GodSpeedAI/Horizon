@@ -63,6 +63,9 @@ export interface RecordsConfig {
 export interface WorkshopConfig {
   readonly url: string;
   readonly key_path: string;
+  /** The workshop agent that is given handed-off steps. Absent: steps can be handed off but not given to an agent. */
+  readonly expert_id?: string;
+  readonly workspace_id?: string;
 }
 
 export interface UiConfig {

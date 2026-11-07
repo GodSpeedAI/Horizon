@@ -201,7 +201,12 @@ function asRecords(value: unknown): RecordsConfig | undefined {
 function asWorkshop(value: unknown): WorkshopConfig | undefined {
   if (value === undefined) return undefined;
   const doc = asRecord(value, "workshop");
-  return { url: asString(doc.url, "workshop.url"), key_path: asString(doc.key_path, "workshop.key_path") };
+  return {
+    url: asString(doc.url, "workshop.url"),
+    key_path: asString(doc.key_path, "workshop.key_path"),
+    ...(doc.expert_id === undefined ? {} : { expert_id: asString(doc.expert_id, "workshop.expert_id") }),
+    ...(doc.workspace_id === undefined ? {} : { workspace_id: asString(doc.workspace_id, "workshop.workspace_id") }),
+  };
 }
 
 function asUi(value: unknown): UiConfig | undefined {
