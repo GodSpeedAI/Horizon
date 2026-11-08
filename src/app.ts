@@ -88,9 +88,9 @@ import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/wor
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
 import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
-import { acceptanceBlocked, answerFor, listAnswers, recordAnswer, routeAnswer, stopWaiting, checkValue, OUTCOMES, WAITING_WORDS, type PanelAnswer } from "./capabilities/panel-answers.ts";
+import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, listAnswers, recordAnswer, rememberAgreed, routeAnswer, stopWaiting, checkValue, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
-import { NO_PANELS, UNNAMED_AGENT, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
+import { ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { readableTitle } from "./ui/desk/banned-words.ts";
 import { agentRowsOf, agentSearchOf, agentStateOf, WITHHELD_WORDS } from "./ui/desk/agent-view.ts";
@@ -114,6 +114,7 @@ import type { Server } from "bun";
 import { RemoteController, type RemoteStatus } from "./remote/server.ts";
 import { remoteSettings } from "./remote/settings.ts";
 import { qrSvg, remotePanelPage } from "./remote/panel.ts";
+import { itemOf, questionOf } from "./ui/surface2/panel-blocks.ts";
 
 type HttpServer = Server<unknown>;
 
@@ -1909,6 +1910,8 @@ export async function createApplication(
       const owner = block !== undefined ? block.asked_by_key ?? null : record !== undefined ? record.asked_by_key ?? null : undefined;
       if (owner !== undefined && owner !== keyId) return { ok: false, code: "SCHEMA", message: "That question was asked by a different agent, so you cannot answer for it." };
     }
+    // A question the person agreed to cannot be recreated with other words, even after its panel was removed or the desk restarted.
+    if (await agreedAltered(op)) return { ok: false, code: "SCHEMA", message: ANSWERED_CANNOT_CHANGE };
     // Only the agent saying where an answer went closes it; nothing else counts as a reply.
     if (op.tool === "answer.route") {
       const routed = await routeAnswer(runtime.runtime.store, caller.tenant, op.panel_id, op.ask_id, op.routed_as);
@@ -1980,6 +1983,27 @@ export async function createApplication(
     return done.ok ? Response.json(done, { headers }) : Response.json(done, { status: done.code === "NOT_FOUND" ? 404 : 400, headers });
   }
 
+  /** Whether a put would change a question the person agreed to, judged against the durable record (not the panel, which may be gone). */
+  async function agreedAltered(op: AgentOp): Promise<boolean> {
+    const store = runtime.runtime.store;
+    const incoming: { readonly panel: string; readonly question: AgreedQuestion }[] = [];
+    if (op.tool === "ask_human") {
+      const raw = op.ask as Record<string, unknown>;
+      const block = typeof raw.id === "string" ? questionOf(raw, raw.id) : null;
+      if (block !== null) incoming.push({ panel: op.panel, question: block });
+    } else if (op.tool === "show_surface") {
+      const surface = op.surface as unknown as { id?: unknown; blocks?: unknown };
+      if (typeof surface.id === "string" && Array.isArray(surface.blocks)) {
+        for (const item of surface.blocks.slice(0, 64).map((b, i) => itemOf(b, i))) if (item.kind === "question") incoming.push({ panel: surface.id, question: item });
+      }
+    }
+    for (const { panel, question } of incoming) {
+      const agreed = await agreedFingerprintOf(store, panel, question.id);
+      if (agreed !== null && agreed !== agreedFingerprint(panel, question)) return true;
+    }
+    return false;
+  }
+
   /** The person's operations on panels: answer, pin, close, open, and stop waiting for an agent's reply. */
   async function deskPanelOp(request: Request): Promise<Response> {
     const headers = { "cache-control": "no-store" };
@@ -2003,12 +2027,14 @@ export async function createApplication(
       const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note, ...(typeof body.version === "string" ? { version: body.version } : {}) });
       if (!result.ok) return fail(409, result.message);
       // Store what the question accepted (a text answer is trimmed), not the raw body.
-      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { version?: string; asked_by?: string | null; asked_by_key?: string | null; input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string }[] } | undefined;
+      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { id: string; question: string; resolves?: string | null; version?: string; asked_by?: string | null; asked_by_key?: string | null; input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string; consequence?: string | null }[] } | undefined;
       const checked = outcome === "answered" && askBlock !== undefined ? answerFor({ input: askBlock.input ?? "select", options: askBlock.options }, value.value) : null;
       if (checked !== null && !checked.ok) return fail(400, checked.message);
       const stored = checked !== null && checked.ok ? checked.value : value.value;
       try {
         await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, now: clock() });
+        // The agreement to these exact words outlives the panel and the desk's memory of it (see agreedAltered).
+        if (outcome === "answered" && askBlock !== undefined) await rememberAgreed(store, caller.tenant, body.panel, body.ask, agreedFingerprint(body.panel, askBlock), clock());
       } catch {
         return fail(500, "Your answer was not saved. Nothing was sent. Try again.");
       }

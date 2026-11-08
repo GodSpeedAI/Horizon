@@ -14,10 +14,12 @@ export interface DeskApp {
   readonly post: (path: string, body: unknown) => Promise<Response>;
   readonly state: (query?: string) => Promise<any>;
   readonly get: (path: string) => Promise<any>;
+  /** The directory this desk keeps its store, config and agent key in. Start again with `root` to restart on the same records. */
+  readonly root: string;
 }
 
-export async function startDeskApp(options: { readonly repoPath?: string; readonly now?: () => Date; readonly approvals?: ApprovalAuthority; readonly economics?: EconomicsSource; readonly reader?: RecordReader; readonly workshop?: () => Access } = {}): Promise<DeskApp> {
-  const root = mkdtempSync(join(tmpdir(), "desk-"));
+export async function startDeskApp(options: { readonly repoPath?: string; readonly now?: () => Date; readonly approvals?: ApprovalAuthority; readonly economics?: EconomicsSource; readonly reader?: RecordReader; readonly workshop?: () => Access; readonly root?: string } = {}): Promise<DeskApp> {
+  const root = options.root ?? mkdtempSync(join(tmpdir(), "desk-"));
   const reader: RecordReader = options.reader ?? {
     repos: () => ({ ok: true, repos: options.repoPath ? [{ repo_id: "R1", path: options.repoPath }] : [] }),
     ledger: () => ({ ok: true, rows: [] }),
@@ -47,6 +49,7 @@ export async function startDeskApp(options: { readonly repoPath?: string; readon
   return {
     application,
     base,
+    root,
     stop: async () => {
       await server.stop(true);
       await application.close();

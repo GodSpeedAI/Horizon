@@ -4,6 +4,7 @@
  * only when the agent sends `answer.route` with `routed_as`, at least 6 characters saying where the answer went (or when the
  * operator says to stop waiting). No other agent call closes it. While a step has an open answer, accepting that step is blocked.
  */
+import { createHash } from "node:crypto";
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
 
 export const PANEL_ANSWERS_COLLECTION = "horizon-panel-answers";
@@ -134,3 +135,39 @@ export const stopWaiting = (store: DurableStore, tenant: string, step: string): 
 export const acceptanceBlocked = (answers: readonly Pick<PanelAnswer, "step" | "replied">[], stepId: string): boolean => answers.filter((a) => a.step === stepId && !a.replied).length > 0;
 
 export const WAITING_WORDS = "You answered an agent about this step and it has not replied yet, so the step cannot be accepted. Wait for the agent to say where your answer went, or choose to stop waiting.";
+
+/**
+ * What the person agreed to, kept apart from the panel so it outlives the panel. An agent that recreates a question the person
+ * answered, with other words, options, consequences, input kind or resolution, is refused, even after the panel was removed or the
+ * desk restarted. One record per answered question: `agreed:<panel>:<question>`.
+ */
+export const AGREED_COLLECTION = "horizon-agreed-answers";
+
+/** The question as the panel model normalises it, as far as the agreement needs it. */
+export interface AgreedQuestion {
+  readonly id: string;
+  readonly question: string;
+  readonly options: readonly { readonly option_id: string; readonly label: string; readonly consequence?: string | null }[];
+  readonly input?: string;
+  readonly resolves?: string | null;
+}
+
+/** A hash of the panel, the question id, its text, options (with consequences), input kind and what it resolves. */
+export function agreedFingerprint(panelId: string, q: AgreedQuestion): string {
+  return createHash("sha256").update(JSON.stringify([panelId, q.id, q.question, q.options.map((o) => [o.option_id, o.label, o.consequence ?? null]), q.input ?? "select", q.resolves ?? null])).digest("hex");
+}
+
+const agreedId = (panelId: string, ask: string): string => `agreed:${panelId}:${ask}`;
+
+export async function agreedFingerprintOf(store: DurableStore, panelId: string, ask: string): Promise<string | null> {
+  const row = await store.getRecord(AGREED_COLLECTION, agreedId(panelId, ask));
+  if (row === null || row === undefined) return null;
+  const fingerprint = (row.value as { fingerprint?: unknown }).fingerprint;
+  return typeof fingerprint === "string" ? fingerprint : null;
+}
+
+/** Keeps the agreement the first time the person answers; a later answer can only carry the same fingerprint (a change is refused before it gets here). */
+export async function rememberAgreed(store: DurableStore, tenant: string, panelId: string, ask: string, fingerprint: string, now: Date): Promise<void> {
+  if ((await agreedFingerprintOf(store, panelId, ask)) !== null) return;
+  await store.commit({ appends: [], records: [{ collection: AGREED_COLLECTION, id: agreedId(panelId, ask), expectedVersion: 0, value: { tenant, panel_id: panelId, ask, fingerprint, at: now.toISOString() } as unknown as { readonly [key: string]: Json } }] });
+}
