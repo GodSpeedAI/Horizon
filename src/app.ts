@@ -94,7 +94,7 @@ import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.t
 import { checkReassign } from "./capabilities/question-rules.ts";
 import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
-import { ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, openPanelId, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
+import { ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, moveQuestion, openPanelId, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { boardWrites, loadBoard, PANEL_LOAD_WORDS, stateWrites, withStored, type CommitRecord } from "./capabilities/panel-records.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { readableTitle } from "./ui/desk/banned-words.ts";
@@ -2201,7 +2201,7 @@ export async function createApplication(
         if (!verdict.ok) return fail(409, verdict.message);
         const when = clock().toISOString();
         const moveRow = newRowRecord(deskWho, { source: "you", kind: "note", words: `Moved the question "${openQuestion.question ?? "the agent's question"}" from ${fromName} to ${toName}.`, outcome: `${toName} now answers for it, since ${when}. Nothing has been answered yet.`, status: "done", refs: { panel_id: body.panel, ask_id: body.ask } }, clock());
-        const movedOpen = { ...panelBoard, open: panelBoard.open.map((p) => (p.id === body.panel ? { ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === body.ask ? { ...b, asked_by_key: body.to_key_id, asked_by: toName } : b)) } : p)) } as PanelsBoard;
+        const movedOpen = moveQuestion(panelBoard, body.panel, body.ask, body.to_key_id, toName);
         try {
           await commitBoard(panelBoard, movedOpen, [moveRow]);
         } catch {
@@ -2214,7 +2214,7 @@ export async function createApplication(
       // The owner on the answers, the owner on the panel and the conversation row are one commit. The panel follows the stored
       // owner, so a route by the old key is refused from now on.
       const toName = toEntry?.name ?? "";
-      const moved = { ...panelBoard, open: panelBoard.open.map((p) => (p.id === body.panel ? { ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === body.ask ? { ...b, asked_by_key: body.to_key_id, asked_by: toName } : b)) } : p)) } as PanelsBoard;
+      const moved = moveQuestion(panelBoard, body.panel, body.ask, body.to_key_id, toName);
       try {
         await commitBoard(panelBoard, moved, planned.records);
       } catch {
@@ -2240,7 +2240,7 @@ export async function createApplication(
       const note = typeof body.note === "string" && body.note.trim() !== "" ? body.note.trim().slice(0, 600) : null;
       const before = panelBoard;
       const step = before.open.find((p) => p.id === body.panel)?.step ?? null;
-      const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note, ...(typeof body.version === "string" ? { version: body.version } : {}) });
+      const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note, ...(typeof body.version === "string" ? { version: body.version } : {}), ...(typeof body.owner_rev === "number" ? { owner_rev: body.owner_rev } : {}) });
       if (!result.ok) return fail(409, result.message);
       // Store what the question accepted (a text answer is trimmed), not the raw body.
       const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { id: string; question: string; resolves?: string | null; version?: string; asked_by?: string | null; asked_by_key?: string | null; input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string; consequence?: string | null }[] } | undefined;

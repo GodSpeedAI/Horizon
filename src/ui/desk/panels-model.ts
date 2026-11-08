@@ -55,6 +55,7 @@ export type AgentOp =
 export const MAX_WITHDRAW_REASON = 200;
 export { REQUIRED_CANNOT_WITHDRAW };
 export const QUESTION_CHANGED = "This question changed after you looked at it. Look again, then answer.";
+export const OWNER_CHANGED = "The owner of this question changed after you looked at it. Look again, then answer.";
 /**
  * A question id keeps its first wording, choices, consequences, input kind and target, whatever its state (unanswered, put off or
  * answered). A put that changes any of them is refused with these words (operator decision: "Use a new question ID for changes").
@@ -68,12 +69,12 @@ const agreedTo = (b: AskBlock | undefined): b is AskBlock => b !== undefined && 
 /** Same words, options, consequences and input kind (the version), and the same thing it settles. */
 const sameQuestion = (a: AskBlock, b: AskBlock): boolean => a.version === b.version && (a.resolves ?? null) === (b.resolves ?? null);
 /** Who owns a question: the agent (by name, for display) and the key that put it up. The first put decides both; a later put keeps them. */
-const ownerOf = (old: AskBlock | undefined, agent: string, key: string): { readonly asked_by: string; readonly asked_by_key: string } => ({ asked_by: old?.asked_by ?? agent, asked_by_key: old?.asked_by_key ?? key });
+const ownerOf = (old: AskBlock | undefined, agent: string, key: string): { readonly asked_by: string; readonly asked_by_key: string; readonly owner_rev: number } => ({ asked_by: old?.asked_by ?? agent, asked_by_key: old?.asked_by_key ?? key, owner_rev: old?.owner_rev ?? 0 });
 /**
  * The very same question put up again. What the person agreed to or skipped stays. A question they put off ("Not yet") opens again,
  * as the card promised ("The agent will ask again later"), and the earlier answer moves into its history.
  */
-function sameAgain(old: AskBlock, now: AskBlock, owner: { readonly asked_by: string; readonly asked_by_key: string }): AskBlock {
+function sameAgain(old: AskBlock, now: AskBlock, owner: { readonly asked_by: string; readonly asked_by_key: string; readonly owner_rev: number }): AskBlock {
   if (old.answered !== null && old.answered.outcome === "deferred") {
     return { ...now, ...owner, answered: null, withdrawn: old.withdrawn ?? null, earlier: [...(old.earlier ?? []), { outcome: old.answered.outcome, value: old.answered.value, note: old.answered.note }] };
   }
@@ -86,7 +87,8 @@ export const hasOpenAsk = (p: Panel): boolean => p.blocks.some(isOpenAsk);
 
 export type HumanOp =
   /** `version` is the version of the question the person was looking at. When it is sent and no longer matches, the answer is refused. */
-  | { readonly op: "human.answer"; readonly panel: string; readonly ask: string; readonly outcome: "answered" | "deferred" | "cancelled"; readonly value?: unknown; readonly note?: string | null; readonly version?: string }
+  /** `owner_rev` is the owner revision of the question the person was looking at. When it is sent and no longer matches, the answer is refused. */
+  | { readonly op: "human.answer"; readonly panel: string; readonly ask: string; readonly outcome: "answered" | "deferred" | "cancelled"; readonly value?: unknown; readonly note?: string | null; readonly version?: string; readonly owner_rev?: number }
   | { readonly op: "human.pin"; readonly id: string; readonly pinned: boolean }
   | { readonly op: "human.close"; readonly id: string }
   | { readonly op: "human.open"; readonly template: string; readonly title?: string; readonly step?: string | null };
@@ -171,14 +173,14 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
         const retained = existing.blocks.filter((o): o is AskBlock => o.kind === "question" && !kept.some((k) => k.kind === "question" && k.id === o.id));
         return { state: replace(state, s.id, (p) => ({ ...p, title: str(s.title, 120) || p.title, step: s.step === undefined ? p.step : (s.step ?? null), blocks: [...kept, ...retained] })), result: { ok: true, panel: s.id } };
       }
-      return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks: blocks.map((b) => (b.kind === "question" ? { ...b, asked_by: agent, asked_by_key: key } : b)), notes: [], owner_key: key });
+      return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks: blocks.map((b) => (b.kind === "question" ? { ...b, asked_by: agent, asked_by_key: key, owner_rev: 0 } : b)), notes: [], owner_key: key });
     }
     case "ask_human": {
       const panel = state.open.find((p) => same(p.id, op.panel));
       const id = typeof op.ask.id === "string" && ID.test(op.ask.id) ? op.ask.id : "";
       const block = id === "" ? null : questionOf(op.ask, id);
       if (block === null) return refuse(state, "SCHEMA", "A question needs an id, the question, and (for pick-one and pick-several) at least two options.");
-      if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [{ ...block, asked_by: agent, asked_by_key: key }], notes: [], owner_key: key });
+      if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [{ ...block, asked_by: agent, asked_by_key: key, owner_rev: 0 }], notes: [], owner_key: key });
       if (panel.owner_key != null && panel.owner_key !== key) return refuse(state, "SCHEMA", PANEL_OWNED_ELSEWHERE);
       const old = panel.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === block.id);
       // A question belongs to the agent that asked it, or to the one the person moved it to. Another agent cannot put it up again.
@@ -229,6 +231,14 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
   }
 }
 
+/**
+ * The person moves a question to another agent. Its owner and its owner revision change in the same step, so an answer that was
+ * looked at under the old owner is refused (see `human.answer`). Returns the board unchanged when the question is not on it.
+ */
+export function moveQuestion(state: Panels, panelId: string, askId: string, toKey: string, toName: string): Panels {
+  return replace(state, panelId, (p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === askId ? { ...b, asked_by_key: toKey, asked_by: toName, owner_rev: (b.owner_rev ?? 0) + 1 } : b)) }));
+}
+
 /** The id a panel the person opens from a template gets. The same template always gives the same id. */
 export const openPanelId = (template: string): string => `open_${template.replace(/[^a-z0-9_-]/gi, "").toLowerCase().slice(0, 40) || "panel"}`;
 
@@ -248,6 +258,7 @@ export function reduceHuman(state: Panels, op: HumanOp): Reduced {
       const ask = panel?.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === op.ask);
       if (panel === undefined || ask === undefined) return refuse(state, "NOT_FOUND", "That question is no longer open.");
       if (op.version !== undefined && ask.version !== undefined && op.version !== ask.version) return refuse(state, "SCHEMA", QUESTION_CHANGED);
+      if (op.owner_rev !== undefined && op.owner_rev !== (ask.owner_rev ?? 0)) return refuse(state, "SCHEMA", OWNER_CHANGED);
       if (ask.answered !== null) return refuse(state, "SCHEMA", "That question was already answered.");
       if ((ask.withdrawn ?? null) !== null) return refuse(state, "SCHEMA", "The agent withdrew that question.");
       // Not now and Skip carry no value; an answer must fit the kind of question.
