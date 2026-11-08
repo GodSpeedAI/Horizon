@@ -2049,8 +2049,10 @@ export async function createApplication(
       }
       panelBoard = state;
       const sentWords = outcome === "answered" ? "Sent. Waiting for the agent to say where it went." : outcome === "deferred" ? "Put off. Waiting for the agent to say where it went." : "Cancelled. Waiting for the agent to say where it went.";
-      const recorded = await logRow({ source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: WAITING_FOR_AGENT, status: "waiting", refs: { panel_id: body.panel, ask_id: body.ask, ...(step ? { step_id: step } : {}) } });
-      await settlePanelRow(body.panel, "You answered. Waiting for the agent to say where it went.");
+      // "Not yet" is not an answer: nothing is sent to the agent, and the row says so.
+      const deferredOnly = outcome === "deferred";
+      const recorded = await logRow({ source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: deferredOnly ? "Not yet. Nothing was sent to the agent." : WAITING_FOR_AGENT, status: deferredOnly ? "done" : "waiting", refs: { panel_id: body.panel, ask_id: body.ask, ...(step ? { step_id: step } : {}) } });
+      await settlePanelRow(body.panel, deferredOnly ? "Not yet. You can answer it later." : "You answered. Waiting for the agent to say where it went.");
       return Response.json({ ok: true, message: sentWords, ...(recorded ? {} : { recorded: false, recorded_words: NOT_RECORDED_WORDS }) }, { headers });
     }
     const op: HumanOp | null =

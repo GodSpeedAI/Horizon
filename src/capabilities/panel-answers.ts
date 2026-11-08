@@ -17,7 +17,7 @@ export interface PanelAnswer {
   readonly panel_id: string;
   readonly n: number;
   readonly ask: string;
-  readonly outcome: Outcome;
+  readonly outcome: Outcome | null;
   readonly value: AnswerValue | null;
   readonly note: string | null;
   readonly at: string;
@@ -76,7 +76,15 @@ export async function recordAnswer(
   for (let attempt = 0; ; attempt += 1) {
     const existing = await listAnswers(store, input.tenant, input.panel_id);
     const n = (existing.at(-1)?.n ?? 0) + 1;
-    const answer: PanelAnswer = { tenant: input.tenant, panel_id: input.panel_id, n, ask: input.ask, outcome: input.outcome, value: input.value ?? null, note: input.note ?? null, at: input.now.toISOString(), version: input.version ?? null, replied: false, step: input.step ?? null, asked_by: input.asked_by ?? null, asked_by_key: input.asked_by_key ?? null };
+    // "Not yet" is not an answer: the outcome stays null, the question keeps its history, and nobody waits for it.
+    const deferred = input.outcome === "deferred";
+    const answer: PanelAnswer = {
+      tenant: input.tenant, panel_id: input.panel_id, n, ask: input.ask,
+      outcome: deferred ? (null as unknown as Outcome) : input.outcome,
+      value: deferred ? null : input.value ?? null, note: input.note ?? null, at: input.now.toISOString(), version: input.version ?? null,
+      replied: deferred, step: input.step ?? null, asked_by: input.asked_by ?? null, asked_by_key: input.asked_by_key ?? null,
+      owner_key: input.asked_by_key ?? null, fingerprint: null, history: deferred ? [{ outcome: "deferred", at: input.now.toISOString() }] : [], waiting_on: deferred ? "none" : "agent",
+    };
     try {
       await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(input.panel_id, n), expectedVersion: 0, value: answer as unknown as { readonly [key: string]: Json } }] });
       return answer;
