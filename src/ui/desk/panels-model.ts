@@ -31,6 +31,10 @@ export interface Panel {
   readonly owner_key?: string | null;
 }
 export const PANEL_OWNED_ELSEWHERE = "That panel belongs to another agent.";
+export const PANEL_OWNER_UNKNOWN = "This panel has no recorded owner, so no agent can add a note to it.";
+/** The most notes a panel holds. A note past it is refused, so no note is ever dropped to make room. */
+export const MAX_NOTES = 20;
+export const NOTES_FULL = `This panel already has ${MAX_NOTES} notes. Nothing was changed.`;
 export interface Panels {
   readonly open: readonly Panel[];
   readonly max: number;
@@ -260,10 +264,16 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
       return { state: replace(state, panel.id, (p) => ({ ...p, step: op.step === undefined ? p.step : (op.step ?? null), blocks: [...p.blocks.filter((b) => b.id !== block.id), next] })), result: { ok: true, panel: panel.id } };
     }
     case "annotate": {
-      if (!state.open.some((p) => same(p.id, op.panel))) return refuse(state, "NOT_FOUND", "That panel is not open.");
+      const panel = state.open.find((p) => same(p.id, op.panel));
+      if (panel === undefined) return refuse(state, "NOT_FOUND", "That panel is not open.");
+      // Only the agent that put the panel up may annotate it. A panel with no recorded owner has no agent that may.
+      if (panel.owner_key == null) return refuse(state, "SCHEMA", PANEL_OWNER_UNKNOWN);
+      if (panel.owner_key !== key) return refuse(state, "SCHEMA", PANEL_OWNED_ELSEWHERE);
       const text = str(op.text, 400);
       if (text === "") return refuse(state, "SCHEMA", "A note needs some words.");
-      return { state: replace(state, op.panel, (p) => ({ ...p, notes: [...p.notes, { text, tone: toneOf(op.tone) }].slice(-20) })), result: { ok: true, panel: op.panel } };
+      // A note never displaces one already there: at the limit the new note is refused, and the notes stay as they are.
+      if (panel.notes.length >= MAX_NOTES) return refuse(state, "SCHEMA", NOTES_FULL);
+      return { state: replace(state, op.panel, (p) => ({ ...p, notes: [...p.notes, { text, tone: toneOf(op.tone) }] })), result: { ok: true, panel: op.panel } };
     }
     case "ask.withdraw": {
       const panel = state.open.find((p) => same(p.id, op.panel_id));
