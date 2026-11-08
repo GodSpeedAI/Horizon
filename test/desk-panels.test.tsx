@@ -4,6 +4,11 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
 import { acceptanceBlocked, listAnswers, recordAnswer, routeAnswer, stopWaiting, PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
+
+// The desk runs panel writes one at a time (panelCommand in app.ts); a test passes the identity queue, since it runs one write at a time.
+function Q<T>(command: () => Promise<T>): Promise<T> {
+  return command();
+}
 import { START, type UiState } from "../src/ui/desk/attention.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";
 import { MAX_OPEN_PANELS, NO_PANELS, reduceAgent, reduceHuman, type Panels as PanelsState } from "../src/ui/desk/panels-model.ts";
@@ -101,7 +106,7 @@ describe("answers are kept", () => {
   test("an answer is recorded unreplied; a reply or the person's choice clears it", async () => {
     const store = createMemoryStore();
     const now = new Date("2026-11-07T10:00:00Z");
-    const a = await recordAnswer(store, { tenant: "t", panel_id: "release", ask: "q1", outcome: "answered", value: "yes", step: "signoff", now });
+    const a = await recordAnswer(store, { tenant: "t", panel_id: "release", ask: "q1", outcome: "answered", value: "yes", step: "signoff", asked_by_key: "ag_alice", now });
     const b = await recordAnswer(store, { tenant: "t", panel_id: "release", ask: "q2", outcome: "deferred", step: "signoff", now });
     expect([a.n, b.n]).toEqual([1, 2]);
     // "Not yet" is not an answer and waits for nobody (store-design-v2 section 3): it does not block the step.
@@ -113,16 +118,16 @@ describe("answers are kept", () => {
     expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(true);
     expect(acceptanceBlocked(await listAnswers(store, "t"), "another_step")).toBe(false);
     // A later agent call is no reply; only a route that says where it went closes the answer.
-    expect((await routeAnswer(store, "t", "release", "q1", "ok")).ok).toBe(false);
+    expect((await routeAnswer(store, "t", "release", "q1", "ok", "ag_alice", Q)).ok).toBe(false);
     expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(true);
-    expect(await routeAnswer(store, "t", "release", "q1", "step handoff_0a49 in Seed: triage inbox")).toEqual({ ok: true, closed: 1 });
+    expect(await routeAnswer(store, "t", "release", "q1", "step handoff_0a49 in Seed: triage inbox", "ag_alice", Q)).toEqual({ ok: true, closed: 1 });
     expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(false);
     // Nothing waits for the agent about the put-off question, so there is nothing to route.
-    expect(await routeAnswer(store, "t", "release", "q2", "no action: put off by the person")).toMatchObject({ ok: false });
+    expect(await routeAnswer(store, "t", "release", "q2", "no action: put off by the person", "ag_alice", Q)).toMatchObject({ ok: false });
     expect((await listAnswers(store, "t", "release"))[0]).toMatchObject({ replied: true, routed_as: "step handoff_0a49 in Seed: triage inbox" });
     expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(false);
     await recordAnswer(store, { tenant: "t", panel_id: "other", ask: "q", outcome: "answered", value: "no", step: "s2", now });
-    expect(await stopWaiting(store, "t", "s2")).toBe(1);
+    expect(await stopWaiting(store, "t", "s2", Q)).toBe(1);
     expect((await listAnswers(store, "t", "other"))[0]).toMatchObject({ replied: true, note: "You chose to stop waiting for the agent." });
     expect(acceptanceBlocked([{ step: "s", replied: false }, { step: "s", replied: true }], "s")).toBe(true);
   });

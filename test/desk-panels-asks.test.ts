@@ -2,6 +2,11 @@
 import { describe, expect, test } from "bun:test";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
 import { acceptanceBlocked, answerFor, listAnswers, recordAnswer, routeAnswer } from "../src/capabilities/panel-answers.ts";
+
+// The desk runs panel writes one at a time (panelCommand in app.ts); a test passes the identity queue, since it runs one write at a time.
+function Q<T>(command: () => Promise<T>): Promise<T> {
+  return command();
+}
 import { ALL_WAITING, MAX_OPEN_PANELS, NO_PANELS, reduceAgent, reduceHuman, type Panels } from "../src/ui/desk/panels-model.ts";
 
 const two = [{ option_id: "yes", label: "Yes" }, { option_id: "no", label: "No" }];
@@ -112,26 +117,26 @@ describe("the answer stays open until the agent says where it went", () => {
   const now = new Date("2026-11-07T10:00:00Z");
   test("too short is refused; a route closes the answer and releases the step", async () => {
     const store = createMemoryStore();
-    await recordAnswer(store, { tenant: "t", panel_id: "p", ask: "q1", outcome: "answered", value: "yes", step: "s1", now });
+    await recordAnswer(store, { tenant: "t", panel_id: "p", ask: "q1", outcome: "answered", value: "yes", step: "s1", asked_by_key: "ag_alice", now });
     expect(acceptanceBlocked(await listAnswers(store, "t"), "s1")).toBe(true);
-    const short = await routeAnswer(store, "t", "p", "q1", "done");
+    const short = await routeAnswer(store, "t", "p", "q1", "done", "ag_alice", Q);
     expect(short.ok).toBe(false);
-    expect(await routeAnswer(store, "t", "p", "q1", "      ")).toMatchObject({ ok: false });
+    expect(await routeAnswer(store, "t", "p", "q1", "      ", "ag_alice", Q)).toMatchObject({ ok: false });
     expect(acceptanceBlocked(await listAnswers(store, "t"), "s1")).toBe(true);
     // The wrong question closes nothing.
-    expect(await routeAnswer(store, "t", "p", "other", "no action: not for this")).toMatchObject({ ok: false });
+    expect(await routeAnswer(store, "t", "p", "other", "no action: not for this", "ag_alice", Q)).toMatchObject({ ok: false });
     expect(acceptanceBlocked(await listAnswers(store, "t"), "s1")).toBe(true);
-    expect(await routeAnswer(store, "t", "p", "q1", "step handoff_0a49 in Seed: triage inbox")).toEqual({ ok: true, closed: 1 });
+    expect(await routeAnswer(store, "t", "p", "q1", "step handoff_0a49 in Seed: triage inbox", "ag_alice", Q)).toEqual({ ok: true, closed: 1 });
     expect((await listAnswers(store, "t"))[0]).toMatchObject({ replied: true, routed_as: "step handoff_0a49 in Seed: triage inbox" });
     expect(acceptanceBlocked(await listAnswers(store, "t"), "s1")).toBe(false);
     // Closed once: a second route has nothing to close.
-    expect(await routeAnswer(store, "t", "p", "q1", "no action: again")).toMatchObject({ ok: false });
+    expect(await routeAnswer(store, "t", "p", "q1", "no action: again", "ag_alice", Q)).toMatchObject({ ok: false });
   });
   test("six characters is enough", async () => {
     const store = createMemoryStore();
-    await recordAnswer(store, { tenant: "t", panel_id: "p", ask: "q1", outcome: "cancelled", step: null, now });
-    expect(await routeAnswer(store, "t", "p", "q1", "12345")).toMatchObject({ ok: false });
-    expect(await routeAnswer(store, "t", "p", "q1", "123456")).toMatchObject({ ok: true });
+    await recordAnswer(store, { tenant: "t", panel_id: "p", ask: "q1", outcome: "cancelled", step: null, asked_by_key: "ag_alice", now });
+    expect(await routeAnswer(store, "t", "p", "q1", "12345", "ag_alice", Q)).toMatchObject({ ok: false });
+    expect(await routeAnswer(store, "t", "p", "q1", "123456", "ag_alice", Q)).toMatchObject({ ok: true });
   });
   test("in the panel, the answered question shows where it went", () => {
     let state = ok(reduceAgent(NO_PANELS, { tool: "ask_human", panel: "p", ask: askOf("q1") }));
