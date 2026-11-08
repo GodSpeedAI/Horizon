@@ -69,14 +69,30 @@ export function checkValue(value: unknown): { readonly ok: true; readonly value:
 
 export async function listAnswers(store: DurableStore, tenant: string, panelId?: string): Promise<PanelAnswer[]> {
   const rows = await store.listRecords(PANEL_ANSWERS_COLLECTION, { tenant });
-  return rows.map((r) => normaliseAnswer(r.value as unknown as PanelAnswer)).filter((a) => panelId === undefined || a.panel_id === panelId).sort((a, b) => (a.panel_id === b.panel_id ? a.n - b.n : a.panel_id < b.panel_id ? -1 : 1));
+  // Only answer records: a question's guard record (`question:<panel>:<ask>`) shares the collection and is not an answer.
+  return rows.filter((r) => r.id.startsWith("answer:")).map((r) => normaliseAnswer(r.value as unknown as PanelAnswer)).filter((a) => panelId === undefined || a.panel_id === panelId).sort((a, b) => (a.panel_id === b.panel_id ? a.n - b.n : a.panel_id < b.panel_id ? -1 : 1));
 }
+
+/** A question already has a committed answer (or a cancel). One answer per question: a second one is refused, and nothing is stored. */
+export class QuestionAlreadyAnswered extends Error {
+  constructor() {
+    super("This question was already answered. Nothing was sent. Look again.");
+    this.name = "QuestionAlreadyAnswered";
+  }
+}
+
+const guardIdOf = (panel: string, ask: string): string => `question:${panel}:${ask}`;
 
 export async function recordAnswer(
   store: DurableStore,
-  input: { readonly tenant: string; readonly panel_id: string; readonly ask: string; readonly outcome: Outcome; readonly value?: AnswerValue | null; readonly note?: string | null; readonly step?: string | null; readonly version?: string | null; readonly asked_by?: string | null; readonly asked_by_key?: string | null; readonly now: Date },
+  input: { readonly tenant: string; readonly panel_id: string; readonly ask: string; readonly outcome: Outcome; readonly value?: AnswerValue | null; readonly note?: string | null; readonly step?: string | null; readonly version?: string | null; readonly asked_by?: string | null; readonly asked_by_key?: string | null; readonly fingerprint?: string | null; readonly now: Date },
 ): Promise<PanelAnswer> {
+  const committed = input.outcome === "answered" || input.outcome === "cancelled";
   for (let attempt = 0; ; attempt += 1) {
+    // The guard is the question's own record. Two answers that race both carry its version; the store refuses the second commit.
+    const guard = await store.getRecord(PANEL_ANSWERS_COLLECTION, guardIdOf(input.panel_id, input.ask));
+    // A guard exists only once a committed answer (or cancel) is stored, so its presence refuses a new one.
+    if (committed && guard !== null && guard !== undefined) throw new QuestionAlreadyAnswered();
     const existing = await listAnswers(store, input.tenant, input.panel_id);
     const n = (existing.at(-1)?.n ?? 0) + 1;
     // "Not yet" is not an answer: the outcome stays null, the question keeps its history, and nobody waits for it.
@@ -86,12 +102,15 @@ export async function recordAnswer(
       outcome: deferred ? (null as unknown as Outcome) : input.outcome,
       value: deferred ? null : input.value ?? null, note: input.note ?? null, at: input.now.toISOString(), version: input.version ?? null,
       replied: deferred, step: input.step ?? null, asked_by: input.asked_by ?? null, asked_by_key: input.asked_by_key ?? null,
-      owner_key: input.asked_by_key ?? null, fingerprint: null, history: deferred ? [{ outcome: "deferred", at: input.now.toISOString() }] : [], waiting_on: deferred ? "none" : "agent",
+      owner_key: input.asked_by_key ?? null, fingerprint: input.fingerprint ?? null, history: deferred ? [{ outcome: "deferred", at: input.now.toISOString() }] : [], waiting_on: deferred ? "none" : "agent",
     };
+    const records: { collection: string; id: string; expectedVersion: number; value: { readonly [key: string]: Json } }[] = [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(input.panel_id, n), expectedVersion: 0, value: answer as unknown as { readonly [key: string]: Json } }];
+    if (committed) records.push({ collection: PANEL_ANSWERS_COLLECTION, id: guardIdOf(input.panel_id, input.ask), expectedVersion: guard?.version ?? 0, value: { tenant: input.tenant, panel_id: input.panel_id, ask: input.ask, outcome: input.outcome, n, at: input.now.toISOString() } });
     try {
-      await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(input.panel_id, n), expectedVersion: 0, value: answer as unknown as { readonly [key: string]: Json } }] });
+      await store.commit({ appends: [], records });
       return answer;
     } catch (error) {
+      // A lost race is looked at again: the next pass sees the committed answer and refuses it.
       if (attempt >= 3) throw error;
     }
   }
@@ -245,4 +264,23 @@ export async function reassignOwner(
     return { ok: false, message: NOTHING_SENT };
   }
   return { ok: true, changed: records.length };
+}
+
+/** The words an unrouted answer from before the upgrade is closed with, when no owner was recorded for it. */
+export const PRE_UPGRADE_WORDS = "Answered before the upgrade; the owner was not recorded.";
+
+/**
+ * Closes answers written before the upgrade that have no owner and no route. They do not block acceptance after the upgrade
+ * (store-design-v2 section 5). Runs once; a second run finds nothing to close. Returns how many it closed.
+ */
+export async function migratePreUpgradeAnswers(store: DurableStore, tenant: string, _now: Date): Promise<number> {
+  let closed = 0;
+  for (const a of await listAnswers(store, tenant)) {
+    if (!waitsForAgent(a) || a.owner_key !== null || a.outcome === null) continue;
+    const row = await store.getRecord(PANEL_ANSWERS_COLLECTION, idOf(a.panel_id, a.n));
+    if (row === null || row === undefined) continue;
+    await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(a.panel_id, a.n), expectedVersion: row.version, value: { ...a, replied: true, waiting_on: "none", routed_as: PRE_UPGRADE_WORDS} as unknown as { readonly [key: string]: Json } }] });
+    closed += 1;
+  }
+  return closed;
 }

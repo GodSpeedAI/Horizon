@@ -88,7 +88,7 @@ import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/wor
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
 import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
-import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, listAnswers, recordAnswer, rememberAgreed, routeAnswer, stopWaiting, checkValue, reassignOwner, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
+import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, listAnswers, migratePreUpgradeAnswers, QuestionAlreadyAnswered, recordAnswer, routeAnswer, stopWaiting, checkValue, reassignOwner, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
 import { ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
@@ -105,6 +105,7 @@ import { recordReader, type RecordReader } from "./adapters/realitytrace-economi
 import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
 import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, PAIR_FIRST_WORDS, printPairingCode } from "./desk/pairing.ts";
 import { DEFAULT_AGENT_KEY_ID, DEFAULT_AGENT_NAME, ownerOfKey, readRegistry } from "./desk/agent-keys.ts";
+import { questionFingerprint } from "./capabilities/question-rules.ts";
 import { noteNotRecorded, notRecordedWarnings } from "./capabilities/reconciliation.ts";
 import { setupMapping } from "./config/setup.ts";
 import type { RecordSource } from "./config/types.ts";
@@ -1863,6 +1864,8 @@ export async function createApplication(
 
   // ---- Stage 4: panels from agents. The open panels are held here; the person's answers are kept in `horizon-panel-answers`. ----
   let panelBoard: PanelsBoard = NO_PANELS;
+  // Answers from before the upgrade with no owner are closed once, at start. Panel reads wait for that to finish.
+  const answersMigrated: Promise<number> = migratePreUpgradeAnswers(runtime.runtime.store, caller.tenant, clock()).catch(() => 0);
 
   /** The question's own words and the open-question test for one panel, from the board. */
   const askOf = (panelId: string, askId: string): { readonly question: string } | null => {
@@ -1904,6 +1907,7 @@ export async function createApplication(
 
   /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`, `ask.withdraw`, `answer.route`). To choose parts well an agent reads `GET /desk/panels/catalogue`. A reply on a panel clears the wait on the answers given there. */
   async function applyAgentOp(op: AgentOp, agentName?: string, keyId: string = UNKEYED_AGENT): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
+    await answersMigrated;
     const who = agentName ?? UNNAMED_AGENT;
     // An agent reads only the answers to the questions it asked itself.
     // Ownership is the key id that put the question up, never the display name: a name is a label any caller can send.
@@ -2007,6 +2011,12 @@ export async function createApplication(
       }
     }
     for (const { panel, question } of incoming) {
+      // The answer's own fingerprint decides when it has one. The older agreement store is read only, for answers written before fingerprints.
+      const answered = (await listAnswers(store, caller.tenant, panel)).filter((a) => a.ask === question.id && a.outcome === "answered");
+      if (answered.some((a) => a.fingerprint != null)) {
+        if (answered.some((a) => a.fingerprint != null && a.fingerprint !== questionFingerprint(question))) return true;
+        continue;
+      }
       const agreed = await agreedFingerprintOf(store, panel, question.id);
       if (agreed !== null && agreed !== agreedFingerprint(panel, question)) return true;
     }
@@ -2020,6 +2030,7 @@ export async function createApplication(
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     if (body === null || typeof body !== "object" || typeof body.op !== "string") return fail(400, "That could not be read. Nothing was changed.");
     const store = runtime.runtime.store;
+    await answersMigrated;
     if (body.op === "human.stop_waiting") {
       if (typeof body.step !== "string" || body.step === "") return fail(400, "Say which step to stop waiting for.");
       const n = await stopWaiting(store, caller.tenant, body.step);
@@ -2060,10 +2071,10 @@ export async function createApplication(
       if (checked !== null && !checked.ok) return fail(400, checked.message);
       const stored = checked !== null && checked.ok ? checked.value : value.value;
       try {
-        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, now: clock() });
-        // The agreement to these exact words outlives the panel and the desk's memory of it (see agreedAltered).
-        if (outcome === "answered" && askBlock !== undefined) await rememberAgreed(store, caller.tenant, body.panel, body.ask, agreedFingerprint(body.panel, askBlock), clock());
-      } catch {
+        // The answer carries the question's fingerprint, so the same question cannot come back with other words (see agreedAltered).
+        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, fingerprint: askBlock === undefined ? null : questionFingerprint(askBlock), now: clock() });
+      } catch (error) {
+        if (error instanceof QuestionAlreadyAnswered) return fail(409, error.message);
         return fail(500, "Your answer was not saved. Nothing was sent. Try again.");
       }
       panelBoard = state;
@@ -2087,6 +2098,7 @@ export async function createApplication(
   }
 
   async function panelsData(): Promise<PanelsData> {
+    await answersMigrated;
     const waiting = new Map<string, string>();
     for (const a of await listAnswers(runtime.runtime.store, caller.tenant)) if (waitsForAgent(a) && a.step !== null && !waiting.has(a.step)) waiting.set(a.step, a.panel_id);
     return { ...panelBoard, waiting: [...waiting].map(([step, panel]) => ({ step, panel })) };
