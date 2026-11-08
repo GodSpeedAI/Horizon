@@ -60,7 +60,7 @@ export interface PanelAnswer {
    * Every change of owner, in order (`planReassign`). The authorship fields (`asked_by`, `asked_by_key`) are never changed by a
    * reassignment; this list says who held the question and when.
    */
-  readonly reassignments?: readonly { readonly from_key: string; readonly to_key: string; readonly from_name: string; readonly to_name: string; readonly at: string }[];
+  readonly reassignments?: readonly { readonly from_key: string | null; readonly to_key: string; readonly from_name: string; readonly to_name: string; readonly at: string }[];
 }
 
 /**
@@ -379,7 +379,8 @@ export async function planReassign(
   store: DurableStore,
   input: {
     readonly tenant: string; readonly panel_id: string; readonly ask: string; readonly question: string;
-    readonly from_key: string; readonly to_key: string; readonly from_name: string; readonly to_name: string;
+    /** The previous owner as the person saw it. Null means the answer has no owner recorded (a legacy answer from before the upgrade). */
+    readonly from_key: string | null; readonly to_key: string; readonly from_name: string; readonly to_name: string;
     readonly paired: boolean; readonly pairedAgeMs: number | null; readonly targetRegistered: boolean; readonly confirmed: boolean;
     readonly who: Who; readonly now: Date;
   },
@@ -388,7 +389,11 @@ export async function planReassign(
   const waiting = rows.filter((r) => waitsForAgent(r.answer)).at(-1)?.answer;
   if (waiting === undefined) return { ok: false, message: "No answer is waiting for an agent on that question, so there is no owner to change. Nothing was changed." };
   const state = { owner_key: waiting.owner_key ?? null, fingerprint: waiting.fingerprint ?? null, outcome: waiting.outcome, replied: waiting.replied, waiting_on: waiting.waiting_on ?? "agent", history: waiting.history ?? [], routed_as: waiting.routed_as ?? null, version: waiting.version ?? null } as const;
-  if (state.owner_key !== input.from_key) return { ok: false, message: "The owner changed while you were looking. Look again, then try. Nothing was changed." };
+  // The comparison is exact: a null previous owner matches only an answer with no owner, and a named one never matches a null owner.
+  if (state.owner_key !== input.from_key) {
+    if (state.owner_key === null) return { ok: false, message: NO_OWNER_RECORDED };
+    return { ok: false, message: "The owner changed while you were looking. Look again, then try. Nothing was changed." };
+  }
   const verdict = checkReassign({ state, paired: input.paired, pairedAgeMs: input.pairedAgeMs ?? Number.POSITIVE_INFINITY, newOwnerKey: input.to_key, targetRegistered: input.targetRegistered, confirmed: input.confirmed });
   if (!verdict.ok) return { ok: false, message: verdict.message };
   const when = input.now.toISOString();
@@ -401,6 +406,9 @@ export async function planReassign(
   const row = newRowRecord(input.who, { source: "you", kind: "note", words: `Moved the question "${input.question}" from ${input.from_name} to ${input.to_name}.`, outcome: `${input.to_name} now answers for it, since ${when}.`, status: "done", refs: { panel_id: input.panel_id, ask_id: input.ask } }, input.now);
   return { ok: true, records: [...records, row], changed: records.length };
 }
+
+/** The refusal when the person names a previous owner for an answer that has none recorded. Send the previous owner as null to move it. */
+export const NO_OWNER_RECORDED = "This answer has no owner recorded, so there is no previous owner to name. Send the previous owner as null to move it. Nothing was changed.";
 
 /** The words an unrouted answer from before the upgrade is closed with, when no owner was recorded for it. */
 export const PRE_UPGRADE_WORDS = "Answered before the upgrade; the owner was not recorded.";

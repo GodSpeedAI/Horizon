@@ -2424,7 +2424,7 @@ export async function createApplication(
     if (body.op === "human.reassign_owner") {
       // The person moves a waiting question to another registered agent. Paired only (the route is paired), a recent pairing, a
       // registered target, and an explicit second confirm that echoes the owner the person saw.
-      if (typeof body.panel !== "string" || typeof body.ask !== "string" || typeof body.from_key_id !== "string" || typeof body.to_key_id !== "string") return fail(400, "That change could not be read. Nothing was changed.");
+      if (typeof body.panel !== "string" || typeof body.ask !== "string" || (typeof body.from_key_id !== "string" && body.from_key_id !== null) || typeof body.to_key_id !== "string") return fail(400, "That change could not be read. Nothing was changed.");
       let registry: ReturnType<typeof readRegistry>;
       try {
         registry = readRegistry(loaded.agentRegistryPath);
@@ -2432,7 +2432,8 @@ export async function createApplication(
         return fail(500, "The agent list could not be read. Nothing was changed.");
       }
       const toEntry = body.to_key_id === DEFAULT_AGENT_KEY_ID ? { key_id: DEFAULT_AGENT_KEY_ID, name: DEFAULT_AGENT_NAME } : registry.find((e) => e.key_id === body.to_key_id);
-      const fromName = body.from_key_id === DEFAULT_AGENT_KEY_ID ? DEFAULT_AGENT_NAME : registry.find((e) => e.key_id === body.from_key_id)?.name ?? "an agent no longer listed";
+      // A null previous owner is an answer that has no owner recorded (a legacy answer from before the upgrade). It names no agent.
+      const fromName = body.from_key_id === null ? "no one" : body.from_key_id === DEFAULT_AGENT_KEY_ID ? DEFAULT_AGENT_NAME :registry.find((e) => e.key_id === body.from_key_id)?.name ?? "an agent no longer listed";
       // Design v3, step 4 (item 6): a question nobody has answered yet moves the same way. Its owner is the panel block's asked_by_key,
       // and the move and its conversation row are one commit. A question with a waiting answer moves its answers (below).
       // A closed panel is still a durable panel: its own record holds the question, so its owner moves with the answers (R2-4).
