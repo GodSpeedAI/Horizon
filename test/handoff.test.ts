@@ -275,11 +275,12 @@ describe("Hand off", () => {
     expect(done.body.message).toContain("It has not started yet:");
     expect(done.body.message).toContain("Start it");
     advanceFails = false;
-    const start = await app.post("/desk/start", { case_id: CASE });
+    // Start it starts the steps the person was shown as waiting: the set is sent back with the start.
+    const start = await app.post("/desk/start", { case_id: CASE, also_starts: [...plan] });
     expect(start.status).toBe(200);
     expect(advances.length).toBe(2);
     expect(advances[1]!.request_id).not.toBe(advances[0]!.request_id);
-    expect((await app.post("/desk/start", { case_id: "nope" })).status).toBe(409);
+    expect((await app.post("/desk/start", { case_id: "nope", also_starts: [] })).status).toBe(409);
   });
 
   test("when agent work is not connected the desk says so and refuses to hand a step to an agent", async () => {

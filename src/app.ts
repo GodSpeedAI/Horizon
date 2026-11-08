@@ -2088,7 +2088,8 @@ export async function createApplication(
 
   async function deskStart(request: Request): Promise<Response> {
     const headers = { "cache-control": "no-store" };
-    const body = (await request.json().catch(() => null)) as { case_id?: unknown } | null;
+    // The start is bound to what the person previewed: the steps listed as waiting, sent back as `also_starts`. A different set is refused.
+    const body = (await request.json().catch(() => null)) as { case_id?: unknown; also_starts?: unknown } | null;
     if (caseKeeper === null) return Response.json({ ok: false, message: "Cases are not connected, so nothing can be started." }, { status: 503, headers });
     const caseId = typeof body?.case_id === "string" ? body.case_id.replace(/^case:/, "") : "";
     const listed = await listCases(caseKeeper);
@@ -2097,6 +2098,9 @@ export async function createApplication(
     if (target === undefined) return Response.json({ ok: false, message: "That case is not running, so nothing can be started." }, { status: 409, headers });
     const waiting = (await waitingToStart([target])).get(caseId) ?? [];
     if (waiting.length === 0) return Response.json({ ok: false, message: "Nothing is waiting to start in that case." }, { status: 409, headers });
+    const previewed = Array.isArray(body?.also_starts) && body.also_starts.every((id) => typeof id === "string") ? (body.also_starts as string[]) : null;
+    if (previewed === null) return Response.json({ ok: false, message: "Look at the steps waiting to start, then start them." }, { status: 400, headers });
+    if (!sameSet(previewed, waiting.map((w) => w.plan_item_id))) return Response.json({ ok: false, message: "The case changed after you looked. Look again, then start." }, { status: 409, headers });
     // The id names this set of waiting steps: a later, different set is a different request.
     const digest = createHash("sha256").update(waiting.map((w) => w.plan_item_id).sort().join("\n")).digest("hex").slice(0, 12);
     const result = await startCase(caseId, `advance:start:${caseId}:${digest}`);

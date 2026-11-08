@@ -86,3 +86,35 @@ describe("the confirmation says what will start", () => {
     expect(handoffFacts({ ...pv, also_starts: [] }, false).next).toContain("Only this step will start");
   });
 });
+
+describe("starting a case is bound to the steps the person previewed", () => {
+  const CHANGED = "The case changed after you looked. Look again, then start.";
+  const start = (body: unknown) => app.post("/desk/start", body);
+
+  test("the start sends the case and the steps it previewed, and starts the case when they are still the waiting set", async () => {
+    plan = ["old_a", "old_b"];
+    advances = 0;
+    const sent = await start({ case_id: CASE, also_starts: ["old_a", "old_b"] });
+    expect(sent.status).toBe(200);
+    expect(advances).toBe(1);
+  });
+
+  test("a step added after the preview refuses the start, and nothing is started", async () => {
+    plan = ["old_a"];
+    advances = 0;
+    // The person previewed ["old_a"]; then a step began waiting.
+    plan = ["old_a", "old_late"];
+    const refused = await start({ case_id: CASE, also_starts: ["old_a"] });
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as any).message).toBe(CHANGED);
+    expect(advances).toBe(0);
+  });
+
+  test("a start that says nothing about what was previewed is refused", async () => {
+    plan = ["old_a"];
+    advances = 0;
+    const bare = await start({ case_id: CASE });
+    expect(bare.status).toBe(400);
+    expect(advances).toBe(0);
+  });
+});

@@ -39,6 +39,10 @@ describe("new sentences are plain", () => {
     clean("the note was saved", "The note was saved. This was done, but it could not be added to the conversation. Check the desk log.");
     clean("steps changed", "Preview out of date. The steps waiting to start in this case changed after you looked at it. Nothing was sent. Look at the new preview and decide again.");
     clean("other agent", "That question was asked by a different agent, so you cannot answer for it.");
+    clean("the case changed after a preview", "The case changed after you looked. Look again, then start.");
+    clean("start needs the preview", "Look at the steps waiting to start, then start them.");
+    clean("try again shows the steps", "Waiting to start now: Fix the footer, Call the supplier. Look again, then start it from Work.");
+    clean("nothing waiting now", "Nothing is waiting to start in that case now.");
   });
 
   test("a conversation with stages, a claimed route and a partly done hand off", () => {

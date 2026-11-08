@@ -398,9 +398,9 @@ function App() {
         return { ok: false, message: "Horizon did not answer, so the label was not saved." };
       }
     },
-    startCase: async (caseId) => {
+    startCase: async (caseId, previewed) => {
       try {
-        const response = await fetch("/desk/start", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ case_id: caseId }) });
+        const response = await fetch("/desk/start", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ case_id: caseId, also_starts: previewed }) });
         const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
         void loadWork();
         return { ok: response.ok && body.ok === true, message: body.message ?? (response.ok ? "Started." : "It did not start.") };
@@ -409,15 +409,17 @@ function App() {
       }
     },
     conversation: {
+      // Try again re-previews: it reads the steps waiting now and shows them. It does not start anything; the person starts from Work.
       retryStart: async (caseId) => {
         try {
-          const response = await fetch("/desk/start", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ case_id: caseId }) });
-          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+          const work = (await (await fetch("/desk/work.json", { headers: { accept: "application/json" } })).json()) as { cases?: { items?: { case_id: string; waiting?: { name: string }[] }[] } };
           void loadRows();
           void loadWork();
-          return { ok: response.ok && body.ok === true, message: body.message ?? (response.ok ? "Started." : "It did not start.") };
+          const waiting = work.cases?.items?.find((c) => c.case_id === caseId)?.waiting ?? [];
+          if (waiting.length === 0) return { ok: false, message: "Nothing is waiting to start in that case now." };
+          return { ok: false, message: `Waiting to start now: ${waiting.map((w) => w.name).join(", ")}. Look again, then start it from Work.` };
         } catch {
-          return { ok: false, message: "Horizon did not answer, so nothing was started." };
+          return { ok: false, message: "Horizon did not answer, so the steps could not be read again." };
         }
       },
       discard: async (rowId) => {

@@ -46,7 +46,7 @@ export interface DeskIo extends NoteIo, InspectIo {
   /** The stored conversation: discarding a waiting suggestion. */
   readonly conversation: ConversationIo;
   /** Starts the steps of a case that were added and are waiting. */
-  readonly startCase: (caseId: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
+  readonly startCase: (caseId: string, previewed: readonly string[]) => Promise<{ readonly ok: boolean; readonly message: string }>;
 }
 
 export interface DeskProps {

@@ -16,7 +16,7 @@ import { ExportButton } from "../../workspace/export-button.tsx";
 export interface WorkViewProps extends ViewProps {
   readonly saveLabel: SaveLabel;
   /** Starts the steps of a case that were added and are waiting. */
-  readonly startCase?: (caseId: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
+  readonly startCase?: (caseId: string, previewed: readonly string[]) => Promise<{ readonly ok: boolean; readonly message: string }>;
 }
 
 /** A folder name, not a full path. */
@@ -171,7 +171,7 @@ export function Work({ ui, dispatch, saveLabel, startCase }: WorkViewProps): Rea
                     ))}
                   </ul>
                   {startCase ? (
-                    <button type="button" onClick={() => void startCase(c.case_id).then((r) => setStartNote(r.message))} data-start-case>
+                    <button type="button" onClick={() => void startCase(c.case_id, (c.waiting ?? []).map((w) => w.plan_item_id)).then((r) => setStartNote(r.message))} data-start-case>
                       Start it
                     </button>
                   ) : null}
