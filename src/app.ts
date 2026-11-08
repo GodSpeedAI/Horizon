@@ -81,6 +81,7 @@ import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type Debugger
 import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare.tsx";
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
 import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
+import { BAD_REQUEST_ID_WORDS, REUSED_REQUEST_WORDS, requestFingerprint, requestRecord, seenRequest, validRequestId } from "./capabilities/desk-requests.ts";
 import { answerRowOf, appendRow, discardRow, listConversation, panelRowOf, planAppend, planUpdate, settleDraftRow } from "./capabilities/conversation.ts";
 import { answerEcho, cleanAgentName, MAX_WAITING_PROPOSALS, TOO_MANY_PROPOSALS, WAITING_FOR_AGENT, type ConversationRow, type RowSource, type RowStage } from "./ui/desk/conversation-model.ts";
 import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
@@ -2175,6 +2176,16 @@ export async function createApplication(
       return Response.json({ ok: true, message: `Moved to ${toName}. Its answer waits for them to say where it went.` }, { headers });
     }
     if (body.op === "human.answer") {
+      // Design v3, section 2: a request id makes a retry safe. The same id with the same body returns the response it got, and
+      // writes nothing; the same id with other contents is refused. The id's record joins the answer's commit below.
+      const requestId = body.request_id;
+      if (requestId !== undefined && !validRequestId(requestId)) return fail(400, BAD_REQUEST_ID_WORDS);
+      const fingerprint = requestFingerprint(body);
+      if (typeof requestId === "string") {
+        const seen = await seenRequest(store, caller.tenant, requestId, fingerprint);
+        if (seen.kind === "reused") return fail(409, REUSED_REQUEST_WORDS);
+        if (seen.kind === "replay") return Response.json(seen.response, { headers });
+      }
       const outcome = body.outcome;
       const value = checkValue(body.value);
       if (typeof body.panel !== "string" || typeof body.ask !== "string" || !(OUTCOMES as readonly unknown[]).includes(outcome) || !value.ok) return fail(400, "That answer could not be read. Nothing was sent.");
@@ -2196,19 +2207,21 @@ export async function createApplication(
       const deferredOnly = outcome === "deferred";
       const panelId: string = body.panel;
       const askId: string = body.ask;
+      const answerResponse = { ok: true, message: sentWords };
       try {
         // The answer carries the question's fingerprint, so the same question cannot come back with other words (see agreedAltered).
         await recordAnswer(store, { tenant: caller.tenant, panel_id: panelId, ask: askId, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, fingerprint: askBlock === undefined ? null : questionFingerprint(askBlock), now: clock(), alsoRecords: async () => {
           const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: deferredOnly ? "Not yet. Nothing was sent to the agent." : WAITING_FOR_AGENT, status: deferredOnly ? "done" : "waiting", refs: { panel_id: panelId, ask_id: askId, ...(step ? { step_id: step } : {}) } }, clock());
           const panelRow = await panelRowWrite(state, panelId, deferredOnly ? "Not yet. You can answer it later." : "You answered. Waiting for the agent to say where it went.");
-          return [...(await boardWrites(store, caller.tenant, before, state)), row.record, ...(panelRow === null ? [] : [panelRow])];
+          const keep = typeof requestId === "string" ? [requestRecord(caller.tenant, requestId, fingerprint, answerResponse)] : [];
+          return [...(await boardWrites(store, caller.tenant, before, state)), row.record, ...(panelRow === null ? [] : [panelRow]), ...keep];
         } });
       } catch (error) {
         if (error instanceof QuestionAlreadyAnswered) return fail(409, error.message);
         return fail(500, NOTHING_SENT);
       }
       await rebuildBoard();
-      return Response.json({ ok: true, message: sentWords }, { headers });
+      return Response.json(answerResponse, { headers });
     }
     const op: HumanOp | null =
       body.op === "human.pin" && typeof body.id === "string" && typeof body.pinned === "boolean" ? { op: "human.pin", id: body.id, pinned: body.pinned }

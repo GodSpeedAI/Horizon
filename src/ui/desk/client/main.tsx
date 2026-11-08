@@ -436,7 +436,7 @@ function App() {
     panels: {
       answer: async (input) => {
         try {
-          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", ...input }) });
+          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", request_id: crypto.randomUUID(), ...input }) });
           const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; recorded?: boolean; recorded_words?: string };
           rev.current = "";
           void poll();
