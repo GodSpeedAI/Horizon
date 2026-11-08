@@ -8,6 +8,7 @@
  * without releasing it does not block the next start.
  */
 import { randomUUID } from "node:crypto";
+import { closeSync, openSync, readFileSync, unlinkSync, writeSync } from "node:fs";
 import type { DurableStore } from "@godspeedai/cognate-events";
 
 export const LOCK_COLLECTION = "horizon-desk-lock";
@@ -63,4 +64,78 @@ export async function releaseDeskLock(store: DurableStore, token: string): Promi
   const current = await store.getRecord(LOCK_COLLECTION, LOCK_ID);
   if (current === undefined || (current.value as { readonly token?: unknown }).token !== token) return;
   await store.commit({ appends: [], records: [{ collection: LOCK_COLLECTION, id: LOCK_ID, expectedVersion: current.version, value: { token: null, pid: null, since: null } }] });
+}
+
+/**
+ * The process-level lock: a file next to the store (`<store>.lock`), taken before the store is opened at all. The store's own record
+ * (above) lives inside the store, so a second desk would migrate an older store before that record could refuse it. This file is
+ * checked first. It holds the owning process id and a random token. It is created with `wx`, so two starts cannot both take it.
+ */
+export interface StoreLockFile {
+  readonly path: string;
+  readonly token: string;
+}
+
+export function storeLockPath(storePath: string): string {
+  return `${storePath}.lock`;
+}
+
+type LockHolder = { readonly pid?: unknown; readonly token?: unknown };
+
+/** The holder the file names. Undefined when there is no file. A file that cannot be read as a holder reads as an empty holder. */
+function readLockHolder(path: string): LockHolder | undefined {
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
+    return typeof parsed === "object" && parsed !== null ? (parsed as LockHolder) : {};
+  } catch (error) {
+    return (error as { code?: unknown }).code === "ENOENT" ? undefined : {};
+  }
+}
+
+/**
+ * Takes the store's lock file, or throws DeskAlreadyRunning. A file whose process is alive (or that cannot be read, so it may be
+ * mid-write) refuses the start. A file whose process has gone is taken over. Call this before the store is opened.
+ */
+export function acquireStoreLockFile(storePath: string): StoreLockFile {
+  const path = storeLockPath(storePath);
+  const token = randomUUID();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    let fd: number;
+    try {
+      fd = openSync(path, "wx");
+    } catch (error) {
+      if ((error as { code?: unknown }).code !== "EEXIST") throw error;
+      const holder = readLockHolder(path);
+      if (holder === undefined) continue;
+      const alive = typeof holder.pid !== "number" || processAlive(holder.pid) || (typeof holder.token === "string" && openTokens.has(holder.token));
+      if (alive) throw new DeskAlreadyRunning();
+      // The process that held it has gone: the lock is stale, so it is taken over.
+      try {
+        unlinkSync(path);
+      } catch (unlinkError) {
+        if ((unlinkError as { code?: unknown }).code !== "ENOENT") throw unlinkError;
+      }
+      continue;
+    }
+    try {
+      writeSync(fd, JSON.stringify({ pid: process.pid, token, since: new Date().toISOString() }));
+    } catch (writeError) {
+      closeSync(fd);
+      unlinkSync(path);
+      throw writeError;
+    }
+    closeSync(fd);
+    return { path, token };
+  }
+  throw new DeskAlreadyRunning();
+}
+
+/** Removes the lock file, if it still holds this lock's token. Nothing is removed when another start has taken it. */
+export function releaseStoreLockFile(lock: StoreLockFile): void {
+  try {
+    if (readLockHolder(lock.path)?.token !== lock.token) return;
+    unlinkSync(lock.path);
+  } catch {
+    // Already gone: nothing to release.
+  }
 }

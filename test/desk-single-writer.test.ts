@@ -4,8 +4,10 @@
  * a process that died does not block the next start. The tests start real application instances on one SQLite file.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { acquireDeskLock, ALREADY_RUNNING_WORDS, DeskAlreadyRunning, LOCK_COLLECTION, LOCK_ID } from "../src/capabilities/desk-lock.ts";
+import { acquireDeskLock, ALREADY_RUNNING_WORDS, DeskAlreadyRunning, LOCK_COLLECTION, LOCK_ID, storeLockPath } from "../src/capabilities/desk-lock.ts";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { Database } from "bun:sqlite";
 import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
@@ -128,5 +130,61 @@ describe("the writer lock comes before any runtime starts", () => {
     } finally {
       await after.close();
     }
+  });
+});
+
+describe("the process-level lock file is checked before the store is opened", () => {
+  /** Stops a desk and turns its store into one written before migration 4 (its lease columns are dropped and its version row removed). */
+  const stopAtSchema3 = async (): Promise<string> => {
+    const first = await open();
+    const root = first.root;
+    await first.stop();
+    apps.splice(apps.indexOf(first), 1);
+    const db = new Database(join(root, "d.sqlite"));
+    try {
+      db.exec("ALTER TABLE outbox DROP COLUMN lease_generation; ALTER TABLE outbox DROP COLUMN lease_owner; DELETE FROM schema_versions WHERE version = 4;");
+    } finally {
+      db.close();
+    }
+    return root;
+  };
+  const schemaVersion = (path: string): number => {
+    const db = new Database(path, { readonly: true });
+    try {
+      return (db.query("SELECT MAX(version) AS version FROM schema_versions").get() as { version: number }).version;
+    } finally {
+      db.close();
+    }
+  };
+
+  test("a store at schema 3 with a live lock file is refused, and its schema version is still 3", async () => {
+    const root = await stopAtSchema3();
+    const path = join(root, "d.sqlite");
+    const lock = storeLockPath(path);
+    // A live process (this test's parent) holds the lock file. Its record in the store is not held, so only the file can refuse.
+    writeFileSync(lock, JSON.stringify({ pid: process.ppid, token: "other-desk", since: new Date().toISOString() }));
+    try {
+      expect(schemaVersion(path)).toBe(3);
+      await expect(startDeskApp({ root })).rejects.toThrow(ALREADY_RUNNING_WORDS);
+      expect(schemaVersion(path)).toBe(3);
+      // The refused start did not take the lock file over.
+      expect(existsSync(lock)).toBe(true);
+    } finally {
+      rmSync(lock, { force: true });
+    }
+  });
+
+  test("a lock file whose process has gone is taken over, and removed when the desk stops", async () => {
+    const root = await stopAtSchema3();
+    const path = join(root, "d.sqlite");
+    const lock = storeLockPath(path);
+    writeFileSync(lock, JSON.stringify({ pid: 2147483646, token: "crashed-desk", since: "2026-11-01T00:00:00.000Z" }));
+    const desk = await startDeskApp({ root });
+    apps.push(desk);
+    expect(schemaVersion(path)).toBe(4);
+    expect(JSON.parse(await Bun.file(lock).text())).toMatchObject({ pid: process.pid });
+    await desk.stop();
+    apps.splice(apps.indexOf(desk), 1);
+    expect(existsSync(lock)).toBe(false);
   });
 });

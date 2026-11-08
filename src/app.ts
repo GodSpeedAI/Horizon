@@ -82,7 +82,7 @@ import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type Debugger
 import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare.tsx";
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
 import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
-import { acquireDeskLock, releaseDeskLock } from "./capabilities/desk-lock.ts";
+import { acquireDeskLock, acquireStoreLockFile, releaseDeskLock, releaseStoreLockFile, type StoreLockFile } from "./capabilities/desk-lock.ts";
 import { appliedVersion, DESK_MIGRATIONS, MIGRATING_WORDS, MIGRATION_FAILED_WORDS, runDeskMigrations } from "./capabilities/desk-migrations.ts";
 import { BAD_REQUEST_ID_WORDS, REQUEST_ID_REQUIRED_WORDS, REUSED_REQUEST_WORDS, requestFingerprint, requestRecord, seenRequest, validRequestId } from "./capabilities/desk-requests.ts";
 import { answerRowOf, appendRow, discardRow, listConversation, newRowRecord, panelRowOf, planAppend, planUpdate, settleDraftRow } from "./capabilities/conversation.ts";
@@ -433,13 +433,24 @@ export async function createApplication(
   // worker, projection runner or poller is built, so a second desk on the same store is refused before it touches the outbox. A read-only
   // open reads through a guard that refuses writes, and takes no lock and gives none up.
   const storeFile = assertStoreBoundary(loaded.config, options.storePath ?? loaded.config.runtime_store);
-  const deskStore: DurableStore = options.readOnly ? openReadOnlyStore(storeFile) : openSqliteStore({ path: storeFile });
+  // The process-level lock file comes before any open of the store: opening a store at an older schema migrates it, so a second desk
+  // must be refused before that open (R3-4). The store's own record lock below stays as a second check.
+  let storeLock: StoreLockFile | undefined;
+  if (!options.readOnly) storeLock = acquireStoreLockFile(storeFile);
+  let deskStore: DurableStore;
+  try {
+    deskStore = options.readOnly ? openReadOnlyStore(storeFile) : openSqliteStore({ path: storeFile });
+  } catch (error) {
+    if (storeLock !== undefined) releaseStoreLockFile(storeLock);
+    throw error;
+  }
   let deskLockToken: string | undefined;
   if (!options.readOnly) {
     try {
       deskLockToken = await acquireDeskLock(deskStore);
     } catch (error) {
       await deskStore.close();
+      if (storeLock !== undefined) releaseStoreLockFile(storeLock);
       throw error;
     }
   }
@@ -476,6 +487,7 @@ export async function createApplication(
   }).catch(async (error: unknown): Promise<never> => {
     if (deskLockToken !== undefined) await releaseDeskLock(deskStore, deskLockToken);
     await deskStore.close();
+    if (storeLock !== undefined) releaseStoreLockFile(storeLock);
     throw error;
   });
   // A read-only open never migrates: until the desk has run every migration, its records cannot be surfaced read-only.
@@ -3206,6 +3218,7 @@ export async function createApplication(
       if (deskLockToken !== undefined) await releaseDeskLock(runtime.runtime.store, deskLockToken);
       await runtime.runtime.close();
       await deskStore.close();
+      if (storeLock !== undefined) releaseStoreLockFile(storeLock);
     },
   };
 }
