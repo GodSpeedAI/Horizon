@@ -63,3 +63,17 @@ describe("a route planned before a reassignment cannot restore the old owner", (
     expect((await listAnswers(store, "t", "p"))[0]?.state).toBe("waiting_for_agent");
   });
 });
+
+describe("a reassignment keeps the authorship of the answers it moves", () => {
+  test("Alice's answer still shows asked_by Alice after the move to Bob; the owner and a history entry change", async () => {
+    const store = createMemoryStore();
+    await askedByAlice(store);
+    const moved = await moveToBob(store);
+    expect(moved.ok).toBe(true);
+    if (!moved.ok) return;
+    await store.commit({ appends: [], records: moved.records });
+    const [row] = await listAnswers(store, "t", "p");
+    expect(row).toMatchObject({ asked_by: "Alice", asked_by_key: "ag_alice", owner_key: "ag_bob" });
+    expect(row?.reassignments).toEqual([{ from_key: "ag_alice", to_key: "ag_bob", from_name: "Alice", to_name: "Bob", at: later.toISOString() }]);
+  });
+});

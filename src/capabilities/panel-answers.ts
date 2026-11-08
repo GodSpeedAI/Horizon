@@ -56,6 +56,11 @@ export interface PanelAnswer {
   readonly state?: QuestionStatus;
   /** Why the answer finished, once it has: the agent named where it went ("reported"), or the person stopped waiting ("stopped"). */
   readonly finished_by?: FinishedBy | null;
+  /**
+   * Every change of owner, in order (`planReassign`). The authorship fields (`asked_by`, `asked_by_key`) are never changed by a
+   * reassignment; this list says who held the question and when.
+   */
+  readonly reassignments?: readonly { readonly from_key: string; readonly to_key: string; readonly from_name: string; readonly to_name: string; readonly at: string }[];
 }
 
 /**
@@ -365,8 +370,10 @@ export async function planReassign(
   const verdict = checkReassign({ state, paired: input.paired, pairedAgeMs: input.pairedAgeMs ?? Number.POSITIVE_INFINITY, newOwnerKey: input.to_key, targetRegistered: input.targetRegistered, confirmed: input.confirmed });
   if (!verdict.ok) return { ok: false, message: verdict.message };
   const when = input.now.toISOString();
-  // Each write commits against the version this read saw.
-  const records: CommitRecord[] = rows.map((r) => ({ collection: PANEL_ANSWERS_COLLECTION, id: idOf(r.answer.panel_id, r.answer.n), expectedVersion: r.version, value: storedOf({ ...r.answer, owner_key: input.to_key, asked_by_key: input.to_key, asked_by: input.to_name }) }));
+  const entry = { from_key: input.from_key, to_key: input.to_key, from_name: input.from_name, to_name: input.to_name, at: when };
+  // Only the current owner changes. The authorship fields (asked_by, asked_by_key) stay as the agent that asked wrote them, and
+  // each record gets the reassignment in its list. Each write commits against the version this read saw.
+  const records: CommitRecord[] = rows.map((r) => ({ collection: PANEL_ANSWERS_COLLECTION, id: idOf(r.answer.panel_id, r.answer.n), expectedVersion: r.version, value: storedOf({ ...r.answer, owner_key: input.to_key, reassignments: [...(r.answer.reassignments ?? []), entry] }) }));
   const row = newRowRecord(input.who, { source: "you", kind: "answer", words: `Moved the question "${input.question}" from ${input.from_name} to ${input.to_name}.`, outcome: `${input.to_name} now answers for it, since ${when}. Its answer is still waiting for them to say where it went.`, status: "waiting" }, input.now);
   return { ok: true, records: [...records, row], changed: records.length };
 }

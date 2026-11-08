@@ -2007,7 +2007,7 @@ export async function createApplication(
     const who = agentName ?? UNNAMED_AGENT;
     // An agent reads only the answers to the questions it asked itself.
     // Ownership is the key id that put the question up, never the display name: a name is a label any caller can send.
-    if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.asked_by_key === keyId) };
+    if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.owner_key === keyId) };
     if (boardRefused !== null) return { ok: false, code: "UNAVAILABLE", message: boardRefused };
     if (op.tool === "ask.withdraw") {
       // A question still on the board is checked by the rule inside the board's withdraw (reduceAgent). One that is only on record
