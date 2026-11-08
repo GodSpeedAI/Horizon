@@ -2071,16 +2071,18 @@ export async function createApplication(
       }
       return result;
     }
+    // The panel and its conversation row are one commit: both are there or neither is, and a failed row write fails the put.
+    const by = agentName === undefined ? {} : { agent_name: agentName };
     try {
-      await commitBoard(panelBoard, state);
+      const alongside: CommitRecord[] = [];
+      if (result.panel !== null && (op.tool === "show_surface" || op.tool === "ask_human")) {
+        const panel = state.open.find((p) => p.id === result.panel);
+        const asking = stillAskingIn(state, result.panel);
+        alongside.push((await planAppend(store, deskWho, { source: "agent", ...by, kind: "panel", words: panel?.title ?? result.panel, outcome: asking ? "An agent asks you a question." : "An agent put this up.", status: asking ? "waiting" : "done", refs: { panel_id: result.panel, ...(panel?.step ? { step_id: panel.step } : {}) } }, clock())).record);
+      }
+      await commitBoard(panelBoard, state, alongside);
     } catch {
       return { ok: false, code: "UNAVAILABLE", message: "The desk could not save the panel. Nothing was changed. Try again." };
-    }
-    const by = agentName === undefined ? {} : { agent_name: agentName };
-    if (result.panel !== null && (op.tool === "show_surface" || op.tool === "ask_human")) {
-      const panel = panelBoard.open.find((p) => p.id === result.panel);
-      const asking = stillAsking(result.panel);
-      await logRow({ source: "agent", ...by, kind: "panel", words: panel?.title ?? result.panel, outcome: asking ? "An agent asks you a question." : "An agent put this up.", status: asking ? "waiting" : "done", refs: { panel_id: result.panel, ...(panel?.step ? { step_id: panel.step } : {}) } });
     }
     return result;
   }
