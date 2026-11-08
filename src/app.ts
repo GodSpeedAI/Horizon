@@ -1947,16 +1947,6 @@ export async function createApplication(
     const planned = await planUpdate(runtime.runtime.store, deskWho, row.row_id, stillAskingIn(board, panelId, except) ? { status: "waiting", outcome: "An agent asks you a question." } : { status: "done", outcome });
     return planned === null ? null : planned.record;
   }
-  /** The panel's own row after a person's answer. It is written after the answer, as before: the answer is already stored, and the row is a read model. */
-  async function settlePanelRow(panelId: string, outcome: string): Promise<void> {
-    try {
-      const record = await panelRowWrite(panelBoard, panelId, outcome);
-      if (record !== null) await runtime.runtime.store.commit({ appends: [], records: [record] });
-    } catch {
-      // The record is a read model.
-    }
-  }
-
   /**
    * The step a route claim is checked against. The claim is checked only when the agent names the step the question resolves, and that
    * step is waiting in an open case now. Any other step the words name leaves the claim as the agent's word. Null otherwise.
@@ -2199,21 +2189,26 @@ export async function createApplication(
       const checked = outcome === "answered" && askBlock !== undefined ? answerFor({ input: askBlock.input ?? "select", options: askBlock.options }, value.value) : null;
       if (checked !== null && !checked.ok) return fail(400, checked.message);
       const stored = checked !== null && checked.ok ? checked.value : value.value;
-      try {
-        // The answer carries the question's fingerprint, so the same question cannot come back with other words (see agreedAltered).
-        // The panel record that shows the answer is written in the same commit as the answer.
-        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, fingerprint: askBlock === undefined ? null : questionFingerprint(askBlock), now: clock(), alsoRecords: () => boardWrites(store, caller.tenant, before, state) });
-      } catch (error) {
-        if (error instanceof QuestionAlreadyAnswered) return fail(409, error.message);
-        return fail(500, "Your answer was not saved. Nothing was sent. Try again.");
-      }
-      await rebuildBoard();
+      // Design v3: the answer, its question state, the panel's presentation and the conversation row are one commit. Either all are
+      // stored or none is, and a failed commit says so in plain words.
       const sentWords = outcome === "answered" ? "Sent. Waiting for the agent to say where it went." : outcome === "deferred" ? "Put off. Waiting for the agent to say where it went." : "Cancelled. Waiting for the agent to say where it went.";
       // "Not yet" is not an answer: nothing is sent to the agent, and the row says so.
       const deferredOnly = outcome === "deferred";
-      const recorded = await logRow({ source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: deferredOnly ? "Not yet. Nothing was sent to the agent." : WAITING_FOR_AGENT, status: deferredOnly ? "done" : "waiting", refs: { panel_id: body.panel, ask_id: body.ask, ...(step ? { step_id: step } : {}) } });
-      await settlePanelRow(body.panel, deferredOnly ? "Not yet. You can answer it later." : "You answered. Waiting for the agent to say where it went.");
-      return Response.json({ ok: true, message: sentWords, ...(recorded ? {} : { recorded: false, recorded_words: NOT_RECORDED_WORDS }) }, { headers });
+      const panelId: string = body.panel;
+      const askId: string = body.ask;
+      try {
+        // The answer carries the question's fingerprint, so the same question cannot come back with other words (see agreedAltered).
+        await recordAnswer(store, { tenant: caller.tenant, panel_id: panelId, ask: askId, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, fingerprint: askBlock === undefined ? null : questionFingerprint(askBlock), now: clock(), alsoRecords: async () => {
+          const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: deferredOnly ? "Not yet. Nothing was sent to the agent." : WAITING_FOR_AGENT, status: deferredOnly ? "done" : "waiting", refs: { panel_id: panelId, ask_id: askId, ...(step ? { step_id: step } : {}) } }, clock());
+          const panelRow = await panelRowWrite(state, panelId, deferredOnly ? "Not yet. You can answer it later." : "You answered. Waiting for the agent to say where it went.");
+          return [...(await boardWrites(store, caller.tenant, before, state)), row.record, ...(panelRow === null ? [] : [panelRow])];
+        } });
+      } catch (error) {
+        if (error instanceof QuestionAlreadyAnswered) return fail(409, error.message);
+        return fail(500, NOTHING_SENT);
+      }
+      await rebuildBoard();
+      return Response.json({ ok: true, message: sentWords }, { headers });
     }
     const op: HumanOp | null =
       body.op === "human.pin" && typeof body.id === "string" && typeof body.pinned === "boolean" ? { op: "human.pin", id: body.id, pinned: body.pinned }
