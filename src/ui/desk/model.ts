@@ -41,6 +41,8 @@ export interface DeskStatus {
   readonly presenting: boolean;
   /** Plain words when records are being made without a rulebook edition; absent or null otherwise. */
   readonly rulebookWarning?: string | null;
+  /** Gaps between a step Horizon did and the conversation row that records it, in plain words, until they are recorded. */
+  readonly reconciliation?: readonly string[];
 }
 
 export interface DeskCase {

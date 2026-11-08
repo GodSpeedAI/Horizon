@@ -105,6 +105,7 @@ import { recordReader, type RecordReader } from "./adapters/realitytrace-economi
 import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
 import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, PAIR_FIRST_WORDS, printPairingCode } from "./desk/pairing.ts";
 import { ownerOfKey } from "./desk/agent-keys.ts";
+import { noteNotRecorded, notRecordedWarnings } from "./capabilities/reconciliation.ts";
 import { setupMapping } from "./config/setup.ts";
 import type { RecordSource } from "./config/types.ts";
 import { existsSync as fileExists, mkdirSync as makeDir, readFileSync as readFileText, writeFileSync as writeFileText } from "node:fs";
@@ -1519,6 +1520,7 @@ export async function createApplication(
         parts: health.parts,
         keyWarning: health.keyWarning,
         presenting,
+        reconciliation: await notRecordedWarnings(store, caller.tenant),
         rulebookWarning: obligationRt !== null && obligationRt.rulebookConnected() === false ? "Rulebook not connected for records: new records are made without a rulebook edition." : null,
       },
       days: await listDays(store, deskWho),
@@ -1929,7 +1931,9 @@ export async function createApplication(
       const where = found === null ? `The agent says it took it to: ${said}. Not checked: Horizon found no step with that name.` : `The agent says it took it to: ${said}. Checked: the step "${found.name}" is in the case "${found.case_title}".`;
       // One entry per answer: the one made when you answered is finished in place.
       const mine = await answerRowOf(runtime.runtime.store, deskWho, op.panel_id, op.ask_id);
-      await logRow({ source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: found === null ? "claimed" : "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id, ...(found === null ? {} : { step_id: found.step_id, case_id: found.case_id }) } });
+      const recorded = await logRow({ source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: found === null ? "claimed" : "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id, ...(found === null ? {} : { step_id: found.step_id, case_id: found.case_id }) } });
+      // The route itself is recorded; only its conversation row failed. The gap is kept in the store and shown in the status line.
+      if (!recorded) await noteNotRecorded(runtime.runtime.store, caller.tenant, { panel_id: op.panel_id, ask_id: op.ask_id, ...(found === null ? {} : { step_id: found.step_id, case_id: found.case_id }) }, clock()).catch(() => console.error("reconciliation: the warning could not be kept"));
       await settlePanelRow(op.panel_id, "You answered. The agent says it has taken it on.");
     }
     if (op.tool === "ask.withdraw") {
