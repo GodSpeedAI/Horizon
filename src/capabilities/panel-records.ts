@@ -227,8 +227,9 @@ export async function boardWrites(store: DurableStore, tenant: string, before: P
     const current = await store.getRecord(PANELS_COLLECTION, id);
     records.push({ collection: PANELS_COLLECTION, id, expectedVersion: current?.version ?? 0, value: storedPanel(panel, tenant, answers, answering) });
   }
-  const order = (p: Panels): string => p.open.map((x) => x.id).join("\n");
-  if (order(before) !== order(after)) {
+  // The order is compared element by element. Joining the ids would make an empty board equal to a board with one empty id (R4-5).
+  const sameOrder = before.open.length === after.open.length && before.open.every((x, i) => x.id === after.open[i]?.id);
+  if (!sameOrder) {
     const current = await store.getRecord(BOARD_COLLECTION, boardIdOf(tenant));
     records.push({ collection: BOARD_COLLECTION, id: boardIdOf(tenant), expectedVersion: current?.version ?? 0, value: { tenant, visible: after.open.map((p) => p.id) } as { readonly [key: string]: Json } });
   }

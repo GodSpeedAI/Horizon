@@ -245,6 +245,9 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
       return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks: blocks.map((b) => (b.kind === "question" ? { ...b, asked_by: agent, asked_by_key: key, owner_key: key, owner_name: agent, owner_rev: 0 } : b)), notes: [], owner_key: key });
     }
     case "ask_human": {
+      // The panel id is checked the way show_surface checks its id, before anything is stored: an empty or malformed id would
+      // save the question under a panel that never shows (R4-5).
+      if (typeof op.panel !== "string" || !ID.test(op.panel)) return refuse(state, "SCHEMA", "A panel needs an id and a list of blocks.");
       const panel = state.open.find((p) => same(p.id, op.panel));
       const id = typeof op.ask.id === "string" && ID.test(op.ask.id) ? op.ask.id : "";
       const asked = id === "" ? null : questionOf(op.ask, id);

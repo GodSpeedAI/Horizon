@@ -339,7 +339,7 @@ describe("states of answers written before this step", () => {
       legacy(2, "d", { outcome: "deferred", state: "waiting_for_agent", finished_by: null, history: [], routed_as: null }),
       legacy(3, "d", { outcome: "answered", replied: false, waiting_on: "agent", routed_as: null }),
     ] as never });
-    expect(await runDeskMigrations(store, scope, new Date(), async (c) => c(), undefined, undefined, "actor:operator")).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(await runDeskMigrations(store, scope, new Date(), async (c) => c(), undefined, undefined, "actor:operator")).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     const rows = await listAnswers(store, scope, "d");
     expect(rows.map((r) => [r.n, r.state, r.outcome, r.replied, r.waiting_on])).toEqual([
       [1, "put_off", null, true, "none"],
