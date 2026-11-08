@@ -129,6 +129,9 @@ export class ApprovalFollowUpError extends Error {
 }
 
 /** Run the steps that follow a decision SEA-Forge has already recorded; any failure but a refused commit becomes an ApprovalFollowUpError. */
+/** The decision state as the lookup read it, with the step each card decides (a card with no step has none). */
+type DecideLookup = DecideState & { readonly stepOf: ReadonlyMap<string, string> };
+
 export async function afterRecordedDecision<T>(steps: () => Promise<T>): Promise<T> {
   try {
     return await steps();
@@ -1566,7 +1569,7 @@ export async function createApplication(
   }
 
   // ---- Stage 3: Decide, Work, and the home panels that used to live on the old workspace page ----
-  async function decideState(moves: readonly WorkspaceMove[]): Promise<DecideState> {
+  async function decideState(moves: readonly WorkspaceMove[]): Promise<DecideLookup> {
     const inbox = await approvalInbox(clock());
     let caseApprovals: CaseApprovals = { kind: "none" };
     if (caseKeeper !== null && approvals !== undefined) {
@@ -1578,17 +1581,19 @@ export async function createApplication(
     const proposedLessons = await listLessons(runtime.runtime.store, caller.tenant, "proposed");
     const built = buildDecide({ inbox, moves, caseApprovals, holds, humanSteps: human.steps, extraNotices: human.notices, lessons: proposedLessons });
     // Accepting a step is blocked while an answer the operator gave an agent about it has had no reply.
+    const stepOf = new Map<string, string>();
+    for (const card of built.cards) {
+      const step = card.kind === "human_step" ? /^human:[^:]+:(.+)$/.exec(card.id)?.[1] ?? null : card.kind === "case_task" && caseApprovals.kind === "listed" ? caseApprovals.approvals.find((row) => `case-task:${row.approval_id}` === card.id)?.plan_item_id ?? null : null;
+      if (step !== null) stepOf.set(card.id, step);
+    }
+    // Accepting a step is blocked while an answer the operator gave an agent about it has had no reply.
     const answers = (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => waitsForAgent(a) && a.step !== null);
-    if (answers.length === 0) return built;
-    const stepOf = (card: DecisionCardData): string | null => {
-      if (card.kind === "human_step") return /^human:[^:]+:(.+)$/.exec(card.id)?.[1] ?? null;
-      if (card.kind === "case_task" && caseApprovals.kind === "listed") return caseApprovals.approvals.find((row) => `case-task:${row.approval_id}` === card.id)?.plan_item_id ?? null;
-      return null;
-    };
+    if (answers.length === 0) return { ...built, stepOf };
     return {
       ...built,
+      stepOf,
       cards: built.cards.map((card) => {
-        const step = stepOf(card);
+        const step = stepOf.get(card.id) ?? null;
         return step !== null && acceptanceBlocked(answers, step) ? { ...card, blocked: card.blocked ?? WAITING_WORDS, preview: { ...card.preview, accept: null } } : card;
       }),
     };
@@ -1634,6 +1639,8 @@ export async function createApplication(
   }
 
   const REFUSED_OLD = "That decision changed or is no longer waiting. Look at the new version and decide again.";
+  /** What a decision says when the wait it was looked up with has changed before the decision ran. */
+  const STALE_LOOKUP_WORDS = "The case changed after you looked. Look again, then start.";
 
   /** One decision from a card. The preview code the operator looked at must still be the card's, or nothing is done. */
   /** A finding from a review, proposed as a lesson. It waits in Decide; only a person's accept makes it active. */
@@ -1662,10 +1669,20 @@ export async function createApplication(
       // The core answers an unreadable request in words.
     }
     const cardId = typeof sent.card_id === "string" ? sent.card_id : "";
-    // Step acceptance is one queued command: it reads the outstanding waits and decides, after every earlier panel command.
+    // The lookup runs outside the queue: it may wait on the case keeper, and what it finds never authorises a decision. The queued
+    // command re-reads the local waits the card depends on, and refuses if the lookup no longer matches them.
+    const looked = cardId === "" ? null : await decideState(await recentMoves()).catch(() => null);
+    const lookedCard = looked?.cards.find((c) => c.id === cardId);
     const { card, response } = await panelCommand(async () => {
-      const found = cardId === "" ? undefined : (await decideState(await recentMoves()).catch(() => null))?.cards.find((c) => c.id === cardId);
-      return { card: found, response: await deskDecideCore(request) };
+      if (looked !== null && lookedCard !== undefined) {
+        const step = looked.stepOf.get(cardId) ?? null;
+        const answers = await listAnswers(runtime.runtime.store, caller.tenant);
+        // A wait that exists now is refused with its own words, as the rule above does.
+        if (step !== null && acceptanceBlocked(answers, step)) return { card: lookedCard, response: Response.json({ ok: false, outcome: "blocked", message: WAITING_WORDS }, { status: 409, headers: { "cache-control": "no-store" } }) };
+        // A wait the lookup saw has gone since: the card the person looked at is no longer the one that would be decided.
+        if (lookedCard.blocked === WAITING_WORDS) return { card: lookedCard, response: Response.json({ ok: false, outcome: "stale", message: STALE_LOOKUP_WORDS }, { status: 409, headers: { "cache-control": "no-store" } }) };
+      }
+      return { card: lookedCard, response: await deskDecideCore(request, looked) };
     });
     if (card === undefined || (response.status === 400 && !response.ok)) return response;
     const done = (await response.clone().json().catch(() => null)) as { ok?: boolean; message?: string; receipt?: string | null } | null;
@@ -1675,7 +1692,7 @@ export async function createApplication(
     return withRecorded(response, recorded);
   }
 
-  async function deskDecideCore(request: Request): Promise<Response> {
+  async function deskDecideCore(request: Request, looked: DecideLookup | null = null): Promise<Response> {
     const fail = (status: number, outcome: string, message: string, details: string | null = null): Response => Response.json({ ok: false, outcome, message, ...(details === null ? {} : { details }) }, { status, headers: { "cache-control": "no-store" } });
     let body: Record<string, unknown>;
     try {
@@ -1691,7 +1708,7 @@ export async function createApplication(
     if (cardId === "" || (choice !== "accept" && choice !== "reject" && choice !== "hold" && choice !== "release")) return fail(400, "unreadable", "Choose accept, reject or hold on a card. Nothing was done.");
     const store = runtime.runtime.store;
     const now = clock();
-    const state = await decideState(await recentMoves());
+    const state = looked ?? (await decideState(await recentMoves()));
     const card = state.cards.find((candidate) => candidate.id === cardId);
     if (card === undefined) return fail(404, "gone", "That decision is no longer waiting. It may have been answered somewhere else. Nothing was done.");
     if (choice === "release") {
@@ -1987,11 +2004,15 @@ export async function createApplication(
    */
   const AGENT_TOOLS = ["show_surface", "ask_human", "arrange", "annotate", "read_responses", "ask.withdraw", "answer.route"] as const;
   async function agentDoor(request: Request, pathname: string): Promise<Response> {
+    // The request body is read before the command is queued, so a slow client never holds the queue. A body larger than the limit
+    // is not read at all; the queued command refuses it after the key is checked.
+    const declared = Number(request.headers.get("content-length") ?? "0");
+    const text = pathname === "/agent/panels" && request.method === "POST" && declared <= 500_000 ? await request.text() : null;
     // Authentication runs inside the queued command, so the key is checked when the command runs, not when it was queued.
-    return panelCommand(() => agentDoorNow(request, pathname));
+    return panelCommand(() => agentDoorNow(request, pathname, text));
   }
 
-  async function agentDoorNow(request: Request, pathname: string): Promise<Response> {
+  async function agentDoorNow(request: Request, pathname: string, text: string | null): Promise<Response> {
     const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
     const refuse = (status: number, message: string): Response => Response.json({ ok: false, message }, { status, headers });
     const given = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
@@ -2005,8 +2026,7 @@ export async function createApplication(
       return Response.json({ ok: true, responses: done.ok ? done.responses ?? [] : [] }, { headers });
     }
     if (pathname !== "/agent/panels" || request.method !== "POST") return refuse(404, "There is nothing at this address. Use POST /agent/panels, GET /agent/panels/answers or GET /agent/panels/catalogue.");
-    const text = await request.text();
-    if (text.length > 500_000) return refuse(413, "That is too large. Send a smaller panel.");
+    if (text === null || text.length > 500_000) return refuse(413, "That is too large. Send a smaller panel.");
     let body: unknown;
     try {
       body = JSON.parse(text);
