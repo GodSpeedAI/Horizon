@@ -33,6 +33,25 @@ export interface PanelAnswer {
   readonly asked_by?: string | null;
   /** The key id of the agent that asked. Only that key reads this answer. Missing on older answers, which no agent reads. */
   readonly asked_by_key?: string | null;
+  /** The agent key that owns the question (set when it is first put; changed only by Reassign owner). Null on older records without a recorded owner. */
+  readonly owner_key?: string | null;
+  /** A hash of the question's words, kind, options and resolution (`questionFingerprint`). Null on older records. */
+  readonly fingerprint?: string | null;
+  /** Earlier outcomes of a deferred question, in order. */
+  readonly history?: readonly { readonly outcome: string; readonly at: string }[];
+  /** Who the answer waits on: the agent (to say where it went), the person, or nobody. Derived for older records by `normaliseAnswer`. */
+  readonly waiting_on?: "agent" | "person" | "none";
+}
+
+/** Fills the fields a record written before the upgrade does not have. The owner is the key that asked, when it was recorded. */
+export function normaliseAnswer(row: PanelAnswer): PanelAnswer & { readonly owner_key: string | null; readonly fingerprint: string | null; readonly history: readonly { readonly outcome: string; readonly at: string }[]; readonly waiting_on: "agent" | "person" | "none" } {
+  return {
+    ...row,
+    owner_key: row.owner_key ?? row.asked_by_key ?? null,
+    fingerprint: row.fingerprint ?? null,
+    history: row.history ?? [],
+    waiting_on: row.waiting_on ?? (row.replied ? "none" : "agent"),
+  };
 }
 
 const idOf = (panel: string, n: number): string => `answer:${panel}:${n}`;
@@ -47,7 +66,7 @@ export function checkValue(value: unknown): { readonly ok: true; readonly value:
 
 export async function listAnswers(store: DurableStore, tenant: string, panelId?: string): Promise<PanelAnswer[]> {
   const rows = await store.listRecords(PANEL_ANSWERS_COLLECTION, { tenant });
-  return rows.map((r) => r.value as unknown as PanelAnswer).filter((a) => panelId === undefined || a.panel_id === panelId).sort((a, b) => (a.panel_id === b.panel_id ? a.n - b.n : a.panel_id < b.panel_id ? -1 : 1));
+  return rows.map((r) => normaliseAnswer(r.value as unknown as PanelAnswer)).filter((a) => panelId === undefined || a.panel_id === panelId).sort((a, b) => (a.panel_id === b.panel_id ? a.n - b.n : a.panel_id < b.panel_id ? -1 : 1));
 }
 
 export async function recordAnswer(
