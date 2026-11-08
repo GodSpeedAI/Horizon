@@ -1537,13 +1537,14 @@ export async function createApplication(
     return { ...shown, rev: createHash("sha256").update(JSON.stringify(shown)).digest("hex").slice(0, 16) };
   }
 
-  async function deskSearch(params: URLSearchParams): Promise<SearchResult> {
+  /** `forAgent`: only notes marked "Let agents read this note" take part, and days and tags (which are made from every note) are not given. */
+  async function deskSearch(params: URLSearchParams, forAgent = false): Promise<SearchResult> {
     const store = runtime.runtime.store;
     const q = (params.get("q") ?? "").trim();
     const day = params.get("day") || null;
     const tag = params.get("tag") || null;
     const filtered = day !== null || tag !== null;
-    const notes = await searchNotes(store, deskWho, { q, ...(day ? { day } : {}), ...(tag ? { tag } : {}) });
+    const notes = (await searchNotes(store, deskWho, { q, ...(day ? { day } : {}), ...(tag ? { tag } : {}) })).filter((n) => !forAgent || n.shared_with_agents === true);
     const records = sourcesOf({ cases: true, agentWork: false, records: recordSources.length > 0 || cockpitStatus().realitytrace })[2]!;
     const result: SearchResult = {
       q,
@@ -1551,8 +1552,8 @@ export async function createApplication(
       tag,
       notes,
       cases: filtered ? [] : (await deskCases()).filter((c) => matches(c.purpose, q)),
-      days: filtered ? [] : (await listDays(store, deskWho)).filter((d) => matches(d.day, q)),
-      tags: filtered ? [] : (await listTags(store, deskWho)).filter((t) => matches(t.name, q)),
+      days: filtered || forAgent ? [] : (await listDays(store, deskWho)).filter((d) => matches(d.day, q)),
+      tags: filtered || forAgent ? [] : (await listTags(store, deskWho)).filter((t) => matches(t.name, q)),
       records,
     };
     return (await presentingOn(store, caller.tenant, caller.actor.id)) ? applyStandIns(result, presentingKey(), deskRepoNames()) : result;
@@ -2464,7 +2465,7 @@ export async function createApplication(
             return Response.json(state, { headers });
           }
           if (url.pathname === "/desk/search" && request.method === "GET") {
-            const found = await deskSearch(url.searchParams);
+            const found = await deskSearch(url.searchParams, page !== null);
             const asked = (url.searchParams.get("q") ?? "").trim();
             // Find as you type is not a move. A find is recorded when the page asks for it (`record=1`) or an agent on the page runs it.
             if (asked !== "" && (url.searchParams.get("record") === "1" || page !== null)) {

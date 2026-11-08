@@ -56,8 +56,12 @@ describe("desk_state and desk_find for an agent", () => {
   test("a find returns counts and shared notes only", async () => {
     const hidden = await agentJson("/desk/search?q=pangolin");
     expect(JSON.stringify(hidden)).not.toContain("pangolin budget");
-    expect(hidden.counts.notes).toBe(1);
+    // The only note that matches is private: an agent sees no result and no count for it.
+    expect(hidden.counts).toEqual({ notes: 0, cases: 0, days: 0, tags: 0 });
     expect(hidden.shared_notes).toEqual([]);
+    // The record of that find, which the agent can read back, does not count the private note either.
+    const rows = (await agentJson("/desk/conversation")).rows as { words: string; outcome: string }[];
+    expect(rows.find((r) => r.words === "Find: pangolin")?.outcome).toBe("0 notes, 0 cases, 0 days, 0 tags.");
     const shown = await agentJson("/desk/search?q=walrus");
     expect(shown.shared_notes[0].body).toContain("walrus plan");
   });
