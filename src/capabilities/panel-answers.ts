@@ -281,14 +281,32 @@ export const STOPPED_ROW = "You stopped waiting. The agent has not said where yo
 export async function planStopWaiting(store: DurableStore, tenant: string, step: string, who?: Who, now?: Date): Promise<{ readonly count: number; readonly records: CommitRecord[] }> {
   const records: CommitRecord[] = [];
   let count = 0;
+  // One conversation row per question: two waiting answers to one question share its row, so the row is planned once (R3-7). Every
+  // answer is still finished.
+  const rowsPlanned = new Set<string>();
   for (const read of await readAnswerRows(store, tenant)) {
     const a = read.answer;
     if (a.step !== step || !checkStopWaiting({ state: answerState(a) }).ok) continue;
     records.push(planFinish(read, "stopped", null, "You chose to stop waiting for the agent."));
     count += 1;
-    if (who !== undefined && now !== undefined) records.push(await answerRowWrite(store, who, a, now));
+    const rowKey = `${a.panel_id}\n${a.ask}`;
+    if (who !== undefined && now !== undefined && !rowsPlanned.has(rowKey)) {
+      rowsPlanned.add(rowKey);
+      records.push(await answerRowWrite(store, who, a, now));
+    }
   }
-  return { count, records };
+  return { count, records: uniqueRecords(records) };
+}
+
+/** Keeps the first record for each collection and id, so one commit never writes the same record twice. */
+function uniqueRecords(records: readonly CommitRecord[]): CommitRecord[] {
+  const seen = new Set<string>();
+  return records.filter((r) => {
+    const key = `${r.collection}\n${r.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /** The conversation row of one answer, finished in place (or added when there is none), as a record. */

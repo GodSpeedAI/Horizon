@@ -434,3 +434,22 @@ describe("a legacy answered question stays sealed after a restart", () => {
     expect(legalTransition("withdrawn", "waiting_for_you")).toBe(false);
   });
 });
+
+describe("two waiting answers to one question share one conversation row (R3-7)", () => {
+  test("stop waiting returns 200, finishes both answers, and writes the row once", async () => {
+    const app = await open();
+    const tenant = app.application.caller.tenant;
+    const store = app.application.runtime.runtime.store;
+    await putAs(app, "dup_wait", question("q"), keys.ag_alice, "dup_step");
+    expect((await answer(app, "dup_wait", "q")).status).toBe(200);
+    // A second waiting answer to the same question, as an older build stored it (no state, the derived fields only).
+    await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: "answer:dup_wait:2", expectedVersion: 0, value: { tenant, panel_id: "dup_wait", n: 2, ask: "q", outcome: "answered", value: "a", note: null, at: "2026-11-07T11:00:00.000Z", version: null, routed_as: null, step: "dup_step", asked_by: null, asked_by_key: null, owner_key: null, fingerprint: null, history: [], replied: false, waiting_on: "agent" } }] });
+    const { result, commits } = await withCommits(app, () => person(app, { op: "human.stop_waiting", step: "dup_step" }));
+    expect(result.status).toBe(200);
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.filter((c) => c === CONVERSATION_COLLECTION)).toHaveLength(1);
+    const rows = await listAnswers(store, tenant, "dup_wait");
+    expect(rows.map((r) => [r.n, r.state, r.finished_by])).toEqual([[1, "finished", "stopped"], [2, "finished", "stopped"]]);
+    expect((await rowsOf(app)).filter((r) => r.outcome === STOPPED_ROW)).toHaveLength(1);
+  });
+});
