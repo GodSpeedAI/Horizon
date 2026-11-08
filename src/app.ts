@@ -2304,8 +2304,13 @@ export async function createApplication(
    */
   async function stepAltered(op: AgentOp): Promise<string | null> {
     const store = runtime.runtime.store;
-    const incoming: { readonly panel: string; readonly ask: string; readonly step: string | null }[] = [];
-    const panelStepNow = (panel: string): string | null => (panelBoard.open.find((p) => p.id === panel) ?? storedPanels.get(panel))?.step ?? null;
+    const incoming: { readonly panel: string; readonly ask: string; readonly step: string | null | undefined }[] = [];
+    // An omitted step means the panel's step. When the panel is not known (neither open nor stored), that step is unknown, so it is
+    // not compared: undefined is left out of the check below.
+    const panelStepNow = (panel: string): string | null | undefined => {
+      const known = panelBoard.open.find((p) => p.id === panel) ?? storedPanels.get(panel);
+      return known === undefined ? undefined : (known.step ?? null);
+    };
     if (op.tool === "ask_human") {
       const raw = op.ask as Record<string, unknown>;
       if (typeof raw.id === "string") incoming.push({ panel: op.panel, ask: raw.id, step: op.step === undefined ? panelStepNow(op.panel) : (op.step ?? null) });
@@ -2318,7 +2323,7 @@ export async function createApplication(
     }
     for (const { panel, ask, step } of incoming) {
       for (const a of (await listAnswers(store, caller.tenant, panel)).filter((x) => x.ask === ask)) {
-        if (typeof a.step !== "string" || a.step === step) continue;
+        if (step === undefined || typeof a.step !== "string" || a.step === step) continue;
         return `That question was answered for the step "${a.step}", so it cannot be put up for ${step === null ? "no step" : `the step "${step}"`}. Use a new question id. Nothing was changed.`;
       }
     }
