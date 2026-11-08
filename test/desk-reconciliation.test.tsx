@@ -16,7 +16,9 @@ const agent = (app: DeskApp, body: unknown) =>
   fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${app.application.loaded.agentKey}`, "content-type": "application/json", "x-horizon-agent-name": "Helper" }, body: JSON.stringify(body) });
 
 describe("a recording failure reaches the person", () => {
-  test("the step is recorded, the gap is kept in the store, and the status line says so", async () => {
+  // Design v3, step 3: a route and its conversation row are one commit. A row that cannot be written refuses the route as a whole,
+  // so there is no recorded step with a missing row, and no gap to keep. This replaces the old behaviour (the route was kept, and a gap was logged).
+  test("a route whose row cannot be written is refused as a whole: nothing is recorded and no gap is kept", async () => {
     const app = await startDeskApp();
     apps.push(app);
     const question = { id: "q", question: "Which plan?", why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }] };
@@ -39,12 +41,13 @@ describe("a recording failure reaches the person", () => {
       console.error = log;
       store.commit = commit as typeof store.commit;
     }
-    // The route was recorded: the answer is closed, and the person's answer carries the agent's words.
-    expect(routed.status).toBe(200);
+    // The route is refused in plain words, and nothing is closed or kept: no status warning, and no gap record.
+    expect(routed.status).toBe(503);
+    expect(((await routed.json()) as { message: string }).message).toBe("Nothing was sent. Try again.");
     const answers = (await (await fetch(`${app.base}/desk/state.json`)).json()) as { status: { reconciliation?: string[] } };
-    expect(answers.status.reconciliation).toEqual([NOT_RECONCILED_WORDS]);
+    expect(answers.status.reconciliation ?? []).toEqual([]);
     const kept = await app.application.runtime.runtime.store.listRecords(RECONCILIATION_COLLECTION, { tenant: app.application.caller.tenant });
-    expect(kept.length).toBe(1);
+    expect(kept.length).toBe(0);
   });
 
   test("the status line shows the words", () => {

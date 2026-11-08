@@ -28,11 +28,12 @@ describe("each question has a version", () => {
     expect(r.result.ok).toBe(true);
   });
 
-  test("an answer to an older version is refused with plain words", () => {
+  test("an answer to a version the question does not have is refused with plain words", () => {
+    // A question keeps its wording under its id, so the version a person saw can only go stale by a different version being sent.
     const s = put(NO_PANELS, ask());
-    const seen = block(s).version;
-    const changed = put(s, ask({ question: "Which plan, really?" }));
-    const r = reduceHuman(changed, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: seen });
+    const seen = "0000000000000";
+    expect(seen).not.toBe(block(s).version);
+    const r = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: seen });
     expect(r.result.ok).toBe(false);
     expect(r.result.ok === false && r.result.message).toBe("This question changed after you looked at it. Look again, then answer.");
     expect(QUESTION_CHANGED).toBe("This question changed after you looked at it. Look again, then answer.");
@@ -52,25 +53,38 @@ describe("each question has a version", () => {
     expect(block(surface.state).answered?.value).toBe("a");
   });
 
-  test("the same question put again keeps the answer; a question nobody answered can be changed", () => {
+  // Operator decision (design v3): "Edit an existing question? No. Use a new question id for changes." The old behaviour, where an
+  // unanswered question could be reworded under the same id, is replaced: the same id keeps its first wording on every state.
+  const SAME_ID = "That question id was already used for different wording. Use a new question id.";
+
+  test("the same question put again keeps the answer; a changed question under the same id is refused while unanswered", () => {
     let s = put(NO_PANELS, ask());
     const before = block(s).version;
-    const edited = put(s, ask({ question: "A clearer question?" }));
-    expect(block(edited).version).not.toBe(before);
+    const edited = reduceAgent(s, { tool: "ask_human", panel: "p", ask: ask({ question: "A clearer question?" }) });
+    expect(edited.result.ok).toBe(false);
+    expect(edited.result.ok === false && edited.result.message).toBe(SAME_ID);
+    expect(block(edited.state).question).toBe("Which plan?");
+    expect(block(edited.state).version).toBe(before);
     s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: before }).state;
     const again = reduceAgent(s, { tool: "ask_human", panel: "p", ask: ask() });
     expect(again.result.ok).toBe(true);
     expect(block(again.state).answered?.value).toBe("a");
   });
 
-  test("a question put off with Not yet starts again when the agent changes it", () => {
+  test("a question put off keeps its id's wording: a changed put is refused, the same words reopen it", () => {
     let s = put(NO_PANELS, ask());
     s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "deferred", version: block(s).version }).state;
     const changed = reduceAgent(s, { tool: "ask_human", panel: "p", ask: ask({ question: "Now which plan?" }) });
-    expect(changed.result.ok).toBe(true);
-    expect(block(changed.state).answered).toBeNull();
+    expect(changed.result.ok).toBe(false);
+    expect(changed.result.ok === false && changed.result.message).toBe(SAME_ID);
+    expect(block(changed.state).answered?.outcome).toBe("deferred");
+    const reopened = reduceAgent(s, { tool: "ask_human", panel: "p", ask: ask() });
+    expect(reopened.result.ok).toBe(true);
+    expect(block(reopened.state).answered).toBeNull();
   });
 });
+
+const SAME_ID_WORDS = "That question id was already used for different wording. Use a new question id.";
 
 describe("over the desk", () => {
   let app: DeskApp;
@@ -79,13 +93,17 @@ describe("over the desk", () => {
   });
   afterAll(async () => app.stop());
 
-  test("a stale answer is refused with the plain words, a current one is recorded with its version", async () => {
+  test("an answer with a version the question does not have is refused with the plain words, a current one is recorded with its version", async () => {
     await app.application.applyAgentOp({ tool: "ask_human", panel: "web", ask: ask() });
     const seen = (await app.state()).panels.open.find((p: any) => p.id === "web").blocks[0].version;
-    await app.application.applyAgentOp({ tool: "ask_human", panel: "web", ask: ask({ question: "Which plan, again?" }) });
-    const stale = await app.post("/desk/panels/op", { op: "human.answer", panel: "web", ask: "q", outcome: "answered", value: "a", version: seen });
+    // A changed question under the same id is refused now (the id keeps its wording), so the board keeps the version the person saw.
+    const reworded = await app.application.applyAgentOp({ tool: "ask_human", panel: "web", ask: ask({ question: "Which plan, again?" }) });
+    expect(reworded.ok).toBe(false);
+    expect(reworded.ok === false && reworded.message).toBe(SAME_ID_WORDS);
+    const stale = await app.post("/desk/panels/op", { op: "human.answer", panel: "web", ask: "q", outcome: "answered", value: "a", version: "0000000000000" });
     expect(stale.status).toBe(409);
     expect(((await stale.json()) as any).message).toBe("This question changed after you looked at it. Look again, then answer.");
+    expect(seen).toMatch(/^[0-9a-f]{14}$/);
     const now = (await app.state()).panels.open.find((p: any) => p.id === "web").blocks[0].version;
     expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "web", ask: "q", outcome: "answered", value: "a", version: now })).status).toBe(200);
     const said = await app.application.applyAgentOp({ tool: "read_responses" });

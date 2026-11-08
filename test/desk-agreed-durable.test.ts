@@ -6,7 +6,7 @@ import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
  * agreement is kept in the store, so it survives the panel being removed and the desk restarting: an agent cannot recreate the
  * question with different words under the same panel and question id.
  */
-const ANSWERED_CANNOT_CHANGE = "The person already answered this question, so it cannot be changed. Ask a new question with a different id.";
+const ANSWERED_CANNOT_CHANGE = "That question id was already used for different wording. Use a new question id.";
 const apps: DeskApp[] = [];
 afterEach(async () => {
   while (apps.length > 0) await apps.pop()!.stop();

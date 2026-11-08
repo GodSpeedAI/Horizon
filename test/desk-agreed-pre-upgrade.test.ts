@@ -8,7 +8,7 @@ import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
  * which is read only (no code writes to it). The agreement's hash there uses the old formula (it includes the panel id), so it
  * must still refuse a changed question. This pins that path with a fixture that looks like a pre-upgrade store.
  */
-const ANSWERED_CANNOT_CHANGE = "The person already answered this question, so it cannot be changed. Ask a new question with a different id.";
+const ANSWERED_CANNOT_CHANGE = "That question id was already used for different wording. Use a new question id.";
 const apps: DeskApp[] = [];
 afterEach(async () => {
   while (apps.length > 0) await apps.pop()!.stop();

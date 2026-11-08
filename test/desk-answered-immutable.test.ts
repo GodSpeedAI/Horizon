@@ -59,9 +59,13 @@ describe("an answered question cannot be erased or changed", () => {
     expect(asks(again.state)[0]?.answered?.value).toBe("a");
   });
 
-  test("an unanswered question can still be removed or changed", () => {
+  test("an unanswered question can still be removed; a changed one under the same id is refused", () => {
     const put = reduceAgent(NO_PANELS, { tool: "ask_human", panel: "p", ask: ask() });
     expect(reduceAgent(put.state, { tool: "show_surface", surface: { id: "p", blocks: [] } }).result.ok).toBe(true);
-    expect(reduceAgent(put.state, { tool: "ask_human", panel: "p", ask: ask({ question: "Reworded?" }) }).result.ok).toBe(true);
+    // Operator decision: "Edit an existing question? No. Use a new question id for changes." The same id keeps its first wording.
+    const reworded = reduceAgent(put.state, { tool: "ask_human", panel: "p", ask: ask({ question: "Reworded?" }) });
+    expect(reworded.result.ok).toBe(false);
+    expect(reworded.result.ok === false && reworded.result.message).toBe("That question id was already used for different wording. Use a new question id.");
+    expect(reduceAgent(put.state, { tool: "ask_human", panel: "p", ask: ask({ id: "q2", question: "Reworded?" }) }).result.ok).toBe(true);
   });
 });

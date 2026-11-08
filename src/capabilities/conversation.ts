@@ -40,11 +40,6 @@ async function everyRow(store: DurableStore, who: Who): Promise<ConversationRow[
   return (await store.listRecords(CONVERSATION_COLLECTION, { tenant: who.tenant })).filter((r) => mine(who, r.value)).map((r) => fromRecord(r.value));
 }
 
-async function put(store: DurableStore, who: Who, row: ConversationRow): Promise<void> {
-  const current = await store.getRecord(CONVERSATION_COLLECTION, row.row_id);
-  await store.commit({ appends: [], records: [{ collection: CONVERSATION_COLLECTION, id: row.row_id, expectedVersion: current?.version ?? 0, value: toJson(row, who) }] });
-}
-
 /**
  * A new row as a record, for a commit that also changes other records (the reassign of a question writes its row in the same
  * commit as the change). Always a new row: nothing is matched or updated in place.
@@ -54,31 +49,57 @@ export function newRowRecord(who: Who, input: NewRow, now: Date): { readonly col
   return { collection: CONVERSATION_COLLECTION, id: row.row_id, expectedVersion: 0, value: toJson(row, who) };
 }
 
+/** One row write, as a record for a commit: the row as it will be stored, and the record that stores it. */
+export interface RowWrite {
+  readonly row: ConversationRow;
+  readonly record: { readonly collection: string; readonly id: string; readonly expectedVersion: number; readonly value: { readonly [key: string]: Json } };
+}
+
+async function recordFor(store: DurableStore, who: Who, row: ConversationRow): Promise<RowWrite["record"]> {
+  const current = await store.getRecord(CONVERSATION_COLLECTION, row.row_id);
+  return { collection: CONVERSATION_COLLECTION, id: row.row_id, expectedVersion: current?.version ?? 0, value: toJson(row, who) };
+}
+
 /**
- * Add a row. A panel row for a panel that already has one updates that row in place; a hand off preview for a draft that already
- * has a waiting preview updates that one. Returns the row as stored.
+ * The write that adds a row, without storing it. A panel row for a panel that already has one updates that row in place; a hand off
+ * preview for a draft that already has a waiting preview updates that one. A commit that also changes other records uses this record.
  */
-export async function appendRow(store: DurableStore, who: Who, input: NewRow, now: Date): Promise<ConversationRow> {
+export async function planAppend(store: DurableStore, who: Who, input: NewRow, now: Date): Promise<RowWrite> {
   const at = now.toISOString();
   const fresh = tidyRow({ row_id: rowIdOf(), at, source: input.source, ...(input.agent_name === undefined ? {} : { agent_name: input.agent_name }), kind: input.kind, words: input.words, outcome: input.outcome, status: input.status, refs: input.refs ?? {}, ...(input.stages === undefined ? {} : { stages: input.stages }) });
   const rows = await everyRow(store, who);
   const same = panelRowFor(rows, fresh) ?? answerRowFor(rows, fresh) ?? (fresh.refs.draft_id !== undefined && fresh.status === "waiting" ? waitingForDraft(rows, fresh.refs.draft_id) : undefined);
   if (same !== undefined) {
     const next = same.kind === "answer" ? { ...same, words: fresh.words, outcome: fresh.outcome, status: fresh.status, refs: { ...same.refs, ...fresh.refs } } : same.kind === "panel" ? reduceConversation([same], { type: "append", row: fresh })[0]! : { ...same, at, words: fresh.words, outcome: fresh.outcome, refs: { ...same.refs, ...fresh.refs } };
-    await put(store, who, next);
-    return next;
+    return { row: next, record: await recordFor(store, who, next) };
   }
-  await put(store, who, fresh);
-  return fresh;
+  return { row: fresh, record: await recordFor(store, who, fresh) };
+}
+
+/**
+ * Add a row. A panel row for a panel that already has one updates that row in place; a hand off preview for a draft that already
+ * has a waiting preview updates that one. Returns the row as stored.
+ */
+export async function appendRow(store: DurableStore, who: Who, input: NewRow, now: Date): Promise<ConversationRow> {
+  const planned = await planAppend(store, who, input, now);
+  await store.commit({ appends: [], records: [planned.record] });
+  return planned.row;
+}
+
+/** The write that changes one row's status and outcome, without storing it. Null when the row is not this person's or not there. */
+export async function planUpdate(store: DurableStore, who: Who, rowId: string, change: { readonly status?: RowStatus; readonly outcome?: string; readonly stages?: readonly RowStage[] }): Promise<RowWrite | null> {
+  const found = await store.getRecord(CONVERSATION_COLLECTION, rowId);
+  if (found === undefined || !mine(who, found.value)) return null;
+  const next = reduceConversation([fromRecord(found.value)], { type: "update", row_id: rowId, ...change })[0]!;
+  return { row: next, record: { collection: CONVERSATION_COLLECTION, id: rowId, expectedVersion: found.version, value: toJson(next, who) } };
 }
 
 /** Change the status and outcome of one row. Returns the row, or null when it is not this person's or not there. */
 export async function updateRow(store: DurableStore, who: Who, rowId: string, change: { readonly status?: RowStatus; readonly outcome?: string; readonly stages?: readonly RowStage[] }): Promise<ConversationRow | null> {
-  const found = await store.getRecord(CONVERSATION_COLLECTION, rowId);
-  if (found === undefined || !mine(who, found.value)) return null;
-  const next = reduceConversation([fromRecord(found.value)], { type: "update", row_id: rowId, ...change })[0]!;
-  await put(store, who, next);
-  return next;
+  const planned = await planUpdate(store, who, rowId, change);
+  if (planned === null) return null;
+  await store.commit({ appends: [], records: [planned.record] });
+  return planned.row;
 }
 
 /** The waiting preview of one draft, if there is one. */

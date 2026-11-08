@@ -14,8 +14,8 @@ import { STAGE_WORD, STATUS_WORD } from "../src/ui/desk/Conversation.tsx";
 import { TOO_MANY_PROPOSALS, type ConversationRow } from "../src/ui/desk/conversation-model.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";
 import { ANSWERED_CANNOT_CHANGE, QUESTION_CHANGED, REQUIRED_CANNOT_WITHDRAW } from "../src/ui/desk/panels-model.ts";
-import { NO_ANSWER_WAITING, TOO_LONG_ROUTE, TOO_SHORT_ROUTE } from "../src/capabilities/question-rules.ts";
-import { NOTHING_SENT, PRE_UPGRADE_WORDS, QuestionAlreadyAnswered } from "../src/capabilities/panel-answers.ts";
+import { NO_ANSWER_WAITING, SAME_ID_OTHER_WORDS, TOO_LONG_ROUTE, TOO_SHORT_ROUTE } from "../src/capabilities/question-rules.ts";
+import { NOTHING_SENT, PRE_UPGRADE_WORDS, QuestionAlreadyAnswered, STOPPED_ROW } from "../src/capabilities/panel-answers.ts";
 import { INSPECT_WITHHELD } from "../src/ui/desk/webmcp-tools.ts";
 import { deskState } from "./support/desk-fixture.ts";
 import { quietIo } from "./support/desk-io.ts";
@@ -44,6 +44,8 @@ describe("new sentences are plain", () => {
       "answered twice": new QuestionAlreadyAnswered().message,
       "nothing sent": NOTHING_SENT,
       "answered before the upgrade": PRE_UPGRADE_WORDS,
+      "same id, other wording": SAME_ID_OTHER_WORDS,
+      "stopped waiting, in the conversation": STOPPED_ROW,
     };
     for (const [label, words] of Object.entries(more)) clean(label, words);
   });

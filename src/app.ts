@@ -81,17 +81,17 @@ import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type Debugger
 import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare.tsx";
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
 import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
-import { answerRowOf, appendRow, discardRow, listConversation, panelRowOf, settleDraftRow, updateRow } from "./capabilities/conversation.ts";
+import { answerRowOf, appendRow, discardRow, listConversation, panelRowOf, planAppend, planUpdate, settleDraftRow } from "./capabilities/conversation.ts";
 import { answerEcho, cleanAgentName, MAX_WAITING_PROPOSALS, TOO_MANY_PROPOSALS, WAITING_FOR_AGENT, type ConversationRow, type RowSource, type RowStage } from "./ui/desk/conversation-model.ts";
 import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
 import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
 import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
-import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, migratePreUpgradeAnswers, QuestionAlreadyAnswered, recordAnswer, routeAnswer, stopWaiting, checkValue, reassignOwner, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
+import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, migrateAnswerStates, migratePreUpgradeAnswers, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
 import { ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, openPanelId, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
-import { boardWrites, loadBoard, PANEL_LOAD_WORDS, withStored } from "./capabilities/panel-records.ts";
+import { boardWrites, loadBoard, PANEL_LOAD_WORDS, stateWrites, withStored, type CommitRecord } from "./capabilities/panel-records.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { readableTitle } from "./ui/desk/banned-words.ts";
 import { agentRowsOf, agentSearchOf, agentStateOf, WITHHELD_WORDS } from "./ui/desk/agent-view.ts";
@@ -107,7 +107,7 @@ import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
 import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, PAIR_FIRST_WORDS, printPairingCode } from "./desk/pairing.ts";
 import { DEFAULT_AGENT_KEY_ID, DEFAULT_AGENT_NAME, ownerOfKey, readRegistry } from "./desk/agent-keys.ts";
 import { checkWithdraw, questionFingerprint } from "./capabilities/question-rules.ts";
-import { noteNotRecorded, notRecordedWarnings } from "./capabilities/reconciliation.ts";
+import { notRecordedWarnings } from "./capabilities/reconciliation.ts";
 import { setupMapping } from "./config/setup.ts";
 import type { RecordSource } from "./config/types.ts";
 import { existsSync as fileExists, mkdirSync as makeDir, readFileSync as readFileText, writeFileSync as writeFileText } from "node:fs";
@@ -1915,27 +1915,43 @@ export async function createApplication(
       boardRefused = PANEL_LOAD_WORDS;
     }
   }
-  /** Commits the change the board made, as records, then rebuilds the board from them. A failed commit leaves the board as it was. */
-  async function commitBoard(before: PanelsBoard, after: PanelsBoard): Promise<void> {
-    const records = await boardWrites(runtime.runtime.store, caller.tenant, before, after);
-    if (records.length > 0) await runtime.runtime.store.commit({ appends: [], records });
+  /**
+   * Commits the change the board made, with the question states it implies and any records that go with it (such as a conversation
+   * row), as one commit, then rebuilds the board from them. A failed commit changes nothing and leaves the board as it was.
+   */
+  async function commitBoard(before: PanelsBoard, after: PanelsBoard, alongside: readonly CommitRecord[] = []): Promise<void> {
+    const store = runtime.runtime.store;
+    const records = [...(await boardWrites(store, caller.tenant, before, after)), ...(await stateWrites(store, caller.tenant, after)), ...alongside];
+    if (records.length > 0) await store.commit({ appends: [], records });
     await rebuildBoard();
   }
   // Answers from before the upgrade with no owner are closed once, at start. Panel reads wait for that to finish.
-  const answersMigrated: Promise<number> = migratePreUpgradeAnswers(runtime.runtime.store, caller.tenant, clock()).catch(() => 0);
+  // The question states are written first (once per record); the pre-upgrade closing reads them.
+  const answersMigrated: Promise<number> = migrateAnswerStates(runtime.runtime.store, caller.tenant).catch(() => 0).then(() => migratePreUpgradeAnswers(runtime.runtime.store, caller.tenant, clock())).catch(() => 0);
 
   /** The question's own words and the open-question test for one panel, from the board. */
   const askOf = (panelId: string, askId: string): { readonly question: string } | null => {
     const q = panelBoard.open.find((p) => p.id === panelId)?.blocks.find((b) => b.kind === "question" && b.id === askId) as { question?: string } | undefined;
     return q === undefined ? null : { question: q.question ?? "" };
   };
-  const stillAsking = (panelId: string): boolean => (panelBoard.open.find((p) => p.id === panelId)?.blocks ?? []).some((b) => { const q = b as unknown as { kind?: string; answered?: unknown; withdrawn?: unknown }; return q.kind === "question" && q.answered == null && q.withdrawn == null; });
-  /** The panel's own conversation entry follows the panel: "Waiting for you" only while a question is open. */
+  /** Whether a panel on `board` still has a question open for the person. `except` leaves one question out (the one just routed). */
+  const stillAskingIn = (board: PanelsBoard, panelId: string, except?: string): boolean => (board.open.find((p) => p.id === panelId)?.blocks ?? []).some((b) => { const q = b as unknown as { kind?: string; id?: string; answered?: unknown; withdrawn?: unknown }; return q.kind === "question" && q.id !== except && q.answered == null && q.withdrawn == null; });
+  const stillAsking = (panelId: string): boolean => stillAskingIn(panelBoard, panelId);
+  /**
+   * The panel's own conversation row as a record for a commit: "Waiting for you" only while a question is open. Null when the panel has no row.
+   * It joins the commit that changes the panel, so the row and the change are both there or neither is.
+   */
+  async function panelRowWrite(board: PanelsBoard, panelId: string, outcome: string, except?: string): Promise<CommitRecord | null> {
+    const row = await panelRowOf(runtime.runtime.store, deskWho, panelId);
+    if (row === undefined) return null;
+    const planned = await planUpdate(runtime.runtime.store, deskWho, row.row_id, stillAskingIn(board, panelId, except) ? { status: "waiting", outcome: "An agent asks you a question." } : { status: "done", outcome });
+    return planned === null ? null : planned.record;
+  }
+  /** The panel's own row after a person's answer. It is written after the answer, as before: the answer is already stored, and the row is a read model. */
   async function settlePanelRow(panelId: string, outcome: string): Promise<void> {
     try {
-      const row = await panelRowOf(runtime.runtime.store, deskWho, panelId);
-      if (row === undefined) return;
-      await updateRow(runtime.runtime.store, deskWho, row.row_id, stillAsking(panelId) ? { status: "waiting", outcome: "An agent asks you a question." } : { status: "done", outcome });
+      const record = await panelRowWrite(panelBoard, panelId, outcome);
+      if (record !== null) await runtime.runtime.store.commit({ appends: [], records: [record] });
     } catch {
       // The record is a read model.
     }
@@ -1987,12 +2003,10 @@ export async function createApplication(
     }
     // A question the person agreed to cannot be recreated with other words, even after its panel was removed or the desk restarted.
     if (await agreedAltered(op)) return { ok: false, code: "SCHEMA", message: ANSWERED_CANNOT_CHANGE };
-    // Only the agent saying where an answer went closes it; nothing else counts as a reply.
-    if (op.tool === "answer.route") {
-      // The owner, the words and the waiting state are checked by the rule inside routeAnswer, for this key.
-      const routed = await routeAnswer(runtime.runtime.store, caller.tenant, op.panel_id, op.ask_id, op.routed_as, keyId);
-      if (!routed.ok) return { ok: false, code: "SCHEMA", message: routed.message };
-    }
+    // Only the agent saying where an answer went closes it; nothing else counts as a reply. The owner, the words and the waiting
+    // state are checked by the rule inside planRoute, for this key. Nothing is written until the commit below.
+    const routePlan = op.tool === "answer.route" ? await planRoute(runtime.runtime.store, caller.tenant, op.panel_id, op.ask_id, op.routed_as, keyId) : null;
+    if (routePlan !== null && !routePlan.ok) return { ok: false, code: "SCHEMA", message: routePlan.message };
     const question = op.tool === "answer.route" || op.tool === "ask.withdraw" ? askOf(op.panel_id, op.ask_id)?.question ?? null : null;
     // What the question settles, as the board has it now: the only step a route claim may be checked against.
     const resolves = op.tool === "answer.route" ? ((panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.find((b) => b.kind === "question" && b.id === op.ask_id) as { resolves?: string | null } | undefined)?.resolves ?? null) : null;
@@ -2001,30 +2015,43 @@ export async function createApplication(
     const base = target === null ? panelBoard : withStored(panelBoard, storedPanels, target);
     const { state, result } = reduceAgent(base, op, who, keyId);
     if (!result.ok) return result;
+    const store = runtime.runtime.store;
+    if (op.tool === "answer.route" && routePlan !== null && routePlan.ok) {
+      // The agent's words are kept as its claim. They count as checked only when they name a step the case keeper really holds.
+      const said = op.routed_as.trim();
+      const found = await findRoutedStep(said, resolves);
+      const where = found === null ? `The agent says it took it to: ${said}. Not checked: Horizon found no step with that name.` : `The agent says it took it to: ${said}. Checked: the step "${found.name}" is in the case "${found.case_title}".`;
+      // One entry per answer: the one made when you answered is finished in place. The route, the row and the panel's row are one commit.
+      const mine = await answerRowOf(store, deskWho, op.panel_id, op.ask_id);
+      const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: found === null ? "claimed" : "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id, ...(found === null ? {} : { step_id: found.step_id, case_id: found.case_id }) } }, clock());
+      const panelRow = await panelRowWrite(state, op.panel_id, "You answered. The agent says it has taken it on.", op.ask_id);
+      try {
+        await store.commit({ appends: [], records: [...routePlan.records, row.record, ...(panelRow === null ? [] : [panelRow])] });
+      } catch {
+        return { ok: false, code: "UNAVAILABLE", message: NOTHING_SENT };
+      }
+      await rebuildBoard();
+      return result;
+    }
+    if (op.tool === "ask.withdraw") {
+      // The withdrawal, its question state, the conversation row and the panel's row are one commit.
+      const why = `The agent withdrew this question: ${op.reason.trim()}`;
+      const mine = await answerRowOf(store, deskWho, op.panel_id, op.ask_id);
+      const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: mine?.words ?? (question ? `The agent's question: ${question}` : "The agent's question"), outcome: why, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id } }, clock());
+      const panelRow = await panelRowWrite(state, op.panel_id, why);
+      try {
+        await commitBoard(panelBoard, state, [row.record, ...(panelRow === null ? [] : [panelRow])]);
+      } catch {
+        return { ok: false, code: "UNAVAILABLE", message: NOTHING_SENT };
+      }
+      return result;
+    }
     try {
       await commitBoard(panelBoard, state);
     } catch {
       return { ok: false, code: "UNAVAILABLE", message: "The desk could not save the panel. Nothing was changed. Try again." };
     }
     const by = agentName === undefined ? {} : { agent_name: agentName };
-    if (op.tool === "answer.route") {
-      // The agent's words are kept as its claim. They count as checked only when they name a step the case keeper really holds.
-      const said = op.routed_as.trim();
-      const found = await findRoutedStep(said, resolves);
-      const where = found === null ? `The agent says it took it to: ${said}. Not checked: Horizon found no step with that name.` : `The agent says it took it to: ${said}. Checked: the step "${found.name}" is in the case "${found.case_title}".`;
-      // One entry per answer: the one made when you answered is finished in place.
-      const mine = await answerRowOf(runtime.runtime.store, deskWho, op.panel_id, op.ask_id);
-      const recorded = await logRow({ source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: found === null ? "claimed" : "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id, ...(found === null ? {} : { step_id: found.step_id, case_id: found.case_id }) } });
-      // The route itself is recorded; only its conversation row failed. The gap is kept in the store and shown in the status line.
-      if (!recorded) await noteNotRecorded(runtime.runtime.store, caller.tenant, { panel_id: op.panel_id, ask_id: op.ask_id, ...(found === null ? {} : { step_id: found.step_id, case_id: found.case_id }) }, clock()).catch(() => console.error("reconciliation: the warning could not be kept"));
-      await settlePanelRow(op.panel_id, "You answered. The agent says it has taken it on.");
-    }
-    if (op.tool === "ask.withdraw") {
-      const why = `The agent withdrew this question: ${op.reason.trim()}`;
-      const mine = await answerRowOf(runtime.runtime.store, deskWho, op.panel_id, op.ask_id);
-      if (mine !== undefined) await logRow({ source: "you", kind: "answer", words: mine.words, outcome: why, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id } });
-      await settlePanelRow(op.panel_id, why);
-    }
     if (result.panel !== null && (op.tool === "show_surface" || op.tool === "ask_human")) {
       const panel = panelBoard.open.find((p) => p.id === result.panel);
       const asking = stillAsking(result.panel);
@@ -2120,8 +2147,16 @@ export async function createApplication(
     await answersMigrated;
     if (body.op === "human.stop_waiting") {
       if (typeof body.step !== "string" || body.step === "") return fail(400, "Say which step to stop waiting for.");
-      const n = await stopWaiting(store, caller.tenant, body.step);
-      return Response.json({ ok: true, message: n === 0 ? "Nothing was waiting." : "Stopped waiting. The step can be accepted now." }, { headers });
+      // The answers' stop and their conversation rows are one commit: both are there or neither is.
+      const plan = await planStopWaiting(store, caller.tenant, body.step, deskWho, clock());
+      if (plan.count === 0) return Response.json({ ok: true, message: "Nothing was waiting." }, { headers });
+      try {
+        await store.commit({ appends: [], records: plan.records });
+      } catch {
+        return fail(500, NOTHING_SENT);
+      }
+      await rebuildBoard();
+      return Response.json({ ok: true, message: "Stopped waiting. The step can be accepted now." }, { headers });
     }
     if (boardRefused !== null) return fail(503, boardRefused);
     if (body.op === "human.reassign_owner") {
@@ -2136,15 +2171,16 @@ export async function createApplication(
       }
       const toEntry = body.to_key_id === DEFAULT_AGENT_KEY_ID ? { key_id: DEFAULT_AGENT_KEY_ID, name: DEFAULT_AGENT_NAME } : registry.find((e) => e.key_id === body.to_key_id);
       const fromName = body.from_key_id === DEFAULT_AGENT_KEY_ID ? DEFAULT_AGENT_NAME : registry.find((e) => e.key_id === body.from_key_id)?.name ?? "an agent no longer listed";
-      const result = await reassignOwner(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, question: askOf(body.panel, body.ask)?.question ?? "the agent's question", from_key: body.from_key_id, to_key: body.to_key_id, from_name: fromName, to_name: toEntry?.name ?? "", paired: true, pairedAgeMs: pairing.pairedAgeMs(request.headers.get("cookie")), targetRegistered: toEntry !== undefined, confirmed: body.confirmed === true, who: deskWho, now: clock() });
-      if (!result.ok) return fail(result.message.startsWith("Nothing was sent") ? 500 : 409, result.message);
-      // The panel record follows the stored owner, so a route by the old key is refused from now on.
+      const planned = await planReassign(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, question: askOf(body.panel, body.ask)?.question ?? "the agent's question", from_key: body.from_key_id, to_key: body.to_key_id, from_name: fromName, to_name: toEntry?.name ?? "", paired: true, pairedAgeMs: pairing.pairedAgeMs(request.headers.get("cookie")), targetRegistered: toEntry !== undefined, confirmed: body.confirmed === true, who: deskWho, now: clock() });
+      if (!planned.ok) return fail(planned.message.startsWith("Nothing was sent") ? 500 : 409, planned.message);
+      // The owner on the answers, the owner on the panel and the conversation row are one commit. The panel follows the stored
+      // owner, so a route by the old key is refused from now on.
       const toName = toEntry?.name ?? "";
       const moved = { ...panelBoard, open: panelBoard.open.map((p) => (p.id === body.panel ? { ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === body.ask ? { ...b, asked_by_key: body.to_key_id, asked_by: toName } : b)) } : p)) } as PanelsBoard;
       try {
-        await commitBoard(panelBoard, moved);
+        await commitBoard(panelBoard, moved, planned.records);
       } catch {
-        return fail(500, "The owner changed, but the panel could not be saved. Look again, then try.");
+        return fail(500, NOTHING_SENT);
       }
       return Response.json({ ok: true, message: `Moved to ${toName}. Its answer waits for them to say where it went.` }, { headers });
     }

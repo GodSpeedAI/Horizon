@@ -29,6 +29,41 @@ export interface QuestionState {
 
 export type Verdict = { readonly ok: true } | { readonly ok: false; readonly message: string };
 
+/**
+ * The five states a question is in (design v3, section 2). The state is stored once, on the question's answer record when it has
+ * one, otherwise on its panel (see panel-records.ts). Every compatibility field (`replied`, `waiting_on`, `answered`, `withdrawn`)
+ * is derived from it by these functions; nothing stores them.
+ */
+export const QUESTION_STATES = ["waiting_for_you", "put_off", "waiting_for_agent", "finished", "withdrawn"] as const;
+export type QuestionStatus = (typeof QUESTION_STATES)[number];
+/** Why a question finished. Kept apart from the state: the agent said where the answer went, or the person stopped waiting. */
+export type FinishedBy = "reported" | "stopped";
+
+/** The compatibility fields a state implies. Only `waiting_for_agent` waits on the agent; `replied` is true for every other state. */
+export function compatOf(status: QuestionStatus): { readonly replied: boolean; readonly waiting_on: WaitingOn } {
+  return status === "waiting_for_agent" ? { replied: false, waiting_on: "agent" } : { replied: true, waiting_on: "none" };
+}
+
+/** The words a closed answer from before the upgrade carries. It names no destination, so it finished by stopping. */
+const PRE_UPGRADE_ROUTE = "Answered before the upgrade; the owner was not recorded.";
+
+/** Why an answer finished, from its destination words. Words that name no destination count as stopped waiting. */
+export function finishedByOf(routedAs: string | null | undefined): FinishedBy {
+  return typeof routedAs === "string" && routedAs.trim() !== "" && routedAs !== PRE_UPGRADE_ROUTE ? "reported" : "stopped";
+}
+
+/**
+ * The state of an answer record. A record written with a `state` has that state. A record from before states existed is read
+ * once by the rule that matches its old fields: an unanswered put-off is `put_off`; an answer that waits for the agent is
+ * `waiting_for_agent`; the rest are `finished`. `migrateAnswerStates` writes the derived state back, so this runs once per record.
+ */
+export function statusOfLegacy(row: { readonly state?: unknown; readonly outcome?: string | null; readonly replied?: boolean; readonly waiting_on?: WaitingOn; readonly routed_as?: string | null }): QuestionStatus {
+  if (typeof row.state === "string" && (QUESTION_STATES as readonly string[]).includes(row.state)) return row.state as QuestionStatus;
+  if (row.outcome === null || row.outcome === undefined) return "put_off";
+  const waiting = row.waiting_on === "agent" || (row.waiting_on === undefined && row.replied !== true);
+  return waiting ? "waiting_for_agent" : "finished";
+}
+
 export const MIN_ROUTE_WORDS = 6;
 export const MAX_ROUTE_WORDS = 300;
 export const PAIRING_MAX_AGE_MS = 10 * 60_000;
@@ -39,6 +74,8 @@ export const TOO_SHORT_ROUTE = "Say where the answer went in at least 6 characte
 export const TOO_LONG_ROUTE = `Keep "where it went" to ${MAX_ROUTE_WORDS} characters or fewer.`;
 export const NO_ANSWER_WAITING = "No answer to that question is waiting for the agent.";
 export const OTHER_AGENT_OWNS = "That question was asked by a different agent, so you cannot answer for it.";
+/** Same id, different wording, choices, consequences, input kind or target: refused on every state (unanswered, put off, answered). */
+export const SAME_ID_OTHER_WORDS = "That question id was already used for different wording. Use a new question id.";
 export const REQUIRED_CANNOT_WITHDRAW = "This question settles a decision, so only you can close it. The agent cannot take it back.";
 
 /** The question's own content, as far as its meaning goes. The id is the record key, so it is not part of the fingerprint. */
@@ -69,7 +106,7 @@ export function checkPut(input: { readonly existing: QuestionState | null; reado
   const { existing, callerKey, fingerprint } = input;
   if (existing === null) return { ok: true, owner_key: callerKey, reopen: false };
   if (existing.owner_key !== callerKey) return refuse("That question belongs to another agent.");
-  if (existing.fingerprint !== null && existing.fingerprint !== fingerprint) return refuse("This question already exists with other words. Ask it with the same words, or give it a new id.");
+  if (existing.fingerprint !== null && existing.fingerprint !== fingerprint) return refuse(SAME_ID_OTHER_WORDS);
   return { ok: true, owner_key: callerKey, reopen: !committed(existing) && existing.history.length > 0 };
 }
 

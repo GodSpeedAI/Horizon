@@ -1,13 +1,15 @@
 /**
  * What the operator answered to an agent's question (stage 4). One record per answer in `horizon-panel-answers`, keyed
- * `answer:<panel_id>:<n>`. An answer starts with `replied: false` ("waiting for the agent to say where it went"). It is closed
- * only when the agent sends `answer.route` with `routed_as`, at least 6 characters saying where the answer went (or when the
- * operator says to stop waiting). No other agent call closes it. While a step has an open answer, accepting that step is blocked.
+ * `answer:<panel_id>:<n>`. Design v3, step 3: every answer stores its `state` once (waiting for the agent, put off, or finished,
+ * with `finished_by` saying why), and `replied` and `waiting_on` are derived from that state. An answer waits for the agent until
+ * the agent says where it went (`answer.route` with `routed_as`), or until the person stops waiting. No other agent call closes it.
+ * Every write that finishes an answer, moves its owner or stops its wait is planned here as records, so the caller can commit it
+ * in the same commit as the panel and the conversation row (see `planRoute`, `planStopWaiting`, `planReassign`).
  */
 import { createHash } from "node:crypto";
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
-import { newRowRecord } from "./conversation.ts";
-import { checkAnswer, checkReassign, checkRoute, checkRouteWords, checkStopWaiting, MAX_ROUTE_WORDS, MIN_ROUTE_WORDS, NO_ANSWER_WAITING, TOO_SHORT_ROUTE, type QuestionState } from "./question-rules.ts";
+import { answerRowOf, newRowRecord, planAppend, planUpdate, type RowWrite } from "./conversation.ts";
+import { checkAnswer, checkReassign, checkRoute, checkRouteWords, checkStopWaiting, compatOf, finishedByOf, MAX_ROUTE_WORDS, MIN_ROUTE_WORDS, NO_ANSWER_WAITING, statusOfLegacy, TOO_SHORT_ROUTE, type FinishedBy, type QuestionState, type QuestionStatus, type WaitingOn } from "./question-rules.ts";
 import type { Who } from "./notes.ts";
 import type { CommitRecord } from "./panel-records.ts";
 
@@ -32,7 +34,7 @@ export interface PanelAnswer {
   readonly at: string;
   /** The version of the question the person was looking at when they answered. Missing on older answers. */
   readonly version?: string | null;
-  /** True once the agent has said where the answer went (`routed_as`), or the operator chose to stop waiting. */
+  /** True unless the answer waits for the agent. Derived from `state`; not stored. */
   readonly replied: boolean;
   /** Where the agent took the answer ("step handoff_0a49 in Seed: triage inbox", "no action: <why>"). Null until it says. */
   readonly routed_as?: string | null;
@@ -48,19 +50,35 @@ export interface PanelAnswer {
   readonly fingerprint?: string | null;
   /** Earlier outcomes of a deferred question, in order. */
   readonly history?: readonly { readonly outcome: string; readonly at: string }[];
-  /** Who the answer waits on: the agent (to say where it went), the person, or nobody. Derived for older records by `normaliseAnswer`. */
-  readonly waiting_on?: "agent" | "person" | "none";
+  /** Who the answer waits on: the agent (to say where it went), the person, or nobody. Derived from `state`; not stored. */
+  readonly waiting_on?: WaitingOn;
+  /** The state of the question as this answer records it. Stored once here; `replied` and `waiting_on` are derived from it. */
+  readonly state?: QuestionStatus;
+  /** Why the answer finished, once it has: the agent named where it went ("reported"), or the person stopped waiting ("stopped"). */
+  readonly finished_by?: FinishedBy | null;
 }
 
-/** Fills the fields a record written before the upgrade does not have. The owner is the key that asked, when it was recorded. */
-export function normaliseAnswer(row: PanelAnswer): PanelAnswer & { readonly owner_key: string | null; readonly fingerprint: string | null; readonly history: readonly { readonly outcome: string; readonly at: string }[]; readonly waiting_on: "agent" | "person" | "none" } {
+/**
+ * Fills the fields a record does not have, and derives the compatibility fields from its state. A record written before states
+ * existed is read once by `statusOfLegacy`. The owner is the key that asked, when it was recorded.
+ */
+export function normaliseAnswer(row: PanelAnswer): PanelAnswer & { readonly state: QuestionStatus; readonly finished_by: FinishedBy | null; readonly owner_key: string | null; readonly fingerprint: string | null; readonly history: readonly { readonly outcome: string; readonly at: string }[]; readonly waiting_on: WaitingOn; readonly replied: boolean } {
+  const state = statusOfLegacy(row);
   return {
     ...row,
+    ...compatOf(state),
+    state,
+    finished_by: state === "finished" ? (row.finished_by ?? finishedByOf(row.routed_as)) : null,
     owner_key: row.owner_key ?? row.asked_by_key ?? null,
     fingerprint: row.fingerprint ?? null,
     history: row.history ?? [],
-    waiting_on: row.waiting_on ?? (row.replied ? "none" : "agent"),
   };
+}
+
+/** The record as it is stored: the compatibility fields that are derived from the state are left out. */
+export function storedOf(a: object): { readonly [key: string]: Json } {
+  const { replied: _replied, waiting_on: _waiting, ...rest } = a as { readonly replied?: unknown; readonly waiting_on?: unknown } & { readonly [key: string]: unknown };
+  return rest as unknown as { readonly [key: string]: Json };
 }
 
 const idOf = (panel: string, n: number): string => `answer:${panel}:${n}`;
@@ -108,20 +126,21 @@ export async function recordAnswer(
     const n = (existing.at(-1)?.n ?? 0) + 1;
     // "Not yet" is not an answer: the outcome stays null, the question keeps its history, and nobody waits for it.
     const deferred = input.outcome === "deferred";
-    const answer: PanelAnswer = {
+    const stored = {
       tenant: input.tenant, panel_id: input.panel_id, n, ask: input.ask,
-      outcome: deferred ? (null as unknown as Outcome) : input.outcome,
+      outcome: deferred ? null : input.outcome,
       value: deferred ? null : input.value ?? null, note: input.note ?? null, at: input.now.toISOString(), version: input.version ?? null,
-      replied: deferred, step: input.step ?? null, asked_by: input.asked_by ?? null, asked_by_key: input.asked_by_key ?? null,
-      owner_key: input.asked_by_key ?? null, fingerprint: input.fingerprint ?? null, history: deferred ? [{ outcome: "deferred", at: input.now.toISOString() }] : [], waiting_on: deferred ? "none" : "agent",
+      routed_as: null, step: input.step ?? null, asked_by: input.asked_by ?? null, asked_by_key: input.asked_by_key ?? null,
+      owner_key: input.asked_by_key ?? null, fingerprint: input.fingerprint ?? null, history: deferred ? [{ outcome: "deferred", at: input.now.toISOString() }] : [],
+      state: deferred ? "put_off" : "waiting_for_agent", finished_by: null,
     };
-    const records: { collection: string; id: string; expectedVersion: number; value: { readonly [key: string]: Json } }[] = [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(input.panel_id, n), expectedVersion: 0, value: answer as unknown as { readonly [key: string]: Json } }];
+    const records: { collection: string; id: string; expectedVersion: number; value: { readonly [key: string]: Json } }[] = [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(input.panel_id, n), expectedVersion: 0, value: storedOf(stored) }];
     if (committed) records.push({ collection: PANEL_ANSWERS_COLLECTION, id: guardIdOf(input.panel_id, input.ask), expectedVersion: guard?.version ?? 0, value: { tenant: input.tenant, panel_id: input.panel_id, ask: input.ask, outcome: input.outcome, n, at: input.now.toISOString() } });
     try {
       // The answer and the panel that shows it are one commit: both are there or neither is.
       const panelRecords = input.alsoRecords ? await input.alsoRecords() : [];
       await store.commit({ appends: [], records: [...records, ...panelRecords] });
-      return answer;
+      return normaliseAnswer(stored as unknown as PanelAnswer);
     } catch (error) {
       // A lost race is looked at again: the next pass sees the committed answer and refuses it.
       if (attempt >= 3) throw error;
@@ -134,20 +153,20 @@ export function answerState(a: PanelAnswer): QuestionState {
   return { owner_key: a.owner_key ?? null, fingerprint: a.fingerprint ?? null, outcome: a.outcome, replied: a.replied, waiting_on: a.waiting_on ?? "none", history: a.history ?? [], routed_as: a.routed_as ?? null, version: a.version ?? null };
 }
 
-/** Closes one answer that waits for the agent: it keeps its words, and its note or the given note. Returns false if it has gone. */
-async function closeAnswer(store: DurableStore, a: PanelAnswer, note: string | null, routedAs: string | null): Promise<boolean> {
+/** The write that finishes one answer: its words are kept, and why it finished is recorded. Null when the answer has gone. */
+type Write = { readonly collection: string; readonly id: string; readonly expectedVersion: number; readonly value: { readonly [key: string]: Json } };
+async function planFinish(store: DurableStore, a: PanelAnswer, by: FinishedBy, routedAs: string | null, note: string | null): Promise<Write | null> {
   const row = await store.getRecord(PANEL_ANSWERS_COLLECTION, idOf(a.panel_id, a.n));
-  if (row === null || row === undefined) return false;
-  await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(a.panel_id, a.n), expectedVersion: row.version, value: { ...a, replied: true, waiting_on: "none", routed_as: routedAs, note: a.note ?? note } as unknown as { readonly [key: string]: Json } }] });
-  return true;
+  if (row === null || row === undefined) return null;
+  return { collection: PANEL_ANSWERS_COLLECTION, id: idOf(a.panel_id, a.n), expectedVersion: row.version, value: storedOf({ ...a, state: "finished", finished_by: by, routed_as: routedAs, note: a.note ?? note }) };
 }
 
 /**
- * The agent says where an answer went: `answer.route { panel_id, ask_id, routed_as }`. Every answer to that question that waits for
- * the agent is closed and keeps the words. `callerKey` is the agent key asking; the owner, the words and the waiting state are
- * checked by `checkRoute`. Without a `callerKey` (the store's own call, not the agent door) the owner is not checked.
+ * The records that say where an answer went: `answer.route { panel_id, ask_id, routed_as }`. Every answer to that question that waits
+ * for the agent is finished and keeps its words. `callerKey` is the agent key asking; the owner, the words and the waiting state are
+ * checked by `checkRoute`. Without a `callerKey` (the store's own call, not the agent door) the owner is not checked. Nothing is written here.
  */
-export async function routeAnswer(store: DurableStore, tenant: string, panelId: string, askId: string, routedAs: unknown, callerKey?: string): Promise<{ readonly ok: true; readonly closed: number } | { readonly ok: false; readonly message: string }> {
+export async function planRoute(store: DurableStore, tenant: string, panelId: string, askId: string, routedAs: unknown, callerKey?: string): Promise<{ readonly ok: true; readonly records: CommitRecord[]; readonly closed: number } | { readonly ok: false; readonly message: string }> {
   const rows = (await listAnswers(store, tenant, panelId)).filter((a) => a.ask === askId);
   const target = rows.filter(waitsForAgent).at(-1) ?? rows.at(-1);
   if (target === undefined) {
@@ -158,9 +177,24 @@ export async function routeAnswer(store: DurableStore, tenant: string, panelId: 
   const verdict = checkRoute({ state, callerKey: callerKey ?? state.owner_key, routedAs });
   if (!verdict.ok) return { ok: false, message: verdict.message };
   const words = typeof routedAs === "string" ? routedAs.trim() : "";
-  let closed = 0;
-  for (const a of rows.filter(waitsForAgent)) if (await closeAnswer(store, a, null, words)) closed += 1;
-  return closed === 0 ? { ok: false, message: NO_ANSWER_WAITING } : { ok: true, closed };
+  const records: CommitRecord[] = [];
+  for (const a of rows.filter(waitsForAgent)) {
+    const write = await planFinish(store, a, "reported", words, null);
+    if (write !== null) records.push(write);
+  }
+  return records.length === 0 ? { ok: false, message: NO_ANSWER_WAITING } : { ok: true, records, closed: records.length };
+}
+
+/** Routes an answer on its own (the store's call, without the desk's rows). Returns how many answers it finished. */
+export async function routeAnswer(store: DurableStore, tenant: string, panelId: string, askId: string, routedAs: unknown, callerKey?: string): Promise<{ readonly ok: true; readonly closed: number } | { readonly ok: false; readonly message: string }> {
+  const planned = await planRoute(store, tenant, panelId, askId, routedAs, callerKey);
+  if (!planned.ok) return planned;
+  try {
+    await store.commit({ appends: [], records: planned.records });
+  } catch {
+    return { ok: false, message: NOTHING_SENT };
+  }
+  return { ok: true, closed: planned.closed };
 }
 
 /** What an ask offers, as far as checking an answer needs it. */
@@ -196,15 +230,40 @@ export function answerFor(ask: AskShape, value: unknown): { readonly ok: true; r
   }
 }
 
-/** The operator chose to stop waiting for the agent about this step. Kept in the record so it is not mistaken for a reply. */
-/** The operator stops waiting: every answer on the step that waits for the agent is closed, if the rule allows it. */
-export async function stopWaiting(store: DurableStore, tenant: string, step: string): Promise<number> {
-  let changed = 0;
+/** The words the conversation row of a stopped answer carries. */
+export const STOPPED_ROW = "You stopped waiting. The agent has not said where your answer went.";
+
+/**
+ * The records that stop the person's wait on one step: every answer on the step that waits for the agent is finished as stopped, and
+ * its conversation row says so, in the same set of records. `who` and `now` are needed for the rows; without them only answers change.
+ */
+export async function planStopWaiting(store: DurableStore, tenant: string, step: string, who?: Who, now?: Date): Promise<{ readonly count: number; readonly records: CommitRecord[] }> {
+  const records: CommitRecord[] = [];
+  let count = 0;
   for (const a of await listAnswers(store, tenant)) {
     if (a.step !== step || !checkStopWaiting({ state: answerState(a) }).ok) continue;
-    if (await closeAnswer(store, a, "You chose to stop waiting for the agent.", null)) changed += 1;
+    const write = await planFinish(store, a, "stopped", null, "You chose to stop waiting for the agent.");
+    if (write === null) continue;
+    records.push(write);
+    count += 1;
+    if (who !== undefined && now !== undefined) records.push(await answerRowWrite(store, who, a, now));
   }
-  return changed;
+  return { count, records };
+}
+
+/** The conversation row of one answer, finished in place (or added when there is none), as a record. */
+async function answerRowWrite(store: DurableStore, who: Who, a: PanelAnswer, now: Date): Promise<CommitRecord> {
+  const existing = await answerRowOf(store, who, a.panel_id, a.ask);
+  const write: RowWrite | null = existing === undefined ? await planAppend(store, who, { source: "you", kind: "answer", words: "Your answer to the agent's question", outcome: STOPPED_ROW, status: "done", refs: { panel_id: a.panel_id, ask_id: a.ask } }, now) : await planUpdate(store, who, existing.row_id, { status: "done", outcome: STOPPED_ROW });
+  if (write === null) throw new Error("the answer's row is not there to finish");
+  return write.record;
+}
+
+/** Stops the wait on one step, as its own commit. Returns how many answers it finished. */
+export async function stopWaiting(store: DurableStore, tenant: string, step: string, who?: Who, now?: Date): Promise<number> {
+  const planned = await planStopWaiting(store, tenant, step, who, now);
+  if (planned.count > 0) await store.commit({ appends: [], records: planned.records });
+  return planned.count;
 }
 
 /**
@@ -257,11 +316,11 @@ export async function rememberAgreed(store: DurableStore, tenant: string, panelI
 export const NOTHING_SENT = "Nothing was sent. Try again.";
 
 /**
- * The person moves a question that waits for an agent to another registered agent. Every answer record of that question takes the
- * new owner, and the conversation row that names both display names is written in the same commit. The commit is refused as a whole
- * if any record has moved since it was read. The caller checks the pairing, the target and the second confirm (see checkReassign).
+ * The records that move a question that waits for an agent to another registered agent: every answer record of that question takes the
+ * new owner, and the conversation row that names both display names is in the same set. The caller commits them with the panel record.
+ * The checks are the pairing, the target, and the second confirm (see checkReassign). Nothing is written here.
  */
-export async function reassignOwner(
+export async function planReassign(
   store: DurableStore,
   input: {
     readonly tenant: string; readonly panel_id: string; readonly ask: string; readonly question: string;
@@ -269,7 +328,7 @@ export async function reassignOwner(
     readonly paired: boolean; readonly pairedAgeMs: number | null; readonly targetRegistered: boolean; readonly confirmed: boolean;
     readonly who: Who; readonly now: Date;
   },
-): Promise<{ readonly ok: true; readonly changed: number } | { readonly ok: false; readonly message: string }> {
+): Promise<{ readonly ok: true; readonly records: CommitRecord[]; readonly changed: number } | { readonly ok: false; readonly message: string }> {
   const rows = (await listAnswers(store, input.tenant, input.panel_id)).filter((a) => a.ask === input.ask);
   const waiting = rows.filter(waitsForAgent).at(-1);
   if (waiting === undefined) return { ok: false, message: "No answer is waiting for an agent on that question, so there is no owner to change. Nothing was changed." };
@@ -277,24 +336,38 @@ export async function reassignOwner(
   if (state.owner_key !== input.from_key) return { ok: false, message: "The owner changed while you were looking. Look again, then try. Nothing was changed." };
   const verdict = checkReassign({ state, paired: input.paired, pairedAgeMs: input.pairedAgeMs ?? Number.POSITIVE_INFINITY, newOwnerKey: input.to_key, targetRegistered: input.targetRegistered, confirmed: input.confirmed });
   if (!verdict.ok) return { ok: false, message: verdict.message };
-  const records: { readonly collection: string; readonly id: string; readonly expectedVersion: number; readonly value: { readonly [key: string]: Json } }[] = [];
+  const records: CommitRecord[] = [];
   for (const row of rows) {
     const current = await store.getRecord(PANEL_ANSWERS_COLLECTION, idOf(row.panel_id, row.n));
     if (current === null || current === undefined) continue;
-    records.push({ collection: PANEL_ANSWERS_COLLECTION, id: idOf(row.panel_id, row.n), expectedVersion: current.version, value: { ...row, owner_key: input.to_key, asked_by_key: input.to_key, asked_by: input.to_name } as unknown as { readonly [key: string]: Json } });
+    records.push({ collection: PANEL_ANSWERS_COLLECTION, id: idOf(row.panel_id, row.n), expectedVersion: current.version, value: storedOf({ ...row, owner_key: input.to_key, asked_by_key: input.to_key, asked_by: input.to_name }) });
   }
   const when = input.now.toISOString();
   const row = newRowRecord(input.who, { source: "you", kind: "answer", words: `Moved the question "${input.question}" from ${input.from_name} to ${input.to_name}.`, outcome: `${input.to_name} now answers for it, since ${when}. Its answer is still waiting for them to say where it went.`, status: "waiting" }, input.now);
-  try {
-    await store.commit({ appends: [], records: [...records, row] });
-  } catch {
-    return { ok: false, message: NOTHING_SENT };
-  }
-  return { ok: true, changed: records.length };
+  return { ok: true, records: [...records, row], changed: records.length };
 }
 
 /** The words an unrouted answer from before the upgrade is closed with, when no owner was recorded for it. */
 export const PRE_UPGRADE_WORDS = "Answered before the upgrade; the owner was not recorded.";
+
+/**
+ * Writes the state of every answer record that has none yet, derived once from its old fields (`statusOfLegacy`). The derived
+ * compatibility fields are dropped from the stored record. Runs before any read that needs states; a second run writes nothing.
+ * Returns how many records it wrote.
+ */
+export async function migrateAnswerStates(store: DurableStore, tenant: string): Promise<number> {
+  const records: CommitRecord[] = [];
+  for (const row of await store.listRecords(PANEL_ANSWERS_COLLECTION, { tenant })) {
+    if (!row.id.startsWith("answer:")) continue;
+    const value = row.value as { readonly [key: string]: unknown };
+    if (typeof value.state === "string") continue;
+    const legacy = { outcome: (value.outcome as string | null | undefined) ?? null, replied: value.replied as boolean | undefined, waiting_on: value.waiting_on as WaitingOn | undefined, routed_as: value.routed_as as string | null | undefined };
+    const state = statusOfLegacy(legacy);
+    records.push({ collection: PANEL_ANSWERS_COLLECTION, id: row.id, expectedVersion: row.version, value: storedOf({ ...value, state, finished_by: state === "finished" ? finishedByOf(legacy.routed_as) : null }) });
+  }
+  if (records.length > 0) await store.commit({ appends: [], records });
+  return records.length;
+}
 
 /**
  * Closes answers written before the upgrade that have no owner and no route. They do not block acceptance after the upgrade
@@ -304,9 +377,9 @@ export async function migratePreUpgradeAnswers(store: DurableStore, tenant: stri
   let closed = 0;
   for (const a of await listAnswers(store, tenant)) {
     if (!waitsForAgent(a) || a.owner_key !== null || a.outcome === null) continue;
-    const row = await store.getRecord(PANEL_ANSWERS_COLLECTION, idOf(a.panel_id, a.n));
-    if (row === null || row === undefined) continue;
-    await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(a.panel_id, a.n), expectedVersion: row.version, value: { ...a, replied: true, waiting_on: "none", routed_as: PRE_UPGRADE_WORDS} as unknown as { readonly [key: string]: Json } }] });
+    const write = await planFinish(store, a, "stopped", PRE_UPGRADE_WORDS, null);
+    if (write === null) continue;
+    await store.commit({ appends: [], records: [write] });
     closed += 1;
   }
   return closed;

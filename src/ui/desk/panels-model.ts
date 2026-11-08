@@ -9,7 +9,7 @@
 export const MAX_OPEN_PANELS = 8;
 
 import { answerFor } from "../../capabilities/panel-answers.ts";
-import { checkRouteWords, checkWithdraw, REQUIRED_CANNOT_WITHDRAW, type QuestionState } from "../../capabilities/question-rules.ts";
+import { checkRouteWords, checkWithdraw, REQUIRED_CANNOT_WITHDRAW, SAME_ID_OTHER_WORDS, type QuestionState } from "../../capabilities/question-rules.ts";
 import { clip, itemOf, questionOf, toneOf, type PanelItem, type PanelTone, type QuestionItem } from "../surface2/panel-blocks.ts";
 
 export type Tone = PanelTone;
@@ -55,7 +55,12 @@ export type AgentOp =
 export const MAX_WITHDRAW_REASON = 200;
 export { REQUIRED_CANNOT_WITHDRAW };
 export const QUESTION_CHANGED = "This question changed after you looked at it. Look again, then answer.";
-export const ANSWERED_CANNOT_CHANGE = "The person already answered this question, so it cannot be changed. Ask a new question with a different id.";
+/**
+ * A question id keeps its first wording, choices, consequences, input kind and target, whatever its state (unanswered, put off or
+ * answered). A put that changes any of them is refused with these words (operator decision: "Use a new question ID for changes").
+ * The name is kept for the answered case, which is where it was first pinned.
+ */
+export const ANSWERED_CANNOT_CHANGE = SAME_ID_OTHER_WORDS;
 /** A question the person answered (not put off, not skipped) is an agreement to those exact words. */
 const agreedTo = (b: AskBlock | undefined): b is AskBlock => b !== undefined && b.answered !== null && b.answered.outcome === "answered";
 /** Same words, options, consequences and input kind (the version), and the same thing it settles. */
@@ -135,18 +140,21 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
         // An update keeps the panel where it is and keeps it pinned; answers already given stay on their questions.
         if (existing.owner_key != null && existing.owner_key !== key) return refuse(state, "SCHEMA", PANEL_OWNED_ELSEWHERE);
         const before = (id: string): AskBlock | undefined => existing.blocks.find((o): o is AskBlock => o.kind === "question" && o.id === id);
-        // A question the person answered cannot be reworded under them; one they put off or skipped starts again when it changes.
-        // Every answered question must come back unchanged: leaving it out, or changing it, is refused.
+        // A question id keeps its first meaning on every state. A question the person answered must also come back, unchanged.
+        for (const b of blocks) {
+          if (b.kind !== "question") continue;
+          const old = before(b.id);
+          if (old !== undefined && !sameQuestion(old, b)) return refuse(state, "SCHEMA", SAME_ID_OTHER_WORDS);
+        }
         for (const o of existing.blocks) {
           if (o.kind !== "question" || !agreedTo(o)) continue;
-          const now = blocks.find((b): b is AskBlock => b.kind === "question" && b.id === o.id);
-          if (now === undefined || !sameQuestion(o, now)) return refuse(state, "SCHEMA", ANSWERED_CANNOT_CHANGE);
+          if (!blocks.some((b) => b.kind === "question" && b.id === o.id)) return refuse(state, "SCHEMA", SAME_ID_OTHER_WORDS);
         }
         const kept = blocks.map((b) => {
           if (b.kind !== "question") return b;
           const old = before(b.id);
           const owner = ownerOf(old, agent, key);
-          return old !== undefined && sameQuestion(old, b) ? sameAgain(old, b, owner) : { ...b, ...owner };
+          return old !== undefined ? sameAgain(old, b, owner) : { ...b, ...owner };
         });
         // A put does not remove a question the person has not answered: it stays until it is answered, withdrawn or routed.
         const unanswered = existing.blocks.filter((o): o is AskBlock => o.kind === "question" && o.answered === null && (o.withdrawn ?? null) === null && !kept.some((k) => k.kind === "question" && k.id === o.id));
@@ -162,10 +170,10 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
       if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [{ ...block, asked_by: agent, asked_by_key: key }], notes: [], owner_key: key });
       if (panel.owner_key != null && panel.owner_key !== key) return refuse(state, "SCHEMA", PANEL_OWNED_ELSEWHERE);
       const old = panel.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === block.id);
-      if (agreedTo(old) && !sameQuestion(old, block)) return refuse(state, "SCHEMA", ANSWERED_CANNOT_CHANGE);
-      // The very same question again keeps what the person said; a changed one starts again.
+      if (old !== undefined && !sameQuestion(old, block)) return refuse(state, "SCHEMA", SAME_ID_OTHER_WORDS);
+      // The very same question again keeps what the person said (an answer, or a put-off that reopens).
       const owner = ownerOf(old, agent, key);
-      const next = old !== undefined && sameQuestion(old, block) ? sameAgain(old, block, owner) : { ...block, ...owner };
+      const next = old !== undefined ? sameAgain(old, block, owner) : { ...block, ...owner };
       return { state: replace(state, panel.id, (p) => ({ ...p, step: op.step === undefined ? p.step : (op.step ?? null), blocks: [...p.blocks.filter((b) => b.id !== block.id), next] })), result: { ok: true, panel: panel.id } };
     }
     case "annotate": {

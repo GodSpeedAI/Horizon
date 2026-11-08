@@ -1,12 +1,15 @@
 /**
- * The desk's open panels as durable records (design v3, step 2). One record per panel in `horizon-panels`, keyed `panel:<panel_id>`,
- * holds the panel and its questions exactly as the board holds them: wording, choices, consequences, decision target, owners,
- * the answer, deferrals and withdrawal. One record in `horizon-desk-board`, keyed `board:<tenant>`, lists the visible panels in
- * order. The board is a view: `loadBoard` builds it from these records, and a record it cannot read is an error, never an empty
- * board. A panel that is closed, removed or evicted only leaves the visible list; its record stays.
+ * The desk's open panels as durable records (design v3, steps 2 and 3). One record per panel in `horizon-panels`, keyed `panel:<panel_id>`,
+ * holds the panel and its questions: wording, choices, consequences, decision target, owners, deferrals and withdrawal. A question's
+ * state is stored once: on its answer record when it has one (`horizon-panel-answers`), otherwise on its panel (withdrawn). The board's
+ * `answered` and `withdrawn` fields are derived from that state here and never stored. One record in `horizon-desk-board`, keyed
+ * `board:<tenant>`, lists the visible panels in order. The board is a view: `loadBoard` builds it from these records, and a record it
+ * cannot read is an error, never an empty board. A panel that is closed, removed or evicted only leaves the visible list; its record stays.
  */
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
-import { hasOpenAsk, MAX_OPEN_PANELS, type Panel, type Panels } from "../ui/desk/panels-model.ts";
+import { listAnswers, PANEL_ANSWERS_COLLECTION, storedOf, type PanelAnswer } from "./panel-answers.ts";
+import { statusOfLegacy, type QuestionStatus } from "./question-rules.ts";
+import { hasOpenAsk, MAX_OPEN_PANELS, type Panel, type Panels, type PanelBlock } from "../ui/desk/panels-model.ts";
 
 export const PANELS_COLLECTION = "horizon-panels";
 export const BOARD_COLLECTION = "horizon-desk-board";
@@ -36,6 +39,38 @@ export function readPanel(value: unknown): Panel {
   return value as unknown as Panel;
 }
 
+/** The newest answer record of one question, if it has one. */
+const latestOf = (answers: readonly PanelAnswer[], panelId: string, askId: string): PanelAnswer | undefined => answers.filter((a) => a.panel_id === panelId && a.ask === askId).at(-1);
+
+/**
+ * A question block as the board shows it. With an answer record, `answered` and `withdrawn` follow its state; without one, the block's
+ * own stored `withdrawn` stands, and a legacy `answered` is kept as it was (the only copy that exists for it).
+ */
+function derivedBlock(panelId: string, block: PanelBlock, answers: readonly PanelAnswer[]): PanelBlock {
+  if (block.kind !== "question") return block;
+  const latest = latestOf(answers, panelId, block.id);
+  if (latest === undefined) return block;
+  const status: QuestionStatus = statusOfLegacy(latest);
+  const answered = status === "put_off" ? { outcome: "deferred", value: null, note: latest.note, routed_as: null } : status === "waiting_for_agent" || status === "finished" ? { outcome: latest.outcome, value: latest.value, note: latest.note, routed_as: latest.routed_as ?? null } : null;
+  const withdrawn = status === "withdrawn" ? (block.withdrawn ?? { reason: "" }) : null;
+  return { ...block, answered, withdrawn } as unknown as PanelBlock;
+}
+
+/** The panel as the board shows it, with its question states derived. */
+function derivedPanel(panel: Panel, answers: readonly PanelAnswer[]): Panel {
+  return { ...panel, blocks: panel.blocks.map((b) => derivedBlock(panel.id, b, answers)) };
+}
+
+/** The panel as it is stored: a question whose answer record holds its state does not store `answered`. */
+function storedPanel(panel: Panel, tenant: string, answers: readonly PanelAnswer[]): { readonly [key: string]: Json } {
+  const blocks = panel.blocks.map((b) => {
+    if (b.kind !== "question" || latestOf(answers, panel.id, b.id) === undefined) return b;
+    const { answered: _answered, ...rest } = b as PanelBlock & { readonly answered?: unknown };
+    return rest as PanelBlock;
+  });
+  return { ...(({ ...panel, blocks }) as unknown as { readonly [key: string]: Json }), tenant };
+}
+
 /** The board as the records hold it, plus every stored panel (visible or not) so a closed panel can be brought back. */
 export interface BoardView {
   readonly board: Panels;
@@ -46,10 +81,11 @@ export interface BoardView {
  * Builds the board from the records. Reads only; a record that cannot be read throws PanelLoadError, and the caller shows the error.
  */
 export async function loadBoard(store: DurableStore, tenant: string): Promise<BoardView> {
+  const answers = await listAnswers(store, tenant);
   const stored = new Map<string, Panel>();
   for (const row of await store.listRecords(PANELS_COLLECTION, { tenant })) {
     const panel = readPanel(row.value);
-    stored.set(panel.id, panel);
+    stored.set(panel.id, derivedPanel(panel, answers));
   }
   const desk = await store.getRecord(BOARD_COLLECTION, boardIdOf(tenant));
   let visible: string[] = [];
@@ -74,17 +110,43 @@ export async function loadBoard(store: DurableStore, tenant: string): Promise<Bo
  */
 export async function boardWrites(store: DurableStore, tenant: string, before: Panels, after: Panels): Promise<CommitRecord[]> {
   const records: CommitRecord[] = [];
+  const answers = await listAnswers(store, tenant);
   const was = new Map(before.open.map((p) => [p.id, JSON.stringify(p)] as const));
   for (const panel of after.open) {
     if (was.get(panel.id) === JSON.stringify(panel)) continue;
     const id = panelIdOf(panel.id);
     const current = await store.getRecord(PANELS_COLLECTION, id);
-    records.push({ collection: PANELS_COLLECTION, id, expectedVersion: current?.version ?? 0, value: { ...(panel as unknown as { readonly [key: string]: Json }), tenant } as { readonly [key: string]: Json } });
+    records.push({ collection: PANELS_COLLECTION, id, expectedVersion: current?.version ?? 0, value: storedPanel(panel, tenant, answers) });
   }
   const order = (p: Panels): string => p.open.map((x) => x.id).join("\n");
   if (order(before) !== order(after)) {
     const current = await store.getRecord(BOARD_COLLECTION, boardIdOf(tenant));
     records.push({ collection: BOARD_COLLECTION, id: boardIdOf(tenant), expectedVersion: current?.version ?? 0, value: { tenant, visible: after.open.map((p) => p.id) } as { readonly [key: string]: Json } });
+  }
+  return records;
+}
+
+/**
+ * The answer records that move a question to the state the board now shows it in: put off becomes waiting for you when the agent
+ * puts it up again; a withdrawn question is withdrawn. A question whose answer already waits for the agent or is finished is left alone.
+ * Written in the same commit as the board change that caused it.
+ */
+export async function stateWrites(store: DurableStore, tenant: string, after: Panels): Promise<CommitRecord[]> {
+  const answers = await listAnswers(store, tenant);
+  const records: CommitRecord[] = [];
+  for (const panel of after.open) {
+    for (const block of panel.blocks) {
+      if (block.kind !== "question") continue;
+      const latest = latestOf(answers, panel.id, block.id);
+      if (latest === undefined) continue;
+      const q = block as unknown as { readonly answered?: { readonly outcome?: string } | null; readonly withdrawn?: unknown };
+      const want: QuestionStatus | null = q.withdrawn ? "withdrawn" : q.answered == null ? "waiting_for_you" : q.answered.outcome === "deferred" ? "put_off" : null;
+      if (want === null || want === statusOfLegacy(latest)) continue;
+      const id = `answer:${panel.id}:${latest.n}`;
+      const row = await store.getRecord(PANEL_ANSWERS_COLLECTION, id);
+      if (row === null || row === undefined) continue;
+      records.push({ collection: PANEL_ANSWERS_COLLECTION, id, expectedVersion: row.version, value: { ...storedOf(latest), state: want, finished_by: null } as { readonly [key: string]: Json } });
+    }
   }
   return records;
 }

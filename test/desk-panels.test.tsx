@@ -105,7 +105,10 @@ describe("answers are kept", () => {
     const b = await recordAnswer(store, { tenant: "t", panel_id: "release", ask: "q2", outcome: "deferred", step: "signoff", now });
     expect([a.n, b.n]).toEqual([1, 2]);
     // "Not yet" is not an answer and waits for nobody (store-design-v2 section 3): it does not block the step.
-    expect((await store.getRecord(PANEL_ANSWERS_COLLECTION, "answer:release:2"))?.value).toMatchObject({ replied: true, outcome: null, waiting_on: "none", step: "signoff" });
+    // The state is stored once, on the answer; replied and waiting_on are derived from it (they are not stored any more).
+    expect((await store.getRecord(PANEL_ANSWERS_COLLECTION, "answer:release:2"))?.value).toMatchObject({ state: "put_off", outcome: null, step: "signoff" });
+    expect((await store.getRecord(PANEL_ANSWERS_COLLECTION, "answer:release:2"))?.value).not.toHaveProperty("replied");
+    expect((await listAnswers(store, "t", "release"))[1]).toMatchObject({ replied: true, outcome: null, waiting_on: "none", state: "put_off" });
     // q1 is answered and waits for the agent, so the step is blocked; the put-off q2 waits for nobody.
     expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(true);
     expect(acceptanceBlocked(await listAnswers(store, "t"), "another_step")).toBe(false);
