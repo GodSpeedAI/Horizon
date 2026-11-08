@@ -56,6 +56,16 @@ export const ANSWERED_CANNOT_CHANGE = "The person already answered this question
 const agreedTo = (b: AskBlock | undefined): b is AskBlock => b !== undefined && b.answered !== null && b.answered.outcome === "answered";
 /** Same words, options, consequences and input kind (the version), and the same thing it settles. */
 const sameQuestion = (a: AskBlock, b: AskBlock): boolean => a.version === b.version && (a.resolves ?? null) === (b.resolves ?? null);
+/**
+ * The very same question put up again. What the person agreed to or skipped stays. A question they put off ("Not yet") opens again,
+ * as the card promised ("The agent will ask again later"), and the earlier answer moves into its history.
+ */
+function sameAgain(old: AskBlock, now: AskBlock, asked_by: string): AskBlock {
+  if (old.answered !== null && old.answered.outcome === "deferred") {
+    return { ...now, asked_by, answered: null, withdrawn: old.withdrawn ?? null, earlier: [...(old.earlier ?? []), { outcome: old.answered.outcome, value: old.answered.value, note: old.answered.note }] };
+  }
+  return { ...now, asked_by, answered: old.answered, withdrawn: old.withdrawn ?? null, ...(old.earlier === undefined ? {} : { earlier: old.earlier }) };
+}
 export const ALL_WAITING = "Eight panels are waiting for answers. Answer or skip one first.";
 /** A question still waiting for the person: not answered (not even put off) and not withdrawn. */
 export const isOpenAsk = (b: PanelBlock): boolean => b.kind === "question" && b.answered === null && (b.withdrawn ?? null) === null;
@@ -117,7 +127,7 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
           if (b.kind !== "question") return b;
           const old = before(b.id);
           const asked_by = old?.asked_by ?? agent;
-          return old !== undefined && sameQuestion(old, b) ? { ...b, asked_by, answered: old.answered, withdrawn: old.withdrawn ?? null } : { ...b, asked_by };
+          return old !== undefined && sameQuestion(old, b) ? sameAgain(old, b, asked_by) : { ...b, asked_by };
         });
         return { state: replace(state, s.id, (p) => ({ ...p, title: str(s.title, 120) || p.title, step: s.step === undefined ? p.step : (s.step ?? null), blocks: kept })), result: { ok: true, panel: s.id } };
       }
@@ -133,7 +143,7 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
       if (agreedTo(old) && !sameQuestion(old, block)) return refuse(state, "SCHEMA", ANSWERED_CANNOT_CHANGE);
       // The very same question again keeps what the person said; a changed one starts again.
       const asked_by = old?.asked_by ?? agent;
-      const next = old !== undefined && sameQuestion(old, block) ? { ...block, asked_by, answered: old.answered, withdrawn: old.withdrawn ?? null } : { ...block, asked_by };
+      const next = old !== undefined && sameQuestion(old, block) ? sameAgain(old, block, asked_by) : { ...block, asked_by };
       return { state: replace(state, panel.id, (p) => ({ ...p, step: op.step === undefined ? p.step : (op.step ?? null), blocks: [...p.blocks.filter((b) => b.id !== block.id), next] })), result: { ok: true, panel: panel.id } };
     }
     case "annotate": {

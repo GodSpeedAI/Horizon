@@ -63,6 +63,16 @@ export function echoesOf(panel: Panel): string[] {
   return out;
 }
 
+/** Answers the person put off before the agent asked again, oldest first, one sentence each. */
+export function historyOf(panel: Panel): string[] {
+  const out: string[] = [];
+  for (const b of panel.blocks) {
+    if (b.kind !== "question") continue;
+    for (const e of b.earlier ?? []) out.push(`Earlier: ${answerEcho({ ...(b.input === undefined ? {} : { input: b.input }), options: b.options }, e.outcome as "deferred", e.value)}`);
+  }
+  return out;
+}
+
 /** How many questions across these cards are still waiting for you. */
 export const openAsksIn = (panels: readonly Panel[]): number => panels.reduce((n, p) => n + p.blocks.filter((b) => b.kind === "question" && hasOpenAsk({ ...p, blocks: [b] })).length, 0);
 
@@ -110,6 +120,13 @@ export function PanelCard({ panel, io, presenting = false, onAction = () => unde
       {panel.blocks.map((block) => (
         <Item key={block.id} panel={panel} item={block} io={io} ctx={ctx} />
       ))}
+      {historyOf(panel).length > 0 ? (
+        <ul className="muted" aria-label="Earlier answers" data-earlier>
+          {historyOf(panel).map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
+        </ul>
+      ) : null}
       {panel.notes.length > 0 ? (
         <ul className="agent-notes" aria-label="Notes from the agent">
           {panel.notes.map((n, i) => (
