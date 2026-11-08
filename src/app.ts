@@ -95,8 +95,8 @@ import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.t
 import { checkReassign } from "./capabilities/question-rules.ts";
 import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, listConflicts, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
-import { ANSWER_NEEDS_REVISION, ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, moveQuestion, openPanelId, reduceAgent, reduceHuman, type AgentOp, type AskBlock, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
-import { boardWrites, loadBoard, movedStoredQuestion, PANEL_LOAD_WORDS, stateWrites, withStored, type CommitRecord } from "./capabilities/panel-records.ts";
+import { ANSWER_NEEDS_REVISION, ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, checkAgentOp, moveQuestion, openPanelId, reduceAgent, reduceHuman, type AgentOp, type AskBlock, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
+import { boardWrites, loadBoard, movedStoredQuestion, PANEL_LOAD_WORDS, PANEL_UNREADABLE_WORDS, readsBack, stateWrites, withStored, type CommitRecord } from "./capabilities/panel-records.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { readableTitle } from "./ui/desk/banned-words.ts";
 import { agentRowsOf, agentSearchOf, agentStateOf, WITHHELD_WORDS } from "./ui/desk/agent-view.ts";
@@ -2046,6 +2046,9 @@ export async function createApplication(
 
   /** The body of applyAgentOp. Runs only inside panelCommand. `dedupe` is the request id and fingerprint of a retried call, if it has one. */
   async function applyAgentOpNow(op: AgentOp, agentName: string | undefined, keyId: string, dedupe: { readonly requestId: string; readonly fingerprint: string } | null): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
+    // Every field is checked by type before anything is read or stored, so a change the board cannot hold is refused whole (400).
+    const typing = checkAgentOp(op);
+    if (typing !== null) return { ok: false, code: "SCHEMA", message: typing };
     await answersMigrated;
     // The request's record, kept with the change it made: a retry with the same id returns this response and writes nothing.
     const agentKeep = (response: { readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] }): CommitRecord[] => (dedupe === null ? [] : [requestRecord(caller.tenant, dedupe.requestId, dedupe.fingerprint, JSON.parse(JSON.stringify(response)) as Json)]);
@@ -2082,6 +2085,11 @@ export async function createApplication(
     const { state, result } = reduceAgent(base, op, who, keyId);
     if (!result.ok) return result;
     const store = runtime.runtime.store;
+    // A panel this change would leave unreadable is refused here, so nothing is stored that the load would refuse (and then every change).
+    if (result.panel !== null && (op.tool === "show_surface" || op.tool === "ask_human" || op.tool === "annotate" || op.tool === "ask.withdraw")) {
+      const changed = state.open.find((p) => p.id === result.panel);
+      if (changed !== undefined && !(await readsBack(store, caller.tenant, changed))) return { ok: false, code: "SCHEMA", message: PANEL_UNREADABLE_WORDS };
+    }
     if (op.tool === "answer.route" && routePlan !== null && routePlan.ok) {
       // The agent's words are kept as its claim. A step the case keeper holds is shown as found, but it is not delivery: the row stays
       // claimed, and nothing marks it done without independent evidence that the step was delivered.

@@ -150,6 +150,21 @@ export async function movedStoredQuestion(store: DurableStore, panelId: string, 
   return { collection: PANELS_COLLECTION, id: row.id, expectedVersion: row.version, value: { ...(row.value as { readonly [key: string]: Json }), blocks: blocks as unknown as Json } };
 }
 
+/** What a change gets when the panel it would leave behind could not be read back on load. Nothing is stored. */
+export const PANEL_UNREADABLE_WORDS = "That panel could not be saved in a form the desk can read back. Nothing was changed.";
+
+/** Whether the panel, as its record would be stored, reads back with the same reader the load uses. Reads only. */
+export async function readsBack(store: DurableStore, tenant: string, panel: Panel): Promise<boolean> {
+  const answers = await listAnswers(store, tenant);
+  try {
+    readPanel(storedPanel(panel, tenant, answers));
+    return true;
+  } catch (error) {
+    if (error instanceof PanelLoadError) return false;
+    throw error;
+  }
+}
+
 /** The board as the records hold it, plus every stored panel (visible or not) so a closed panel can be brought back. */
 export interface BoardView {
   readonly board: Panels;

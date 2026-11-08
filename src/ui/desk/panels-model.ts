@@ -52,6 +52,47 @@ export type AgentOp =
   /** The agent says where an answer went (`routed_as`, at least 6 characters). This is the only thing that closes an answer. */
   | { readonly tool: "answer.route"; readonly panel_id: string; readonly ask_id: string; readonly routed_as: string };
 
+/** The words an agent change gets when one of its fields has the wrong type. The whole change is refused before anything is stored. */
+export const FIELD_TYPE_WORDS = "A panel change has a field of the wrong kind. Panel ids, ids and words are text, and the step is text or null. Nothing was changed.";
+const textOrAbsent = (v: unknown): boolean => v === undefined || typeof v === "string";
+const stepOk = (v: unknown): boolean => v === undefined || v === null || typeof v === "string";
+/** One question's fields as an agent sends them. Each field that is sent has the type the catalogue gives it. */
+const askFieldsOk = (ask: Record<string, unknown>): boolean =>
+  typeof ask.id === "string" &&
+  typeof ask.question === "string" &&
+  textOrAbsent(ask.why_needed) &&
+  textOrAbsent(ask.input) &&
+  (ask.resolves === undefined || ask.resolves === null || typeof ask.resolves === "string") &&
+  (ask.options === undefined || (Array.isArray(ask.options) && ask.options.every((o) => isRec(o) && typeof o.option_id === "string" && textOrAbsent(o.label) && textOrAbsent(o.consequence))));
+/**
+ * Checks the whole agent change by type, before any of it is read or stored: every panel id is text, the step is text or null, and
+ * every question field has its type. Null when the change is well typed. The door and the desk's own callers both go through it.
+ */
+export function checkAgentOp(op: unknown): string | null {
+  if (!isRec(op)) return FIELD_TYPE_WORDS;
+  const typed = (() => {
+    switch (op.tool) {
+      case "read_responses":
+        return true;
+      case "show_surface":
+        return isRec(op.surface) && typeof op.surface.id === "string" && textOrAbsent(op.surface.title) && stepOk(op.surface.step) && Array.isArray(op.surface.blocks);
+      case "ask_human":
+        return typeof op.panel === "string" && isRec(op.ask) && askFieldsOk(op.ask) && stepOk(op.step);
+      case "arrange":
+        return isRec(op.action) && typeof op.action.op === "string" && typeof op.action.id === "string";
+      case "annotate":
+        return typeof op.panel === "string" && typeof op.text === "string" && textOrAbsent(op.tone);
+      case "ask.withdraw":
+        return typeof op.panel_id === "string" && typeof op.ask_id === "string" && typeof op.reason === "string";
+      case "answer.route":
+        return typeof op.panel_id === "string" && typeof op.ask_id === "string" && typeof op.routed_as === "string";
+      default:
+        return false;
+    }
+  })();
+  return typed ? null : FIELD_TYPE_WORDS;
+}
+
 export const MAX_WITHDRAW_REASON = 200;
 export { REQUIRED_CANNOT_WITHDRAW };
 export const QUESTION_CHANGED = "This question changed after you looked at it. Look again, then answer.";
