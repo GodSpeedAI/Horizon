@@ -1946,7 +1946,7 @@ export async function createApplication(
   // Design v3, step 4 (item 4): the records are migrated under a versioned marker. Until that run finishes, every change is refused with
   // words saying so (503); a run that fails pauses changes for good until the desk restarts with the store fixed.
   let migrationState: "running" | "done" | "failed" = "running";
-  const answersMigrated: Promise<void> = runDeskMigrations(runtime.runtime.store, caller.tenant, clock(), DESK_MIGRATIONS, options.migrationHold).then(
+  const answersMigrated: Promise<void> = runDeskMigrations(runtime.runtime.store, caller.tenant, clock(), panelCommand, DESK_MIGRATIONS, options.migrationHold).then(
     () => {
       migrationState = "done";
     },

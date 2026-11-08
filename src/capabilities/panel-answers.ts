@@ -340,12 +340,6 @@ export async function agreedFingerprintOf(store: DurableStore, panelId: string, 
   return typeof fingerprint === "string" ? fingerprint : null;
 }
 
-/** Keeps the agreement the first time the person answers; a later answer can only carry the same fingerprint (a change is refused before it gets here). */
-export async function rememberAgreed(store: DurableStore, tenant: string, panelId: string, ask: string, fingerprint: string, now: Date): Promise<void> {
-  if ((await agreedFingerprintOf(store, panelId, ask)) !== null) return;
-  await store.commit({ appends: [], records: [{ collection: AGREED_COLLECTION, id: agreedId(panelId, ask), expectedVersion: 0, value: { tenant, panel_id: panelId, ask, fingerprint, at: now.toISOString() } as unknown as { readonly [key: string]: Json } }] });
-}
-
 export const NOTHING_SENT = "Nothing was sent. Try again.";
 
 /**

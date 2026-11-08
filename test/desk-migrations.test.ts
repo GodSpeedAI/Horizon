@@ -7,6 +7,10 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
 import { listAnswers, PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
 import { MIGRATION_COLLECTION, MIGRATING_WORDS, runDeskMigrations, type DeskMigration } from "../src/capabilities/desk-migrations.ts";
+import type { PanelQueue } from "../src/capabilities/panel-answers.ts";
+
+/** A queue that runs each command at once; the migrations run one after another anyway. */
+const queue: PanelQueue = (command) => command();
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
 const apps: DeskApp[] = [];
@@ -116,10 +120,10 @@ describe("the migration runner", () => {
     const store = createMemoryStore();
     const { ran, migrations } = fixture();
     const now = new Date("2026-11-08T09:00:00Z");
-    expect(await runDeskMigrations(store, "t", now, migrations)).toEqual([1, 2, 3]);
+    expect(await runDeskMigrations(store, "t", now, queue, migrations)).toEqual([1, 2, 3]);
     expect(ran).toEqual([1, 2, 3]);
     const commitsBefore = (await store.getRecord(MIGRATION_COLLECTION, "marker:t"))?.version;
-    expect(await runDeskMigrations(store, "t", now, migrations)).toEqual([]);
+    expect(await runDeskMigrations(store, "t", now, queue, migrations)).toEqual([]);
     expect(ran).toEqual([1, 2, 3]);
     expect((await store.getRecord(MIGRATION_COLLECTION, "marker:t"))?.version).toBe(commitsBefore);
   });
@@ -135,10 +139,10 @@ describe("the migration runner", () => {
         ran.push(2);
       } },
     ];
-    await expect(runDeskMigrations(store, "t", new Date(), migrations)).rejects.toThrow("disk full");
+    await expect(runDeskMigrations(store, "t", new Date(), queue, migrations)).rejects.toThrow("disk full");
     expect((await store.getRecord(MIGRATION_COLLECTION, "marker:t"))?.value).toMatchObject({ version: 1 });
     fail = false;
-    expect(await runDeskMigrations(store, "t", new Date(), migrations)).toEqual([2]);
+    expect(await runDeskMigrations(store, "t", new Date(), queue, migrations)).toEqual([2]);
     expect(ran).toEqual([1, 2]);
   });
 });
