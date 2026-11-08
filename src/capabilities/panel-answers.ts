@@ -100,7 +100,7 @@ async function markWhere(store: DurableStore, tenant: string, pick: (a: PanelAns
     if (a.replied || !pick(a)) continue;
     const row = await store.getRecord(PANEL_ANSWERS_COLLECTION, idOf(a.panel_id, a.n));
     if (row === null || row === undefined) continue;
-    await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(a.panel_id, a.n), expectedVersion: row.version, value: { ...a, replied: true, routed_as: routedAs, note: a.note ?? note } as unknown as { readonly [key: string]: Json } }] });
+    await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(a.panel_id, a.n), expectedVersion: row.version, value: { ...a, replied: true, waiting_on: "none", routed_as: routedAs, note: a.note ?? note } as unknown as { readonly [key: string]: Json } }] });
     changed += 1;
   }
   return changed;
@@ -158,8 +158,14 @@ export function answerFor(ask: AskShape, value: unknown): { readonly ok: true; r
 /** The operator chose to stop waiting for the agent about this step. Kept in the record so it is not mistaken for a reply. */
 export const stopWaiting = (store: DurableStore, tenant: string, step: string): Promise<number> => markWhere(store, tenant, (a) => a.step === step, "You chose to stop waiting for the agent.");
 
-/** Acceptance of a step is blocked until the agent has replied (the annex predicate). */
-export const acceptanceBlocked = (answers: readonly Pick<PanelAnswer, "step" | "replied">[], stepId: string): boolean => answers.filter((a) => a.step === stepId && !a.replied).length > 0;
+/**
+ * The one test for whether an answer waits for the agent: `waiting_on = agent`. A record written before `waiting_on` existed reads as
+ * waiting for the agent until the agent has replied. Every place that asks "is this answer waiting?" uses this.
+ */
+export const waitsForAgent = (a: { readonly replied: boolean; readonly waiting_on?: "agent" | "person" | "none" }): boolean => (a.waiting_on ?? (a.replied ? "none" : "agent")) === "agent";
+
+/** Acceptance of a step is blocked while any answer on it waits for the agent. Nothing else blocks it (store-design-v2 section 3). */
+export const acceptanceBlocked = (answers: readonly { readonly step: string | null; readonly replied: boolean; readonly waiting_on?: "agent" | "person" | "none" }[], stepId: string): boolean => answers.some((a) => a.step === stepId && waitsForAgent(a));
 
 export const WAITING_WORDS = "You answered an agent about this step and it has not replied yet, so the step cannot be accepted. Wait for the agent to say where your answer went, or choose to stop waiting.";
 

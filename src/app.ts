@@ -88,7 +88,7 @@ import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/wor
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
 import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
-import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, listAnswers, recordAnswer, rememberAgreed, routeAnswer, stopWaiting, checkValue, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
+import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, listAnswers, recordAnswer, rememberAgreed, routeAnswer, stopWaiting, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
 import { ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
@@ -1577,7 +1577,7 @@ export async function createApplication(
     const proposedLessons = await listLessons(runtime.runtime.store, caller.tenant, "proposed");
     const built = buildDecide({ inbox, moves, caseApprovals, holds, humanSteps: human.steps, extraNotices: human.notices, lessons: proposedLessons });
     // Accepting a step is blocked while an answer the operator gave an agent about it has had no reply.
-    const answers = (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.step !== null);
+    const answers = (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => waitsForAgent(a) && a.step !== null);
     if (answers.length === 0) return built;
     const stepOf = (card: DecisionCardData): string | null => {
       if (card.kind === "human_step") return /^human:[^:]+:(.+)$/.exec(card.id)?.[1] ?? null;
@@ -2069,7 +2069,7 @@ export async function createApplication(
 
   async function panelsData(): Promise<PanelsData> {
     const waiting = new Map<string, string>();
-    for (const a of await listAnswers(runtime.runtime.store, caller.tenant)) if (!a.replied && a.step !== null && !waiting.has(a.step)) waiting.set(a.step, a.panel_id);
+    for (const a of await listAnswers(runtime.runtime.store, caller.tenant)) if (waitsForAgent(a) && a.step !== null && !waiting.has(a.step)) waiting.set(a.step, a.panel_id);
     return { ...panelBoard, waiting: [...waiting].map(([step, panel]) => ({ step, panel })) };
   }
 
