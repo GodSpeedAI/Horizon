@@ -2042,13 +2042,14 @@ export async function createApplication(
     if (!result.ok) return result;
     const store = runtime.runtime.store;
     if (op.tool === "answer.route" && routePlan !== null && routePlan.ok) {
-      // The agent's words are kept as its claim. They count as checked only when they name a step the case keeper really holds.
+      // The agent's words are kept as its claim. A step the case keeper holds is shown as found, but it is not delivery: the row stays
+      // claimed, and nothing marks it done without independent evidence that the step was delivered.
       const said = op.routed_as.trim();
       const found = await findRoutedStep(said, resolves);
-      const where = found === null ? `The agent says it took it to: ${said}. Not checked: Horizon found no step with that name.` : `The agent says it took it to: ${said}. Checked: the step "${found.name}" is in the case "${found.case_title}".`;
+      const where = found === null ? `The agent says it took it to: ${said}. Not checked: Horizon found no step with that name.` : `The agent says it took it to: ${said}. Step found: the step "${found.name}" is in the case "${found.case_title}".`;
       // One entry per answer: the one made when you answered is finished in place. The route, the row and the panel's row are one commit.
       const mine = await answerRowOf(store, deskWho, op.panel_id, op.ask_id);
-      const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: found === null ? "claimed" : "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id, ...(found === null ? {} : { step_id: found.step_id, case_id: found.case_id }) } }, clock());
+      const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: "claimed", refs: { panel_id: op.panel_id, ask_id: op.ask_id, ...(found === null ? {} : { step_id: found.step_id, case_id: found.case_id }) } }, clock());
       const panelRow = await panelRowWrite(state, op.panel_id, "You answered. The agent says it has taken it on.", op.ask_id);
       try {
         await store.commit({ appends: [], records: [...routePlan.records, row.record, ...(panelRow === null ? [] : [panelRow])] });

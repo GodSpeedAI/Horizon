@@ -55,13 +55,17 @@ describe("an agent's \"I routed it\" is its claim, not proof", () => {
     expect(statusWord(mine)).toBe("Agent says so");
   });
 
-  test("a route that names a step the case keeper holds is shown as checked, with the step as a link, when the question resolves that step", async () => {
+  test("a route that names a step the case keeper holds shows the step as found, with the step as a link, and the claim stays claimed", async () => {
     await answered("p-real", "handoff_0a49");
     await app.application.applyAgentOp({ tool: "answer.route", panel_id: "p-real", ask_id: "q", routed_as: "step handoff_0a49 in Ship the checkout fix" });
     const mine = (await rows()).find((r) => r.kind === "answer" && r.refs.panel_id === "p-real");
     expect(mine.outcome).toContain("The agent says it took it to: step handoff_0a49");
-    expect(mine.outcome).toContain('Checked: the step "Fix the total" is in the case');
+    expect(mine.outcome).toContain('Step found: the step "Fix the total" is in the case');
+    expect(mine.outcome).not.toContain("Checked");
     expect(mine.refs).toMatchObject({ step_id: "handoff_0a49", case_id: CASE });
-    expect(mine.status).toBe("done");
+    // Finding the step is not delivery: the row is not marked done.
+    expect(mine.status).toBe("claimed");
+    expect(mine.status).not.toBe("done");
+    expect(statusWord(mine)).toBe("Agent says so");
   });
 });
