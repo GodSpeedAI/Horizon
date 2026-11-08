@@ -10,6 +10,7 @@ import type { ConversationRow, RowStage, RowStatus } from "./conversation-model.
 import { PanelCard, type PanelsIo } from "./Panels.tsx";
 import type { BlockCtx } from "./blocks/index.tsx";
 import { CommitSummary, type CommitFacts } from "./Commitment.tsx";
+import { conflictViews } from "./conflict-model.ts";
 
 export const STATUS_WORD: Readonly<Record<RowStatus, string>> = { done: "Done", waiting: "Waiting for you", refused: "Refused", unseen: "Not seen yet", claimed: "Agent says so", partial: "Partly done" };
 /** An answer you gave waits on the agent, not on you. */
@@ -219,6 +220,19 @@ export function ConversationView({ ui, dispatch, panels, conversation, onConfirm
             <button type="button" onClick={() => void panels.stopWaiting(w.step)}>
               Stop waiting
             </button>
+          </p>
+        );
+      })}
+      {conflictViews(data?.panels?.conflicts).map((c) => {
+        const step = c.step;
+        return (
+          <p key={c.key} className="notice" role="status" data-conflict={c.ask} data-conflict-panel={c.panel}>
+            <strong>{c.title}</strong> {c.words}{" "}
+            {step !== null && c.actions.includes("stop_waiting") ? (
+              <button type="button" onClick={() => void panels.stopWaiting(step)}>
+                Stop waiting
+              </button>
+            ) : null}
           </p>
         );
       })}

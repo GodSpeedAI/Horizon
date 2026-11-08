@@ -443,6 +443,18 @@ export async function conflictOf(store: DurableStore, panelId: string, askId: st
   return row !== null && row !== undefined;
 }
 
+/** Every question whose stored answers were marked as contradictory, with the answer numbers they hold. Reads only. */
+export async function listConflicts(store: DurableStore, tenant: string): Promise<{ readonly panel_id: string; readonly ask: string; readonly answers: readonly number[] }[]> {
+  const out: { readonly panel_id: string; readonly ask: string; readonly answers: readonly number[] }[] = [];
+  for (const row of await store.listRecords(PANEL_ANSWERS_COLLECTION, { tenant })) {
+    if (!row.id.startsWith("conflict:")) continue;
+    const value = row.value as { readonly panel_id?: unknown; readonly ask?: unknown; readonly answers?: unknown };
+    if (typeof value.panel_id !== "string" || typeof value.ask !== "string") continue;
+    out.push({ panel_id: value.panel_id, ask: value.ask, answers: Array.isArray(value.answers) ? value.answers.filter((n): n is number => typeof n === "number") : [] });
+  }
+  return out.sort((a, b) => (a.panel_id === b.panel_id ? (a.ask < b.ask ? -1 : a.ask > b.ask ? 1 : 0) : a.panel_id < b.panel_id ? -1 : 1));
+}
+
 /**
  * Migration (finding R2-9 and R2-10). Reconciles the sealed identities of the questions the store holds:
  *  - every standalone agreement (`agreed:<panel>:<ask>`) gets its guard, `question:<panel>:<ask>`, so the question cannot be answered

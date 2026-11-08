@@ -161,9 +161,19 @@ export interface HomeState {
   readonly assurance: string;
 }
 
+/** A question whose stored answers disagree. `step` is the step its answers bear on, when one does. */
+export interface ConflictItem {
+  readonly panel: string;
+  readonly ask: string;
+  readonly question: string | null;
+  readonly step: string | null;
+}
+
 /** The open agent panels, and the steps whose answers an agent has not replied to. */
 export interface PanelsData extends Panels {
   readonly waiting: readonly { readonly step: string; readonly panel: string }[];
+  /** Questions whose stored answers contradict each other. The person decides which answer stands (finding R2-10). */
+  readonly conflicts?: readonly ConflictItem[];
   /** Set when the saved panels could not be read. The board is then not shown; these words say so in its place. */
   readonly refused?: string | null;
 }

@@ -93,7 +93,7 @@ import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistor
 import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
 import { checkReassign } from "./capabilities/question-rules.ts";
-import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
+import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, listConflicts, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
 import { ANSWER_NEEDS_REVISION, ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, moveQuestion, openPanelId, reduceAgent, reduceHuman, type AgentOp, type AskBlock, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { boardWrites, loadBoard, movedStoredQuestion, PANEL_LOAD_WORDS, stateWrites, withStored, type CommitRecord } from "./capabilities/panel-records.ts";
@@ -103,6 +103,7 @@ import { agentRowsOf, agentSearchOf, agentStateOf, WITHHELD_WORDS } from "./ui/d
 import { caseTitle, matches, partsOf, plainWords, sourcesOf, type DeskCase, type DecideState, type DecisionCardData, type PanelsData, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
 import { confirmedDecision, failedDecision } from "./ui/desk/decision-words.ts";
 import { buildDecide, waitingCount, type CaseApprovals, type HumanStepInput } from "./ui/desk/decide-build.ts";
+import { conflictLogLines } from "./ui/desk/conflict-model.ts";
 import { addItem, advance as caseAdvance, detailsOf, entryOptions, approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
 import { activeHolds, checkReason, putHold, recordDecision } from "./capabilities/decisions.ts";
 import { caseItems, costSource, orderWork, sessionItems, type AcceptedKnowledge, type WorkData } from "./ui/desk/work-build.ts";
@@ -1979,8 +1980,16 @@ export async function createApplication(
   // words saying so (503); a run that fails pauses changes for good until the desk restarts with the store fixed.
   let migrationState: "running" | "done" | "failed" = options.readOnly ? "done" : "running";
   const answersMigrated: Promise<void> = options.readOnly ? Promise.resolve() : runDeskMigrations(runtime.runtime.store, caller.tenant, clock(), panelCommand, DESK_MIGRATIONS, options.migrationHold).then(
-    () => {
+    async () => {
       migrationState = "done";
+      // One line per conflicted question, with ids only: the answers' words are never logged (R2-10).
+      if (!options.readOnly) {
+        try {
+          for (const line of conflictLogLines((await listConflicts(runtime.runtime.store, caller.tenant)).map((c) => ({ panel: c.panel_id, ask: c.ask })))) console.error(line);
+        } catch (error) {
+          console.error("desk: the conflicted answers could not be listed", error instanceof Error ? error.name : "unknown");
+        }
+      }
     },
     (error: unknown) => {
       migrationState = "failed";
@@ -2378,8 +2387,11 @@ export async function createApplication(
       return { open: [], max: panelBoard.max, waiting: [...unread].map(([step, panel]) => ({ step, panel })), refused: boardRefused };
     }
     const waiting = new Map<string, string>();
-    for (const a of await listAnswers(runtime.runtime.store, caller.tenant)) if (waitsForAgent(a) && a.step !== null && !waiting.has(a.step)) waiting.set(a.step, a.panel_id);
-    return { ...panelBoard, waiting: [...waiting].map(([step, panel]) => ({ step, panel })) };
+    const allAnswers = await listAnswers(runtime.runtime.store, caller.tenant);
+    for (const a of allAnswers) if (waitsForAgent(a) && a.step !== null && !waiting.has(a.step)) waiting.set(a.step, a.panel_id);
+    // A question whose stored answers disagree is listed until the person decides (R2-10). Its step is the one its answers bear on.
+    const conflicts = (await listConflicts(runtime.runtime.store, caller.tenant)).map((c) => ({ panel: c.panel_id, ask: c.ask, question: askOf(c.panel_id, c.ask)?.question ?? null, step: allAnswers.find((a) => a.panel_id === c.panel_id && a.ask === c.ask && a.step !== null)?.step ?? null }));
+    return { ...panelBoard, waiting: [...waiting].map(([step, panel]) => ({ step, panel })), conflicts };
   }
 
   /** Starts the waiting steps of a case (`case_advance`). The id names one attempt; a refusal moves it on, a timeout keeps it. */
