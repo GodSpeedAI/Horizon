@@ -131,6 +131,25 @@ export async function migrateQuestionStates(store: DurableStore, tenant: string)
   return records.length;
 }
 
+/**
+ * The record that moves one question of a panel that is not on the board (closed, or evicted) to another owner. The panel's own record
+ * is the durable question, so a hidden question's owner lives there too. Null when the panel has no record or no such question.
+ * Checked against the version this read saw; the caller commits it with the owner change on the answers.
+ */
+export async function movedStoredQuestion(store: DurableStore, panelId: string, askId: string, toKey: string, toName: string): Promise<CommitRecord | null> {
+  const row = await store.getRecord(PANELS_COLLECTION, panelIdOf(panelId));
+  if (row === null || row === undefined) return null;
+  const panel = readPanel(row.value);
+  let found = false;
+  const blocks = panel.blocks.map((b) => {
+    if (b.kind !== "question" || b.id !== askId) return b;
+    found = true;
+    return { ...b, owner_key: toKey, owner_name: toName, owner_rev: (b.owner_rev ?? 0) + 1 };
+  });
+  if (!found) return null;
+  return { collection: PANELS_COLLECTION, id: row.id, expectedVersion: row.version, value: { ...(row.value as { readonly [key: string]: Json }), blocks: blocks as unknown as Json } };
+}
+
 /** The board as the records hold it, plus every stored panel (visible or not) so a closed panel can be brought back. */
 export interface BoardView {
   readonly board: Panels;

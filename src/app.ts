@@ -96,7 +96,7 @@ import { checkReassign } from "./capabilities/question-rules.ts";
 import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
 import { ANSWER_NEEDS_REVISION, ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, moveQuestion, openPanelId, reduceAgent, reduceHuman, type AgentOp, type AskBlock, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
-import { boardWrites, loadBoard, PANEL_LOAD_WORDS, stateWrites, withStored, type CommitRecord } from "./capabilities/panel-records.ts";
+import { boardWrites, loadBoard, movedStoredQuestion, PANEL_LOAD_WORDS, stateWrites, withStored, type CommitRecord } from "./capabilities/panel-records.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { readableTitle } from "./ui/desk/banned-words.ts";
 import { agentRowsOf, agentSearchOf, agentStateOf, WITHHELD_WORDS } from "./ui/desk/agent-view.ts";
@@ -2268,7 +2268,9 @@ export async function createApplication(
       const fromName = body.from_key_id === DEFAULT_AGENT_KEY_ID ? DEFAULT_AGENT_NAME : registry.find((e) => e.key_id === body.from_key_id)?.name ?? "an agent no longer listed";
       // Design v3, step 4 (item 6): a question nobody has answered yet moves the same way. Its owner is the panel block's asked_by_key,
       // and the move and its conversation row are one commit. A question with a waiting answer moves its answers (below).
-      const openQuestion = panelBoard.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { readonly question?: string; readonly answered?: unknown; readonly withdrawn?: unknown; readonly asked_by_key?: string | null; readonly owner_key?: string | null } | undefined;
+      // A closed panel is still a durable panel: its own record holds the question, so its owner moves with the answers (R2-4).
+      const hiddenPanel = !panelBoard.open.some((p) => p.id === body.panel);
+      const openQuestion = (panelBoard.open.find((p) => p.id === body.panel) ?? storedPanels.get(body.panel))?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { readonly question?: string; readonly answered?: unknown; readonly withdrawn?: unknown; readonly asked_by_key?: string | null; readonly owner_key?: string | null } | undefined;
       const waitingAnswers = (await listAnswers(store, caller.tenant, body.panel)).filter((a) => a.ask === body.ask && waitsForAgent(a));
       if (openQuestion !== undefined && openQuestion.answered == null && openQuestion.withdrawn == null && waitingAnswers.length === 0) {
         const toName = toEntry?.name ?? "";
@@ -2279,9 +2281,10 @@ export async function createApplication(
         const when = clock().toISOString();
         const moveRow = newRowRecord(deskWho, { source: "you", kind: "note", words: `Moved the question "${openQuestion.question ?? "the agent's question"}" from ${fromName} to ${toName}.`, outcome: `${toName} now answers for it, since ${when}. Nothing has been answered yet.`, status: "done", refs: { panel_id: body.panel, ask_id: body.ask } }, clock());
         const movedOpen = moveQuestion(panelBoard, body.panel, body.ask, body.to_key_id, toName);
+        const hiddenMove = hiddenPanel ? await movedStoredQuestion(store, body.panel, body.ask, body.to_key_id, toName) : null;
         const response = { ok: true as const, message: `Moved to ${toName}. The question waits for them to answer.` };
         try {
-          await commitBoard(panelBoard, movedOpen, [moveRow, ...requestKeep(response)]);
+          await commitBoard(panelBoard, movedOpen, [moveRow, ...(hiddenMove === null ? [] : [hiddenMove]), ...requestKeep(response)]);
         } catch {
           return fail(500, NOTHING_SENT);
         }
@@ -2293,9 +2296,10 @@ export async function createApplication(
       // owner, so a route by the old key is refused from now on.
       const toName = toEntry?.name ?? "";
       const moved = moveQuestion(panelBoard, body.panel, body.ask, body.to_key_id, toName);
+      const hiddenMove = hiddenPanel ? await movedStoredQuestion(store, body.panel, body.ask, body.to_key_id, toName) : null;
       const response = { ok: true as const, message: `Moved to ${toName}. Its answer waits for them to say where it went.` };
       try {
-        await commitBoard(panelBoard, moved, [...planned.records, ...requestKeep(response)]);
+        await commitBoard(panelBoard, moved, [...planned.records, ...(hiddenMove === null ? [] : [hiddenMove]), ...requestKeep(response)]);
       } catch {
         return fail(500, NOTHING_SENT);
       }
