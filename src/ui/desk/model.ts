@@ -164,6 +164,8 @@ export interface HomeState {
 /** The open agent panels, and the steps whose answers an agent has not replied to. */
 export interface PanelsData extends Panels {
   readonly waiting: readonly { readonly step: string; readonly panel: string }[];
+  /** Set when the saved panels could not be read. The board is then not shown; these words say so in its place. */
+  readonly refused?: string | null;
 }
 
 export interface DeskState {

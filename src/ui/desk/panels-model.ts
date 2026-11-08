@@ -208,6 +208,9 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
   }
 }
 
+/** The id a panel the person opens from a template gets. The same template always gives the same id. */
+export const openPanelId = (template: string): string => `open_${template.replace(/[^a-z0-9_-]/gi, "").toLowerCase().slice(0, 40) || "panel"}`;
+
 export function reduceHuman(state: Panels, op: HumanOp): Reduced {
   switch (op.op) {
     case "human.pin":
@@ -215,7 +218,7 @@ export function reduceHuman(state: Panels, op: HumanOp): Reduced {
     case "human.close":
       return state.open.some((p) => same(p.id, op.id)) ? { state: { ...state, open: state.open.filter((p) => !same(p.id, op.id)) }, result: { ok: true, panel: op.id } } : refuse(state, "NOT_FOUND", "That panel is not open.");
     case "human.open": {
-      const id = `open_${op.template.replace(/[^a-z0-9_-]/gi, "").toLowerCase().slice(0, 40) || "panel"}`;
+      const id = openPanelId(op.template);
       if (state.open.some((p) => same(p.id, id))) return { state, result: { ok: true, panel: id } };
       return admit(state, { id, title: str(op.title, 120) || op.template.slice(0, 60), step: op.step ?? null, pinned: false, blocks: [], notes: [] });
     }

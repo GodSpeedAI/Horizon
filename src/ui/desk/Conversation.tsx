@@ -137,6 +137,7 @@ export function ConversationView({ ui, dispatch, panels, conversation, onConfirm
   const open = data?.panels?.open ?? [];
   const needsYou = conversationWaiting(rows, open);
   const stepWaits = data?.panels?.waiting ?? [];
+  const panelsRefused = data?.panels?.refused ?? null;
 
   // Newest at the bottom. The view follows new rows unless you scrolled up; then a button says there is more below.
   useEffect(() => {
@@ -197,6 +198,11 @@ export function ConversationView({ ui, dispatch, panels, conversation, onConfirm
           </span>
         </p>
       </header>
+      {panelsRefused !== null ? (
+        <p className="cv-refused" role="alert" data-panels-refused>
+          {panelsRefused}
+        </p>
+      ) : null}
       <p className="cv-try" data-try>
         <span className="cv-meta">Try</span>
         {["/find invoice", "/handoff Fix the checkout total", "/note Call the supplier"].map((phrase) => (

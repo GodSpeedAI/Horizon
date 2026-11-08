@@ -9,6 +9,7 @@ import type { DurableStore, Json } from "@godspeedai/cognate-events";
 import { newRowRecord } from "./conversation.ts";
 import { checkAnswer, checkReassign, checkRoute, checkRouteWords, checkStopWaiting, MAX_ROUTE_WORDS, MIN_ROUTE_WORDS, NO_ANSWER_WAITING, TOO_SHORT_ROUTE, type QuestionState } from "./question-rules.ts";
 import type { Who } from "./notes.ts";
+import type { CommitRecord } from "./panel-records.ts";
 
 /** The route words' limits and refusal, as the rules define them (kept under these names for the desk's callers). */
 export const MIN_ROUTED_AS = MIN_ROUTE_WORDS;
@@ -90,7 +91,7 @@ const guardIdOf = (panel: string, ask: string): string => `question:${panel}:${a
 
 export async function recordAnswer(
   store: DurableStore,
-  input: { readonly tenant: string; readonly panel_id: string; readonly ask: string; readonly outcome: Outcome; readonly value?: AnswerValue | null; readonly note?: string | null; readonly step?: string | null; readonly version?: string | null; readonly asked_by?: string | null; readonly asked_by_key?: string | null; readonly fingerprint?: string | null; readonly now: Date },
+  input: { readonly tenant: string; readonly panel_id: string; readonly ask: string; readonly outcome: Outcome; readonly value?: AnswerValue | null; readonly note?: string | null; readonly step?: string | null; readonly version?: string | null; readonly asked_by?: string | null; readonly asked_by_key?: string | null; readonly fingerprint?: string | null; readonly now: Date; /** The panel records that show the answer. Committed in the same commit as the answer. */ readonly alsoRecords?: () => Promise<readonly CommitRecord[]> },
 ): Promise<PanelAnswer> {
   const committed = input.outcome === "answered" || input.outcome === "cancelled";
   for (let attempt = 0; ; attempt += 1) {
@@ -117,7 +118,9 @@ export async function recordAnswer(
     const records: { collection: string; id: string; expectedVersion: number; value: { readonly [key: string]: Json } }[] = [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(input.panel_id, n), expectedVersion: 0, value: answer as unknown as { readonly [key: string]: Json } }];
     if (committed) records.push({ collection: PANEL_ANSWERS_COLLECTION, id: guardIdOf(input.panel_id, input.ask), expectedVersion: guard?.version ?? 0, value: { tenant: input.tenant, panel_id: input.panel_id, ask: input.ask, outcome: input.outcome, n, at: input.now.toISOString() } });
     try {
-      await store.commit({ appends: [], records });
+      // The answer and the panel that shows it are one commit: both are there or neither is.
+      const panelRecords = input.alsoRecords ? await input.alsoRecords() : [];
+      await store.commit({ appends: [], records: [...records, ...panelRecords] });
       return answer;
     } catch (error) {
       // A lost race is looked at again: the next pass sees the committed answer and refuses it.

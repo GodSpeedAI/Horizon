@@ -90,7 +90,8 @@ import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type A
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
 import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, migratePreUpgradeAnswers, QuestionAlreadyAnswered, recordAnswer, routeAnswer, stopWaiting, checkValue, reassignOwner, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
-import { ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
+import { ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, openPanelId, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
+import { boardWrites, loadBoard, PANEL_LOAD_WORDS, withStored } from "./capabilities/panel-records.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { readableTitle } from "./ui/desk/banned-words.ts";
 import { agentRowsOf, agentSearchOf, agentStateOf, WITHHELD_WORDS } from "./ui/desk/agent-view.ts";
@@ -1891,7 +1892,35 @@ export async function createApplication(
     panelTail = run.catch(() => undefined);
     return run;
   };
+  // Design v3 step 2: the board is read from the durable records here, before the desk accepts a panel command. A read that fails
+  // is kept as words the desk shows instead of the board; it never becomes an empty board, and panel changes are refused.
   let panelBoard: PanelsBoard = NO_PANELS;
+  let storedPanels: ReadonlyMap<string, Panel> = new Map();
+  let boardRefused: string | null = null;
+  try {
+    const view = await loadBoard(runtime.runtime.store, caller.tenant);
+    panelBoard = view.board;
+    storedPanels = view.stored;
+  } catch (error) {
+    boardRefused = PANEL_LOAD_WORDS;
+    console.error("panels: the saved panels could not be read, so panel changes are refused", error instanceof Error ? error.name : "unknown");
+  }
+  /** Rebuilds the board from the records the store now holds. A record that cannot be read refuses panel changes from here on. */
+  async function rebuildBoard(): Promise<void> {
+    try {
+      const view = await loadBoard(runtime.runtime.store, caller.tenant);
+      panelBoard = view.board;
+      storedPanels = view.stored;
+    } catch {
+      boardRefused = PANEL_LOAD_WORDS;
+    }
+  }
+  /** Commits the change the board made, as records, then rebuilds the board from them. A failed commit leaves the board as it was. */
+  async function commitBoard(before: PanelsBoard, after: PanelsBoard): Promise<void> {
+    const records = await boardWrites(runtime.runtime.store, caller.tenant, before, after);
+    if (records.length > 0) await runtime.runtime.store.commit({ appends: [], records });
+    await rebuildBoard();
+  }
   // Answers from before the upgrade with no owner are closed once, at start. Panel reads wait for that to finish.
   const answersMigrated: Promise<number> = migratePreUpgradeAnswers(runtime.runtime.store, caller.tenant, clock()).catch(() => 0);
 
@@ -1945,6 +1974,7 @@ export async function createApplication(
     // An agent reads only the answers to the questions it asked itself.
     // Ownership is the key id that put the question up, never the display name: a name is a label any caller can send.
     if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.asked_by_key === keyId) };
+    if (boardRefused !== null) return { ok: false, code: "UNAVAILABLE", message: boardRefused };
     if (op.tool === "ask.withdraw") {
       // A question still on the board is checked by the rule inside the board's withdraw (reduceAgent). One that is only on record
       // (its panel is closed) is checked here, with the same rule, before the board says it is not open.
@@ -1966,9 +1996,16 @@ export async function createApplication(
     const question = op.tool === "answer.route" || op.tool === "ask.withdraw" ? askOf(op.panel_id, op.ask_id)?.question ?? null : null;
     // What the question settles, as the board has it now: the only step a route claim may be checked against.
     const resolves = op.tool === "answer.route" ? ((panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.find((b) => b.kind === "question" && b.id === op.ask_id) as { resolves?: string | null } | undefined)?.resolves ?? null) : null;
-    const { state, result } = reduceAgent(panelBoard, op, who, keyId);
+    // A panel that was closed or evicted comes back with its stored questions, so the put merges with them.
+    const target = op.tool === "show_surface" ? op.surface.id : op.tool === "ask_human" ? op.panel : null;
+    const base = target === null ? panelBoard : withStored(panelBoard, storedPanels, target);
+    const { state, result } = reduceAgent(base, op, who, keyId);
     if (!result.ok) return result;
-    panelBoard = state;
+    try {
+      await commitBoard(panelBoard, state);
+    } catch {
+      return { ok: false, code: "UNAVAILABLE", message: "The desk could not save the panel. Nothing was changed. Try again." };
+    }
     const by = agentName === undefined ? {} : { agent_name: agentName };
     if (op.tool === "answer.route") {
       // The agent's words are kept as its claim. They count as checked only when they name a step the case keeper really holds.
@@ -2038,7 +2075,7 @@ export async function createApplication(
     if (typeof op.op === "string" && op.op.startsWith("human.")) return refuse(403, "Only the person can do that. An agent cannot answer, pin, close or open a panel for them.");
     if (typeof op.tool !== "string" || !(AGENT_TOOLS as readonly string[]).includes(op.tool)) return refuse(400, `Say which tool: ${AGENT_TOOLS.join(", ")}. Nothing was changed.`);
     const done = await applyAgentOpNow(op as unknown as AgentOp, name, owner.key_id);
-    return done.ok ? Response.json(done, { headers }) : Response.json(done, { status: done.code === "NOT_FOUND" ? 404 : 400, headers });
+    return done.ok ? Response.json(done, { headers }) : Response.json(done, { status: done.code === "NOT_FOUND" ? 404 : done.code === "UNAVAILABLE" ? 503 : 400, headers });
   }
 
   /** Whether a put would change a question the person agreed to, judged against the durable record (not the panel, which may be gone). */
@@ -2086,6 +2123,7 @@ export async function createApplication(
       const n = await stopWaiting(store, caller.tenant, body.step);
       return Response.json({ ok: true, message: n === 0 ? "Nothing was waiting." : "Stopped waiting. The step can be accepted now." }, { headers });
     }
+    if (boardRefused !== null) return fail(503, boardRefused);
     if (body.op === "human.reassign_owner") {
       // The person moves a waiting question to another registered agent. Paired only (the route is paired), a recent pairing, a
       // registered target, and an explicit second confirm that echoes the owner the person saw.
@@ -2100,9 +2138,14 @@ export async function createApplication(
       const fromName = body.from_key_id === DEFAULT_AGENT_KEY_ID ? DEFAULT_AGENT_NAME : registry.find((e) => e.key_id === body.from_key_id)?.name ?? "an agent no longer listed";
       const result = await reassignOwner(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, question: askOf(body.panel, body.ask)?.question ?? "the agent's question", from_key: body.from_key_id, to_key: body.to_key_id, from_name: fromName, to_name: toEntry?.name ?? "", paired: true, pairedAgeMs: pairing.pairedAgeMs(request.headers.get("cookie")), targetRegistered: toEntry !== undefined, confirmed: body.confirmed === true, who: deskWho, now: clock() });
       if (!result.ok) return fail(result.message.startsWith("Nothing was sent") ? 500 : 409, result.message);
-      // The page's own copy of the question follows the stored owner, so a route by the old key is refused from now on.
+      // The panel record follows the stored owner, so a route by the old key is refused from now on.
       const toName = toEntry?.name ?? "";
-      panelBoard = { ...panelBoard, open: panelBoard.open.map((p) => (p.id === body.panel ? { ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === body.ask ? { ...b, asked_by_key: body.to_key_id, asked_by: toName } : b)) } : p)) } as PanelsBoard;
+      const moved = { ...panelBoard, open: panelBoard.open.map((p) => (p.id === body.panel ? { ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === body.ask ? { ...b, asked_by_key: body.to_key_id, asked_by: toName } : b)) } : p)) } as PanelsBoard;
+      try {
+        await commitBoard(panelBoard, moved);
+      } catch {
+        return fail(500, "The owner changed, but the panel could not be saved. Look again, then try.");
+      }
       return Response.json({ ok: true, message: `Moved to ${toName}. Its answer waits for them to say where it went.` }, { headers });
     }
     if (body.op === "human.answer") {
@@ -2122,12 +2165,13 @@ export async function createApplication(
       const stored = checked !== null && checked.ok ? checked.value : value.value;
       try {
         // The answer carries the question's fingerprint, so the same question cannot come back with other words (see agreedAltered).
-        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, fingerprint: askBlock === undefined ? null : questionFingerprint(askBlock), now: clock() });
+        // The panel record that shows the answer is written in the same commit as the answer.
+        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, fingerprint: askBlock === undefined ? null : questionFingerprint(askBlock), now: clock(), alsoRecords: () => boardWrites(store, caller.tenant, before, state) });
       } catch (error) {
         if (error instanceof QuestionAlreadyAnswered) return fail(409, error.message);
         return fail(500, "Your answer was not saved. Nothing was sent. Try again.");
       }
-      panelBoard = state;
+      await rebuildBoard();
       const sentWords = outcome === "answered" ? "Sent. Waiting for the agent to say where it went." : outcome === "deferred" ? "Put off. Waiting for the agent to say where it went." : "Cancelled. Waiting for the agent to say where it went.";
       // "Not yet" is not an answer: nothing is sent to the agent, and the row says so.
       const deferredOnly = outcome === "deferred";
@@ -2141,14 +2185,26 @@ export async function createApplication(
       : body.op === "human.open" && typeof body.template === "string" ? { op: "human.open", template: body.template, ...(typeof body.title === "string" ? { title: body.title } : {}) }
       : null;
     if (op === null) return fail(400, "That is not something a panel can do. Nothing was changed.");
-    const { state, result } = reduceHuman(panelBoard, op);
+    // An opened panel comes back with its stored questions when it had been opened before.
+    const base = op.op === "human.open" ? withStored(panelBoard, storedPanels, openPanelId(op.template)) : panelBoard;
+    const { state, result } = reduceHuman(base, op);
     if (!result.ok) return fail(409, result.message);
-    panelBoard = state;
+    try {
+      await commitBoard(panelBoard, state);
+    } catch {
+      return fail(500, "The desk could not save the panel. Nothing was changed. Try again.");
+    }
     return Response.json({ ok: true, message: "Done." }, { headers });
   }
 
   async function panelsData(): Promise<PanelsData> {
     await answersMigrated;
+    if (boardRefused !== null) {
+      // The board is not shown as empty: the words say why it is missing.
+      const unread = new Map<string, string>();
+      for (const a of await listAnswers(runtime.runtime.store, caller.tenant)) if (waitsForAgent(a) && a.step !== null && !unread.has(a.step)) unread.set(a.step, a.panel_id);
+      return { open: [], max: panelBoard.max, waiting: [...unread].map(([step, panel]) => ({ step, panel })), refused: boardRefused };
+    }
     const waiting = new Map<string, string>();
     for (const a of await listAnswers(runtime.runtime.store, caller.tenant)) if (waitsForAgent(a) && a.step !== null && !waiting.has(a.step)) waiting.set(a.step, a.panel_id);
     return { ...panelBoard, waiting: [...waiting].map(([step, panel]) => ({ step, panel })) };
