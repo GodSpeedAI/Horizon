@@ -6,7 +6,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
 import { acceptanceBlocked, listAnswers, PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
-import { MIGRATION_COLLECTION, MIGRATING_WORDS, runDeskMigrations, type DeskMigration } from "../src/capabilities/desk-migrations.ts";
+import { MIGRATION_COLLECTION, MIGRATING_WORDS, MIGRATION_FAILED_WORDS, runDeskMigrations, type DeskMigration } from "../src/capabilities/desk-migrations.ts";
 import type { PanelQueue } from "../src/capabilities/panel-answers.ts";
 
 /** A queue that runs each command at once; the migrations run one after another anyway. */
@@ -111,6 +111,38 @@ describe("the desk's record migrations", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ state: "waiting_for_agent", waiting_on: "agent", replied: false, finished_by: null, routed_as: null });
     expect(acceptanceBlocked(rows, "step-legacy")).toBe(true);
+  });
+
+  test("after a forced migration failure, an agent op and a person's op both refuse, and nothing is persisted", async () => {
+    const first = await open();
+    await forgetMarker(first);
+    let release!: () => void;
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const failed = await restart(first, { migrationHold: hold, awaitMigration: false });
+    // The marker's commit fails, so the migration fails and the desk pauses changes for good.
+    const store = storeOf(failed) as unknown as { commit: (input: { records?: { collection: string }[] }) => Promise<unknown> };
+    const real = store.commit.bind(store);
+    store.commit = async (input) => {
+      if ((input.records ?? []).some((r) => r.collection === MIGRATION_COLLECTION)) throw new Error("disk full");
+      return real(input);
+    };
+    const quiet = console.error;
+    console.error = () => undefined;
+    try {
+      release();
+      await failed.application.migrated;
+    } finally {
+      console.error = quiet;
+    }
+    const agentOp = { tool: "ask_human", panel: "paused-agent", ask: { id: "q", question: "Which plan?", why_needed: "x", options: [{ option_id: "a", label: "Plan A" }] } };
+    const agent = await failed.application.applyAgentOp(agentOp as unknown as Parameters<typeof failed.application.applyAgentOp>[0]);
+    expect(agent).toMatchObject({ ok: false, message: MIGRATION_FAILED_WORDS });
+    expect((await storeOf(failed).getRecord("horizon-panels", "panel:paused-agent")) ?? null).toBeNull();
+    const human = await failed.post("/desk/panels/op", { op: "human.pin", id: "none", pinned: true });
+    expect(human.status).toBe(503);
+    expect(((await human.json()) as { message: string }).message).toBe(MIGRATION_FAILED_WORDS);
   });
 
   test("the words for a pending migration are plain", () => {

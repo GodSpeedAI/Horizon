@@ -1956,6 +1956,8 @@ export async function createApplication(
     },
   );
   const migrationRefusal = (): Response => Response.json({ ok: false, message: migrationState === "failed" ? MIGRATION_FAILED_WORDS : MIGRATING_WORDS }, { status: 503, headers: { "cache-control": "no-store" } });
+  /** The words every panel change gets while the records are not migrated (pending or failed). Null once the desk may change records. */
+  const migrationBlock = (): string | null => (migrationState === "done" ? null : migrationState === "failed" ? MIGRATION_FAILED_WORDS : MIGRATING_WORDS);
 
   /** The question's own words and the open-question test for one panel, from the board. */
   const askOf = (panelId: string, askId: string): { readonly question: string } | null => {
@@ -2008,6 +2010,9 @@ export async function createApplication(
     // An agent reads only the answers to the questions it asked itself.
     // Ownership is the key id that put the question up, never the display name: a name is a label any caller can send.
     if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.owner_key === keyId) };
+    // Shared with the person's writes: no panel changes while the records are migrating or after a failed migration, whoever calls.
+    const paused = migrationBlock();
+    if (paused !== null) return { ok: false, code: "UNAVAILABLE", message: paused };
     if (boardRefused !== null) return { ok: false, code: "UNAVAILABLE", message: boardRefused };
     if (op.tool === "ask.withdraw") {
       // A question still on the board is checked by the rule inside the board's withdraw (reduceAgent). One that is only on record
@@ -2163,6 +2168,9 @@ export async function createApplication(
     if (body === null || typeof body !== "object" || typeof body.op !== "string") return fail(400, "That could not be read. Nothing was changed.");
     const store = runtime.runtime.store;
     await answersMigrated;
+    // Shared with the agent's writes: a person's change is refused while the records are migrating or after a failed migration.
+    const paused = migrationBlock();
+    if (paused !== null) return fail(503, paused);
     if (body.op === "human.stop_waiting") {
       if (typeof body.step !== "string" || body.step === "") return fail(400, "Say which step to stop waiting for.");
       // The answers' stop and their conversation rows are one commit: both are there or neither is.
