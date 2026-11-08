@@ -30,7 +30,7 @@ describe("no path writes answer records outside the desk queue", () => {
     const calls = [...app.matchAll(/await recordAnswer\(/g)].map((m) => m.index!);
     expect(calls.length).toBe(1);
     expect(enclosingFunction(app, calls[0]!)).toBe("deskPanelOpNow");
-    expect(app).toContain("return panelCommand(() => deskPanelOpNow(request));");
+    expect(app).toContain("return panelCommand(() => deskPanelOpNow(request, read));");
   });
 
   test("the answer-record migrations run only through the desk's migration runner, with the queue passed in", () => {
