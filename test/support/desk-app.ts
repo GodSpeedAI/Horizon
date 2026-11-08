@@ -52,9 +52,12 @@ export async function startDeskApp(options: { readonly repoPath?: string; readon
     base,
     root,
     stop: async () => {
-      await server.stop(true);
-      await application.close();
-      restore();
+      try {
+        await server.stop(true);
+        await application.close();
+      } finally {
+        restore();
+      }
     },
     post: (path, body) => fetch(`${base}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: typeof body === "string" ? body : JSON.stringify(body) }),
     get: async (path) => (await fetch(`${base}${path}`)).json(),

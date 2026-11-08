@@ -33,6 +33,8 @@ describe("a panel put is one commit with its row", () => {
     const again = await startDeskApp({ root: app.root });
     apps.push(again);
     expect((await again.state()).panels.open.map((p: { id: string }) => p.id)).not.toContain("w-atomic");
+    // Stop this desk before the next test starts: each desk restores the secret-file env on stop, so they must stop last-in first-out.
+    await again.stop();
   });
 
   test("a put whose row is written is stored with its panel", async () => {

@@ -13,14 +13,20 @@ import {
 
 // Every loadConfig here writes the agent key somewhere: point the default at a temp dir so tests never touch .cognate/.
 const agentKeyRoot = mkdtempSync(join(tmpdir(), "horizon-agent-key-default-"));
+// Every test here starts with the secret-file env cleared, so a desk test that left HORIZON_SECRET_FILE set cannot redirect the secret.
 let savedAgentKeyFile: string | undefined;
+let savedSecretFile: string | undefined;
 beforeEach(() => {
   savedAgentKeyFile = process.env.HORIZON_AGENT_KEY_FILE;
+  savedSecretFile = process.env.HORIZON_SECRET_FILE;
+  delete process.env.HORIZON_SECRET_FILE;
   process.env.HORIZON_AGENT_KEY_FILE = join(agentKeyRoot, "agent.key");
 });
 afterEach(() => {
   if (savedAgentKeyFile === undefined) delete process.env.HORIZON_AGENT_KEY_FILE;
   else process.env.HORIZON_AGENT_KEY_FILE = savedAgentKeyFile;
+  if (savedSecretFile === undefined) delete process.env.HORIZON_SECRET_FILE;
+  else process.env.HORIZON_SECRET_FILE = savedSecretFile;
 });
 
 function fixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
