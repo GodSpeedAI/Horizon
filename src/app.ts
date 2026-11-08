@@ -1693,6 +1693,9 @@ export async function createApplication(
     const { card, response } = await panelCommand(async () => {
       // Revalidated when the command runs, not when it was queued: a session that ended while it waited (logout) refuses it.
       if (!pairing.paired(request.headers.get("cookie"))) return { card: undefined, response: notPairedRefusal() };
+      // Shared with the panel and agent writes: no decision while the records are migrating or after a failed migration.
+      const paused = migrationBlock();
+      if (paused !== null) return { card: undefined, response: Response.json({ ok: false, outcome: "unavailable", message: paused }, { status: 503, headers: { "cache-control": "no-store" } }) };
       if (looked !== null && lookedCard !== undefined) {
         const step = looked.stepOf.get(cardId) ?? null;
         const answers = await listAnswers(runtime.runtime.store, caller.tenant);
