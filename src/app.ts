@@ -2101,6 +2101,8 @@ export async function createApplication(
     }
     // A question the person agreed to cannot be recreated with other words, even after its panel was removed or the desk restarted.
     if (await agreedAltered(op)) return { ok: false, code: "SCHEMA", message: ANSWERED_CANNOT_CHANGE };
+    const movedStep = await stepAltered(op);
+    if (movedStep !== null) return { ok: false, code: "SCHEMA", message: movedStep };
     // Only the agent saying where an answer went closes it; nothing else counts as a reply. The owner, the words and the waiting
     // state are checked by the rule inside planRoute, for this key. Nothing is written until the commit below.
     const routePlan = op.tool === "answer.route" ? await planRoute(runtime.runtime.store, caller.tenant, op.panel_id, op.ask_id, op.routed_as, keyId) : null;
@@ -2214,6 +2216,34 @@ export async function createApplication(
     const done = await agentCommandNow(op as unknown as AgentOp, name, owner.key_id);
     const status = done.ok ? 200 : done.code === "NOT_FOUND" ? 404 : done.code === "REUSED" ? 409 : done.code === "UNAVAILABLE" ? 503 : 400;
     return Response.json(done, { status, headers });
+  }
+
+  /**
+   * Whether a put would move a question to another step than the one its stored answers bear on (finding R3-5). The answers are read
+   * from the durable record, so a panel that is gone still counts. An answer whose step is unknown (not a string) is preserved as unknown
+   * and does not block the put; nothing here writes the submitted step into an answer. Returns the refusal words, or null.
+   */
+  async function stepAltered(op: AgentOp): Promise<string | null> {
+    const store = runtime.runtime.store;
+    const incoming: { readonly panel: string; readonly ask: string; readonly step: string | null }[] = [];
+    const panelStepNow = (panel: string): string | null => (panelBoard.open.find((p) => p.id === panel) ?? storedPanels.get(panel))?.step ?? null;
+    if (op.tool === "ask_human") {
+      const raw = op.ask as Record<string, unknown>;
+      if (typeof raw.id === "string") incoming.push({ panel: op.panel, ask: raw.id, step: op.step === undefined ? panelStepNow(op.panel) : (op.step ?? null) });
+    } else if (op.tool === "show_surface") {
+      const surface = op.surface as unknown as { id?: unknown; step?: unknown; blocks?: unknown };
+      if (typeof surface.id === "string" && Array.isArray(surface.blocks)) {
+        const step = surface.step === undefined ? panelStepNow(surface.id) : (typeof surface.step === "string" ? surface.step : null);
+        for (const item of surface.blocks.slice(0, 64).map((b, i) => itemOf(b, i))) if (item.kind === "question") incoming.push({ panel: surface.id, ask: item.id, step });
+      }
+    }
+    for (const { panel, ask, step } of incoming) {
+      for (const a of (await listAnswers(store, caller.tenant, panel)).filter((x) => x.ask === ask)) {
+        if (typeof a.step !== "string" || a.step === step) continue;
+        return `That question was answered for the step "${a.step}", so it cannot be put up for ${step === null ? "no step" : `the step "${step}"`}. Use a new question id. Nothing was changed.`;
+      }
+    }
+    return null;
   }
 
   /** Whether a put would change a question the person agreed to, judged against the durable record (not the panel, which may be gone). */

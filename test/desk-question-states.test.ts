@@ -14,6 +14,7 @@ import { acceptanceBlocked, listAnswers, migrateAnswerStates, NOTHING_SENT, PANE
 import { runDeskMigrations } from "../src/capabilities/desk-migrations.ts";
 import { compatOf, finishedByOf, legalTransition, SAME_ID_OTHER_WORDS, statusOfLegacy } from "../src/capabilities/question-rules.ts";
 import { CONVERSATION_COLLECTION } from "../src/capabilities/conversation.ts";
+import { questionFingerprint } from "../src/capabilities/question-rules.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { withRequestId } from "./support/request-body.ts";
 
@@ -451,5 +452,31 @@ describe("two waiting answers to one question share one conversation row (R3-7)"
     const rows = await listAnswers(store, tenant, "dup_wait");
     expect(rows.map((r) => [r.n, r.state, r.finished_by])).toEqual([[1, "finished", "stopped"], [2, "finished", "stopped"]]);
     expect((await rowsOf(app)).filter((r) => r.outcome === STOPPED_ROW)).toHaveLength(1);
+  });
+});
+
+describe("a question keeps the step its stored answers bear on (R3-5)", () => {
+  test("republishing identical wording under another step is refused; the same step is allowed; an unknown step is left unknown", async () => {
+    const first = await open();
+    const tenant = first.application.caller.tenant;
+    const store = first.application.runtime.runtime.store;
+    // A fingerprinted legacy answer for old_step, waiting for the agent, with no durable panel on the desk.
+    const words = question("q");
+    const fingerprint = questionFingerprint({ question: words.question, options: words.options });
+    const legacyWait = (panel: string, step: string | null) => ({ collection: PANEL_ANSWERS_COLLECTION, id: `answer:${panel}:1`, expectedVersion: 0, value: { tenant, panel_id: panel, n: 1, ask: "q", outcome: "answered", value: "a", note: null, at: "2026-11-07T10:00:00.000Z", version: null, routed_as: null, step, asked_by: "Alice", asked_by_key: "ag_alice", owner_key: "ag_alice", fingerprint, history: [], replied: false, waiting_on: "agent" } });
+    await store.commit({ appends: [], records: [legacyWait("rt_panel", "old_step")] as never });
+    const second = await restart(first);
+    const again = second.application.runtime.runtime.store;
+    const moved = await putAs(second, "rt_panel", words, keys.ag_alice, "new_step");
+    expect(moved.status).toBe(400);
+    expect(((await moved.json()) as any).message).toContain('answered for the step "old_step"');
+    expect(blockOf(await second.state(), "rt_panel", "q")).toBeUndefined();
+    // The identical step is not a change: the question is put up, and its wait still concerns old_step.
+    expect((await putAs(second, "rt_panel", words, keys.ag_alice, "old_step")).status).toBe(200);
+    expect((await listAnswers(again, tenant, "rt_panel")).map((r) => [r.step, r.waiting_on])).toEqual([["old_step", "agent"]]);
+    // An unknown legacy step is preserved as unknown: a put under a step does not adopt it.
+    await again.commit({ appends: [], records: [legacyWait("rt_unknown", null)] as never });
+    expect((await putAs(second, "rt_unknown", words, keys.ag_alice, "new_step")).status).toBe(200);
+    expect((await listAnswers(again, tenant, "rt_unknown")).map((r) => [r.step, r.waiting_on])).toEqual([[null, "agent"]]);
   });
 });
