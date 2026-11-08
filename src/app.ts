@@ -3205,8 +3205,14 @@ export async function createApplication(
         },
       });
       if (!pairingPrinted) {
+        // No terminal means no pairing code, and no desk: the server is stopped rather than left serving a code nobody can read (R3-3).
+        try {
+          printPairingCode(server.url.origin, pairingCode);
+        } catch (error) {
+          server.stop(true);
+          throw error;
+        }
         pairingPrinted = true;
-        printPairingCode(server.url.origin, pairingCode);
       }
       return server;
     },

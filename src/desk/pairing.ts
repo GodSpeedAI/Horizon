@@ -132,11 +132,21 @@ export function receivePairingCodesForTests(sink: ((origin: string, code: string
   codeSink = sink;
 }
 
-/** Where the pairing line goes: the controlling terminal (/dev/tty) when there is one, else standard output. */
+/** The words for a start with no terminal to show the code on. Plain, and they never include the code. */
+export const NO_TERMINAL_WORDS = "Horizon needs a terminal to show the pairing code, so the desk did not start. Run the desk from an interactive terminal.";
+
+/** Raised when there is no controlling terminal (/dev/tty) for the pairing code. The code is then not shown anywhere. */
+export class PairingNeedsTerminal extends Error {
+  override readonly name = "PairingNeedsTerminal";
+  constructor() {
+    super(NO_TERMINAL_WORDS);
+  }
+}
+
+/** Where the pairing line goes: the controlling terminal (/dev/tty) only. */
 export interface PairingOutput {
   /** Writes the line to the terminal. False when there is no controlling terminal. */
   readonly terminal: (line: string) => boolean;
-  readonly stdout: (line: string) => void;
 }
 
 export const terminalOutput = (): PairingOutput => ({
@@ -153,7 +163,6 @@ export const terminalOutput = (): PairingOutput => ({
       return false;
     }
   },
-  stdout: (line) => console.log(line),
 });
 
 /** The pairing line, in plain words, for the terminal. */
@@ -162,8 +171,8 @@ export function pairingLine(shown: string): string {
 }
 
 /**
- * Shows the pairing code once. On a terminal it goes to the terminal only. Without one (a service, a pipe) it goes to standard
- * output, marked as such. Under the test sink nothing is printed: the sink receives the code instead.
+ * Shows the pairing code once, on the terminal only. Without a terminal (a service, a pipe) the code is not written anywhere and the
+ * pairing flow is refused. Under the test sink nothing is printed: the sink receives the code instead.
  */
 export function printPairingCode(origin: string, code: string, output: PairingOutput = terminalOutput()): void {
   const shown = `${code.slice(0, 4)}-${code.slice(4)}`;
@@ -174,10 +183,7 @@ export function printPairingCode(origin: string, code: string, output: PairingOu
   deliverPairingLine(shown, output);
 }
 
-/** Sends the pairing line to the terminal, or to standard output with the words that say so. Returns where it went. */
-export function deliverPairingLine(shown: string, output: PairingOutput): "terminal" | "stdout" {
-  const line = pairingLine(shown);
-  if (output.terminal(line)) return "terminal";
-  output.stdout(`${line} (not a terminal: printed to output)`);
-  return "stdout";
+/** Sends the pairing line to the terminal. Without one it writes nothing and throws PairingNeedsTerminal. */
+export function deliverPairingLine(shown: string, output: PairingOutput): void {
+  if (!output.terminal(pairingLine(shown))) throw new PairingNeedsTerminal();
 }

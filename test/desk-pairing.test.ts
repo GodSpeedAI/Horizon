@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createDeskPairing, deliverPairingLine, LOCK_MS, PAIRING_LIFETIME_MS, pairingLine, SESSION_LIFETIME_MS, WRONG_CODE_WORDS, LOCKED_WORDS, SPENT_CODE_WORDS } from "../src/desk/pairing.ts";
+import { createDeskPairing, deliverPairingLine, LOCK_MS, NO_TERMINAL_WORDS, PairingNeedsTerminal, PAIRING_LIFETIME_MS, pairingLine, SESSION_LIFETIME_MS, WRONG_CODE_WORDS, LOCKED_WORDS, SPENT_CODE_WORDS } from "../src/desk/pairing.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { testCodeFor } from "./support/write-token.ts";
 
@@ -44,17 +44,39 @@ describe("the pairing code", () => {
 
   test("the line says what it is, and goes to the terminal when there is one", () => {
     const terminal: string[] = [];
-    const stdout: string[] = [];
-    deliverPairingLine("ABCD-EFGH", { terminal: (line) => (terminal.push(line), true), stdout: (line) => stdout.push(line) });
+    deliverPairingLine("ABCD-EFGH", { terminal: (line) => (terminal.push(line), true) });
     expect(terminal).toEqual([pairingLine("ABCD-EFGH")]);
-    expect(stdout).toEqual([]);
     expect(terminal[0]).toMatch(/enter this pairing code: [2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}\. It works once and expires in 10 minutes\./);
   });
 
-  test("without a terminal the same line goes to standard output, marked as printed to output", () => {
-    const stdout: string[] = [];
-    expect(deliverPairingLine("ABCD-EFGH", { terminal: () => false, stdout: (line) => stdout.push(line) })).toBe("stdout");
-    expect(stdout).toEqual([`${pairingLine("ABCD-EFGH")} (not a terminal: printed to output)`]);
+  test("without a terminal the code is not written to standard output or standard error, and pairing is refused", () => {
+    const written: string[] = [];
+    const spied = (target: { write: (...args: unknown[]) => unknown }) => {
+      const write = target.write;
+      target.write = (...args: unknown[]) => (written.push(args.map(String).join(" ")), true);
+      return () => (target.write = write);
+    };
+    const log = console.log;
+    const error = console.error;
+    const restoreOut = spied(process.stdout as never);
+    const restoreErr = spied(process.stderr as never);
+    console.log = (...args: unknown[]) => void written.push(args.map(String).join(" "));
+    console.error = (...args: unknown[]) => void written.push(args.map(String).join(" "));
+    let thrown: unknown;
+    try {
+      deliverPairingLine("ABCD-EFGH", { terminal: () => false });
+    } catch (caught) {
+      thrown = caught;
+    } finally {
+      console.log = log;
+      console.error = error;
+      restoreOut();
+      restoreErr();
+    }
+    expect(thrown).toBeInstanceOf(PairingNeedsTerminal);
+    expect((thrown as Error).message).toBe(NO_TERMINAL_WORDS);
+    expect(NO_TERMINAL_WORDS).toContain("interactive terminal");
+    expect(written).toEqual([]);
   });
 
   test("a correct code pairs and sets an HttpOnly, SameSite=Strict session cookie", async () => {
