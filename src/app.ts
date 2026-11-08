@@ -2212,12 +2212,19 @@ export async function createApplication(
     }
     const item = handoffItem(draftId, text, reviewAsked);
     const agent = deskAgent();
+    // The case keeper can only start a whole case, so sending starts every step that is waiting in it, not just this one.
+    const waitingNow = await caseSteps(caseKeeper, target.case_id);
+    if (waitingNow.kind !== "ok") return fail(waitingNow.kind === "refused" || waitingNow.kind === "stale" ? 409 : 502, waitingNow.kind, waitingNow.kind === "stale" ? REFUSED_OLD : waitingNow.words, detailsOf(waitingNow));
+    const alsoStarts = waitingNow.value.steps.filter((st) => st.execution === "pending" && st.plan_item_id !== item.plan_item_id).map((st) => ({ step_id: st.plan_item_id, name: st.name }));
+    if (phase === "send" && Array.isArray(body.also_starts) && !sameSet(body.also_starts, alsoStarts.map((st) => st.step_id))) {
+      return fail(409, "preview_out_of_date", "Preview out of date. The steps waiting to start in this case changed after you looked at it. Nothing was sent. Look at the new preview and decide again.");
+    }
     if (phase === "preview") {
       await saveDraft(store, caller.tenant, caller.actor.id, { draftId, text, mode: "handoff" });
       const dry = await addItem(caseKeeper, { case_id: target.case_id, item, dry_run: true });
       if (dry.kind !== "ok") return fail(dry.kind === "refused" ? 409 : dry.kind === "stale" ? 409 : 502, dry.kind, dry.kind === "stale" ? REFUSED_OLD : dry.words, detailsOf(dry));
       if (dry.value.plan_precondition === null) return fail(502, "unreadable", "The case keeper did not give a version code for this case, so the hand off cannot be tied to what you see. Try again in a moment.");
-      return out({ ok: true, preview: { draft_id: draftId, case_id: target.case_id, case_title: caseTitleNow, step_name: item.name, step_id: dry.value.plan_item_id, check: "The case keeper checked this step against the case and it fits.", plan_precondition: dry.value.plan_precondition, agent, review: reviewAsked ? { reviewable } : null } }, headers);
+      return out({ ok: true, preview: { draft_id: draftId, case_id: target.case_id, case_title: caseTitleNow, step_name: item.name, step_id: dry.value.plan_item_id, check: "The case keeper checked this step against the case and it fits.", plan_precondition: dry.value.plan_precondition, also_starts: alsoStarts, agent, review: reviewAsked ? { reviewable } : null } }, headers);
     }
     const pre = body.plan_precondition;
     if (typeof pre !== "object" || pre === null || typeof (pre as { ref?: unknown }).ref !== "string" || typeof (pre as { expected_digest?: unknown }).expected_digest !== "string") {
@@ -2802,6 +2809,9 @@ export function pageAgentOf(request: Request): PageAgent | null {
   const name = cleanAgentName(request.headers.get("x-horizon-agent-name"));
   return name === undefined ? {} : { name };
 }
+
+/** Whether a list the page sent holds exactly these ids. */
+const sameSet = (given: readonly unknown[], ids: readonly string[]): boolean => given.length === ids.length && given.every((g) => typeof g === "string" && ids.includes(g)) && new Set(given).size === given.length;
 
 export const NOT_RECORDED_WORDS = "This was done, but it could not be added to the conversation. Check the desk log.";
 

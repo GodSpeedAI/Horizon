@@ -31,6 +31,8 @@ export interface HandoffPreview {
   readonly check: string;
   readonly plan_precondition: { readonly ref: string; readonly expected_digest: string };
   readonly agent: { readonly offered: boolean; readonly words: string };
+  /** Other steps already waiting in the case. Sending starts the whole case, so these start too. The send carries their ids back, and a different set is refused. */
+  readonly also_starts?: readonly { readonly step_id: string; readonly name: string }[];
   /** Set when the step is a review: the steps with finished work that it can check. */
   readonly review?: { readonly reviewable: readonly { readonly step_id: string; readonly name: string }[] } | null;
 }
@@ -44,7 +46,7 @@ export interface HandoffIo {
   readonly draft: () => Promise<DraftInfo | null>;
   readonly saveDraft: (input: { draft_id: string; text: string }) => void;
   readonly preview: (input: { draft_id: string; text: string; case_id?: string; review?: { step_id?: string } }) => Promise<{ readonly ok: true; readonly preview: HandoffPreview } | { readonly ok: false; readonly message: string }>;
-  readonly send: (input: { draft_id: string; text: string; case_id: string; plan_precondition: HandoffPreview["plan_precondition"]; assign: boolean; review?: { step_id: string } }) => Promise<{ readonly ok: true; readonly message: string; readonly draft_id: string } | { readonly ok: false; readonly outcome: string; readonly message: string }>;
+  readonly send: (input: { draft_id: string; text: string; case_id: string; plan_precondition: HandoffPreview["plan_precondition"]; also_starts?: readonly string[]; assign: boolean; review?: { step_id: string } }) => Promise<{ readonly ok: true; readonly message: string; readonly draft_id: string } | { readonly ok: false; readonly outcome: string; readonly message: string }>;
 }
 
 export interface Suggestion {
@@ -98,13 +100,20 @@ export function handoffButtonLabel(pv: HandoffPreview, assign: boolean): string 
   return pv.review ? "Run a review" : assign && pv.agent.offered ? "Send step to agent" : "Add step to the case";
 }
 
+/** Exactly what starts. The case keeper starts a whole case, so every step waiting in it starts, not only the new one. */
+export function startsWords(pv: HandoffPreview): string {
+  const others = pv.also_starts ?? [];
+  if (others.length === 0) return `The step "${pv.step_name}" is added to the case and started. Only this step will start.`;
+  return `The step "${pv.step_name}" is added to the case. Starting the case starts all of these waiting steps: "${pv.step_name}", ${others.map((o) => `"${o.name}"`).join(", ")}.`;
+}
+
 /** The four facts above the hand off button. */
 export function handoffFacts(pv: HandoffPreview, assign: boolean): CommitFacts {
   const toAgent = assign && pv.agent.offered;
   return {
     action: pv.review ? `Run a review: ${pv.step_name}` : toAgent ? `Send step to agent: ${pv.step_name}` : `Add step to the case: ${pv.step_name}`,
     destination: pv.case_title,
-    next: toAgent ? "The step is added to the case and started, and an agent is given it. You see what came of each stage in the conversation." : "The step is added to the case and started. You see what came of each stage in the conversation.",
+    next: `${startsWords(pv)} ${toAgent ? "An agent is given the new step. " : ""}You see what came of each stage in the conversation.`,
     undo: { can: false, words: "A step that is added stays on record." },
   };
 }
@@ -141,6 +150,11 @@ export function HandoffPreviewCard({ pv, assign, outOfDate, busy, onCancel, onCo
             </dd>
           </>
         ) : null}
+        <dt>Will start</dt>
+        <dd>
+          {[pv.step_name, ...(pv.also_starts ?? []).map((o) => o.name)].join(", ")}
+          {(pv.also_starts ?? []).length > 0 ? " (starting a case starts every step waiting in it)" : ""}
+        </dd>
         <dt>Agent</dt>
         <dd>{pv.agent.offered ? (assign ? "Yes, an agent will also take it" : "No, it stays with you") : pv.agent.words}</dd>
       </dl>
@@ -305,7 +319,7 @@ export function Composer({ ui, dispatch, io, request = null }: ComposerProps): R
   const confirmHandoff = async (): Promise<void> => {
     if (pv === null || draft === null) return;
     setBusy(true);
-    const result = await io.handoff.send({ draft_id: pv.draft_id, text: pvText, case_id: pv.case_id, plan_precondition: pv.plan_precondition, assign: assign && pv.agent.offered, ...(pv.review ? { review: { step_id: reviewStep } } : {}) });
+    const result = await io.handoff.send({ draft_id: pv.draft_id, text: pvText, case_id: pv.case_id, plan_precondition: pv.plan_precondition, also_starts: (pv.also_starts ?? []).map((o) => o.step_id), assign: assign && pv.agent.offered, ...(pv.review ? { review: { step_id: reviewStep } } : {}) });
     setBusy(false);
     if (result.ok) {
       setPv(null);
