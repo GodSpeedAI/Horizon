@@ -5,7 +5,8 @@
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import { createHash, randomBytes } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
 import { acceptanceBlocked, listAnswers, PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
@@ -307,4 +308,42 @@ describe("an agent op issued straight after startup", () => {
       if (timer !== undefined) clearTimeout(timer);
     }
   });
+});
+
+describe("a fresh store loads an empty board, with no error", () => {
+  test("a fresh store starts with no stderr line, an empty board, and a valid show_surface succeeds", async () => {
+    const logged: unknown[][] = [];
+    const quiet = console.error;
+    console.error = (...args: unknown[]) => {
+      logged.push(args);
+    };
+    let app: DeskApp;
+    try {
+      app = await open();
+    } finally {
+      console.error = quiet;
+    }
+    expect(logged).toEqual([]);
+    const state = await app.state();
+    expect(state.panels.open).toEqual([]);
+    expect(state.panels.refused ?? null).toBeNull();
+    const shown = await app.application.applyAgentOp({ tool: "show_surface", surface: { id: "fresh-one", title: "Fresh", blocks: [] } } as unknown as Parameters<typeof app.application.applyAgentOp>[0]);
+    expect(shown).toMatchObject({ ok: true });
+  });
+
+  test("the mcp command on a fresh store writes nothing to stderr", async () => {
+    const root = mkdtempSync(join(tmpdir(), "desk-mcp-"));
+    try {
+      const env: Record<string, string> = {};
+      for (const [key, value] of Object.entries(process.env)) if (value !== undefined && key !== "HORIZON_CONFIG" && key !== "HORIZON_SECRET_FILE") env[key] = value;
+      env.HORIZON_STORE = join(root, "s.sqlite");
+      const main = join(dirname(import.meta.dir), "src", "main.ts");
+      const child = Bun.spawn([process.execPath, "run", main, "mcp"], { stdin: "ignore", stdout: "pipe", stderr: "pipe", env });
+      const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited]);
+      expect(stderr).toBe("");
+      expect(code).toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
 });

@@ -2004,15 +2004,18 @@ export async function createApplication(
     async () => {
       // Every migration has run, so the records are where the desk reads them. The board is read from the store now, with the
       // operator-scope records migration 7 moved. Changes stay refused until that read holds; a read that fails keeps them refused.
-      try {
-        const view = await loadBoard(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
-        panelBoard = view.board;
-        storedPanels = view.stored;
-        migrationState = "done";
-      } catch (error) {
-        migrationState = "failed";
-        boardRefused = PANEL_LOAD_WORDS;
-        console.error("desk: the saved panels could not be read after the migration, so changes are paused", error instanceof Error ? error.name : "unknown");
+      // A desk closed before its migrations finish has closed its store: nothing is served, so the board is not read (and nothing logs).
+      if (!closing) {
+        try {
+          const view = await loadBoard(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
+          panelBoard = view.board;
+          storedPanels = view.stored;
+          migrationState = "done";
+        } catch (error) {
+          migrationState = "failed";
+          boardRefused = PANEL_LOAD_WORDS;
+          console.error("desk: the saved panels could not be read after the migration, so changes are paused", error instanceof Error ? error.name : "unknown");
+        }
       }
       // One line per conflicted question, with ids only: the answers' words are never logged (R2-10).
       if (!options.readOnly && !closing) {
