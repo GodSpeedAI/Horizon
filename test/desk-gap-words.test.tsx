@@ -2,6 +2,7 @@
 /** The word scan, extended to the text the gap fixes added. */
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { startsWords } from "../src/ui/desk/Composer.tsx";
 import { AGENT_READ_WORDS, NOT_RECORDED_WORDS, WRITE_TOKEN_WORDS } from "../src/app.ts";
 import { WITHHELD_WORDS } from "../src/ui/desk/agent-view.ts";
 import { BANNED, hasBannedWords } from "../src/ui/desk/banned-words.ts";
@@ -26,6 +27,16 @@ describe("new sentences are plain", () => {
   test("every refusal and note", () => {
     const all: Record<string, string> = { WRITE_TOKEN_WORDS, NOT_RECORDED_WORDS, TOO_MANY_PROPOSALS, QUESTION_CHANGED, ANSWERED_CANNOT_CHANGE, REQUIRED_CANNOT_WITHDRAW, AGENT_READ_WORDS, WITHHELD_WORDS, INSPECT_WITHHELD, ...CONTROL_WORDS, ...STATUS_WORD, ...STAGE_WORD };
     for (const [label, words] of Object.entries(all)) clean(label, words);
+  });
+
+  test("the sentences that say what will start, and the warnings shown after an answer or a note", () => {
+    const pv = { draft_id: "d", case_id: "c1", case_title: "Seed", step_name: "Fix the footer", step_id: "s", check: "ok", plan_precondition: { ref: "p", expected_digest: "x" }, agent: { offered: false, words: "" } };
+    clean("starts, others", startsWords({ ...pv, also_starts: [{ step_id: "a", name: "Call the supplier" }] }).replace(/Fix the footer|Call the supplier/g, ""));
+    clean("starts, only this", startsWords(pv).replace(/Fix the footer/g, ""));
+    clean("the answer could not be sent", "The answer could not be sent. Nothing was changed. Try again.");
+    clean("the note was saved", "The note was saved. This was done, but it could not be added to the conversation. Check the desk log.");
+    clean("steps changed", "Preview out of date. The steps waiting to start in this case changed after you looked at it. Nothing was sent. Look at the new preview and decide again.");
+    clean("other agent", "That question was asked by a different agent, so you cannot answer for it.");
   });
 
   test("a conversation with stages, a claimed route and a partly done hand off", () => {
