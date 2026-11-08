@@ -377,7 +377,9 @@ export async function planReassign(
   // Only the current owner changes. The authorship fields (asked_by, asked_by_key) stay as the agent that asked wrote them, and
   // each record gets the reassignment in its list. Each write commits against the version this read saw.
   const records: CommitRecord[] = rows.map((r) => ({ collection: PANEL_ANSWERS_COLLECTION, id: idOf(r.answer.panel_id, r.answer.n), expectedVersion: r.version, value: storedOf({ ...r.answer, owner_key: input.to_key, reassignments: [...(r.answer.reassignments ?? []), entry] }) }));
-  const row = newRowRecord(input.who, { source: "you", kind: "answer", words: `Moved the question "${input.question}" from ${input.from_name} to ${input.to_name}.`, outcome: `${input.to_name} now answers for it, since ${when}. Its answer is still waiting for them to say where it went.`, status: "waiting" }, input.now);
+  // A completed note that names the panel and the question, as an unanswered question's move does. It is not a waiting row: the
+  // answer's own row is the one that waits, and the route finishes it.
+  const row = newRowRecord(input.who, { source: "you", kind: "note", words: `Moved the question "${input.question}" from ${input.from_name} to ${input.to_name}.`, outcome: `${input.to_name} now answers for it, since ${when}.`, status: "done", refs: { panel_id: input.panel_id, ask_id: input.ask } }, input.now);
   return { ok: true, records: [...records, row], changed: records.length };
 }
 
