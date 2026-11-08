@@ -8,8 +8,9 @@ import { openSequential, renderSequentialText, type SequentialIntent } from "./u
  * same `application.surface()` seam the GUI route uses and commit through the same
  * `application.commitSurfaceIntent()`, so a verb cannot mean something the GUI does not.
  */
-const application = await createApplication();
 const [command, ...rest] = process.argv.slice(2);
+// `surface` only reads, so it opens the store read-only and may run while a desk holds the write lock. Every other command writes.
+const application = await createApplication(command === "surface" ? { readOnly: true } : {});
 
 function flag(name: string): string | undefined {
   const index = rest.indexOf(`--${name}`);

@@ -5,6 +5,7 @@
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import { acquireDeskLock, ALREADY_RUNNING_WORDS, DeskAlreadyRunning, LOCK_COLLECTION, LOCK_ID } from "../src/capabilities/desk-lock.ts";
+import { join } from "node:path";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
 const apps: DeskApp[] = [];
@@ -72,5 +73,34 @@ describe("one writer per desk database", () => {
     apps.splice(apps.indexOf(first), 1);
     // The record now names a live process, so a desk cannot take the store until that process lets it go.
     await expect(startDeskApp({ root: first.root })).rejects.toThrow(ALREADY_RUNNING_WORDS);
+  });
+});
+
+describe("the read-only surface open beside a running desk", () => {
+  test("a read-only open takes no lock, so it opens while a desk holds the store, and the desk keeps its lock", async () => {
+    const first = await open();
+    const reader = await startDeskApp({ root: first.root, readOnly: true });
+    apps.push(reader);
+    const view = reader.application.surface();
+    expect(view.ok).toBe(true);
+    await reader.stop();
+    apps.splice(apps.indexOf(reader), 1);
+    // The desk still holds the lock: a second writer is still refused.
+    await expect(startDeskApp({ root: first.root })).rejects.toThrow(ALREADY_RUNNING_WORDS);
+  });
+
+  test("a read-only open refuses to migrate: until the records are migrated it cannot surface", async () => {
+    // A desk whose record migration is held pending never writes the migration marker.
+    const stalled = await startDeskApp({ migrationHold: new Promise(() => undefined), awaitMigration: false });
+    apps.push(stalled);
+    await expect(startDeskApp({ root: stalled.root, readOnly: true })).rejects.toThrow("not migrated yet");
+  });
+
+  test("a store opened read-only refuses every write, and the record is not written", async () => {
+    const first = await open();
+    const { openReadOnlyStore } = await import("../src/runtime/create.ts");
+    const store = openReadOnlyStore(join(first.root, "d.sqlite"));
+    await expect(store.commit({ appends: [], records: [{ collection: "horizon-read-only-probe", id: "x", expectedVersion: 0, value: { a: 1 } }] })).rejects.toThrow("opened read-only");
+    expect(await store.getRecord("horizon-read-only-probe", "x")).toBeUndefined();
   });
 });

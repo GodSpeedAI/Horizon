@@ -1,8 +1,9 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { AgentDefinition, Caller } from "@godspeedai/cognate-runtime-api";
 import { createRuntime, type ActionPolicy, type GovernanceOptions, type PendingEvent, type Runtime } from "@godspeedai/cognate-runtime-bun";
-import type { OutboxIntent } from "@godspeedai/cognate-events";
+import type { DurableStore, OutboxIntent } from "@godspeedai/cognate-events";
+import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
 import type { Component, Policy } from "@godspeedai/cognate-kernel-api";
 import type { HorizonConfig } from "../config/types.ts";
 import type { LoadedWorld } from "../adapters/semantic.ts";
@@ -55,6 +56,52 @@ export interface HorizonRuntime {
   readonly storePath: string;
 }
 
+/** The store's write methods. A read-only open refuses each one, so nothing run against that store can change it. */
+const WRITE_METHODS: ReadonlySet<string> = new Set([
+  "commit",
+  "claimOutbox",
+  "settleOutbox",
+  "claimOutboxLeased",
+  "renewOutboxLease",
+  "settleOutboxLease",
+  "requeueOutbox",
+  "claimRunOwnership",
+  "renewRunOwnership",
+  "releaseRunOwnership",
+  "commitProjection",
+  "failProjection",
+  "resetProjection",
+  "putBlob",
+  "deleteBlob",
+  "erasePayload",
+]);
+
+/** Raised when a read-only open is asked to write. */
+export class ReadOnlyStoreWrite extends Error {
+  override readonly name = "ReadOnlyStoreWrite";
+  constructor(method: string) {
+    super(`STORE: opened read-only, so ${method} is refused`);
+  }
+}
+
+/**
+ * Opens an existing desk database for reading while a desk may be writing it. It never creates the file. Every write method is
+ * replaced by one that rejects, so a read-only open cannot change the store even where the runtime tries to.
+ */
+export function openReadOnlyStore(storePath: string): DurableStore {
+  if (!existsSync(storePath)) fail(`no desk database at ${storePath} yet, so there is nothing to surface`);
+  const store = openSqliteStore({ path: storePath });
+  return new Proxy(store, {
+    get(target, property) {
+      if (typeof property === "string" && WRITE_METHODS.has(property) && Reflect.has(target, property)) {
+        return () => Promise.reject(new ReadOnlyStoreWrite(property));
+      }
+      const value = Reflect.get(target, property, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
 export function assertStoreBoundary(config: HorizonConfig, storePath: string): string {
   if (config.deployment_profile === "local_operator") {
     if (storePath.trim() === "" || storePath === ":memory:" || storePath.includes(":memory:")) {
@@ -96,11 +143,13 @@ export async function createHorizonRuntime(
      * RealityTrace observation of each governed navigation commit. Absent: no observations.
      */
     readonly outboxFor?: (event: PendingEvent) => readonly OutboxIntent[];
+    /** An already-open store the runtime uses instead of opening `storePath` itself (a read-only open passes a guarded one). */
+    readonly store?: DurableStore;
   },
 ): Promise<HorizonRuntime> {
   const storePath = assertStoreBoundary(config, options.storePath ?? config.runtime_store);
   const runtime = await createRuntime({
-    store: storePath,
+    store: options.store === undefined ? storePath : { store: options.store },
     policy,
     actions,
     agents: options.agents ?? [healthAgent],

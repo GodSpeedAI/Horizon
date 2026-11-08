@@ -14,7 +14,7 @@ import { observeResearch, requireResearch, type ResearchStatus } from "./adapter
 import { economicsFromEnv, loadConfig } from "./config/load.ts";
 import { ECONOMICS_SCHEMA } from "./economics/model.ts";
 import type { LoadedConfig, OperatorsConfig } from "./config/types.ts";
-import { createHorizonRuntime, type HorizonRuntime } from "./runtime/create.ts";
+import { assertStoreBoundary, createHorizonRuntime, openReadOnlyStore, type HorizonRuntime } from "./runtime/create.ts";
 import { appendIntentAttempt, appendIntentRecord, createFrameRegister, NAVIGATION_INTENT_COMMIT, navigationIntentComponent, readIntentAttempts, readIntentRecords, type FrameRegister, type IntentAttempt } from "./capabilities/navigation-intent.ts";
 import { checkPurpose, latestCase, onboardingSkipped, openCase, setOnboardingSkipped } from "./capabilities/workspace-records.ts";
 import { CONTRACT_VERSION, contractVersionOf } from "./capabilities/capacity-ledger.ts";
@@ -82,7 +82,7 @@ import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
 import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
 import { acquireDeskLock, releaseDeskLock } from "./capabilities/desk-lock.ts";
-import { DESK_MIGRATIONS, MIGRATING_WORDS, MIGRATION_FAILED_WORDS, runDeskMigrations } from "./capabilities/desk-migrations.ts";
+import { appliedVersion, DESK_MIGRATIONS, MIGRATING_WORDS, MIGRATION_FAILED_WORDS, runDeskMigrations } from "./capabilities/desk-migrations.ts";
 import { BAD_REQUEST_ID_WORDS, REUSED_REQUEST_WORDS, requestFingerprint, requestRecord, seenRequest, validRequestId } from "./capabilities/desk-requests.ts";
 import { answerRowOf, appendRow, discardRow, listConversation, newRowRecord, panelRowOf, planAppend, planUpdate, settleDraftRow } from "./capabilities/conversation.ts";
 import { answerEcho, cleanAgentName, MAX_WAITING_PROPOSALS, TOO_MANY_PROPOSALS, WAITING_FOR_AGENT, type ConversationRow, type RowSource, type RowStage } from "./ui/desk/conversation-model.ts";
@@ -373,6 +373,12 @@ export async function createApplication(
     readonly workshop?: () => Access;
     /** Test seam: a promise the desk's record migration waits for before it runs, so a test can hold a migration pending. */
     readonly migrationHold?: Promise<unknown>;
+    /**
+     * Read-only open for the CLI `surface` path, which may run while a desk holds the store. It takes no desk lock, writes nothing
+     * at startup (no operator registration, contract activation, reconciliation, migration or Obligation snapshot), and refuses to
+     * start when the desk's records are not migrated yet. Every store write it attempts is refused.
+     */
+    readonly readOnly?: boolean;
   } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath);
@@ -399,7 +405,7 @@ export async function createApplication(
     configured.mode === "sea-forge"
       ? {
           ...configured,
-          approvalPollMs: configured.approvalPollMs ?? 2_000,
+          approvalPollMs: options.readOnly ? 0 : (configured.approvalPollMs ?? 2_000),
           ...(configured.authority === undefined
             ? {}
             : {
@@ -425,7 +431,7 @@ export async function createApplication(
   const bindingFor = (operationRef: string) => loaded.config.operations.find((binding) => binding.operation_ref === operationRef);
   // The rulebook is Horizon's DomainForge model; RealityTrace snapshots it so records carry its edition.
   const obligationRt = realityTrace ? new RealityTraceObligation({ bin: realityTrace.bin, dataHome: realityTrace.dataHome, stateHome: realityTrace.stateHome, repoDir: `${realityTrace.repoDir}-obligations`, rulebookEntry: resolve("domain", "interaction-model.sea") }) : null;
-  void obligationRt?.snapshot();
+  if (!options.readOnly) void obligationRt?.snapshot();
   const obligationDeps: ObligationDeps = {
     store: () => runtime.runtime.store,
     tenant: caller.tenant,
@@ -440,9 +446,12 @@ export async function createApplication(
     settlementConfigured: governance.mode === "sea-forge" && realityTrace !== undefined,
     now: () => new Date(),
   };
+  // A read-only open reads the store through a guard that refuses writes; the runtime uses that store instead of opening its own.
+  const readStore = options.readOnly ? openReadOnlyStore(assertStoreBoundary(loaded.config, options.storePath ?? loaded.config.runtime_store)) : undefined;
   const runtime: HorizonRuntime = await createHorizonRuntime(loaded.config, world, {
     caller,
     ...(options.storePath ? { storePath: options.storePath } : {}),
+    ...(readStore === undefined ? {} : { store: readStore }),
     components: [navigationIntentComponent(frames)],
     agents: [structuralObservationAgent(frames), navigationCommitAgent(() => runtime.runtime.store, { bindingFor, deps: obligationDeps })],
     ...(options.contextAdapter === undefined ? {} : { contextAdapter: options.contextAdapter }),
@@ -450,23 +459,31 @@ export async function createApplication(
     // The observation commits with the governed invocation itself (the outbox), so it cannot be lost.
     ...(realityTrace ? { outboxFor: observationOutbox(NAVIGATION_INTENT_COMMIT.id) } : {}),
   });
-  // Design v3, section 2: one local writer per desk database. A second desk on the same store is refused before anything is written.
-  let deskLockToken: string;
-  try {
-    deskLockToken = await acquireDeskLock(runtime.runtime.store);
-  } catch (error) {
+  // A read-only open never migrates: until the desk has run every migration, its records cannot be surfaced read-only.
+  if (options.readOnly && (await appliedVersion(runtime.runtime.store, caller.tenant)) < Math.max(...DESK_MIGRATIONS.map((migration) => migration.version))) {
     await runtime.runtime.close();
-    throw error;
+    throw new Error("horizon: the desk's records are not migrated yet, so the store cannot be surfaced read-only. Start the desk once to finish the migration, then surface again.");
+  }
+  // Design v3, section 2: one local writer per desk database. A second desk on the same store is refused before anything is written.
+  // A read-only open takes no lock and gives none up.
+  let deskLockToken: string | undefined;
+  if (!options.readOnly) {
+    try {
+      deskLockToken = await acquireDeskLock(runtime.runtime.store);
+    } catch (error) {
+      await runtime.runtime.close();
+      throw error;
+    }
   }
   if (loaded.config.settlement) assertSnapshotDir(snapshotDirOf(loaded.config.settlement, runtime.storePath), runtime.storePath);
   // HORIZON-001 1.1.0: suspend pending v1 commit runs and mark the store before anything is served.
-  await activateContract(runtime.runtime.store, new Date());
+  if (!options.readOnly) await activateContract(runtime.runtime.store, new Date());
   // Durable operators, sessions and devices live in the same store. Operators named in configuration are
   // provisioned here (the host's administrative act); the mapping is then validated, never trusted blindly.
   const identity = createIdentityService(identityStoreOf(runtime.runtime.store));
   const identityTenant = identityTenantOf(caller.tenant);
   const operatorsConfig = resolveOperatorsConfig(options.operators ?? loaded.config.operators);
-  for (const operatorId of Object.keys(operatorsConfig.actors)) await identity.registerOperator({ tenant: identityTenant, operatorId, label: "configured operator" });
+  if (!options.readOnly) for (const operatorId of Object.keys(operatorsConfig.actors)) await identity.registerOperator({ tenant: identityTenant, operatorId, label: "configured operator" });
   operatorActors = await validateOperatorActors(operatorsConfig, { identity, tenant: identityTenant, serviceActorId: serviceActor.actor_id });
   const mappedActors: OperatorActors = operatorActors;
   /** Why a session Caller may not commit, or null when it may. */
@@ -477,8 +494,10 @@ export async function createApplication(
     return null;
   }
   // Complete accounting for terminal intents that still hold; awaiting-authority holds are only reported.
-  const stranded = await reconcilePending(runtime.runtime.store, caller.tenant);
-  if (stranded.blockers.length > 0) console.error(`horizon: ${stranded.blockers.length} intent(s) hold capacity awaiting authority`);
+  if (!options.readOnly) {
+    const stranded = await reconcilePending(runtime.runtime.store, caller.tenant);
+    if (stranded.blockers.length > 0) console.error(`horizon: ${stranded.blockers.length} intent(s) hold capacity awaiting authority`);
+  }
   const evidence = realityTrace ? new RealityTraceEvidence(runtime.runtime.store, realityTrace) : undefined;
   let issued: FrameView | null = null;
   let boundChoices: readonly StructuralChoice[] = [];
@@ -515,7 +534,7 @@ export async function createApplication(
   // Resume stored windows. A restart mid-window resumes the same window; a window that closed while Horizon was
   // down is closed late, which SEA-Forge settles unresolved (C cannot be proven on time), never from late evidence.
   for (const pending of await listPending(runtime.runtime.store, caller.tenant)) {
-    if (!pending.terminal && pending.stage === "executed") scheduleClose(pending);
+    if (!options.readOnly && !pending.terminal && pending.stage === "executed") scheduleClose(pending);
   }
 
   /** Issue a frame for the current request and register it as the one an intent may name. */
@@ -1950,8 +1969,8 @@ export async function createApplication(
   // The question states are written first (once per record); the pre-upgrade closing reads them.
   // Design v3, step 4 (item 4): the records are migrated under a versioned marker. Until that run finishes, every change is refused with
   // words saying so (503); a run that fails pauses changes for good until the desk restarts with the store fixed.
-  let migrationState: "running" | "done" | "failed" = "running";
-  const answersMigrated: Promise<void> = runDeskMigrations(runtime.runtime.store, caller.tenant, clock(), panelCommand, DESK_MIGRATIONS, options.migrationHold).then(
+  let migrationState: "running" | "done" | "failed" = options.readOnly ? "done" : "running";
+  const answersMigrated: Promise<void> = options.readOnly ? Promise.resolve() : runDeskMigrations(runtime.runtime.store, caller.tenant, clock(), panelCommand, DESK_MIGRATIONS, options.migrationHold).then(
     () => {
       migrationState = "done";
     },
@@ -3136,7 +3155,7 @@ export async function createApplication(
       if (remote.listening) await remote.stop();
       for (const timer of windowTimers.values()) clearTimeout(timer);
       windowTimers.clear();
-      await releaseDeskLock(runtime.runtime.store, deskLockToken);
+      if (deskLockToken !== undefined) await releaseDeskLock(runtime.runtime.store, deskLockToken);
       await runtime.runtime.close();
     },
   };
