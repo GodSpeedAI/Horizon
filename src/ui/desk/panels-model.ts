@@ -88,7 +88,11 @@ function admit(state: Panels, panel: Panel): Reduced {
 
 const replace = (state: Panels, id: string, change: (p: Panel) => Panel): Panels => ({ ...state, open: state.open.map((p) => (same(p.id, id) ? change(p) : p)) });
 
-export function reduceAgent(state: Panels, op: AgentOp): Reduced {
+/** The name an agent without one is known by. */
+export const UNNAMED_AGENT = "unnamed agent";
+
+/** `agent` is who is calling (the agent door's name for it). A question remembers the agent that first put it up. */
+export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_AGENT): Reduced {
   switch (op.tool) {
     case "read_responses":
       return { state, result: { ok: true, panel: null } };
@@ -105,22 +109,24 @@ export function reduceAgent(state: Panels, op: AgentOp): Reduced {
         const kept = blocks.map((b) => {
           if (b.kind !== "question") return b;
           const old = before(b.id);
-          return old !== undefined && old.version === b.version ? { ...b, answered: old.answered, withdrawn: old.withdrawn ?? null } : b;
+          const asked_by = old?.asked_by ?? agent;
+          return old !== undefined && old.version === b.version ? { ...b, asked_by, answered: old.answered, withdrawn: old.withdrawn ?? null } : { ...b, asked_by };
         });
         return { state: replace(state, s.id, (p) => ({ ...p, title: str(s.title, 120) || p.title, step: s.step === undefined ? p.step : (s.step ?? null), blocks: kept })), result: { ok: true, panel: s.id } };
       }
-      return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks, notes: [] });
+      return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks: blocks.map((b) => (b.kind === "question" ? { ...b, asked_by: agent } : b)), notes: [] });
     }
     case "ask_human": {
       const panel = state.open.find((p) => same(p.id, op.panel));
       const id = typeof op.ask.id === "string" && ID.test(op.ask.id) ? op.ask.id : "";
       const block = id === "" ? null : questionOf(op.ask, id);
       if (block === null) return refuse(state, "SCHEMA", "A question needs an id, the question, and (for pick-one and pick-several) at least two options.");
-      if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [block], notes: [] });
+      if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [{ ...block, asked_by: agent }], notes: [] });
       const old = panel.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === block.id);
       if (agreedTo(old) && old.version !== block.version) return refuse(state, "SCHEMA", ANSWERED_CANNOT_CHANGE);
       // The very same question again keeps what the person said; a changed one starts again.
-      const next = old !== undefined && old.version === block.version ? { ...block, answered: old.answered, withdrawn: old.withdrawn ?? null } : block;
+      const asked_by = old?.asked_by ?? agent;
+      const next = old !== undefined && old.version === block.version ? { ...block, asked_by, answered: old.answered, withdrawn: old.withdrawn ?? null } : { ...block, asked_by };
       return { state: replace(state, panel.id, (p) => ({ ...p, step: op.step === undefined ? p.step : (op.step ?? null), blocks: [...p.blocks.filter((b) => b.id !== block.id), next] })), result: { ok: true, panel: panel.id } };
     }
     case "annotate": {

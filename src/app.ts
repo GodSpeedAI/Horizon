@@ -90,7 +90,7 @@ import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type A
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
 import { acceptanceBlocked, answerFor, listAnswers, recordAnswer, routeAnswer, stopWaiting, checkValue, OUTCOMES, WAITING_WORDS, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
-import { NO_PANELS, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
+import { NO_PANELS, UNNAMED_AGENT, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { readableTitle } from "./ui/desk/banned-words.ts";
 import { agentRowsOf, agentSearchOf, agentStateOf, WITHHELD_WORDS } from "./ui/desk/agent-view.ts";
@@ -1894,14 +1894,21 @@ export async function createApplication(
 
   /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`, `ask.withdraw`, `answer.route`). To choose parts well an agent reads `GET /desk/panels/catalogue`. A reply on a panel clears the wait on the answers given there. */
   async function applyAgentOp(op: AgentOp, agentName?: string): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
-    if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied) };
+    const who = agentName ?? UNNAMED_AGENT;
+    // An agent reads only the answers to the questions it asked itself.
+    if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.asked_by === who) };
+    if (op.tool === "answer.route" || op.tool === "ask.withdraw") {
+      const asker = (panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.find((b) => b.kind === "question" && b.id === op.ask_id) as { asked_by?: string | null } | undefined)?.asked_by
+        ?? (await listAnswers(runtime.runtime.store, caller.tenant, op.panel_id)).find((a) => a.ask === op.ask_id)?.asked_by;
+      if (asker !== undefined && asker !== null && asker !== who) return { ok: false, code: "SCHEMA", message: "That question was asked by a different agent, so you cannot answer for it." };
+    }
     // Only the agent saying where an answer went closes it; nothing else counts as a reply.
     if (op.tool === "answer.route") {
       const routed = await routeAnswer(runtime.runtime.store, caller.tenant, op.panel_id, op.ask_id, op.routed_as);
       if (!routed.ok) return { ok: false, code: "SCHEMA", message: routed.message };
     }
     const question = op.tool === "answer.route" || op.tool === "ask.withdraw" ? askOf(op.panel_id, op.ask_id)?.question ?? null : null;
-    const { state, result } = reduceAgent(panelBoard, op);
+    const { state, result } = reduceAgent(panelBoard, op, who);
     if (!result.ok) return result;
     panelBoard = state;
     const by = agentName === undefined ? {} : { agent_name: agentName };
@@ -1989,12 +1996,12 @@ export async function createApplication(
       const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note, ...(typeof body.version === "string" ? { version: body.version } : {}) });
       if (!result.ok) return fail(409, result.message);
       // Store what the question accepted (a text answer is trimmed), not the raw body.
-      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { version?: string; input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string }[] } | undefined;
+      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { version?: string; asked_by?: string | null; input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string }[] } | undefined;
       const checked = outcome === "answered" && askBlock !== undefined ? answerFor({ input: askBlock.input ?? "select", options: askBlock.options }, value.value) : null;
       if (checked !== null && !checked.ok) return fail(400, checked.message);
       const stored = checked !== null && checked.ok ? checked.value : value.value;
       try {
-        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, now: clock() });
+        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, now: clock() });
       } catch {
         return fail(500, "Your answer was not saved. Nothing was sent. Try again.");
       }

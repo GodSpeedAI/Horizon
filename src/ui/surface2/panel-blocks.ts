@@ -55,6 +55,8 @@ export interface QuestionItem extends Validated {
   readonly resolves?: string | null;
   readonly answered: { readonly outcome: string; readonly value: unknown; readonly note: string | null; readonly routed_as?: string | null } | null;
   readonly withdrawn?: { readonly reason: string } | null;
+  /** The agent that first put this question up (the agent door's name for it). Set once and never changed by a later put. */
+  readonly asked_by?: string | null;
 }
 export interface UnavailableItem extends Validated {
   readonly kind: "unavailable";
