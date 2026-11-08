@@ -16,6 +16,7 @@ import type { ConversationRow } from "../conversation-model.ts";
 import { startDeskTools } from "../webmcp.ts";
 import { inspectForAgent, type DeskAgentInvoker } from "../webmcp-tools.ts";
 import { POLL_MS, itemsOf, shiftDay, withDetails, type DeskState, type SearchResult } from "../model.ts";
+import { requestIdFor, settleRequest } from "./request-ids.ts";
 import { PAIR_BODY, PAIR_BUTTON, PAIR_FAILED, PAIR_HEADING, PAIR_LIMIT, PAIR_NO_ANSWER } from "../pair-words.ts";
 
 const DRAFT_KEY = "horizon.desk.draft";
@@ -83,18 +84,6 @@ function Gate() {
 }
 
 /** A move that was done but not recorded says so after its own words. */
-/**
- * The request id of the answer being sent. A retry of the same answer (after no reply, or a server error) sends the same id, so the
- * desk returns the stored response instead of writing the answer again. A new answer gets a new id. It is cleared once the desk has replied.
- */
-let pendingAnswer: { readonly key: string; readonly requestId: string } | null = null;
-
-/**
- * The request id of the stop-waiting command in flight. A retry of the same stop (the same step, after no reply or a server error)
- * sends the same id, so the desk returns the stored reply and does not stop a wait made since. A new stop gets a new id.
- */
-let pendingStop: { readonly step: string; readonly requestId: string } | null = null;
-
 const withRecordNote = (message: string, body: { recorded?: boolean; recorded_words?: string }): string => (body.recorded === false && body.recorded_words ? `${message} ${body.recorded_words}` : message);
 
 function read<T>(key: string, fallback: T): T {
@@ -448,11 +437,10 @@ function App() {
     panels: {
       answer: async (input) => {
         try {
-          const key = JSON.stringify(input);
-          if (pendingAnswer === null || pendingAnswer.key !== key) pendingAnswer = { key, requestId: crypto.randomUUID() };
-          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", request_id: pendingAnswer.requestId, ...input }) });
-          // A reply that is not a server error is final for this id: the answer was stored, or refused and nothing was written.
-          if (response.status < 500) pendingAnswer = null;
+          // A retry of the same answer sends the same id; a reply that is not a server error is final for it.
+          const key = `answer:${JSON.stringify(input)}`;
+          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", ...input, request_id: requestIdFor(key) }) });
+          if (response.status < 500) settleRequest(key);
           const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; recorded?: boolean; recorded_words?: string };
           rev.current = "";
           void poll();
@@ -463,23 +451,25 @@ function App() {
         }
       },
       pin: async (id, pinned) => {
-        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.pin", id, pinned, request_id: crypto.randomUUID() }) }).catch(() => undefined);
+        const key = `pin:${id}:${pinned}`;
+        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.pin", id, pinned, request_id: requestIdFor(key) }) }).then((r) => { if (r.status < 500) settleRequest(key); }, () => undefined);
         rev.current = "";
         void poll();
           void loadRows();
       },
       close: async (id) => {
-        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.close", id, request_id: crypto.randomUUID() }) }).catch(() => undefined);
+        const key = `close:${id}`;
+        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.close", id, request_id: requestIdFor(key) }) }).then((r) => { if (r.status < 500) settleRequest(key); }, () => undefined);
         rev.current = "";
         void poll();
           void loadRows();
       },
       stopWaiting: async (step) => {
         try {
-          if (pendingStop === null || pendingStop.step !== step) pendingStop = { step, requestId: crypto.randomUUID() };
-          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.stop_waiting", step, request_id: pendingStop.requestId }) });
-          // A reply that is not a server error is final for this id.
-          if (response.status < 500) pendingStop = null;
+          // A retry of the same stop (the same step) sends the same id; a reply that is not a server error is final for it.
+          const key = `stop:${step}`;
+          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.stop_waiting", step, request_id: requestIdFor(key) }) });
+          if (response.status < 500) settleRequest(key);
           const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
           rev.current = "";
           void poll();
