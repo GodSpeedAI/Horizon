@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import type { Json } from "@godspeedai/cognate-events";
 import { AGREED_COLLECTION, agreedFingerprint, recordAnswer } from "../src/capabilities/panel-answers.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { withRequestId } from "./support/request-body.ts";
 
 /**
  * An answer written before the upgrade has no fingerprint on its record. Its protection comes from the older agreed-answers store,
@@ -22,7 +23,7 @@ const question = (text: string) => ({
   resolves: "step_one",
 });
 const agent = (app: DeskApp, body: unknown) =>
-  fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${app.application.loaded.agentKey}`, "content-type": "application/json", "x-horizon-agent-name": "Helper" }, body: JSON.stringify(body) });
+  fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${app.application.loaded.agentKey}`, "content-type": "application/json", "x-horizon-agent-name": "Helper" }, body: JSON.stringify(withRequestId(body)) });
 
 describe("an answer written before the upgrade keeps its protection through the agreed-answers store", () => {
   test("no fingerprint on the answer, an old agreement on file: a changed question is refused, the same one is let through", async () => {

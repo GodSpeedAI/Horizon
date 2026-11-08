@@ -12,6 +12,7 @@ import { SAME_ID_OTHER_WORDS } from "../src/capabilities/question-rules.ts";
 import { questionVersion } from "../src/ui/surface2/panel-blocks.ts";
 import { NO_PANELS, QUESTION_CHANGED, reduceAgent, reduceHuman, type AskBlock, type Panels } from "../src/ui/desk/panels-model.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { withRequestId } from "./support/request-body.ts";
 
 const options = [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }];
 const ask = { id: "q", question: "Which plan?", why_needed: "x", options };
@@ -83,7 +84,7 @@ describe("the step recorded for an answer is the question's target", () => {
     const app: DeskApp = await startDeskApp();
     try {
       writeFileSync(join(dirname(app.application.loaded.agentKeyPath), "agents.json"), JSON.stringify({ schema: "horizon.agents/1", agents: [{ key_id: "ag_alice", name: "Alice", sha256: sha(key), added: "2026-11-07T09:00:00.000Z" }] }));
-      const put = await fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": "Alice" }, body: JSON.stringify({ tool: "ask_human", panel: "tg", step: "s_old", ask }) });
+      const put = await fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": "Alice" }, body: JSON.stringify(withRequestId({ tool: "ask_human", panel: "tg", step: "s_old", ask })) });
       expect(put.status).toBe(200);
       const board = (await app.state()).panels.open.find((p: { id: string }) => p.id === "tg");
       const shown = board.blocks.find((b: { id: string }) => b.id === "q");

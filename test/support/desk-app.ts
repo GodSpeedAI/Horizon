@@ -18,6 +18,13 @@ export interface DeskApp {
   readonly root: string;
 }
 
+/** A panel change body with a request id: the caller's own, or a fresh one. Other paths and string bodies pass unchanged. */
+function withRequestId(path: string, body: unknown): unknown {
+  const changes = path === "/desk/panels/op" || path === "/agent/panels";
+  if (!changes || typeof body !== "object" || body === null || Array.isArray(body) || "request_id" in body) return body;
+  return { ...body, request_id: crypto.randomUUID() };
+}
+
 export async function startDeskApp(options: { readonly repoPath?: string; readonly now?: () => Date; readonly approvals?: ApprovalAuthority; readonly economics?: EconomicsSource; readonly reader?: RecordReader; readonly workshop?: () => Access; readonly root?: string; /** A promise the record migration waits for (a test holds it pending). */ readonly migrationHold?: Promise<unknown>; /** Default true: the call returns once the records are migrated, so a test can change them at once. */ readonly awaitMigration?: boolean; /** Open read-only, as the CLI surface path does. */ readonly readOnly?: boolean } = {}): Promise<DeskApp> {
   const root = options.root ?? mkdtempSync(join(tmpdir(), "desk-"));
   const reader: RecordReader = options.reader ?? {
@@ -59,7 +66,9 @@ export async function startDeskApp(options: { readonly repoPath?: string; readon
         restore();
       }
     },
-    post: (path, body) => fetch(`${base}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: typeof body === "string" ? body : JSON.stringify(body) }),
+    // Every panel change carries a request id (R2-11). A body without one gets a fresh id, so a test that does not care about retries
+    // need not name one; a test that retries passes its own id.
+    post: (path, body) => fetch(`${base}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: typeof body === "string" ? body : JSON.stringify(withRequestId(path, body)) }),
     get: async (path) => (await fetch(`${base}${path}`)).json(),
     state: async (query = "") => (await fetch(`${base}/desk/state.json?${query}`)).json(),
   };

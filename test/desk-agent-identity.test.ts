@@ -4,6 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { withRequestId } from "./support/request-body.ts";
 
 /**
  * Every agent has its own key. The registry (`agents.json`, beside agent.key) holds a hash of each key, never the key. The
@@ -40,12 +41,12 @@ const as = (key: string, name: string | null, path: string, body?: unknown) =>
   fetch(`${app.base}${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json", ...(name === null ? {} : { "x-horizon-agent-name": name }) },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    ...(body === undefined ? {} : { body: JSON.stringify(withRequestId(body)) }),
   });
 const answersFor = async (key: string, name: string | null): Promise<any[]> => ((await (await as(key, name, "/agent/panels/answers")).json()) as any).responses;
 const question = (id: string) => ({ id, question: `Which plan for ${id}?`, why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }] });
 const answer = async (panel: string, ask: string) =>
-  fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", panel, ask, ...(await revisionOf(app, panel, ask)), outcome: "answered", value: "a" }) });
+  fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(withRequestId({ op: "human.answer", panel, ask, ...(await revisionOf(app, panel, ask)), outcome: "answered", value: "a" })) });
 
 describe("each agent has its own key", () => {
   test("the default key, and each registry key, reach the door; an unknown key does not", async () => {

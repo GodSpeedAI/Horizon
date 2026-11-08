@@ -5,6 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { withRequestId } from "./support/request-body.ts";
 
 let app: DeskApp;
 const key = randomBytes(32).toString("hex");
@@ -16,8 +17,8 @@ beforeAll(async () => {
 afterAll(async () => app.stop());
 
 const ask = { id: "deferred_q", question: "Which plan for the deferred case?", why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }] };
-const agent = (body: unknown) => fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": "Alice" }, body: JSON.stringify(body) });
-const person = async (body: unknown) => fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(await withRevision(app, body)) });
+const agent = (body: unknown) => fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": "Alice" }, body: JSON.stringify(withRequestId(body)) });
+const person = async (body: unknown) => fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(withRequestId(await withRevision(app, body))) });
 
 describe("a question put off can still be answered", () => {
   test("defer, put the same words again, answer: the answer is stored", async () => {

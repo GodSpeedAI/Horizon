@@ -84,7 +84,7 @@ import { compareSession, listSessions, onlyContradicted, type CompareView } from
 import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
 import { acquireDeskLock, releaseDeskLock } from "./capabilities/desk-lock.ts";
 import { appliedVersion, DESK_MIGRATIONS, MIGRATING_WORDS, MIGRATION_FAILED_WORDS, runDeskMigrations } from "./capabilities/desk-migrations.ts";
-import { BAD_REQUEST_ID_WORDS, REUSED_REQUEST_WORDS, requestFingerprint, requestRecord, seenRequest, validRequestId } from "./capabilities/desk-requests.ts";
+import { BAD_REQUEST_ID_WORDS, REQUEST_ID_REQUIRED_WORDS, REUSED_REQUEST_WORDS, requestFingerprint, requestRecord, seenRequest, validRequestId } from "./capabilities/desk-requests.ts";
 import { answerRowOf, appendRow, discardRow, listConversation, newRowRecord, panelRowOf, planAppend, planUpdate, settleDraftRow } from "./capabilities/conversation.ts";
 import { answerEcho, cleanAgentName, MAX_WAITING_PROPOSALS, TOO_MANY_PROPOSALS, WAITING_FOR_AGENT, type ConversationRow, type RowSource, type RowStage } from "./ui/desk/conversation-model.ts";
 import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
@@ -2165,6 +2165,8 @@ export async function createApplication(
     // contents is refused. The id's record is kept with the change, in the same commit.
     const requestId = op.request_id;
     if (requestId !== undefined && !validRequestId(requestId)) return refuse(400, BAD_REQUEST_ID_WORDS);
+    // Every change an agent makes carries its id (R2-11). Reading the answers changes nothing and needs none.
+    if (op.tool !== "read_responses" && typeof requestId !== "string") return refuse(400, REQUEST_ID_REQUIRED_WORDS);
     let dedupe: { readonly requestId: string; readonly fingerprint: string } | null = null;
     if (typeof requestId === "string") {
       const fingerprint = requestFingerprint(op);
@@ -2230,6 +2232,8 @@ export async function createApplication(
     // contents is refused. The id's record joins the operation's commit, so the change and its record are stored together or not at all.
     const requestId = body.request_id;
     if (requestId !== undefined && !validRequestId(requestId)) return fail(400, BAD_REQUEST_ID_WORDS);
+    // Every person change carries its id, so a retry of one command can be told from a new command (R2-11).
+    if (typeof requestId !== "string") return fail(400, REQUEST_ID_REQUIRED_WORDS);
     const fingerprint = requestFingerprint(body);
     if (typeof requestId === "string") {
       const seen = await seenRequest(store, caller.tenant, requestId, fingerprint);

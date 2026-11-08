@@ -10,6 +10,7 @@ import { listAnswers } from "../src/capabilities/panel-answers.ts";
 import { moveQuestion, NO_PANELS, reduceAgent, type AskBlock, type Panels } from "../src/ui/desk/panels-model.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { revisionOf } from "./support/answer-revision.ts";
+import { withRequestId } from "./support/request-body.ts";
 
 const keys = { ag_alice: randomBytes(32).toString("hex"), ag_alice2: randomBytes(32).toString("hex") };
 const sha = (k: string) => createHash("sha256").update(k).digest("hex");
@@ -32,8 +33,8 @@ afterAll(async () => {
 
 const q = (id: string) => ({ id, question: `Which plan for ${id}?`, why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }] });
 const agent = (app: DeskApp, key: string, name: string, body: unknown) =>
-  fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": name }, body: JSON.stringify(body) });
-const person = (app: DeskApp, body: unknown) => fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": name }, body: JSON.stringify(withRequestId(body)) });
+const person = (app: DeskApp, body: unknown) => fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(withRequestId(body)) });
 const qOf = (s: Panels, panel: string, ask: string): AskBlock => s.open.find((p) => p.id === panel)!.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === ask)!;
 
 describe("the author of a question stays the agent that asked, after a reassignment", () => {

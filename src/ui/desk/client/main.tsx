@@ -89,6 +89,12 @@ function Gate() {
  */
 let pendingAnswer: { readonly key: string; readonly requestId: string } | null = null;
 
+/**
+ * The request id of the stop-waiting command in flight. A retry of the same stop (the same step, after no reply or a server error)
+ * sends the same id, so the desk returns the stored reply and does not stop a wait made since. A new stop gets a new id.
+ */
+let pendingStop: { readonly step: string; readonly requestId: string } | null = null;
+
 const withRecordNote = (message: string, body: { recorded?: boolean; recorded_words?: string }): string => (body.recorded === false && body.recorded_words ? `${message} ${body.recorded_words}` : message);
 
 function read<T>(key: string, fallback: T): T {
@@ -457,20 +463,23 @@ function App() {
         }
       },
       pin: async (id, pinned) => {
-        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.pin", id, pinned }) }).catch(() => undefined);
+        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.pin", id, pinned, request_id: crypto.randomUUID() }) }).catch(() => undefined);
         rev.current = "";
         void poll();
           void loadRows();
       },
       close: async (id) => {
-        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.close", id }) }).catch(() => undefined);
+        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.close", id, request_id: crypto.randomUUID() }) }).catch(() => undefined);
         rev.current = "";
         void poll();
           void loadRows();
       },
       stopWaiting: async (step) => {
         try {
-          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.stop_waiting", step }) });
+          if (pendingStop === null || pendingStop.step !== step) pendingStop = { step, requestId: crypto.randomUUID() };
+          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.stop_waiting", step, request_id: pendingStop.requestId }) });
+          // A reply that is not a server error is final for this id.
+          if (response.status < 500) pendingStop = null;
           const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
           rev.current = "";
           void poll();

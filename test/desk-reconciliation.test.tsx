@@ -7,6 +7,7 @@ import { NOT_RECONCILED_WORDS, RECONCILIATION_COLLECTION } from "../src/capabili
 import { StatusBar } from "../src/ui/desk/StatusBar.tsx";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { deskState } from "./support/desk-fixture.ts";
+import { withRequestId } from "./support/request-body.ts";
 
 const apps: DeskApp[] = [];
 afterEach(async () => {
@@ -14,7 +15,7 @@ afterEach(async () => {
 });
 
 const agent = (app: DeskApp, body: unknown) =>
-  fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${app.application.loaded.agentKey}`, "content-type": "application/json", "x-horizon-agent-name": "Helper" }, body: JSON.stringify(body) });
+  fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${app.application.loaded.agentKey}`, "content-type": "application/json", "x-horizon-agent-name": "Helper" }, body: JSON.stringify(withRequestId(body)) });
 
 describe("a recording failure reaches the person", () => {
   // Design v3, step 3: a route and its conversation row are one commit. A row that cannot be written refuses the route as a whole,
@@ -24,7 +25,7 @@ describe("a recording failure reaches the person", () => {
     apps.push(app);
     const question = { id: "q", question: "Which plan?", why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }] };
     expect((await agent(app, { tool: "ask_human", panel: "p", ask: question })).status).toBe(200);
-    await fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", panel: "p", ask: "q", ...(await revisionOf(app, "p", "q")), outcome: "answered", value: "a" }) });
+    await fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(withRequestId({ op: "human.answer", panel: "p", ask: "q", ...(await revisionOf(app, "p", "q")), outcome: "answered", value: "a" })) });
 
     // The conversation store cannot write a row from here on. Other records still write.
     const store = app.application.runtime.runtime.store as unknown as { commit: (input: { records?: { collection: string }[] }) => Promise<unknown> };

@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { PANELS_COLLECTION } from "../src/capabilities/panel-records.ts";
 import { CONVERSATION_COLLECTION } from "../src/capabilities/conversation.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { withRequestId } from "./support/request-body.ts";
 
 const keys = { ag_alice: randomBytes(32).toString("hex"), ag_alice2: randomBytes(32).toString("hex") };
 const sha = (k: string) => createHash("sha256").update(k).digest("hex");
@@ -33,8 +34,8 @@ afterAll(async () => {
 
 const q = (id: string) => ({ id, question: `Which plan for ${id}?`, why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }] });
 const agent = (app: DeskApp, key: string, name: string, body: unknown) =>
-  fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": name }, body: JSON.stringify(body) });
-const person = (app: DeskApp, body: unknown) => fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": name }, body: JSON.stringify(withRequestId(body)) });
+const person = (app: DeskApp, body: unknown) => fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(withRequestId(body)) });
 const move = (app: DeskApp, extra: Record<string, unknown>) => person(app, { op: "human.reassign_owner", panel: "open_panel", ask: "open_q", from_key_id: "ag_alice", to_key_id: "ag_alice2", ...extra });
 const ownerOf = async (app: DeskApp): Promise<string | null | undefined> => {
   const row = await app.application.runtime.runtime.store.getRecord(PANELS_COLLECTION, "panel:open_panel");

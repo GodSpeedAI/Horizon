@@ -9,12 +9,13 @@ import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DUPLICATE_BLOCK_ID } from "../src/ui/desk/panels-model.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { withRequestId } from "./support/request-body.ts";
 
 const key = randomBytes(32).toString("hex");
 const sha = (k: string) => createHash("sha256").update(k).digest("hex");
 const question = (id: string) => ({ id, question: "Which plan?", why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }] });
 const agent = (app: DeskApp, body: unknown) =>
-  fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": "Alice" }, body: JSON.stringify(body) });
+  fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": "Alice" }, body: JSON.stringify(withRequestId(body)) });
 const writeRegistry = (app: DeskApp) => {
   const entries = [{ key_id: "ag_alice", name: "Alice", sha256: sha(key), added: "2026-11-07T09:00:00.000Z" }];
   writeFileSync(join(dirname(app.application.loaded.agentKeyPath), "agents.json"), JSON.stringify({ schema: "horizon.agents/1", agents: entries }));

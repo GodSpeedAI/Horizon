@@ -61,7 +61,7 @@ describe("the agent door reads its body before queueing", () => {
     let finish!: () => void;
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(encoder.encode('{"tool":"show_surface","surface":'));
+        controller.enqueue(encoder.encode('{"tool":"show_surface","request_id":"held-body-1","surface":'));
         finish = () => {
           controller.enqueue(encoder.encode(JSON.stringify(surface("held_body").surface) + "}"));
           controller.close();

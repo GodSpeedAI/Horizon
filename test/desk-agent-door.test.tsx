@@ -11,6 +11,7 @@ import { PanelCard, echoesOf } from "../src/ui/desk/Panels.tsx";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { deskState } from "./support/desk-fixture.ts";
 import { quietIo } from "./support/desk-io.ts";
+import { withRequestId } from "./support/request-body.ts";
 
 const select = { id: "which_way", question: "Which plan should we use?", why_needed: "Two plans", options: [{ option_id: "plan_a", label: "Plan A" }, { option_id: "plan_b", label: "Plan B" }] };
 const multi = { id: "many", input: "multiselect", question: "Which parts?", why_needed: "x", options: [{ option_id: "o1", label: "Part one" }, { option_id: "o2", label: "Part two" }] };
@@ -24,7 +25,7 @@ beforeAll(async () => {
 afterAll(async () => app.stop());
 
 const door = (path: string, body?: unknown, auth: string | null = `Bearer ${key}`, extra: Record<string, string> = {}) =>
-  fetch(`${app.base}${path}`, { method: body === undefined ? "GET" : "POST", headers: { ...(auth === null ? {} : { authorization: auth }), "content-type": "application/json", ...extra }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  fetch(`${app.base}${path}`, { method: body === undefined ? "GET" : "POST", headers: { ...(auth === null ? {} : { authorization: auth }), "content-type": "application/json", ...extra }, ...(body === undefined ? {} : { body: JSON.stringify(withRequestId(body)) }) });
 const rows = async (): Promise<any[]> => (await (await fetch(`${app.base}/desk/conversation`)).json()).rows;
 
 describe("the agent door", () => {

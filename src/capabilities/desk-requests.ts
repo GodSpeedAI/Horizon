@@ -15,6 +15,8 @@ import type { CommitRecord } from "./panel-records.ts";
 export const REQUESTS_COLLECTION = "horizon-desk-requests";
 export const REUSED_REQUEST_WORDS = "That request id was already used for something else.";
 export const BAD_REQUEST_ID_WORDS = "That request id could not be read. Nothing was sent.";
+/** Every change carries a request id: the same id is the same command, so a retry never repeats it. */
+export const REQUEST_ID_REQUIRED_WORDS = "This change has no request id, so a retry could not be told apart. Nothing was changed.";
 const MAX_REQUEST_ID = 100;
 
 /** A request id is a non-empty string of up to 100 characters, with no spaces or control characters. */
