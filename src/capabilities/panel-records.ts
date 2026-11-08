@@ -8,7 +8,7 @@
  */
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
 import { listAnswers, PANEL_ANSWERS_COLLECTION, storedOf, type PanelAnswer } from "./panel-answers.ts";
-import { QUESTION_STATES, statusOfLegacy, type QuestionStatus } from "./question-rules.ts";
+import { legalTransition, QUESTION_STATES, statusOfLegacy, type QuestionStatus } from "./question-rules.ts";
 import { hasOpenAsk, MAX_OPEN_PANELS, type Panel, type Panels, type PanelBlock } from "../ui/desk/panels-model.ts";
 
 export const PANELS_COLLECTION = "horizon-panels";
@@ -201,7 +201,9 @@ export async function stateWrites(store: DurableStore, tenant: string, after: Pa
       if (latest === undefined) continue;
       const q = block as unknown as { readonly answered?: { readonly outcome?: string } | null; readonly withdrawn?: unknown };
       const want: QuestionStatus | null = q.withdrawn ? "withdrawn" : q.answered == null ? "waiting_for_you" : q.answered.outcome === "deferred" ? "put_off" : null;
-      if (want === null || want === statusOfLegacy(latest)) continue;
+      const from = statusOfLegacy(latest);
+      // Only a legal move is written: an answer the person gave or the agent finished never goes back to waiting for you.
+      if (want === null || want === from || !legalTransition(from, want)) continue;
       const id = `answer:${panel.id}:${latest.n}`;
       const row = await store.getRecord(PANEL_ANSWERS_COLLECTION, id);
       if (row === null || row === undefined) continue;

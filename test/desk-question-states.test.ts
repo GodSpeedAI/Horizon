@@ -9,8 +9,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
-import { listAnswers, migrateAnswerStates, NOTHING_SENT, PANEL_ANSWERS_COLLECTION, STOPPED_ROW } from "../src/capabilities/panel-answers.ts";
-import { compatOf, finishedByOf, SAME_ID_OTHER_WORDS, statusOfLegacy } from "../src/capabilities/question-rules.ts";
+import { listAnswers, migrateAnswerStates, NOTHING_SENT, PANEL_ANSWERS_COLLECTION, QuestionAlreadyAnswered, recordAnswer, STOPPED_ROW } from "../src/capabilities/panel-answers.ts";
+import { compatOf, finishedByOf, legalTransition, SAME_ID_OTHER_WORDS, statusOfLegacy } from "../src/capabilities/question-rules.ts";
 import { CONVERSATION_COLLECTION } from "../src/capabilities/conversation.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
@@ -374,5 +374,36 @@ describe("a person's change queued before logout does not run after it", () => {
     queue.restore();
     const answers = await listAnswers(app.application.runtime.runtime.store, app.application.caller.tenant, "logout_p");
     expect(answers.filter((a) => a.ask === "q" && a.outcome !== null)).toEqual([]);
+  });
+});
+
+describe("a legacy answered question stays sealed after a restart", () => {
+  test("a republish with new wording is refused, and a second answer is refused", async () => {
+    const first = await open();
+    const tenant = first.application.caller.tenant;
+    const store = first.application.runtime.runtime.store;
+    // An answer written before fingerprints and guards: its wording is unknown, and no panel shows it.
+    await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: "answer:sealed_legacy:1", expectedVersion: 0, value: { tenant, panel_id: "sealed_legacy", n: 1, ask: "q", outcome: "answered", value: "a", note: null, at: "2026-11-02T10:00:00.000Z", version: null, routed_as: null, step: null, asked_by: null, asked_by_key: null, owner_key: null, fingerprint: null, history: [], replied: true, waiting_on: "none" } }] });
+    const current = await store.getRecord("horizon-desk-migrations", `marker:${tenant}`);
+    await store.commit({ appends: [], records: [{ collection: "horizon-desk-migrations", id: `marker:${tenant}`, expectedVersion: current?.version ?? 0, value: { tenant, version: 0, name: "forgotten", at: "2026-11-01T00:00:00.000Z" } }] });
+    const second = await restart(first);
+    const again = second.application.runtime.runtime.store;
+    const changed = await putAs(second, "sealed_legacy", question("q", "Invented wording?"));
+    expect(changed.status).not.toBe(200);
+    expect(blockOf(await second.state(), "sealed_legacy", "q")).toBeUndefined();
+    expect((await answer(second, "sealed_legacy", "q")).status).not.toBe(200);
+    const rows = await listAnswers(again, tenant, "sealed_legacy");
+    expect(rows.map((r) => [r.n, r.state])).toEqual([[1, "finished"]]);
+    expect((await again.getRecord(PANEL_ANSWERS_COLLECTION, "question:sealed_legacy:q"))?.value).toMatchObject({ outcome: "answered", n: 1 });
+    await expect(recordAnswer(again, { tenant, panel_id: "sealed_legacy", ask: "q", outcome: "answered", value: "b", now: new Date() })).rejects.toBeInstanceOf(QuestionAlreadyAnswered);
+  });
+
+  test("a state moves only along a legal transition", () => {
+    expect(legalTransition("put_off", "waiting_for_you")).toBe(true);
+    expect(legalTransition("waiting_for_you", "put_off")).toBe(true);
+    expect(legalTransition("put_off", "withdrawn")).toBe(true);
+    expect(legalTransition("finished", "waiting_for_you")).toBe(false);
+    expect(legalTransition("waiting_for_agent", "waiting_for_you")).toBe(false);
+    expect(legalTransition("withdrawn", "waiting_for_you")).toBe(false);
   });
 });

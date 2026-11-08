@@ -39,6 +39,24 @@ export type QuestionStatus = (typeof QUESTION_STATES)[number];
 /** Why a question finished. Kept apart from the state: the agent said where the answer went, or the person stopped waiting. */
 export type FinishedBy = "reported" | "stopped";
 
+/**
+ * The state moves the board may make on an answer record: a put-off question comes back as waiting for you when the agent puts it up
+ * again, a question is withdrawn, and a question is put off or reopened by the person. Nothing else moves a state. A question the person
+ * answered (waiting for the agent or finished) or withdrew never moves back, so a republish cannot make it answerable again.
+ */
+const LEGAL_STATE_MOVES: { readonly [from in QuestionStatus]: readonly QuestionStatus[] } = {
+  waiting_for_you: ["put_off", "withdrawn"],
+  put_off: ["waiting_for_you", "withdrawn"],
+  waiting_for_agent: [],
+  finished: [],
+  withdrawn: [],
+};
+
+/** Whether a question may move from one stored state to another. Only the moves in `LEGAL_STATE_MOVES` are legal. */
+export function legalTransition(from: QuestionStatus, to: QuestionStatus): boolean {
+  return LEGAL_STATE_MOVES[from].includes(to);
+}
+
 /** The compatibility fields a state implies. Only `waiting_for_agent` waits on the agent; `replied` is true for every other state. */
 export function compatOf(status: QuestionStatus): { readonly replied: boolean; readonly waiting_on: WaitingOn } {
   return status === "waiting_for_agent" ? { replied: false, waiting_on: "agent" } : { replied: true, waiting_on: "none" };

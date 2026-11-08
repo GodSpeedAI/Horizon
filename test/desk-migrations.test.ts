@@ -69,7 +69,7 @@ describe("the desk's record migrations", () => {
     expect("replied" in raw).toBe(false);
     expect("waiting_on" in raw).toBe(false);
     const marker = await storeOf(second).getRecord(MIGRATION_COLLECTION, `marker:${second.application.caller.tenant}`);
-    expect((marker!.value as { version: number }).version).toBe(3);
+    expect((marker!.value as { version: number }).version).toBe(4);
   });
 
   test("a second start with nothing pending writes nothing", async () => {

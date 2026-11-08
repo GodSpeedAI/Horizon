@@ -143,11 +143,13 @@ export async function recordAnswer(
     // A guard exists only once a committed answer (or cancel) is stored. The rule decides whether the question is still open.
     // The version the person saw is checked by the desk's answer step (panels-model, reduceHuman), not here: the store has
     // no version to compare with until an answer is committed, so this check passes the version through unchanged.
+    const existing = await listAnswers(store, input.tenant, input.panel_id);
     if (committed) {
-      const state: QuestionState = { owner_key: input.asked_by_key ?? null, fingerprint: input.fingerprint ?? null, outcome: guard ? String((guard.value as { outcome?: unknown }).outcome) : null, replied: false, waiting_on: "none", history: [], routed_as: null, version: null };
+      // A question an answer or cancel already sealed is refused, whether or not its guard was written (a legacy answer has none).
+      const sealed = existing.find((a) => a.ask === input.ask && (a.outcome === "answered" || a.outcome === "cancelled"));
+      const state: QuestionState = { owner_key: input.asked_by_key ?? null, fingerprint: input.fingerprint ?? null, outcome: guard ? String((guard.value as { outcome?: unknown }).outcome) : (sealed?.outcome ?? null), replied: false, waiting_on: "none", history: [], routed_as: null, version: null };
       if (!checkAnswer({ state, seenVersion: null }).ok) throw new QuestionAlreadyAnswered();
     }
-    const existing = await listAnswers(store, input.tenant, input.panel_id);
     const n = (existing.at(-1)?.n ?? 0) + 1;
     // "Not yet" is not an answer: the outcome stays null, the question keeps its history, and nobody waits for it.
     const deferred = input.outcome === "deferred";
@@ -401,4 +403,23 @@ export async function migrateAnswerStates(store: DurableStore, tenant: string): 
  */
 export async function migratePreUpgradeAnswers(_store: DurableStore, _tenant: string, _now: Date): Promise<number> {
   return 0;
+}
+
+/**
+ * Seals every question a committed answer or cancel answered (design v3, finding 3): each gets its guard record, `question:<panel>:<ask>`,
+ * which refuses a second answer. A legacy answer keeps its unknown wording, so no fingerprint is invented here. Runs once; a second run
+ * finds every guard in place and writes nothing. Returns how many guards it wrote.
+ */
+export async function migrateSealedQuestions(store: DurableStore, tenant: string): Promise<number> {
+  const guards = new Set((await store.listRecords(PANEL_ANSWERS_COLLECTION, { tenant })).map((r) => r.id).filter((id) => id.startsWith("question:")));
+  const records: CommitRecord[] = [];
+  for (const a of await listAnswers(store, tenant)) {
+    if (a.outcome !== "answered" && a.outcome !== "cancelled") continue;
+    const id = guardIdOf(a.panel_id, a.ask);
+    if (guards.has(id)) continue;
+    guards.add(id);
+    records.push({ collection: PANEL_ANSWERS_COLLECTION, id, expectedVersion: 0, value: { tenant, panel_id: a.panel_id, ask: a.ask, outcome: a.outcome, n: a.n, at: a.at } as { readonly [key: string]: Json } });
+  }
+  if (records.length > 0) await store.commit({ appends: [], records });
+  return records.length;
 }

@@ -2145,14 +2145,17 @@ export async function createApplication(
       }
     }
     for (const { panel, question } of incoming) {
-      // The answer's own fingerprint decides when it has one. The older agreement store is read only, for answers written before fingerprints.
-      const answered = (await listAnswers(store, caller.tenant, panel)).filter((a) => a.ask === question.id && a.outcome === "answered");
-      if (answered.some((a) => a.fingerprint != null)) {
-        if (answered.some((a) => a.fingerprint != null && a.fingerprint !== questionFingerprint(question))) return true;
+      // A question an answer or cancel sealed keeps its first wording. Its own fingerprint decides when it has one. Without one (written
+      // before fingerprints) the wording is unknown, so only the agreement store, read here, can say the new words are the same.
+      const sealed = (await listAnswers(store, caller.tenant, panel)).filter((a) => a.ask === question.id && (a.outcome === "answered" || a.outcome === "cancelled"));
+      if (sealed.some((a) => a.fingerprint != null)) {
+        if (sealed.some((a) => a.fingerprint != null && a.fingerprint !== questionFingerprint(question))) return true;
         continue;
       }
       const agreed = await agreedFingerprintOf(store, panel, question.id);
       if (agreed !== null && agreed !== agreedFingerprint(panel, question)) return true;
+      // A sealed question whose wording is unknown is refused unless the agreement store says the words are the same.
+      if (sealed.length > 0 && agreed !== agreedFingerprint(panel, question)) return true;
     }
     return false;
   }
