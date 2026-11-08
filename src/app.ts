@@ -1955,18 +1955,21 @@ export async function createApplication(
     panelTail = run.catch(() => undefined);
     return run;
   };
-  // Design v3 step 2: the board is read from the durable records here, before the desk accepts a panel command. A read that fails
-  // is kept as words the desk shows instead of the board; it never becomes an empty board, and panel changes are refused.
+  // Design v3 step 2: the board is read from the durable records. A read that fails is kept as words the desk shows instead of the
+  // board; it never becomes an empty board, and panel changes are refused. A desk that migrates does not read the board here: it reads
+  // it once every migration has run (answersMigrated below), so the board holds the records the migrations moved.
   let panelBoard: PanelsBoard = NO_PANELS;
   let storedPanels: ReadonlyMap<string, Panel> = new Map();
   let boardRefused: string | null = null;
-  try {
-    const view = await loadBoard(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
-    panelBoard = view.board;
-    storedPanels = view.stored;
-  } catch (error) {
-    boardRefused = PANEL_LOAD_WORDS;
-    console.error("panels: the saved panels could not be read, so panel changes are refused", error instanceof Error ? error.name : "unknown");
+  if (options.readOnly) {
+    try {
+      const view = await loadBoard(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
+      panelBoard = view.board;
+      storedPanels = view.stored;
+    } catch (error) {
+      boardRefused = PANEL_LOAD_WORDS;
+      console.error("panels: the saved panels could not be read, so panel changes are refused", error instanceof Error ? error.name : "unknown");
+    }
   }
   /** Rebuilds the board from the records the store now holds. A record that cannot be read refuses panel changes from here on. */
   async function rebuildBoard(): Promise<void> {
@@ -1999,7 +2002,18 @@ export async function createApplication(
   let conflictsListed: Promise<void> = Promise.resolve();
   const answersMigrated: Promise<void> = options.readOnly ? Promise.resolve() : runDeskMigrations(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id), clock(), panelCommand, DESK_MIGRATIONS, options.migrationHold, soleOperator).then(
     async () => {
-      migrationState = "done";
+      // Every migration has run, so the records are where the desk reads them. The board is read from the store now, with the
+      // operator-scope records migration 7 moved. Changes stay refused until that read holds; a read that fails keeps them refused.
+      try {
+        const view = await loadBoard(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
+        panelBoard = view.board;
+        storedPanels = view.stored;
+        migrationState = "done";
+      } catch (error) {
+        migrationState = "failed";
+        boardRefused = PANEL_LOAD_WORDS;
+        console.error("desk: the saved panels could not be read after the migration, so changes are paused", error instanceof Error ? error.name : "unknown");
+      }
       // One line per conflicted question, with ids only: the answers' words are never logged (R2-10).
       if (!options.readOnly && !closing) {
         conflictsListed = (async (): Promise<void> => {
@@ -2015,6 +2029,8 @@ export async function createApplication(
     },
     (error: unknown) => {
       migrationState = "failed";
+      // The board was never read after the migrations, so it is shown as words, not as an empty board.
+      boardRefused = PANEL_LOAD_WORDS;
       console.error("desk: the saved records could not be migrated, so changes are paused", error instanceof Error ? error.name : "unknown");
     },
   );
@@ -2900,8 +2916,9 @@ export async function createApplication(
           // state-changing routes also check Origin and Sec-Fetch-Site (cross-site POSTs).
           const refused = crossSiteRefusal(request, server.port ?? port, request.method !== "POST");
           if (refused !== null) return refused;
-          // Reads are served while records are migrated; a change is refused until the migration has finished.
-          if (!READ_METHODS.has(request.method) && migrationState !== "done") return migrationRefusal();
+          // Reads are served while records are migrated; a change is refused until the migration has finished. Pairing writes no
+          // record, so a browser can still pair and read the words that say why the board is not shown.
+          if (!READ_METHODS.has(request.method) && migrationState !== "done" && url.pathname !== "/desk/pair") return migrationRefusal();
           if (url.pathname.startsWith("/agent/panels")) return agentDoor(request, url.pathname);
           // Every read needs the pairing session, except the page itself, its session check and the static client bundle that pairs.
           // The page-agent header is a label, never a grant: an unpaired caller is refused whatever the header says.

@@ -4,9 +4,14 @@
  * The restart tests reopen the desk's SQLite file, and the legacy answer is written in the shape the upgrade found it in.
  */
 import { afterAll, describe, expect, test } from "bun:test";
+import { createHash, randomBytes } from "node:crypto";
+import { writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
 import { acceptanceBlocked, listAnswers, PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
 import { MIGRATION_COLLECTION, MIGRATING_WORDS, MIGRATION_FAILED_WORDS, runDeskMigrations, type DeskMigration } from "../src/capabilities/desk-migrations.ts";
+import { BOARD_COLLECTION, PANELS_COLLECTION, panelIdOf } from "../src/capabilities/panel-records.ts";
+import { withRequestId } from "./support/request-body.ts";
 import type { PanelQueue } from "../src/capabilities/panel-answers.ts";
 
 /** A queue that runs each command at once; the migrations run one after another anyway. */
@@ -148,6 +153,94 @@ describe("the desk's record migrations", () => {
 
   test("the words for a pending migration are plain", () => {
     expect(MIGRATING_WORDS).toBe("The desk is updating its saved records. Nothing was changed. Try again in a moment.");
+  });
+});
+
+describe("the board after the migrations", () => {
+  const ALPHA_ID = "ag_alpha0001";
+  const BRAVO_ID = "ag_bravo0002";
+  const hash = (key: string): string => createHash("sha256").update(key).digest("hex");
+
+  /** A pinned panel as the desk stored it before operator scoping: under the bare tenant, owned by agent A, on the visible board. */
+  async function seedLegacyPinnedPanel(app: DeskApp, panel: string): Promise<void> {
+    const store = storeOf(app);
+    const tenant = app.application.caller.tenant;
+    await store.commit({
+      appends: [],
+      records: [
+        { collection: PANELS_COLLECTION, id: `panel:${panel}`, expectedVersion: 0, value: { tenant, id: panel, title: "Legacy plan", step: null, pinned: true, blocks: [], notes: [], owner_key: ALPHA_ID } },
+        { collection: BOARD_COLLECTION, id: `board:${tenant}`, expectedVersion: 0, value: { tenant, visible: [panel] } },
+      ],
+    });
+  }
+
+  /** Registers agents A and B in the desk's registry (hashes only), as the agent-identity tests do. */
+  function registerAgents(app: DeskApp, alpha: string, bravo: string): void {
+    const registry = join(dirname(app.application.loaded.agentKeyPath), "agents.json");
+    writeFileSync(registry, JSON.stringify({
+      schema: "horizon.agents/1",
+      agents: [
+        { key_id: ALPHA_ID, name: "Alpha agent", sha256: hash(alpha), added: "2026-11-07T09:00:00.000Z" },
+        { key_id: BRAVO_ID, name: "Bravo agent", sha256: hash(bravo), added: "2026-11-07T09:00:00.000Z" },
+      ],
+    }));
+  }
+
+  test("a pinned legacy panel owned by A is on the board after the migration, and B cannot take it over", async () => {
+    const first = await open();
+    await seedLegacyPinnedPanel(first, "legacy-pinned");
+    await forgetMarker(first);
+    const alpha = randomBytes(32).toString("hex");
+    const bravo = randomBytes(32).toString("hex");
+    const second = await restart(first);
+    registerAgents(second, alpha, bravo);
+
+    const state = await second.state();
+    expect(state.panels.open.map((p: { id: string }) => p.id)).toEqual(["legacy-pinned"]);
+    expect(state.panels.open[0]).toMatchObject({ id: "legacy-pinned", pinned: true, owner_key: ALPHA_ID });
+
+    const takeover = await fetch(`${second.base}/agent/panels`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${bravo}`, "content-type": "application/json", "x-horizon-agent-name": "Bravo agent" },
+      body: JSON.stringify(withRequestId({ tool: "show_surface", surface: { id: "legacy-pinned", title: "Bravo takes it", blocks: [] } })),
+    });
+    expect(takeover.status).toBeGreaterThanOrEqual(400);
+    const stored = (await storeOf(second).getRecord(PANELS_COLLECTION, panelIdOf(deskScopeFor(second), "legacy-pinned")))!.value as { owner_key: string; pinned: boolean; title: string };
+    expect(stored).toMatchObject({ owner_key: ALPHA_ID, pinned: true, title: "Legacy plan" });
+  });
+
+  test("when the board cannot be read after the migrations, every change is refused with the migration-failed words", async () => {
+    const first = await open();
+    await forgetMarker(first);
+    let release!: () => void;
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const failed = await restart(first, { migrationHold: hold, awaitMigration: false });
+    // The board read after the migrations fails (the panel records of this operator cannot be listed); the migrations themselves run.
+    const scope = deskScopeFor(failed);
+    const store = storeOf(failed) as unknown as { listRecords: (...args: unknown[]) => Promise<unknown> };
+    const real = store.listRecords.bind(store);
+    store.listRecords = async (...args: unknown[]) => {
+      const [collection, filter] = args as [string, { tenant?: string } | undefined];
+      if (collection === PANELS_COLLECTION && filter?.tenant === scope) throw new Error("forced board read failure");
+      return real(...args);
+    };
+    const quiet = console.error;
+    console.error = () => undefined;
+    try {
+      release();
+      await failed.application.migrated;
+    } finally {
+      console.error = quiet;
+    }
+    const agentOp = { tool: "show_surface", surface: { id: "after-failure", title: "Refused", blocks: [] } };
+    const agent = await failed.application.applyAgentOp(agentOp as unknown as Parameters<typeof failed.application.applyAgentOp>[0]);
+    expect(agent).toMatchObject({ ok: false, message: MIGRATION_FAILED_WORDS });
+    expect((await storeOf(failed).getRecord(PANELS_COLLECTION, panelIdOf(scope, "after-failure"))) ?? null).toBeNull();
+    const human = await failed.post("/desk/panels/op", { op: "human.pin", id: "none", pinned: true });
+    expect(human.status).toBe(503);
+    expect(((await human.json()) as { message: string }).message).toBe(MIGRATION_FAILED_WORDS);
   });
 });
 

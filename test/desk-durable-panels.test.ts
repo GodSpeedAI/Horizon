@@ -9,6 +9,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { BOARD_COLLECTION, PANEL_LOAD_WORDS } from "../src/capabilities/panel-records.ts";
+import { MIGRATION_FAILED_WORDS } from "../src/capabilities/desk-migrations.ts";
 import { ANSWERED_CANNOT_CHANGE } from "../src/ui/desk/panels-model.ts";
 import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { withRequestId } from "./support/request-body.ts";
@@ -136,7 +137,8 @@ describe("a load that fails is shown as an error, never as an empty desk", () =>
     expect(state.panels.open).toEqual([]);
     const pinned = await person(second, { op: "human.pin", id: "dur5", pinned: true });
     expect(pinned.status).toBe(503);
-    expect(((await pinned.json()) as { message: string }).message).toBe(PANEL_LOAD_WORDS);
+    // The board is read after the migrations, so a board that cannot be read pauses changes with the migration-failed words.
+    expect(((await pinned.json()) as { message: string }).message).toBe(MIGRATION_FAILED_WORDS);
     const put = await agent(second, keys.ag_alice, "Alice", surface("dur5_new"));
     expect(put.status).toBe(503);
   });
