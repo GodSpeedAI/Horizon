@@ -147,6 +147,8 @@ export interface LoadedConfig {
   readonly operator: {
     readonly principal: { readonly id: string; readonly kind: "user" };
     readonly tenant: string;
+    /** The operator ref the configuration file names, before HORIZON_OPERATOR_REF overrides it (the one operator the config names). */
+    readonly configuredRef: string;
   };
   readonly launchSecret: string;
   readonly secretPath: string;

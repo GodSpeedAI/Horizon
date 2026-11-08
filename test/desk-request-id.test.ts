@@ -9,7 +9,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { listAnswers } from "../src/capabilities/panel-answers.ts";
 import { CONVERSATION_COLLECTION } from "../src/capabilities/conversation.ts";
 import { REUSED_REQUEST_WORDS } from "../src/capabilities/desk-requests.ts";
-import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
 const apps: DeskApp[] = [];
 const open = async (root?: string) => {
@@ -38,7 +38,7 @@ describe("a request id makes a retry safe", () => {
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
     expect(secondBody).toEqual(firstBody);
-    expect((await listAnswers(app.application.runtime.runtime.store, app.application.caller.tenant, "p1")).filter((a) => a.ask === "q1").length).toBe(1);
+    expect((await listAnswers(app.application.runtime.runtime.store, deskScopeFor(app), "p1")).filter((a) => a.ask === "q1").length).toBe(1);
     expect(await rowsFor(app, "q1")).toBe(1);
   });
 
@@ -65,7 +65,7 @@ describe("a request id makes a retry safe", () => {
     expect(body.ok).toBe(false);
     expect(body.message).toBe("That request id was already used for something else.");
     expect(REUSED_REQUEST_WORDS).toBe(body.message);
-    const stored = (await listAnswers(app.application.runtime.runtime.store, app.application.caller.tenant, "p3")).filter((a) => a.ask === "q3");
+    const stored = (await listAnswers(app.application.runtime.runtime.store, deskScopeFor(app), "p3")).filter((a) => a.ask === "q3");
     expect(stored.length).toBe(1);
     expect(stored[0]!.value).toBe("a");
   });

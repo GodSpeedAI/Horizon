@@ -11,7 +11,8 @@ import type { PanelQueue } from "../src/capabilities/panel-answers.ts";
 
 /** A queue that runs each command at once; the migrations run one after another anyway. */
 const queue: PanelQueue = (command) => command();
-import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { answerIdOf } from "../src/capabilities/panel-answers.ts";
 
 const apps: DeskApp[] = [];
 const open = async (options: { root?: string; migrationHold?: Promise<unknown>; awaitMigration?: boolean } = {}) => {
@@ -35,14 +36,14 @@ const COLLECTIONS = ["horizon-panels", PANEL_ANSWERS_COLLECTION, MIGRATION_COLLE
 /** Every record in the collections the migration reads or writes, with its version. */
 async function versionsOf(app: DeskApp): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
-  for (const collection of COLLECTIONS) for (const row of await storeOf(app).listRecords(collection, { tenant: app.application.caller.tenant })) out[`${collection}/${row.id}`] = row.version;
+  for (const collection of COLLECTIONS) for (const row of await storeOf(app).listRecords(collection, { tenant: deskScopeFor(app) })) out[`${collection}/${row.id}`] = row.version;
   return out;
 }
 
 /** Makes the marker read as "nothing has run", as an upgrade from before the marker would find it. */
 async function forgetMarker(app: DeskApp): Promise<void> {
   const store = storeOf(app);
-  const tenant = app.application.caller.tenant;
+  const tenant = deskScopeFor(app);
   const current = await store.getRecord(MIGRATION_COLLECTION, `marker:${tenant}`);
   await store.commit({ appends: [], records: [{ collection: MIGRATION_COLLECTION, id: `marker:${tenant}`, expectedVersion: current?.version ?? 0, value: { tenant, version: 0, name: "forgotten", at: "2026-11-01T00:00:00.000Z" } }] });
 }
@@ -60,16 +61,16 @@ describe("the desk's record migrations", () => {
     await seedLegacyAnswer(first, "legacy-1");
     await forgetMarker(first);
     const second = await restart(first);
-    const [answer] = await listAnswers(storeOf(second), second.application.caller.tenant, "legacy-1");
+    const [answer] = await listAnswers(storeOf(second), deskScopeFor(second), "legacy-1");
     expect(answer).toBeDefined();
     expect(answer!.state).toBe("finished");
     expect(answer!.value).toBe("a");
-    const raw = (await storeOf(second).getRecord(PANEL_ANSWERS_COLLECTION, "answer:legacy-1:1"))!.value as Record<string, unknown>;
+    const raw = (await storeOf(second).getRecord(PANEL_ANSWERS_COLLECTION, answerIdOf(deskScopeFor(second), "legacy-1", 1)))!.value as Record<string, unknown>;
     expect(raw.state).toBe("finished");
     expect("replied" in raw).toBe(false);
     expect("waiting_on" in raw).toBe(false);
-    const marker = await storeOf(second).getRecord(MIGRATION_COLLECTION, `marker:${second.application.caller.tenant}`);
-    expect((marker!.value as { version: number }).version).toBe(6);
+    const marker = await storeOf(second).getRecord(MIGRATION_COLLECTION, `marker:${deskScopeFor(second)}`);
+    expect((marker!.value as { version: number }).version).toBe(7);
   });
 
   test("a second start with nothing pending writes nothing", async () => {
@@ -107,7 +108,7 @@ describe("the desk's record migrations", () => {
     await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: "answer:legacy-wait:1", expectedVersion: 0, value: { tenant, panel_id: "legacy-wait", n: 1, ask: "q", outcome: "answered", value: "a", note: null, at: "2026-11-02T10:00:00.000Z", version: null, routed_as: null, step: "step-legacy", asked_by: null, asked_by_key: null, owner_key: null, fingerprint: null, history: [], replied: false } }] });
     await forgetMarker(first);
     const second = await restart(first);
-    const rows = await listAnswers(storeOf(second), second.application.caller.tenant, "legacy-wait");
+    const rows = await listAnswers(storeOf(second), deskScopeFor(second), "legacy-wait");
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ state: "waiting_for_agent", waiting_on: "agent", replied: false, finished_by: null, routed_as: null });
     expect(acceptanceBlocked(rows, "step-legacy")).toBe(true);
@@ -208,7 +209,7 @@ describe("an agent op issued straight after startup", () => {
       expect(result.ok).toBe(true);
       await Promise.race([app.application.migrated, timeout]);
       const markers = await app.application.runtime.runtime.store.listRecords(MIGRATION_COLLECTION);
-      expect(markers.map((row) => (row.value as { version?: number }).version)).toEqual([6]);
+      expect(markers.map((row) => (row.value as { version?: number }).version)).toEqual([7]);
     } finally {
       if (timer !== undefined) clearTimeout(timer);
     }

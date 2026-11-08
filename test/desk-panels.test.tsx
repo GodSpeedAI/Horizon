@@ -18,6 +18,7 @@ import { PanelCard } from "../src/ui/desk/Panels.tsx";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { deskState } from "./support/desk-fixture.ts";
 import { quietIo } from "./support/desk-io.ts";
+import { answerIdOf } from "../src/capabilities/panel-answers.ts";
 import { fakeCaseKeeper, type FakeKeeper } from "./support/fake-case-keeper.ts";
 
 const surface = (id: string, over: Record<string, unknown> = {}) => ({ tool: "show_surface" as const, surface: { id, title: `Panel ${id}`, blocks: [{ type: "callout", id: "c1", tone: "ok", text: "Looks fine" }], ...over } });
@@ -113,8 +114,8 @@ describe("answers are kept", () => {
     expect([a.n, b.n]).toEqual([1, 2]);
     // "Not yet" is not an answer and waits for nobody (store-design-v2 section 3): it does not block the step.
     // The state is stored once, on the answer; replied and waiting_on are derived from it (they are not stored any more).
-    expect((await store.getRecord(PANEL_ANSWERS_COLLECTION, "answer:release:2"))?.value).toMatchObject({ state: "put_off", outcome: null, step: "signoff" });
-    expect((await store.getRecord(PANEL_ANSWERS_COLLECTION, "answer:release:2"))?.value).not.toHaveProperty("replied");
+    expect((await store.getRecord(PANEL_ANSWERS_COLLECTION, answerIdOf("t", "release", 2)))?.value).toMatchObject({ state: "put_off", outcome: null, step: "signoff" });
+    expect((await store.getRecord(PANEL_ANSWERS_COLLECTION, answerIdOf("t", "release", 2)))?.value).not.toHaveProperty("replied");
     expect((await listAnswers(store, "t", "release"))[1]).toMatchObject({ replied: true, outcome: null, waiting_on: "none", state: "put_off" });
     // q1 is answered and waits for the agent, so the step is blocked; the put-off q2 waits for nobody.
     expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(true);

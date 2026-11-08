@@ -394,6 +394,7 @@ export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.
     operator: {
       principal: operatorPrincipal(withStore),
       tenant: setupTenant(setup, hostname()),
+      configuredRef: config.identity.operator_ref,
     },
     launchSecret,
     secretPath: resolve(secretPath),

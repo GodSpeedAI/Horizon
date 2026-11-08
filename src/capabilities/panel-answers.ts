@@ -86,7 +86,8 @@ export function storedOf(a: object): { readonly [key: string]: Json } {
   return rest as unknown as { readonly [key: string]: Json };
 }
 
-const idOf = (panel: string, n: number): string => `answer:${panel}:${n}`;
+/** The id of one answer record. The scope (the operator's tenant scope, see deskScopeOf) is part of the key, so no operator's answer shares an id with another's. */
+export const answerIdOf = (scope: string, panel: string, n: number): string => `answer:${scope}:${panel}:${n}`;
 
 export function checkValue(value: unknown): { readonly ok: true; readonly value: AnswerValue | null } | { readonly ok: false } {
   if (value === undefined || value === null) return { ok: true, value: null };
@@ -130,7 +131,7 @@ export class QuestionAlreadyAnswered extends Error {
   }
 }
 
-const guardIdOf = (panel: string, ask: string): string => `question:${panel}:${ask}`;
+export const guardIdOf = (scope: string, panel: string, ask: string): string => `question:${scope}:${panel}:${ask}`;
 
 export async function recordAnswer(
   store: DurableStore,
@@ -139,7 +140,7 @@ export async function recordAnswer(
   const committed = input.outcome === "answered" || input.outcome === "cancelled";
   for (let attempt = 0; ; attempt += 1) {
     // The guard is the question's own record. Two answers that race both carry its version; the store refuses the second commit.
-    const guard = await store.getRecord(PANEL_ANSWERS_COLLECTION, guardIdOf(input.panel_id, input.ask));
+    const guard = await store.getRecord(PANEL_ANSWERS_COLLECTION, guardIdOf(input.tenant, input.panel_id, input.ask));
     // A guard exists only once a committed answer (or cancel) is stored. The rule decides whether the question is still open.
     // The version the person saw is checked by the desk's answer step (panels-model, reduceHuman), not here: the store has
     // no version to compare with until an answer is committed, so this check passes the version through unchanged.
@@ -161,8 +162,8 @@ export async function recordAnswer(
       owner_key: input.owner_key ?? input.asked_by_key ?? null, fingerprint: input.fingerprint ?? null, history: deferred ? [{ outcome: "deferred", at: input.now.toISOString() }] : [],
       state: deferred ? "put_off" : "waiting_for_agent", finished_by: null,
     };
-    const records: { collection: string; id: string; expectedVersion: number; value: { readonly [key: string]: Json } }[] = [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(input.panel_id, n), expectedVersion: 0, value: storedOf(stored) }];
-    if (committed) records.push({ collection: PANEL_ANSWERS_COLLECTION, id: guardIdOf(input.panel_id, input.ask), expectedVersion: guard?.version ?? 0, value: { tenant: input.tenant, panel_id: input.panel_id, ask: input.ask, outcome: input.outcome, n, at: input.now.toISOString() } });
+    const records: { collection: string; id: string; expectedVersion: number; value: { readonly [key: string]: Json } }[] = [{ collection: PANEL_ANSWERS_COLLECTION, id: answerIdOf(input.tenant, input.panel_id, n), expectedVersion: 0, value: storedOf(stored) }];
+    if (committed) records.push({ collection: PANEL_ANSWERS_COLLECTION, id: guardIdOf(input.tenant, input.panel_id, input.ask), expectedVersion: guard?.version ?? 0, value: { tenant: input.tenant, panel_id: input.panel_id, ask: input.ask, outcome: input.outcome, n, at: input.now.toISOString() } });
     try {
       // The answer and the panel that shows it are one commit: both are there or neither is.
       const panelRecords = input.alsoRecords ? await input.alsoRecords() : [];
@@ -188,7 +189,7 @@ export function answerState(a: PanelAnswer): QuestionState {
 type Write = { readonly collection: string; readonly id: string; readonly expectedVersion: number; readonly value: { readonly [key: string]: Json } };
 function planFinish(read: ReadAnswer, by: FinishedBy, routedAs: string | null, note: string | null): Write {
   const a = read.answer;
-  return { collection: PANEL_ANSWERS_COLLECTION, id: idOf(a.panel_id, a.n), expectedVersion: read.version, value: storedOf({ ...a, state: "finished", finished_by: by, routed_as: routedAs, note: a.note ?? note }) };
+  return { collection: PANEL_ANSWERS_COLLECTION, id: answerIdOf(a.tenant, a.panel_id, a.n), expectedVersion: read.version, value: storedOf({ ...a, state: "finished", finished_by: by, routed_as: routedAs, note: a.note ?? note }) };
 }
 
 /**
@@ -200,7 +201,7 @@ export async function planRoute(store: DurableStore, tenant: string, panelId: st
   if (typeof callerKey !== "string" || callerKey.trim() === "") return { ok: false, message: NO_CALLER_KEY };
   const rows = (await readAnswerRows(store, tenant, panelId)).filter((r) => r.answer.ask === askId);
   // A question whose answers contradict each other is refused for routing until the person decides (R2-10).
-  if (await conflictOf(store, panelId, askId)) return { ok: false, message: CONFLICTED_WORDS };
+  if (await conflictOf(store, tenant, panelId, askId)) return { ok: false, message: CONFLICTED_WORDS };
   const target = (rows.filter((r) => waitsForAgent(r.answer)).at(-1) ?? rows.at(-1))?.answer;
   if (target === undefined) {
     const words = checkRouteWords(routedAs);
@@ -358,10 +359,10 @@ export function agreedFingerprint(panelId: string, q: AgreedQuestion): string {
   return createHash("sha256").update(JSON.stringify([panelId, q.id, q.question, q.options.map((o) => [o.option_id, o.label, o.consequence ?? null]), q.input ?? "select", q.resolves ?? null])).digest("hex");
 }
 
-const agreedId = (panelId: string, ask: string): string => `agreed:${panelId}:${ask}`;
+export const agreedId = (scope: string, panelId: string, ask: string): string => `agreed:${scope}:${panelId}:${ask}`;
 
-export async function agreedFingerprintOf(store: DurableStore, panelId: string, ask: string): Promise<string | null> {
-  const row = await store.getRecord(AGREED_COLLECTION, agreedId(panelId, ask));
+export async function agreedFingerprintOf(store: DurableStore, tenant: string, panelId: string, ask: string): Promise<string | null> {
+  const row = await store.getRecord(AGREED_COLLECTION, agreedId(tenant, panelId, ask));
   if (row === null || row === undefined) return null;
   const fingerprint = (row.value as { fingerprint?: unknown }).fingerprint;
   return typeof fingerprint === "string" ? fingerprint : null;
@@ -394,7 +395,7 @@ export async function planReassign(
   const entry = { from_key: input.from_key, to_key: input.to_key, from_name: input.from_name, to_name: input.to_name, at: when };
   // Only the current owner changes. The authorship fields (asked_by, asked_by_key) stay as the agent that asked wrote them, and
   // each record gets the reassignment in its list. Each write commits against the version this read saw.
-  const records: CommitRecord[] = rows.map((r) => ({ collection: PANEL_ANSWERS_COLLECTION, id: idOf(r.answer.panel_id, r.answer.n), expectedVersion: r.version, value: storedOf({ ...r.answer, owner_key: input.to_key, reassignments: [...(r.answer.reassignments ?? []), entry] }) }));
+  const records: CommitRecord[] = rows.map((r) => ({ collection: PANEL_ANSWERS_COLLECTION, id: answerIdOf(r.answer.tenant, r.answer.panel_id, r.answer.n), expectedVersion: r.version, value: storedOf({ ...r.answer, owner_key: input.to_key, reassignments: [...(r.answer.reassignments ?? []), entry] }) }));
   // A completed note that names the panel and the question, as an unanswered question's move does. It is not a waiting row: the
   // answer's own row is the one that waits, and the route finishes it.
   const row = newRowRecord(input.who, { source: "you", kind: "note", words: `Moved the question "${input.question}" from ${input.from_name} to ${input.to_name}.`, outcome: `${input.to_name} now answers for it, since ${when}.`, status: "done", refs: { panel_id: input.panel_id, ask_id: input.ask } }, input.now);
@@ -442,7 +443,7 @@ export async function migrateSealedQuestions(store: DurableStore, tenant: string
   const records: CommitRecord[] = [];
   for (const a of await listAnswers(store, tenant)) {
     if (a.outcome !== "answered" && a.outcome !== "cancelled") continue;
-    const id = guardIdOf(a.panel_id, a.ask);
+    const id = guardIdOf(tenant, a.panel_id, a.ask);
     if (guards.has(id)) continue;
     guards.add(id);
     records.push({ collection: PANEL_ANSWERS_COLLECTION, id, expectedVersion: 0, value: { tenant, panel_id: a.panel_id, ask: a.ask, outcome: a.outcome, n: a.n, at: a.at } as { readonly [key: string]: Json } });
@@ -452,14 +453,14 @@ export async function migrateSealedQuestions(store: DurableStore, tenant: string
 }
 
 /** The record that marks a question whose stored answers contradict each other (finding R2-10). `conflict:<panel>:<ask>`. */
-const conflictIdOf = (panel: string, ask: string): string => `conflict:${panel}:${ask}`;
+export const conflictIdOf = (scope: string, panel: string, ask: string): string => `conflict:${scope}:${panel}:${ask}`;
 
 /** The words a route on a conflicted question gets. The person decides which answer stands; the desk never picks one. */
 export const CONFLICTED_WORDS = "Two answers to this question disagree about its value or its owner, so the desk will not route it. The person needs to decide which one stands. Nothing was changed.";
 
 /** Whether the question's answers were marked as contradictory. Reads only. */
-export async function conflictOf(store: DurableStore, panelId: string, askId: string): Promise<boolean> {
-  const row = await store.getRecord(PANEL_ANSWERS_COLLECTION, conflictIdOf(panelId, askId));
+export async function conflictOf(store: DurableStore, tenant: string, panelId: string, askId: string): Promise<boolean> {
+  const row = await store.getRecord(PANEL_ANSWERS_COLLECTION, conflictIdOf(tenant, panelId, askId));
   return row !== null && row !== undefined;
 }
 
@@ -489,7 +490,7 @@ export async function migrateReconcile(store: DurableStore, tenant: string): Pro
   for (const row of await store.listRecords(AGREED_COLLECTION, { tenant })) {
     const value = row.value as { readonly panel_id?: unknown; readonly ask?: unknown; readonly fingerprint?: unknown; readonly at?: unknown };
     if (typeof value.panel_id !== "string" || typeof value.ask !== "string") continue;
-    const id = guardIdOf(value.panel_id, value.ask);
+    const id = guardIdOf(tenant, value.panel_id, value.ask);
     if (guards.has(id)) continue;
     guards.add(id);
     records.push({ collection: PANEL_ANSWERS_COLLECTION, id, expectedVersion: 0, value: { tenant, panel_id: value.panel_id, ask: value.ask, outcome: "answered", n: 0, at: typeof value.at === "string" ? value.at : new Date(0).toISOString(), fingerprint: typeof value.fingerprint === "string" ? value.fingerprint : null, from_agreement: true } as { readonly [key: string]: Json } });
@@ -504,8 +505,8 @@ export async function migrateReconcile(store: DurableStore, tenant: string): Pro
     const distinct = new Set(answers.map((a) => JSON.stringify([a.owner_key ?? null, a.outcome, a.value ?? null])));
     if (distinct.size < 2) continue;
     const { panel_id, ask } = answers[0]!;
-    const id = conflictIdOf(panel_id, ask);
-    if (await conflictOf(store, panel_id, ask)) continue;
+    const id = conflictIdOf(tenant, panel_id, ask);
+    if (await conflictOf(store, tenant, panel_id, ask)) continue;
     records.push({ collection: PANEL_ANSWERS_COLLECTION, id, expectedVersion: 0, value: { tenant, panel_id, ask, answers: answers.map((a) => a.n), owners: [...new Set(answers.map((a) => a.owner_key ?? null))].map((k) => k ?? "") } as { readonly [key: string]: Json } });
   }
   if (records.length > 0) await store.commit({ appends: [], records });

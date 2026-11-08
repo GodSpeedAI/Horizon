@@ -10,8 +10,9 @@ import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { PANELS_COLLECTION } from "../src/capabilities/panel-records.ts";
 import { CONVERSATION_COLLECTION } from "../src/capabilities/conversation.ts";
-import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { withRequestId } from "./support/request-body.ts";
+import { panelIdOf } from "../src/capabilities/panel-records.ts";
 
 const keys = { ag_alice: randomBytes(32).toString("hex"), ag_alice2: randomBytes(32).toString("hex") };
 const sha = (k: string) => createHash("sha256").update(k).digest("hex");
@@ -38,7 +39,7 @@ const agent = (app: DeskApp, key: string, name: string, body: unknown) =>
 const person = (app: DeskApp, body: unknown) => fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(withRequestId(body)) });
 const move = (app: DeskApp, extra: Record<string, unknown>) => person(app, { op: "human.reassign_owner", panel: "open_panel", ask: "open_q", from_key_id: "ag_alice", to_key_id: "ag_alice2", ...extra });
 const ownerOf = async (app: DeskApp): Promise<string | null | undefined> => {
-  const row = await app.application.runtime.runtime.store.getRecord(PANELS_COLLECTION, "panel:open_panel");
+  const row = await app.application.runtime.runtime.store.getRecord(PANELS_COLLECTION, panelIdOf(deskScopeFor(app), "open_panel"));
   const block = (row?.value as { blocks: { kind: string; id: string; owner_key?: string | null }[] } | undefined)?.blocks.find((b) => b.kind === "question" && b.id === "open_q");
   return block?.owner_key;
 };

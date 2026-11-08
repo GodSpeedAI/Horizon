@@ -4,7 +4,7 @@
  */
 import { afterEach, describe, expect, test } from "bun:test";
 import { MIGRATION_COLLECTION, MIGRATION_FAILED_WORDS, MIGRATING_WORDS } from "../src/capabilities/desk-migrations.ts";
-import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
 const apps: DeskApp[] = [];
 afterEach(async () => {
@@ -33,7 +33,7 @@ describe("deskDecide honours the migration state", () => {
     apps.push(first);
     // Make the marker read as "nothing has run", so the next start runs the migration.
     const store = first.application.runtime.runtime.store;
-    const tenant = first.application.caller.tenant;
+    const tenant = deskScopeFor(first);
     const current = await store.getRecord(MIGRATION_COLLECTION, `marker:${tenant}`);
     await store.commit({ appends: [], records: [{ collection: MIGRATION_COLLECTION, id: `marker:${tenant}`, expectedVersion: current?.version ?? 0, value: { tenant, version: 0, name: "forgotten", at: "2026-11-01T00:00:00.000Z" } }] });
     const root = first.root;

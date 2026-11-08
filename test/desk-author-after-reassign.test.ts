@@ -8,7 +8,7 @@ import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { listAnswers } from "../src/capabilities/panel-answers.ts";
 import { moveQuestion, NO_PANELS, reduceAgent, type AskBlock, type Panels } from "../src/ui/desk/panels-model.ts";
-import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { revisionOf } from "./support/answer-revision.ts";
 import { withRequestId } from "./support/request-body.ts";
 
@@ -61,7 +61,7 @@ describe("the author of a question stays the agent that asked, after a reassignm
     expect(board.blocks.find((b: { id: string }) => b.id === "aa_q")).toMatchObject({ asked_by: "Alice", asked_by_key: "ag_alice", owner_key: "ag_alice2" });
     const answered = await person(app, { op: "human.answer", panel: "aa", ask: "aa_q", outcome: "answered", value: "a", ...(await revisionOf(app, "aa", "aa_q")) });
     expect(answered.status).toBe(200);
-    const rows = await listAnswers(app.application.runtime.runtime.store, app.application.caller.tenant, "aa");
+    const rows = await listAnswers(app.application.runtime.runtime.store, deskScopeFor(app), "aa");
     expect(rows.find((r) => r.ask === "aa_q")).toMatchObject({ asked_by: "Alice", asked_by_key: "ag_alice", owner_key: "ag_alice2" });
   });
 });

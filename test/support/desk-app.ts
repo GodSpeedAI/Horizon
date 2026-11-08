@@ -6,6 +6,7 @@ import type { RecordReader, EconomicsSource } from "../../src/adapters/realitytr
 import type { ApprovalAuthority } from "../../src/adapters/sea-forge-config.ts";
 import type { Access } from "../../src/adapters/workshop.ts";
 import { horizonDocument, writeConfig } from "./config.ts";
+import { deskScopeOf } from "../../src/capabilities/panel-records.ts";
 
 export interface DeskApp {
   readonly application: HorizonApplication;
@@ -73,3 +74,9 @@ export async function startDeskApp(options: { readonly repoPath?: string; readon
     state: async (query = "") => (await fetch(`${base}/desk/state.json?${query}`)).json(),
   };
 }
+
+/**
+ * The scope this desk keys its panel records by: the tenant and the operator (R4-1). Panel records, board order, answers, guards and
+ * receipts are read with this, never with the tenant alone.
+ */
+export const deskScopeFor = (app: { readonly application: HorizonApplication }): string => deskScopeOf(app.application.caller.tenant, app.application.caller.actor.id);

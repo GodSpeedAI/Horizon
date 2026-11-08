@@ -10,7 +10,7 @@ import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { BOARD_COLLECTION, PANEL_LOAD_WORDS } from "../src/capabilities/panel-records.ts";
 import { ANSWERED_CANNOT_CHANGE } from "../src/ui/desk/panels-model.ts";
-import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { withRequestId } from "./support/request-body.ts";
 
 const keys = { ag_alice: randomBytes(32).toString("hex"), ag_alice2: randomBytes(32).toString("hex") };
@@ -127,7 +127,7 @@ describe("a load that fails is shown as an error, never as an empty desk", () =>
     expect((await putQuestion(first, "dur5", "dur5_q")).status).toBe(200);
     // A board that lists a panel with no record: the load cannot build the board from the records.
     const store = first.application.runtime.runtime.store as unknown as { getRecord: (c: string, id: string) => Promise<{ version: number } | null>; commit: (i: unknown) => Promise<unknown> };
-    const tenant = first.application.caller.tenant;
+    const tenant = deskScopeFor(first);
     const current = await store.getRecord(BOARD_COLLECTION, `board:${tenant}`);
     await store.commit({ appends: [], records: [{ collection: BOARD_COLLECTION, id: `board:${tenant}`, expectedVersion: current?.version ?? 0, value: { tenant, visible: ["dur5", "ghost"] } }] });
     const second = await restart(first);

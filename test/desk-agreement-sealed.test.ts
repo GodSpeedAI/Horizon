@@ -6,7 +6,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { AGREED_COLLECTION, agreedFingerprint, listAnswers, PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
 import { MIGRATION_COLLECTION } from "../src/capabilities/desk-migrations.ts";
 import { revisionOf } from "./support/answer-revision.ts";
-import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { guardIdOf } from "../src/capabilities/panel-answers.ts";
 
 const apps: DeskApp[] = [];
 const open = async (root?: string) => {
@@ -23,7 +24,7 @@ const question = { id: "q1", question: "Which plan?", why_needed: "x", options: 
 /** Makes the marker read as "nothing has run", then restarts the desk on the same store so every migration runs again. */
 async function migrateAgain(app: DeskApp): Promise<DeskApp> {
   const store = app.application.runtime.runtime.store;
-  const tenant = app.application.caller.tenant;
+  const tenant = deskScopeFor(app);
   const current = await store.getRecord(MIGRATION_COLLECTION, `marker:${tenant}`);
   await store.commit({ appends: [], records: [{ collection: MIGRATION_COLLECTION, id: `marker:${tenant}`, expectedVersion: current?.version ?? 0, value: { tenant, version: 0, name: "forgotten", at: "2026-11-01T00:00:00.000Z" } }] });
   const root = app.root;
@@ -45,8 +46,8 @@ describe("an agreement with no answer record seals its question", () => {
     expect(put.status).toBe(200);
     const answered = await app.post("/desk/panels/op", { op: "human.answer", panel: "sealed_panel", ask: "q1", ...(await revisionOf(app, "sealed_panel", "q1")), outcome: "answered", value: "a" });
     expect(answered.status).toBe(409);
-    expect((await listAnswers(app.application.runtime.runtime.store, app.application.caller.tenant, "sealed_panel"))).toHaveLength(0);
+    expect((await listAnswers(app.application.runtime.runtime.store, deskScopeFor(app), "sealed_panel"))).toHaveLength(0);
     // The guard that seals it is in the store.
-    expect(await app.application.runtime.runtime.store.getRecord(PANEL_ANSWERS_COLLECTION, "question:sealed_panel:q1")).not.toBeNull();
+    expect(await app.application.runtime.runtime.store.getRecord(PANEL_ANSWERS_COLLECTION, guardIdOf(deskScopeFor(app), "sealed_panel", "q1"))).not.toBeNull();
   });
 });

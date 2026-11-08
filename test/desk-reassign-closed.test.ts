@@ -8,7 +8,8 @@ import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { PANELS_COLLECTION } from "../src/capabilities/panel-records.ts";
 import { revisionOf } from "./support/answer-revision.ts";
-import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { panelIdOf } from "../src/capabilities/panel-records.ts";
 
 const keys = { ag_alice: randomBytes(32).toString("hex"), ag_alice2: randomBytes(32).toString("hex") };
 const sha = (k: string) => createHash("sha256").update(k).digest("hex");
@@ -36,7 +37,7 @@ const agent = (app: DeskApp, key: string, body: unknown) =>
   fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": "Alice" }, body: JSON.stringify(({ request_id: rid(), ...(body as object) })) });
 const person = (app: DeskApp, body: unknown) => fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(({ request_id: rid(), ...(body as object) })) });
 const storedQuestion = async (app: DeskApp) => {
-  const row = await app.application.runtime.runtime.store.getRecord(PANELS_COLLECTION, "panel:open_panel");
+  const row = await app.application.runtime.runtime.store.getRecord(PANELS_COLLECTION, panelIdOf(deskScopeFor(app), "open_panel"));
   return (row?.value as { blocks: { kind: string; id: string; owner_key?: string | null }[] } | undefined)?.blocks.find((b) => b.kind === "question" && b.id === "q1");
 };
 

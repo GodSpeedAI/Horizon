@@ -9,7 +9,9 @@ import { PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
 import { PANELS_COLLECTION, questionStateOf } from "../src/capabilities/panel-records.ts";
 import { MIGRATION_COLLECTION } from "../src/capabilities/desk-migrations.ts";
 import { QUESTION_STATES } from "../src/capabilities/question-rules.ts";
-import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { panelIdOf } from "../src/capabilities/panel-records.ts";
+import { answerIdOf } from "../src/capabilities/panel-answers.ts";
 
 const apps: DeskApp[] = [];
 const open = async (root?: string) => {
@@ -28,7 +30,7 @@ afterAll(async () => {
 });
 
 const askOf = (id: string) => ({ id, question: "Which plan?", why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }] });
-const tenantOf = (app: DeskApp) => app.application.caller.tenant;
+const tenantOf = (app: DeskApp) => deskScopeFor(app);
 const storeOf = (app: DeskApp) => app.application.runtime.runtime.store;
 
 /** One panel per state, each with one question "q", set up through the agent door and the person's answers. */
@@ -72,21 +74,21 @@ describe("every question has one stored state, and it survives a restart", () =>
   test("an unanswered question stores waiting for you on its own panel record", async () => {
     const app = await open();
     await setUpEveryState(app);
-    const raw = (await storeOf(app).getRecord(PANELS_COLLECTION, "panel:st-waiting"))!.value as { blocks: { kind: string; id: string; state?: unknown }[] };
+    const raw = (await storeOf(app).getRecord(PANELS_COLLECTION, panelIdOf(tenantOf(app), "st-waiting")))!.value as { blocks: { kind: string; id: string; state?: unknown }[] };
     expect(raw.blocks.find((b) => b.kind === "question" && b.id === "q")?.state).toBe("waiting_for_you");
-    const withdrawn = (await storeOf(app).getRecord(PANELS_COLLECTION, "panel:st-withdrawn"))!.value as { blocks: { kind: string; id: string; state?: unknown }[] };
+    const withdrawn = (await storeOf(app).getRecord(PANELS_COLLECTION, panelIdOf(tenantOf(app), "st-withdrawn")))!.value as { blocks: { kind: string; id: string; state?: unknown }[] };
     expect(withdrawn.blocks.find((b) => b.kind === "question" && b.id === "q")?.state).toBe("withdrawn");
   });
 
   test("an answered question stores its state once, on its answer record, and not on its panel", async () => {
     const app = await open();
     await setUpEveryState(app);
-    const answer = (await storeOf(app).getRecord(PANEL_ANSWERS_COLLECTION, "answer:st-finished:1"))!.value as { state?: unknown; finished_by?: unknown; replied?: unknown; waiting_on?: unknown };
+    const answer = (await storeOf(app).getRecord(PANEL_ANSWERS_COLLECTION, answerIdOf(tenantOf(app), "st-finished", 1)))!.value as { state?: unknown; finished_by?: unknown; replied?: unknown; waiting_on?: unknown };
     expect(answer.state).toBe("finished");
     expect(answer.finished_by).toBe("reported");
     expect("replied" in answer).toBe(false);
     expect("waiting_on" in answer).toBe(false);
-    const panel = (await storeOf(app).getRecord(PANELS_COLLECTION, "panel:st-finished"))!.value as { blocks: { kind: string; id: string; state?: unknown; answered?: unknown }[] };
+    const panel = (await storeOf(app).getRecord(PANELS_COLLECTION, panelIdOf(tenantOf(app), "st-finished")))!.value as { blocks: { kind: string; id: string; state?: unknown; answered?: unknown }[] };
     const block = panel.blocks.find((b) => b.kind === "question" && b.id === "q")!;
     expect(block.state).toBeUndefined();
     expect(block.answered).toBeUndefined();
@@ -111,14 +113,14 @@ describe("every question has one stored state, and it survives a restart", () =>
     const store = storeOf(app);
     const tenant = tenantOf(app);
     // Strip the stored state from the unanswered question, as a record from before this step would look.
-    const row = (await store.getRecord(PANELS_COLLECTION, "panel:st-waiting"))!;
+    const row = (await store.getRecord(PANELS_COLLECTION, panelIdOf(tenant, "st-waiting")))!;
     const legacy = { ...(row.value as Record<string, unknown>), blocks: (row.value as { blocks: Record<string, unknown>[] }).blocks.map((b) => (b.kind === "question" ? { ...b, state: undefined } : b)) };
-    await store.commit({ appends: [], records: [{ collection: PANELS_COLLECTION, id: "panel:st-waiting", expectedVersion: row.version, value: JSON.parse(JSON.stringify(legacy)) }] });
+    await store.commit({ appends: [], records: [{ collection: PANELS_COLLECTION, id: panelIdOf(tenant, "st-waiting"), expectedVersion: row.version, value: JSON.parse(JSON.stringify(legacy)) }] });
     const marker = await store.getRecord(MIGRATION_COLLECTION, `marker:${tenant}`);
     await store.commit({ appends: [], records: [{ collection: MIGRATION_COLLECTION, id: `marker:${tenant}`, expectedVersion: marker?.version ?? 0, value: { tenant, version: 0, name: "forgotten", at: "2026-11-01T00:00:00.000Z" } }] });
     const again = await restart(app);
     expect(await questionStateOf(storeOf(again), tenantOf(again), "st-waiting", "q")).toBe("waiting_for_you");
-    const raw = (await storeOf(again).getRecord(PANELS_COLLECTION, "panel:st-waiting"))!.value as { blocks: { kind: string; state?: unknown }[] };
+    const raw = (await storeOf(again).getRecord(PANELS_COLLECTION, panelIdOf(tenantOf(again), "st-waiting")))!.value as { blocks: { kind: string; state?: unknown }[] };
     expect(raw.blocks.find((b) => b.kind === "question")?.state).toBe("waiting_for_you");
   });
 

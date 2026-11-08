@@ -11,7 +11,7 @@ import { listAnswers } from "../src/capabilities/panel-answers.ts";
 import { SAME_ID_OTHER_WORDS } from "../src/capabilities/question-rules.ts";
 import { questionVersion } from "../src/ui/surface2/panel-blocks.ts";
 import { NO_PANELS, QUESTION_CHANGED, reduceAgent, reduceHuman, type AskBlock, type Panels } from "../src/ui/desk/panels-model.ts";
-import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { withRequestId } from "./support/request-body.ts";
 
 const options = [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }];
@@ -90,7 +90,7 @@ describe("the step recorded for an answer is the question's target", () => {
       const shown = board.blocks.find((b: { id: string }) => b.id === "q");
       const answered = await app.post("/desk/panels/op", { op: "human.answer", panel: "tg", ask: "q", version: shown.version, owner_rev: shown.owner_rev ?? 0, outcome: "answered", value: "a" });
       expect(answered.status).toBe(200);
-      const rows = await listAnswers(app.application.runtime.runtime.store, app.application.caller.tenant);
+      const rows = await listAnswers(app.application.runtime.runtime.store, deskScopeFor(app));
       expect(rows.find((r) => r.panel_id === "tg" && r.ask === "q")?.step).toBe("s_old");
     } finally {
       await app.stop();

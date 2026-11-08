@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { Json } from "@godspeedai/cognate-events";
 import { AGREED_COLLECTION, agreedFingerprint, recordAnswer } from "../src/capabilities/panel-answers.ts";
-import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { withRequestId } from "./support/request-body.ts";
+import { agreedId } from "../src/capabilities/panel-answers.ts";
+import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
 /**
  * An answer written before the upgrade has no fingerprint on its record. Its protection comes from the older agreed-answers store,
@@ -30,13 +31,13 @@ describe("an answer written before the upgrade keeps its protection through the 
     const app = await startDeskApp();
     apps.push(app);
     const store = app.application.runtime.runtime.store;
-    const { tenant } = app.application.caller;
+    const tenant = deskScopeFor(app);
     const now = new Date("2026-11-06T10:00:00.000Z");
     // The pre-upgrade answer: no fingerprint, no owner.
     await recordAnswer(store, { tenant, panel_id: "p", ask: "q", outcome: "answered", value: "a", step: "step_one", now });
     // The pre-upgrade agreement, with the old hash (panel id included), as the old desk wrote it.
     const old = agreedFingerprint("p", { id: "q", question: "Which plan?", options: [{ option_id: "a", label: "Plan A", consequence: null }, { option_id: "b", label: "Plan B", consequence: null }], input: "select", resolves: "step_one" });
-    await store.commit({ appends: [], records: [{ collection: AGREED_COLLECTION, id: "agreed:p:q", expectedVersion: 0, value: { tenant, panel_id: "p", ask: "q", fingerprint: old, at: now.toISOString() } as unknown as { readonly [key: string]: Json } }] });
+    await store.commit({ appends: [], records: [{ collection: AGREED_COLLECTION, id: agreedId(tenant, "p", "q"), expectedVersion: 0, value: { tenant, panel_id: "p", ask: "q", fingerprint: old, at: now.toISOString() } as unknown as { readonly [key: string]: Json } }] });
 
     const changed = await agent(app, { tool: "ask_human", panel: "p", ask: question("Which plan now, and at what cost?") });
     expect(changed.status).toBe(400);

@@ -39,7 +39,7 @@ describe("no path writes answer records outside the desk queue", () => {
       expect(/\bmigrate(AnswerStates|PreUpgradeAnswers)\(/.test(text)).toBe(false);
     }
     expect(sources.get("capabilities/desk-migrations.ts")).toContain("await queue(");
-    expect(app).toMatch(/runDeskMigrations\(runtime\.runtime\.store, caller\.tenant, clock\(\), panelCommand, /);
+    expect(app).toMatch(/runDeskMigrations\(runtime\.runtime\.store, deskScopeOf\(caller\.tenant, caller\.actor\.id\), clock\(\), panelCommand, /);
   });
 
   test("rememberAgreed, the unqueued agreement writer, is gone from production code", () => {

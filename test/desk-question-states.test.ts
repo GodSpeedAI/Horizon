@@ -15,8 +15,11 @@ import { runDeskMigrations } from "../src/capabilities/desk-migrations.ts";
 import { compatOf, finishedByOf, legalTransition, SAME_ID_OTHER_WORDS, statusOfLegacy } from "../src/capabilities/question-rules.ts";
 import { CONVERSATION_COLLECTION } from "../src/capabilities/conversation.ts";
 import { questionFingerprint } from "../src/capabilities/question-rules.ts";
-import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { withRequestId } from "./support/request-body.ts";
+import { answerIdOf } from "../src/capabilities/panel-answers.ts";
+import { guardIdOf } from "../src/capabilities/panel-answers.ts";
+import { deskScopeOf } from "../src/capabilities/panel-records.ts";
 
 const SAME_ID = "That question id was already used for different wording. Use a new question id.";
 const keys = { ag_alice: randomBytes(32).toString("hex"), ag_alice2: randomBytes(32).toString("hex") };
@@ -149,7 +152,7 @@ describe("each state is stored once and the rest is derived", () => {
     expect(blockOf(state, "st_gone", "x").withdrawn?.reason).toBe("no longer needed");
     expect(blockOf(state, "st_gone", "x").answered).toBeNull();
 
-    const stored = (panel: string, ask: string) => app.application.runtime.runtime.store.listRecords(PANEL_ANSWERS_COLLECTION, { tenant: app.application.caller.tenant }).then((rows) => rows.find((r) => r.id === `answer:${panel}:1`)?.value as any);
+    const stored = (panel: string, ask: string) => app.application.runtime.runtime.store.listRecords(PANEL_ANSWERS_COLLECTION, { tenant: deskScopeFor(app) }).then((rows) => rows.find((r) => r.id === answerIdOf(deskScopeFor(app), panel, 1))?.value as any);
     expect(await stored("st_put", "p")).toMatchObject({ state: "put_off", finished_by: null });
     expect(await stored("st_agent", "a")).toMatchObject({ state: "waiting_for_agent", finished_by: null });
     expect(await stored("st_done", "d")).toMatchObject({ state: "finished", finished_by: "reported" });
@@ -293,6 +296,7 @@ describe("after each transition a restart loads the same state", () => {
 
 describe("states of answers written before this step", () => {
   const tenant = "t";
+  const scope = deskScopeOf(tenant, "actor:operator");
   const legacy = (n: number, panel: string, value: Record<string, unknown>) => ({ collection: PANEL_ANSWERS_COLLECTION, id: `answer:${panel}:${n}`, expectedVersion: 0, value: { tenant, panel_id: panel, n, ask: "q", value: null, note: null, at: "2026-11-07T10:00:00.000Z", step: "s", ...value } });
 
   test("a legacy record is read once: its state is derived, and the derived copies are dropped", async () => {
@@ -335,8 +339,8 @@ describe("states of answers written before this step", () => {
       legacy(2, "d", { outcome: "deferred", state: "waiting_for_agent", finished_by: null, history: [], routed_as: null }),
       legacy(3, "d", { outcome: "answered", replied: false, waiting_on: "agent", routed_as: null }),
     ] as never });
-    expect(await runDeskMigrations(store, tenant, new Date(), async (c) => c())).toEqual([1, 2, 3, 4, 5, 6]);
-    const rows = await listAnswers(store, tenant, "d");
+    expect(await runDeskMigrations(store, scope, new Date(), async (c) => c(), undefined, undefined, "actor:operator")).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    const rows = await listAnswers(store, scope, "d");
     expect(rows.map((r) => [r.n, r.state, r.outcome, r.replied, r.waiting_on])).toEqual([
       [1, "put_off", null, true, "none"],
       [2, "put_off", null, true, "none"],
@@ -347,7 +351,7 @@ describe("states of answers written before this step", () => {
     expect(acceptanceBlocked(rows.slice(0, 2), "s")).toBe(false);
     expect(acceptanceBlocked(rows, "s")).toBe(true);
     // Append-only: a second run finds nothing to repair.
-    expect(await runDeskMigrations(store, tenant, new Date(), async (c) => c())).toEqual([]);
+    expect(await runDeskMigrations(store, scope, new Date(), async (c) => c())).toEqual([]);
   });
 });
 
@@ -400,7 +404,7 @@ describe("a person's change queued before logout does not run after it", () => {
     expect(((await refused.json()) as { outcome: string }).outcome).toBe("not_paired");
     await blocking;
     queue.restore();
-    const answers = await listAnswers(app.application.runtime.runtime.store, app.application.caller.tenant, "logout_p");
+    const answers = await listAnswers(app.application.runtime.runtime.store, deskScopeFor(app), "logout_p");
     expect(answers.filter((a) => a.ask === "q" && a.outcome !== null)).toEqual([]);
   });
 });
@@ -412,17 +416,17 @@ describe("a legacy answered question stays sealed after a restart", () => {
     const store = first.application.runtime.runtime.store;
     // An answer written before fingerprints and guards: its wording is unknown, and no panel shows it.
     await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: "answer:sealed_legacy:1", expectedVersion: 0, value: { tenant, panel_id: "sealed_legacy", n: 1, ask: "q", outcome: "answered", value: "a", note: null, at: "2026-11-02T10:00:00.000Z", version: null, routed_as: null, step: null, asked_by: null, asked_by_key: null, owner_key: null, fingerprint: null, history: [], replied: true, waiting_on: "none" } }] });
-    const current = await store.getRecord("horizon-desk-migrations", `marker:${tenant}`);
-    await store.commit({ appends: [], records: [{ collection: "horizon-desk-migrations", id: `marker:${tenant}`, expectedVersion: current?.version ?? 0, value: { tenant, version: 0, name: "forgotten", at: "2026-11-01T00:00:00.000Z" } }] });
+    const current = await store.getRecord("horizon-desk-migrations", `marker:${deskScopeFor(first)}`);
+    await store.commit({ appends: [], records: [{ collection: "horizon-desk-migrations", id: `marker:${deskScopeFor(first)}`, expectedVersion: current?.version ?? 0, value: { tenant: deskScopeFor(first), version: 0, name: "forgotten", at: "2026-11-01T00:00:00.000Z" } }] });
     const second = await restart(first);
     const again = second.application.runtime.runtime.store;
     const changed = await putAs(second, "sealed_legacy", question("q", "Invented wording?"));
     expect(changed.status).not.toBe(200);
     expect(blockOf(await second.state(), "sealed_legacy", "q")).toBeUndefined();
     expect((await answer(second, "sealed_legacy", "q")).status).not.toBe(200);
-    const rows = await listAnswers(again, tenant, "sealed_legacy");
+    const rows = await listAnswers(again, deskScopeFor(second), "sealed_legacy");
     expect(rows.map((r) => [r.n, r.state])).toEqual([[1, "finished"]]);
-    expect((await again.getRecord(PANEL_ANSWERS_COLLECTION, "question:sealed_legacy:q"))?.value).toMatchObject({ outcome: "answered", n: 1 });
+    expect((await again.getRecord(PANEL_ANSWERS_COLLECTION, guardIdOf(deskScopeFor(second), "sealed_legacy", "q")))?.value).toMatchObject({ outcome: "answered", n: 1 });
     await expect(recordAnswer(again, { tenant, panel_id: "sealed_legacy", ask: "q", outcome: "answered", value: "b", now: new Date() })).rejects.toBeInstanceOf(QuestionAlreadyAnswered);
   });
 
@@ -439,17 +443,17 @@ describe("a legacy answered question stays sealed after a restart", () => {
 describe("two waiting answers to one question share one conversation row (R3-7)", () => {
   test("stop waiting returns 200, finishes both answers, and writes the row once", async () => {
     const app = await open();
-    const tenant = app.application.caller.tenant;
+    const tenant = deskScopeFor(app);
     const store = app.application.runtime.runtime.store;
     await putAs(app, "dup_wait", question("q"), keys.ag_alice, "dup_step");
     expect((await answer(app, "dup_wait", "q")).status).toBe(200);
     // A second waiting answer to the same question, as an older build stored it (no state, the derived fields only).
-    await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: "answer:dup_wait:2", expectedVersion: 0, value: { tenant, panel_id: "dup_wait", n: 2, ask: "q", outcome: "answered", value: "a", note: null, at: "2026-11-07T11:00:00.000Z", version: null, routed_as: null, step: "dup_step", asked_by: null, asked_by_key: null, owner_key: null, fingerprint: null, history: [], replied: false, waiting_on: "agent" } }] });
+    await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: answerIdOf(tenant, "dup_wait", 2), expectedVersion: 0, value: { tenant, panel_id: "dup_wait", n: 2, ask: "q", outcome: "answered", value: "a", note: null, at: "2026-11-07T11:00:00.000Z", version: null, routed_as: null, step: "dup_step", asked_by: null, asked_by_key: null, owner_key: null, fingerprint: null, history: [], replied: false, waiting_on: "agent" } }] });
     const { result, commits } = await withCommits(app, () => person(app, { op: "human.stop_waiting", step: "dup_step" }));
     expect(result.status).toBe(200);
     expect(commits).toHaveLength(1);
     expect(commits[0]!.filter((c) => c === CONVERSATION_COLLECTION)).toHaveLength(1);
-    const rows = await listAnswers(store, tenant, "dup_wait");
+    const rows = await listAnswers(store, deskScopeFor(app), "dup_wait");
     expect(rows.map((r) => [r.n, r.state, r.finished_by])).toEqual([[1, "finished", "stopped"], [2, "finished", "stopped"]]);
     expect((await rowsOf(app)).filter((r) => r.outcome === STOPPED_ROW)).toHaveLength(1);
   });
@@ -458,12 +462,12 @@ describe("two waiting answers to one question share one conversation row (R3-7)"
 describe("a question keeps the step its stored answers bear on (R3-5)", () => {
   test("republishing identical wording under another step is refused; the same step is allowed; an unknown step is left unknown", async () => {
     const first = await open();
-    const tenant = first.application.caller.tenant;
+    const tenant = deskScopeFor(first);
     const store = first.application.runtime.runtime.store;
     // A fingerprinted legacy answer for old_step, waiting for the agent, with no durable panel on the desk.
     const words = question("q");
     const fingerprint = questionFingerprint({ question: words.question, options: words.options });
-    const legacyWait = (panel: string, step: string | null) => ({ collection: PANEL_ANSWERS_COLLECTION, id: `answer:${panel}:1`, expectedVersion: 0, value: { tenant, panel_id: panel, n: 1, ask: "q", outcome: "answered", value: "a", note: null, at: "2026-11-07T10:00:00.000Z", version: null, routed_as: null, step, asked_by: "Alice", asked_by_key: "ag_alice", owner_key: "ag_alice", fingerprint, history: [], replied: false, waiting_on: "agent" } });
+    const legacyWait = (panel: string, step: string | null) => ({ collection: PANEL_ANSWERS_COLLECTION, id: answerIdOf(tenant, panel, 1), expectedVersion: 0, value: { tenant, panel_id: panel, n: 1, ask: "q", outcome: "answered", value: "a", note: null, at: "2026-11-07T10:00:00.000Z", version: null, routed_as: null, step, asked_by: "Alice", asked_by_key: "ag_alice", owner_key: "ag_alice", fingerprint, history: [], replied: false, waiting_on: "agent" } });
     await store.commit({ appends: [], records: [legacyWait("rt_panel", "old_step")] as never });
     const second = await restart(first);
     const again = second.application.runtime.runtime.store;
@@ -473,10 +477,10 @@ describe("a question keeps the step its stored answers bear on (R3-5)", () => {
     expect(blockOf(await second.state(), "rt_panel", "q")).toBeUndefined();
     // The identical step is not a change: the question is put up, and its wait still concerns old_step.
     expect((await putAs(second, "rt_panel", words, keys.ag_alice, "old_step")).status).toBe(200);
-    expect((await listAnswers(again, tenant, "rt_panel")).map((r) => [r.step, r.waiting_on])).toEqual([["old_step", "agent"]]);
+    expect((await listAnswers(again, deskScopeFor(second), "rt_panel")).map((r) => [r.step, r.waiting_on])).toEqual([["old_step", "agent"]]);
     // An unknown legacy step is preserved as unknown: a put under a step does not adopt it.
     await again.commit({ appends: [], records: [legacyWait("rt_unknown", null)] as never });
     expect((await putAs(second, "rt_unknown", words, keys.ag_alice, "new_step")).status).toBe(200);
-    expect((await listAnswers(again, tenant, "rt_unknown")).map((r) => [r.step, r.waiting_on])).toEqual([[null, "agent"]]);
+    expect((await listAnswers(again, deskScopeFor(second), "rt_unknown")).map((r) => [r.step, r.waiting_on])).toEqual([[null, "agent"]]);
   });
 });

@@ -6,7 +6,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { CONFLICT_WORDS, conflictLogLines, conflictViews } from "../src/ui/desk/conflict-model.ts";
 import { PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
 import { MIGRATION_COLLECTION } from "../src/capabilities/desk-migrations.ts";
-import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
 const SECRET = "SECRET-ANSWER-WORDS-91";
 
@@ -43,10 +43,11 @@ async function restartWithConflict(): Promise<{ app: DeskApp; errors: string[] }
   const first = await startDeskApp();
   apps.push(first);
   const tenant = first.application.caller.tenant;
+  const scope = deskScopeFor(first);
   const store = first.application.runtime.runtime.store;
   await store.commit({ appends: [], records: [legacy(tenant, "p1", 1, "ag_a", SECRET), legacy(tenant, "p1", 2, "ag_b", "other words")] });
-  const marker = await store.getRecord(MIGRATION_COLLECTION, `marker:${tenant}`);
-  await store.commit({ appends: [], records: [{ collection: MIGRATION_COLLECTION, id: `marker:${tenant}`, expectedVersion: marker?.version ?? 0, value: { tenant, version: 0, name: "forgotten", at: "2026-11-01T00:00:00.000Z" } }] });
+  const marker = await store.getRecord(MIGRATION_COLLECTION, `marker:${scope}`);
+  await store.commit({ appends: [], records: [{ collection: MIGRATION_COLLECTION, id: `marker:${scope}`, expectedVersion: marker?.version ?? 0, value: { tenant: scope, version: 0, name: "forgotten", at: "2026-11-01T00:00:00.000Z" } }] });
   const root = first.root;
   await first.stop();
   apps.splice(apps.indexOf(first), 1);

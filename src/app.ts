@@ -96,7 +96,7 @@ import { checkReassign } from "./capabilities/question-rules.ts";
 import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, listConflicts, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
 import { ANSWER_NEEDS_REVISION, ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, checkAgentOp, moveQuestion, openPanelId, reduceAgent, reduceHuman, type AgentOp, type AskBlock, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
-import { boardWrites, loadBoard, movedStoredQuestion, PANEL_LOAD_WORDS, PANEL_UNREADABLE_WORDS, readsBack, stateWrites, withStored, type CommitRecord } from "./capabilities/panel-records.ts";
+import { boardWrites, deskScopeOf, loadBoard, movedStoredQuestion, PANEL_LOAD_WORDS, PANEL_UNREADABLE_WORDS, readsBack, stateWrites, withStored, type CommitRecord } from "./capabilities/panel-records.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { readableTitle } from "./ui/desk/banned-words.ts";
 import { agentRowsOf, agentSearchOf, agentStateOf, WITHHELD_WORDS } from "./ui/desk/agent-view.ts";
@@ -491,7 +491,7 @@ export async function createApplication(
     throw error;
   });
   // A read-only open never migrates: until the desk has run every migration, its records cannot be surfaced read-only.
-  if (options.readOnly && (await appliedVersion(runtime.runtime.store, caller.tenant)) < Math.max(...DESK_MIGRATIONS.map((migration) => migration.version))) {
+  if (options.readOnly && (await appliedVersion(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))) < Math.max(...DESK_MIGRATIONS.map((migration) => migration.version))) {
     await runtime.runtime.close();
     await deskStore.close();
     throw new Error("horizon: the desk's records are not migrated yet, so the store cannot be surfaced read-only. Start the desk once to finish the migration, then surface again.");
@@ -504,6 +504,8 @@ export async function createApplication(
   const identity = createIdentityService(identityStoreOf(runtime.runtime.store));
   const identityTenant = identityTenantOf(caller.tenant);
   const operatorsConfig = resolveOperatorsConfig(options.operators ?? loaded.config.operators);
+  // The operator the configuration names (before any HORIZON_OPERATOR_REF override): the only operator legacy panel records can be proven to belong to (migration 7).
+  const soleOperator = loaded.operator.configuredRef;
   if (!options.readOnly) for (const operatorId of Object.keys(operatorsConfig.actors)) await identity.registerOperator({ tenant: identityTenant, operatorId, label: "configured operator" });
   operatorActors = await validateOperatorActors(operatorsConfig, { identity, tenant: identityTenant, serviceActorId: serviceActor.actor_id });
   const mappedActors: OperatorActors = operatorActors;
@@ -1644,7 +1646,7 @@ export async function createApplication(
       if (step !== null) stepOf.set(card.id, step);
     }
     // Accepting a step is blocked while an answer the operator gave an agent about it has had no reply.
-    const answers = (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => waitsForAgent(a) && a.step !== null);
+    const answers = (await listAnswers(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))).filter((a) => waitsForAgent(a) && a.step !== null);
     if (answers.length === 0) return { ...built, stepOf };
     return {
       ...built,
@@ -1738,7 +1740,7 @@ export async function createApplication(
       if (paused !== null) return { card: undefined, response: Response.json({ ok: false, outcome: "unavailable", message: paused }, { status: 503, headers: { "cache-control": "no-store" } }) };
       if (looked !== null && lookedCard !== undefined) {
         const step = looked.stepOf.get(cardId) ?? null;
-        const answers = await listAnswers(runtime.runtime.store, caller.tenant);
+        const answers = await listAnswers(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
         // A wait that exists now is refused with its own words, as the rule above does.
         if (step !== null && acceptanceBlocked(answers, step)) return { card: lookedCard, response: Response.json({ ok: false, outcome: "blocked", message: WAITING_WORDS }, { status: 409, headers: { "cache-control": "no-store" } }) };
         // A wait the lookup saw has gone since: the card the person looked at is no longer the one that would be decided.
@@ -1959,7 +1961,7 @@ export async function createApplication(
   let storedPanels: ReadonlyMap<string, Panel> = new Map();
   let boardRefused: string | null = null;
   try {
-    const view = await loadBoard(runtime.runtime.store, caller.tenant);
+    const view = await loadBoard(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
     panelBoard = view.board;
     storedPanels = view.stored;
   } catch (error) {
@@ -1969,7 +1971,7 @@ export async function createApplication(
   /** Rebuilds the board from the records the store now holds. A record that cannot be read refuses panel changes from here on. */
   async function rebuildBoard(): Promise<void> {
     try {
-      const view = await loadBoard(runtime.runtime.store, caller.tenant);
+      const view = await loadBoard(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
       panelBoard = view.board;
       storedPanels = view.stored;
     } catch {
@@ -1982,7 +1984,7 @@ export async function createApplication(
    */
   async function commitBoard(before: PanelsBoard, after: PanelsBoard, alongside: readonly CommitRecord[] = []): Promise<void> {
     const store = runtime.runtime.store;
-    const records = [...(await boardWrites(store, caller.tenant, before, after)), ...(await stateWrites(store, caller.tenant, after)), ...alongside];
+    const records = [...(await boardWrites(store, deskScopeOf(caller.tenant, caller.actor.id), before, after)), ...(await stateWrites(store, deskScopeOf(caller.tenant, caller.actor.id), after)), ...alongside];
     if (records.length > 0) await store.commit({ appends: [], records });
     await rebuildBoard();
   }
@@ -1991,13 +1993,13 @@ export async function createApplication(
   // Design v3, step 4 (item 4): the records are migrated under a versioned marker. Until that run finishes, every change is refused with
   // words saying so (503); a run that fails pauses changes for good until the desk restarts with the store fixed.
   let migrationState: "running" | "done" | "failed" = options.readOnly ? "done" : "running";
-  const answersMigrated: Promise<void> = options.readOnly ? Promise.resolve() : runDeskMigrations(runtime.runtime.store, caller.tenant, clock(), panelCommand, DESK_MIGRATIONS, options.migrationHold).then(
+  const answersMigrated: Promise<void> = options.readOnly ? Promise.resolve() : runDeskMigrations(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id), clock(), panelCommand, DESK_MIGRATIONS, options.migrationHold, soleOperator).then(
     async () => {
       migrationState = "done";
       // One line per conflicted question, with ids only: the answers' words are never logged (R2-10).
       if (!options.readOnly) {
         try {
-          for (const line of conflictLogLines((await listConflicts(runtime.runtime.store, caller.tenant)).map((c) => ({ panel: c.panel_id, ask: c.ask })))) console.error(line);
+          for (const line of conflictLogLines((await listConflicts(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))).map((c) => ({ panel: c.panel_id, ask: c.ask })))) console.error(line);
         } catch (error) {
           console.error("desk: the conflicted answers could not be listed", error instanceof Error ? error.name : "unknown");
         }
@@ -2103,7 +2105,7 @@ export async function createApplication(
     if (requestId !== undefined && !validRequestId(requestId)) return { ok: false, code: "SCHEMA", message: BAD_REQUEST_ID_WORDS };
     if (typeof requestId !== "string") return applyAgentOpNow(op, agentName, keyId, null, lookup);
     const fingerprint = requestFingerprint(op as unknown as { readonly [key: string]: unknown });
-    const seen = await seenRequest(runtime.runtime.store, caller.tenant, requestId, fingerprint);
+    const seen = await seenRequest(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id), requestId, fingerprint);
     if (seen.kind === "reused") return { ok: false, code: "REUSED", message: REUSED_REQUEST_WORDS };
     if (seen.kind === "replay") return seen.response as unknown as AgentReply;
     return applyAgentOpNow(op, agentName, keyId, { requestId, fingerprint }, lookup);
@@ -2113,11 +2115,11 @@ export async function createApplication(
   async function applyAgentOpNow(op: AgentOp, agentName: string | undefined, keyId: string, dedupe: { readonly requestId: string; readonly fingerprint: string } | null, lookup: RouteLookup | null = null): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
     await answersMigrated;
     // The request's record, kept with the change it made: a retry with the same id returns this response and writes nothing.
-    const agentKeep = (response: { readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] }): CommitRecord[] => (dedupe === null ? [] : [requestRecord(caller.tenant, dedupe.requestId, dedupe.fingerprint, JSON.parse(JSON.stringify(response)) as Json)]);
+    const agentKeep = (response: { readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] }): CommitRecord[] => (dedupe === null ? [] : [requestRecord(deskScopeOf(caller.tenant, caller.actor.id), dedupe.requestId, dedupe.fingerprint, JSON.parse(JSON.stringify(response)) as Json)]);
     const who = agentName ?? UNNAMED_AGENT;
     // An agent reads only the answers to the questions it asked itself.
     // Ownership is the key id that put the question up, never the display name: a name is a label any caller can send.
-    if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.owner_key === keyId) };
+    if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))).filter((a) => !a.replied && a.owner_key === keyId) };
     // Shared with the person's writes: no panel changes while the records are migrating or after a failed migration, whoever calls.
     const paused = migrationBlock();
     if (paused !== null) return { ok: false, code: "UNAVAILABLE", message: paused };
@@ -2126,7 +2128,7 @@ export async function createApplication(
       // A question still on the board is checked by the rule inside the board's withdraw (reduceAgent). One that is only on record
       // (its panel is closed) is checked here, with the same rule, before the board says it is not open.
       const onBoard = panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.some((b) => b.kind === "question" && b.id === op.ask_id) ?? false;
-      const record = onBoard ? undefined : (await listAnswers(runtime.runtime.store, caller.tenant, op.panel_id)).find((a) => a.ask === op.ask_id);
+      const record = onBoard ? undefined : (await listAnswers(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id), op.panel_id)).find((a) => a.ask === op.ask_id);
       if (record !== undefined) {
         const verdict = checkWithdraw({ state: answerState(record), callerKey: keyId, resolvesRequiredStep: false });
         if (!verdict.ok) return { ok: false, code: "SCHEMA", message: verdict.message };
@@ -2138,7 +2140,7 @@ export async function createApplication(
     if (movedStep !== null) return { ok: false, code: "SCHEMA", message: movedStep };
     // Only the agent saying where an answer went closes it; nothing else counts as a reply. The owner, the words and the waiting
     // state are checked by the rule inside planRoute, for this key. Nothing is written until the commit below.
-    const routePlan = op.tool === "answer.route" ? await planRoute(runtime.runtime.store, caller.tenant, op.panel_id, op.ask_id, op.routed_as, keyId) : null;
+    const routePlan = op.tool === "answer.route" ? await planRoute(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id), op.panel_id, op.ask_id, op.routed_as, keyId) : null;
     if (routePlan !== null && !routePlan.ok) return { ok: false, code: "SCHEMA", message: routePlan.message };
     const question = op.tool === "answer.route" || op.tool === "ask.withdraw" ? askOf(op.panel_id, op.ask_id)?.question ?? null : null;
     // What the question settles, as the board has it now: the only step a route claim may be checked against.
@@ -2152,7 +2154,7 @@ export async function createApplication(
     // A panel this change would leave unreadable is refused here, so nothing is stored that the load would refuse (and then every change).
     if (result.panel !== null && (op.tool === "show_surface" || op.tool === "ask_human" || op.tool === "annotate" || op.tool === "ask.withdraw")) {
       const changed = state.open.find((p) => p.id === result.panel);
-      if (changed !== undefined && !(await readsBack(store, caller.tenant, changed))) return { ok: false, code: "SCHEMA", message: PANEL_UNREADABLE_WORDS };
+      if (changed !== undefined && !(await readsBack(store, deskScopeOf(caller.tenant, caller.actor.id), changed))) return { ok: false, code: "SCHEMA", message: PANEL_UNREADABLE_WORDS };
     }
     if (op.tool === "answer.route" && routePlan !== null && routePlan.ok) {
       // The agent's words are kept as its claim. A step the case keeper holds is shown as found, but it is not delivery: the row stays
@@ -2322,7 +2324,7 @@ export async function createApplication(
       }
     }
     for (const { panel, ask, step } of incoming) {
-      for (const a of (await listAnswers(store, caller.tenant, panel)).filter((x) => x.ask === ask)) {
+      for (const a of (await listAnswers(store, deskScopeOf(caller.tenant, caller.actor.id), panel)).filter((x) => x.ask === ask)) {
         if (step === undefined || typeof a.step !== "string" || a.step === step) continue;
         return `That question was answered for the step "${a.step}", so it cannot be put up for ${step === null ? "no step" : `the step "${step}"`}. Use a new question id. Nothing was changed.`;
       }
@@ -2347,12 +2349,12 @@ export async function createApplication(
     for (const { panel, question } of incoming) {
       // A question an answer or cancel sealed keeps its first wording. Its own fingerprint decides when it has one. Without one (written
       // before fingerprints) the wording is unknown, so only the agreement store, read here, can say the new words are the same.
-      const sealed = (await listAnswers(store, caller.tenant, panel)).filter((a) => a.ask === question.id && (a.outcome === "answered" || a.outcome === "cancelled"));
+      const sealed = (await listAnswers(store, deskScopeOf(caller.tenant, caller.actor.id), panel)).filter((a) => a.ask === question.id && (a.outcome === "answered" || a.outcome === "cancelled"));
       if (sealed.some((a) => a.fingerprint != null)) {
         if (sealed.some((a) => a.fingerprint != null && a.fingerprint !== questionFingerprint(question))) return true;
         continue;
       }
-      const agreed = await agreedFingerprintOf(store, panel, question.id);
+      const agreed = await agreedFingerprintOf(store, deskScopeOf(caller.tenant, caller.actor.id), panel, question.id);
       if (agreed !== null && agreed !== agreedFingerprint(panel, question)) return true;
       // A sealed question whose wording is unknown is refused unless the agreement store says the words are the same.
       if (sealed.length > 0 && agreed !== agreedFingerprint(panel, question)) return true;
@@ -2397,15 +2399,15 @@ export async function createApplication(
     if (typeof requestId !== "string") return fail(400, REQUEST_ID_REQUIRED_WORDS);
     const fingerprint = requestFingerprint(body);
     if (typeof requestId === "string") {
-      const seen = await seenRequest(store, caller.tenant, requestId, fingerprint);
+      const seen = await seenRequest(store, deskScopeOf(caller.tenant, caller.actor.id), requestId, fingerprint);
       if (seen.kind === "reused") return fail(409, REUSED_REQUEST_WORDS);
       if (seen.kind === "replay") return Response.json(seen.response, { headers });
     }
-    const requestKeep = (response: { readonly ok: true; readonly message: string }): CommitRecord[] => (typeof requestId === "string" ? [requestRecord(caller.tenant, requestId, fingerprint, response)] : []);
+    const requestKeep = (response: { readonly ok: true; readonly message: string }): CommitRecord[] => (typeof requestId === "string" ? [requestRecord(deskScopeOf(caller.tenant, caller.actor.id), requestId, fingerprint, response)] : []);
     if (body.op === "human.stop_waiting") {
       if (typeof body.step !== "string" || body.step === "") return fail(400, "Say which step to stop waiting for.");
       // The answers' stop, their conversation rows and the request's record are one commit: all are there or none is.
-      const plan = await planStopWaiting(store, caller.tenant, body.step, deskWho, clock());
+      const plan = await planStopWaiting(store, deskScopeOf(caller.tenant, caller.actor.id), body.step, deskWho, clock());
       const response = plan.count === 0 ? { ok: true as const, message: "Nothing was waiting." } : { ok: true as const, message: "Stopped waiting. The step can be accepted now." };
       const records = [...plan.records, ...requestKeep(response)];
       if (records.length > 0) {
@@ -2436,7 +2438,7 @@ export async function createApplication(
       // A closed panel is still a durable panel: its own record holds the question, so its owner moves with the answers (R2-4).
       const hiddenPanel = !panelBoard.open.some((p) => p.id === body.panel);
       const openQuestion = (panelBoard.open.find((p) => p.id === body.panel) ?? storedPanels.get(body.panel))?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { readonly question?: string; readonly answered?: unknown; readonly withdrawn?: unknown; readonly asked_by_key?: string | null; readonly owner_key?: string | null } | undefined;
-      const waitingAnswers = (await listAnswers(store, caller.tenant, body.panel)).filter((a) => a.ask === body.ask && waitsForAgent(a));
+      const waitingAnswers = (await listAnswers(store, deskScopeOf(caller.tenant, caller.actor.id), body.panel)).filter((a) => a.ask === body.ask && waitsForAgent(a));
       if (openQuestion !== undefined && openQuestion.answered == null && openQuestion.withdrawn == null && waitingAnswers.length === 0) {
         const toName = toEntry?.name ?? "";
         const ownerNow = openQuestion.owner_key ?? openQuestion.asked_by_key ?? null;
@@ -2446,7 +2448,7 @@ export async function createApplication(
         const when = clock().toISOString();
         const moveRow = newRowRecord(deskWho, { source: "you", kind: "note", words: `Moved the question "${openQuestion.question ?? "the agent's question"}" from ${fromName} to ${toName}.`, outcome: `${toName} now answers for it, since ${when}. Nothing has been answered yet.`, status: "done", refs: { panel_id: body.panel, ask_id: body.ask } }, clock());
         const movedOpen = moveQuestion(panelBoard, body.panel, body.ask, body.to_key_id, toName);
-        const hiddenMove = hiddenPanel ? await movedStoredQuestion(store, body.panel, body.ask, body.to_key_id, toName) : null;
+        const hiddenMove = hiddenPanel ? await movedStoredQuestion(store, deskScopeOf(caller.tenant, caller.actor.id), body.panel, body.ask, body.to_key_id, toName) : null;
         const response = { ok: true as const, message: `Moved to ${toName}. The question waits for them to answer.` };
         try {
           await commitBoard(panelBoard, movedOpen, [moveRow, ...(hiddenMove === null ? [] : [hiddenMove]), ...requestKeep(response)]);
@@ -2455,13 +2457,13 @@ export async function createApplication(
         }
         return Response.json(response, { headers });
       }
-      const planned = await planReassign(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, question: askOf(body.panel, body.ask)?.question ?? "the agent's question", from_key: body.from_key_id, to_key: body.to_key_id, from_name: fromName, to_name: toEntry?.name ?? "", paired: true, pairedAgeMs: pairing.pairedAgeMs(request.headers.get("cookie")), targetRegistered: toEntry !== undefined, confirmed: body.confirmed === true, who: deskWho, now: clock() });
+      const planned = await planReassign(store, { tenant: deskScopeOf(caller.tenant, caller.actor.id), panel_id: body.panel, ask: body.ask, question: askOf(body.panel, body.ask)?.question ?? "the agent's question", from_key: body.from_key_id, to_key: body.to_key_id, from_name: fromName, to_name: toEntry?.name ?? "", paired: true, pairedAgeMs: pairing.pairedAgeMs(request.headers.get("cookie")), targetRegistered: toEntry !== undefined, confirmed: body.confirmed === true, who: deskWho, now: clock() });
       if (!planned.ok) return fail(planned.message.startsWith("Nothing was sent") ? 500 : 409, planned.message);
       // The owner on the answers, the owner on the panel and the conversation row are one commit. The panel follows the stored
       // owner, so a route by the old key is refused from now on.
       const toName = toEntry?.name ?? "";
       const moved = moveQuestion(panelBoard, body.panel, body.ask, body.to_key_id, toName);
-      const hiddenMove = hiddenPanel ? await movedStoredQuestion(store, body.panel, body.ask, body.to_key_id, toName) : null;
+      const hiddenMove = hiddenPanel ? await movedStoredQuestion(store, deskScopeOf(caller.tenant, caller.actor.id), body.panel, body.ask, body.to_key_id, toName) : null;
       const response = { ok: true as const, message: `Moved to ${toName}. Its answer waits for them to say where it went.` };
       try {
         await commitBoard(panelBoard, moved, [...planned.records, ...(hiddenMove === null ? [] : [hiddenMove]), ...requestKeep(response)]);
@@ -2499,10 +2501,10 @@ export async function createApplication(
       const answerResponse = { ok: true as const, message: sentWords };
       try {
         // The answer carries the question's fingerprint, so the same question cannot come back with other words (see agreedAltered).
-        await recordAnswer(store, { tenant: caller.tenant, panel_id: panelId, ask: askId, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, owner_key: askBlock?.owner_key ?? askBlock?.asked_by_key ?? null, fingerprint: askBlock === undefined ? null : questionFingerprint(askBlock), now: clock(), alsoRecords: async () => {
+        await recordAnswer(store, { tenant: deskScopeOf(caller.tenant, caller.actor.id), panel_id: panelId, ask: askId, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, owner_key: askBlock?.owner_key ?? askBlock?.asked_by_key ?? null, fingerprint: askBlock === undefined ? null : questionFingerprint(askBlock), now: clock(), alsoRecords: async () => {
           const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: deferredOnly ? "Not yet. Nothing was sent to the agent." : WAITING_FOR_AGENT, status: deferredOnly ? "done" : "waiting", refs: { panel_id: panelId, ask_id: askId, ...(step ? { step_id: step } : {}) } }, clock());
           const panelRow = await panelRowWrite(state, panelId, deferredOnly ? "Not yet. You can answer it later." : "You answered. Waiting for the agent to say where it went.");
-          return [...(await boardWrites(store, caller.tenant, before, state, { panel: panelId, ask: askId })), row.record, ...(panelRow === null ? [] : [panelRow]), ...requestKeep(answerResponse)];
+          return [...(await boardWrites(store, deskScopeOf(caller.tenant, caller.actor.id), before, state, { panel: panelId, ask: askId })), row.record, ...(panelRow === null ? [] : [panelRow]), ...requestKeep(answerResponse)];
         } });
       } catch (error) {
         if (error instanceof QuestionAlreadyAnswered) return fail(409, error.message);
@@ -2535,14 +2537,14 @@ export async function createApplication(
     if (boardRefused !== null) {
       // The board is not shown as empty: the words say why it is missing.
       const unread = new Map<string, string>();
-      for (const a of await listAnswers(runtime.runtime.store, caller.tenant)) if (waitsForAgent(a) && a.step !== null && !unread.has(a.step)) unread.set(a.step, a.panel_id);
+      for (const a of await listAnswers(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))) if (waitsForAgent(a) && a.step !== null && !unread.has(a.step)) unread.set(a.step, a.panel_id);
       return { open: [], max: panelBoard.max, waiting: [...unread].map(([step, panel]) => ({ step, panel })), refused: boardRefused };
     }
     const waiting = new Map<string, string>();
-    const allAnswers = await listAnswers(runtime.runtime.store, caller.tenant);
+    const allAnswers = await listAnswers(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
     for (const a of allAnswers) if (waitsForAgent(a) && a.step !== null && !waiting.has(a.step)) waiting.set(a.step, a.panel_id);
     // A question whose stored answers disagree is listed until the person decides (R2-10). Its step is the one its answers bear on.
-    const conflicts = (await listConflicts(runtime.runtime.store, caller.tenant)).map((c) => ({ panel: c.panel_id, ask: c.ask, question: askOf(c.panel_id, c.ask)?.question ?? null, step: allAnswers.find((a) => a.panel_id === c.panel_id && a.ask === c.ask && a.step !== null)?.step ?? null }));
+    const conflicts = (await listConflicts(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))).map((c) => ({ panel: c.panel_id, ask: c.ask, question: askOf(c.panel_id, c.ask)?.question ?? null, step: allAnswers.find((a) => a.panel_id === c.panel_id && a.ask === c.ask && a.step !== null)?.step ?? null }));
     return { ...panelBoard, waiting: [...waiting].map(([step, panel]) => ({ step, panel })), conflicts };
   }
 

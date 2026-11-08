@@ -40,7 +40,7 @@ export function requestFingerprint(body: { readonly [key: string]: unknown }): s
   return createHash("sha256").update(canonical(rest)).digest("hex");
 }
 
-const requestIdOf = (tenant: string, requestId: string): string => `request:${tenant}:${requestId}`;
+export const requestIdOf = (tenant: string, requestId: string): string => `request:${tenant}:${requestId}`;
 
 export type RequestSeen = { readonly kind: "new" } | { readonly kind: "replay"; readonly response: Json } | { readonly kind: "reused" };
 
