@@ -110,6 +110,8 @@ const VERSION_FORMAT = /^[0-9a-f]{14}$/;
  * The name is kept for the answered case, which is where it was first pinned.
  */
 export const ANSWERED_CANNOT_CHANGE = SAME_ID_OTHER_WORDS;
+/** A question with no recorded owner (and no recorded author) is not claimed by a put. Only the person can give it an owner (a reassignment). */
+export const QUESTION_NEEDS_DECISION = "This question has no recorded owner, so an agent cannot put it up again. This question needs a decision from the person. Nothing was changed.";
 /** Two blocks in one put share an id. Refused before anything is stored. */
 export const DUPLICATE_BLOCK_ID = "Two blocks on this panel use the same id. Give each block its own id.";
 /** A question the person answered (not put off, not skipped) is an agreement to those exact words. */
@@ -122,11 +124,11 @@ const withTarget = (q: AskBlock, target: string | null): AskBlock => ({ ...q, ta
 /** A stored question as a put compares it. A question stored before targets existed sits on its panel's step, so that step is its target. */
 const comparable = (old: AskBlock, step: string | null): AskBlock => withTarget(old, old.target !== undefined ? old.target : step);
 /** The author of a question: the agent that first put it up. Set once; a later put or a reassignment never changes it. */
-const authorOf = (old: AskBlock | undefined, agent: string, key: string): { readonly asked_by: string; readonly asked_by_key: string } => ({ asked_by: old?.asked_by ?? agent, asked_by_key: old?.asked_by_key ?? key });
+const authorOf = (old: AskBlock | undefined, agent: string, key: string): { readonly asked_by: string | null; readonly asked_by_key: string | null } => (old === undefined ? { asked_by: agent, asked_by_key: key } : { asked_by: old.asked_by ?? null, asked_by_key: old.asked_by_key ?? null });
 /** The agent that answers for a question now. A question stored before owners existed is owned by its author. */
 const ownerKey = (b: AskBlock): string | null => b.owner_key ?? b.asked_by_key ?? null;
 /** The author (kept) and the current owner (kept by a later put, moved by a reassignment) of a question. */
-const ownerOf = (old: AskBlock | undefined, agent: string, key: string) => ({ ...authorOf(old, agent, key), owner_key: old?.owner_key ?? old?.asked_by_key ?? key, owner_name: old?.owner_name ?? old?.asked_by ?? agent, owner_rev: old?.owner_rev ?? 0 });
+const ownerOf = (old: AskBlock | undefined, agent: string, key: string) => (old === undefined ? { ...authorOf(old, agent, key), owner_key: key, owner_name: agent, owner_rev: 0 } : { ...authorOf(old, agent, key), owner_key: ownerKey(old), owner_name: old.owner_name ?? old.asked_by ?? null, owner_rev: old.owner_rev ?? 0 });
 /**
  * The very same question put up again. What the person agreed to or skipped stays. A question they put off ("Not yet") opens again,
  * as the card promised ("The agent will ask again later"), and the earlier answer moves into its history.
@@ -152,7 +154,7 @@ export type HumanOp =
   | { readonly op: "human.close"; readonly id: string }
   | { readonly op: "human.open"; readonly template: string; readonly title?: string; readonly step?: string | null };
 
-export type Refusal = { readonly ok: false; readonly code: "SCHEMA" | "NOT_FOUND" | "CAP" | "PINNED"; readonly message: string };
+export type Refusal = { readonly ok: false; readonly code: "SCHEMA" | "NOT_FOUND" | "CAP" | "PINNED" | "DECISION"; readonly message: string };
 export type Reduced = { readonly state: Panels; readonly result: { readonly ok: true; readonly panel: string | null } | Refusal };
 
 const refuse = (state: Panels, code: Refusal["code"], message: string): Reduced => ({ state, result: { ok: false, code, message } });
@@ -214,6 +216,7 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
         for (const b of blocks) {
           if (b.kind !== "question") continue;
           const old = before(b.id);
+          if (old !== undefined && ownerKey(old) === null) return refuse(state, "DECISION", QUESTION_NEEDS_DECISION);
           if (old !== undefined && ownerKey(old) !== null && ownerKey(old) !== key) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
           if (old !== undefined && !sameQuestion(old, b)) return refuse(state, "SCHEMA", SAME_ID_OTHER_WORDS);
         }
@@ -259,6 +262,7 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
       const found = panel.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === block.id);
       const old = found === undefined ? undefined : comparable(found, panel.step);
       // A question belongs to the agent that asked it, or to the one the person moved it to. Another agent cannot put it up again.
+      if (old !== undefined && ownerKey(old) === null) return refuse(state, "DECISION", QUESTION_NEEDS_DECISION);
       if (old !== undefined && ownerKey(old) !== null && ownerKey(old) !== key) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
       if (old !== undefined && !sameQuestion(old, block)) return refuse(state, "SCHEMA", SAME_ID_OTHER_WORDS);
       // The very same question again keeps what the person said (an answer, or a put-off that reopens).

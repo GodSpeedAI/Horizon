@@ -2319,7 +2319,7 @@ export async function createApplication(
     const requestId = op.request_id;
     if (op.tool !== "read_responses" && typeof requestId !== "string") return refuse(400, REQUEST_ID_REQUIRED_WORDS);
     const done = await agentCommandNow(op as unknown as AgentOp, name, owner.key_id, lookup);
-    const status = done.ok ? 200 : done.code === "NOT_FOUND" ? 404 : done.code === "REUSED" ? 409 : done.code === "UNAVAILABLE" ? 503 : 400;
+    const status = done.ok ? 200 : done.code === "NOT_FOUND" ? 404 : done.code === "REUSED" || done.code === "DECISION" ? 409 : done.code === "UNAVAILABLE" ? 503 : 400;
     return Response.json(done, { status, headers });
   }
 
