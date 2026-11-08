@@ -2,7 +2,7 @@
 
 Phone remote control lets the solo stack owner keep working the governed loop from a phone: see the open case, what is waiting for their approval, recent moves with their claims, and act on them (approve or reject, commit an offered move, open a case, observe and settle). The phone shows the same canonical state as the cockpit. Nothing is decided on the phone that is not decided by SEA-Forge, exactly as at the desk.
 
-Remote control is off until you turn it on from the cockpit. Turning it on is an action at the desk.
+Remote control is off until you turn it on from the cockpit. Turning it on is an action at the desk. The desk itself opens only after the browser pairs with the code the terminal printed at start (see docs/agents-and-panels.md).
 
 ## Turn it on
 

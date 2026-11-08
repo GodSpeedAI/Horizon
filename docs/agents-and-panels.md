@@ -11,6 +11,14 @@ Ask, then wait. Say where each answer went. You cannot answer or confirm for the
 - If you no longer need an answer, withdraw the question with a reason (`ask.withdraw`).
 - Anything the person's side does (`human.answer`, `human.pin`, `human.close`, `human.open`) is refused at this door.
 
+## Pairing and the desk's writes
+
+When Horizon starts it prints a pairing code in the terminal: "To open the desk, enter this pairing code: XXXX-XXXX. It works once and expires in 10 minutes." A browser opens the desk by typing that code on the "Pair this browser" screen. The code works once. The browser then holds a session cookie (HttpOnly, SameSite=Strict) for 12 hours, or until Horizon restarts or the browser logs out (`POST /desk/pair/logout`). Every write the desk makes sends that cookie.
+
+- The desk page carries no secret. Reading `/desk` gives a program nothing it can write with.
+- Pairing gives agents nothing new. An agent on the page (`x-horizon-source: page-agent`) keeps the limits above. The agent door (`/agent/panels`) keeps its own key and never takes a session.
+- Limit, stated plainly: anyone who can read the terminal can see the code and pair. A local program with terminal access can pair. This is a boundary against other callers, not a sandbox.
+
 ## How to call it
 
 The door is on the desk's own address (for example `http://127.0.0.1:<port>`). Every call needs the agent key:
