@@ -6,6 +6,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { acquireDeskLock, ALREADY_RUNNING_WORDS, DeskAlreadyRunning, LOCK_COLLECTION, LOCK_ID } from "../src/capabilities/desk-lock.ts";
 import { join } from "node:path";
+import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
 const apps: DeskApp[] = [];
@@ -102,5 +103,30 @@ describe("the read-only surface open beside a running desk", () => {
     const store = openReadOnlyStore(join(first.root, "d.sqlite"));
     await expect(store.commit({ appends: [], records: [{ collection: "horizon-read-only-probe", id: "x", expectedVersion: 0, value: { a: 1 } }] })).rejects.toThrow("opened read-only");
     expect(await store.getRecord("horizon-read-only-probe", "x")).toBeUndefined();
+  });
+});
+
+describe("the writer lock comes before any runtime starts", () => {
+  test("a second desk on a held store is refused, and a pending outbox item is left as it was", async () => {
+    // A desk that stopped leaves a pending run.execute item behind. A live process (this test's parent) then holds the lock.
+    const first = await open();
+    const root = first.root;
+    await first.stop();
+    apps.splice(apps.indexOf(first), 1);
+    const path = join(root, "d.sqlite");
+    const raw = openSqliteStore({ path });
+    const held = await raw.getRecord(LOCK_COLLECTION, LOCK_ID);
+    await raw.commit({ appends: [], records: [{ collection: LOCK_COLLECTION, id: LOCK_ID, expectedVersion: held?.version ?? 0, value: { token: "other-desk", pid: process.ppid, since: new Date().toISOString() } }], outbox: [{ id: "run.execute:held-item", topic: "run.execute", payload: { runId: "run-that-does-not-exist" } }] });
+    await raw.close();
+    // The refused start must not deliver the item: its runtime is never built.
+    await expect(startDeskApp({ root })).rejects.toThrow(ALREADY_RUNNING_WORDS);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const after = openSqliteStore({ path });
+    try {
+      const items = await after.listOutbox({ topic: "run.execute" });
+      expect(items.map((item) => ({ id: item.id, status: item.status, attempts: item.attempts }))).toEqual([{ id: "run.execute:held-item", status: "pending", attempts: 0 }]);
+    } finally {
+      await after.close();
+    }
   });
 });

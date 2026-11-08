@@ -36,7 +36,8 @@ import { approvalAuthorityFromEnv, type ApprovalAuthority } from "./adapters/sea
 import { buildInbox, type InboxReadout } from "./domain/approval-inbox.ts";
 import { authorityOf, defaultRealityTraceRepo, observationOutbox, realityTraceFromEnv, RealityTraceEvidence, type GovernedInvocation, type RealityTraceConfig, type SettlementAuthority } from "./adapters/settlement.ts";
 import { appendSettlement, latestSettlement, type ExecutionRecord, type NavigationSettlement, type RealityTraceObservation, type SettlementReference } from "./capabilities/navigation-settlement.ts";
-import type { Json } from "@godspeedai/cognate-events";
+import type { DurableStore, Json } from "@godspeedai/cognate-events";
+import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
 import type { RunView } from "@godspeedai/cognate-runtime-api";
 import { buildStructuralFrame, type NavigationFrameV1, type NavigationIntentRecord } from "./domain/frame.ts";
 import { buildCommitIntent, IntentError, type CommitIntentInput, type CommitIntentOutput } from "./domain/intent.ts";
@@ -427,6 +428,20 @@ export async function createApplication(
       : options.realityTrace === null
         ? undefined
         : (options.realityTrace ?? realityTraceFromEnv(process.env, defaultRealityTraceRepo(options.storePath ?? process.env.HORIZON_STORE ?? loaded.config.runtime_store)));
+  // Design v3, section 2: one local writer per desk database. The store is opened and the writer lock taken before any runtime, recovery
+  // worker, projection runner or poller is built, so a second desk on the same store is refused before it touches the outbox. A read-only
+  // open reads through a guard that refuses writes, and takes no lock and gives none up.
+  const storeFile = assertStoreBoundary(loaded.config, options.storePath ?? loaded.config.runtime_store);
+  const deskStore: DurableStore = options.readOnly ? openReadOnlyStore(storeFile) : openSqliteStore({ path: storeFile });
+  let deskLockToken: string | undefined;
+  if (!options.readOnly) {
+    try {
+      deskLockToken = await acquireDeskLock(deskStore);
+    } catch (error) {
+      await deskStore.close();
+      throw error;
+    }
+  }
   // HORIZON-001 1.1.0: bound operations, capacity and the obligation flow (SPEC-CR-002).
   const bindingFor = (operationRef: string) => loaded.config.operations.find((binding) => binding.operation_ref === operationRef);
   // The rulebook is Horizon's DomainForge model; RealityTrace snapshots it so records carry its edition.
@@ -446,34 +461,27 @@ export async function createApplication(
     settlementConfigured: governance.mode === "sea-forge" && realityTrace !== undefined,
     now: () => new Date(),
   };
-  // A read-only open reads the store through a guard that refuses writes; the runtime uses that store instead of opening its own.
-  const readStore = options.readOnly ? openReadOnlyStore(assertStoreBoundary(loaded.config, options.storePath ?? loaded.config.runtime_store)) : undefined;
+  // The runtime uses the store opened above (and locked, when writable) instead of opening its own.
   const runtime: HorizonRuntime = await createHorizonRuntime(loaded.config, world, {
     caller,
     ...(options.storePath ? { storePath: options.storePath } : {}),
-    ...(readStore === undefined ? {} : { store: readStore }),
+    store: deskStore,
     components: [navigationIntentComponent(frames)],
     agents: [structuralObservationAgent(frames), navigationCommitAgent(() => runtime.runtime.store, { bindingFor, deps: obligationDeps })],
     ...(options.contextAdapter === undefined ? {} : { contextAdapter: options.contextAdapter }),
     governance,
     // The observation commits with the governed invocation itself (the outbox), so it cannot be lost.
     ...(realityTrace ? { outboxFor: observationOutbox(NAVIGATION_INTENT_COMMIT.id) } : {}),
+  }).catch(async (error: unknown): Promise<never> => {
+    if (deskLockToken !== undefined) await releaseDeskLock(deskStore, deskLockToken);
+    await deskStore.close();
+    throw error;
   });
   // A read-only open never migrates: until the desk has run every migration, its records cannot be surfaced read-only.
   if (options.readOnly && (await appliedVersion(runtime.runtime.store, caller.tenant)) < Math.max(...DESK_MIGRATIONS.map((migration) => migration.version))) {
     await runtime.runtime.close();
+    await deskStore.close();
     throw new Error("horizon: the desk's records are not migrated yet, so the store cannot be surfaced read-only. Start the desk once to finish the migration, then surface again.");
-  }
-  // Design v3, section 2: one local writer per desk database. A second desk on the same store is refused before anything is written.
-  // A read-only open takes no lock and gives none up.
-  let deskLockToken: string | undefined;
-  if (!options.readOnly) {
-    try {
-      deskLockToken = await acquireDeskLock(runtime.runtime.store);
-    } catch (error) {
-      await runtime.runtime.close();
-      throw error;
-    }
   }
   if (loaded.config.settlement) assertSnapshotDir(snapshotDirOf(loaded.config.settlement, runtime.storePath), runtime.storePath);
   // HORIZON-001 1.1.0: suspend pending v1 commit runs and mark the store before anything is served.
@@ -3161,6 +3169,7 @@ export async function createApplication(
       windowTimers.clear();
       if (deskLockToken !== undefined) await releaseDeskLock(runtime.runtime.store, deskLockToken);
       await runtime.runtime.close();
+      await deskStore.close();
     },
   };
 }
