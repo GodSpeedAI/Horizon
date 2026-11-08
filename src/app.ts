@@ -81,6 +81,7 @@ import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type Debugger
 import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare.tsx";
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
 import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
+import { acquireDeskLock, releaseDeskLock } from "./capabilities/desk-lock.ts";
 import { BAD_REQUEST_ID_WORDS, REUSED_REQUEST_WORDS, requestFingerprint, requestRecord, seenRequest, validRequestId } from "./capabilities/desk-requests.ts";
 import { answerRowOf, appendRow, discardRow, listConversation, panelRowOf, planAppend, planUpdate, settleDraftRow } from "./capabilities/conversation.ts";
 import { answerEcho, cleanAgentName, MAX_WAITING_PROPOSALS, TOO_MANY_PROPOSALS, WAITING_FOR_AGENT, type ConversationRow, type RowSource, type RowStage } from "./ui/desk/conversation-model.ts";
@@ -443,6 +444,14 @@ export async function createApplication(
     // The observation commits with the governed invocation itself (the outbox), so it cannot be lost.
     ...(realityTrace ? { outboxFor: observationOutbox(NAVIGATION_INTENT_COMMIT.id) } : {}),
   });
+  // Design v3, section 2: one local writer per desk database. A second desk on the same store is refused before anything is written.
+  let deskLockToken: string;
+  try {
+    deskLockToken = await acquireDeskLock(runtime.runtime.store);
+  } catch (error) {
+    await runtime.runtime.close();
+    throw error;
+  }
   if (loaded.config.settlement) assertSnapshotDir(snapshotDirOf(loaded.config.settlement, runtime.storePath), runtime.storePath);
   // HORIZON-001 1.1.0: suspend pending v1 commit runs and mark the store before anything is served.
   await activateContract(runtime.runtime.store, new Date());
@@ -3044,6 +3053,7 @@ export async function createApplication(
       if (remote.listening) await remote.stop();
       for (const timer of windowTimers.values()) clearTimeout(timer);
       windowTimers.clear();
+      await releaseDeskLock(runtime.runtime.store, deskLockToken);
       await runtime.runtime.close();
     },
   };
