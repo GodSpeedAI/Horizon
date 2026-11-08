@@ -21,7 +21,7 @@ describe("a panel put is one commit with its row", () => {
     const commit = store.commit.bind(store);
     // Only the conversation row's write fails; the panel's write would succeed on its own.
     store.commit = async (commitInput: Parameters<typeof commit>[0]) => {
-      if (commitInput.records.some((r) => r.collection === CONVERSATION_COLLECTION)) throw new Error("row write refused");
+      if ((commitInput.records ?? []).some((r) => r.collection === CONVERSATION_COLLECTION)) throw new Error("row write refused");
       return commit(commitInput);
     };
     const put = await app.application.applyAgentOp({ tool: "ask_human", panel: "w-atomic", ask });

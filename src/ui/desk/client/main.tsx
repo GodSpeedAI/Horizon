@@ -83,6 +83,12 @@ function Gate() {
 }
 
 /** A move that was done but not recorded says so after its own words. */
+/**
+ * The request id of the answer being sent. A retry of the same answer (after no reply, or a server error) sends the same id, so the
+ * desk returns the stored response instead of writing the answer again. A new answer gets a new id. It is cleared once the desk has replied.
+ */
+let pendingAnswer: { readonly key: string; readonly requestId: string } | null = null;
+
 const withRecordNote = (message: string, body: { recorded?: boolean; recorded_words?: string }): string => (body.recorded === false && body.recorded_words ? `${message} ${body.recorded_words}` : message);
 
 function read<T>(key: string, fallback: T): T {
@@ -436,7 +442,11 @@ function App() {
     panels: {
       answer: async (input) => {
         try {
-          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", request_id: crypto.randomUUID(), ...input }) });
+          const key = JSON.stringify(input);
+          if (pendingAnswer === null || pendingAnswer.key !== key) pendingAnswer = { key, requestId: crypto.randomUUID() };
+          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", request_id: pendingAnswer.requestId, ...input }) });
+          // A reply that is not a server error is final for this id: the answer was stored, or refused and nothing was written.
+          if (response.status < 500) pendingAnswer = null;
           const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; recorded?: boolean; recorded_words?: string };
           rev.current = "";
           void poll();

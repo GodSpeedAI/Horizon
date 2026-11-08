@@ -2002,12 +2002,14 @@ export async function createApplication(
 
   /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`, `ask.withdraw`, `answer.route`). To choose parts well an agent reads `GET /desk/panels/catalogue`. A reply on a panel clears the wait on the answers given there. */
   async function applyAgentOp(op: AgentOp, agentName?: string, keyId: string = UNKEYED_AGENT): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
-    return panelCommand(() => applyAgentOpNow(op, agentName, keyId));
+    return panelCommand(() => applyAgentOpNow(op, agentName, keyId, null));
   }
 
-  /** The body of applyAgentOp. Runs only inside panelCommand. */
-  async function applyAgentOpNow(op: AgentOp, agentName: string | undefined, keyId: string): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
+  /** The body of applyAgentOp. Runs only inside panelCommand. `dedupe` is the request id and fingerprint of a retried call, if it has one. */
+  async function applyAgentOpNow(op: AgentOp, agentName: string | undefined, keyId: string, dedupe: { readonly requestId: string; readonly fingerprint: string } | null): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
     await answersMigrated;
+    // The request's record, kept with the change it made: a retry with the same id returns this response and writes nothing.
+    const agentKeep = (response: { readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] }): CommitRecord[] => (dedupe === null ? [] : [requestRecord(caller.tenant, dedupe.requestId, dedupe.fingerprint, JSON.parse(JSON.stringify(response)) as Json)]);
     const who = agentName ?? UNNAMED_AGENT;
     // An agent reads only the answers to the questions it asked itself.
     // Ownership is the key id that put the question up, never the display name: a name is a label any caller can send.
@@ -2052,7 +2054,7 @@ export async function createApplication(
       const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: "claimed", refs: { panel_id: op.panel_id, ask_id: op.ask_id, ...(found === null ? {} : { step_id: found.step_id, case_id: found.case_id }) } }, clock());
       const panelRow = await panelRowWrite(state, op.panel_id, "You answered. The agent says it has taken it on.", op.ask_id);
       try {
-        await store.commit({ appends: [], records: [...routePlan.records, row.record, ...(panelRow === null ? [] : [panelRow])] });
+        await store.commit({ appends: [], records: [...routePlan.records, row.record, ...(panelRow === null ? [] : [panelRow]), ...agentKeep(result)] });
       } catch {
         return { ok: false, code: "UNAVAILABLE", message: NOTHING_SENT };
       }
@@ -2066,7 +2068,7 @@ export async function createApplication(
       const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: mine?.words ?? (question ? `The agent's question: ${question}` : "The agent's question"), outcome: why, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id } }, clock());
       const panelRow = await panelRowWrite(state, op.panel_id, why);
       try {
-        await commitBoard(panelBoard, state, [row.record, ...(panelRow === null ? [] : [panelRow])]);
+        await commitBoard(panelBoard, state, [row.record, ...(panelRow === null ? [] : [panelRow]), ...agentKeep(result)]);
       } catch {
         return { ok: false, code: "UNAVAILABLE", message: NOTHING_SENT };
       }
@@ -2075,7 +2077,7 @@ export async function createApplication(
     // The panel and its conversation row are one commit: both are there or neither is, and a failed row write fails the put.
     const by = agentName === undefined ? {} : { agent_name: agentName };
     try {
-      const alongside: CommitRecord[] = [];
+      const alongside: CommitRecord[] = [...agentKeep(result)];
       if (result.panel !== null && (op.tool === "show_surface" || op.tool === "ask_human")) {
         const panel = state.open.find((p) => p.id === result.panel);
         const asking = stillAskingIn(state, result.panel);
@@ -2114,7 +2116,7 @@ export async function createApplication(
     const name = cleanAgentName(request.headers.get("x-horizon-agent-name"));
     if (pathname === "/agent/panels/catalogue" && request.method === "GET") return Response.json({ schema: SURFACE_SCHEMA, vocabulary: vocabulary(), blocks: CATALOGUE }, { headers });
     if (pathname === "/agent/panels/answers" && request.method === "GET") {
-      const done = await applyAgentOpNow({ tool: "read_responses" }, name, owner.key_id);
+      const done = await applyAgentOpNow({ tool: "read_responses" }, name, owner.key_id, null);
       return Response.json({ ok: true, responses: done.ok ? done.responses ?? [] : [] }, { headers });
     }
     if (pathname !== "/agent/panels" || request.method !== "POST") return refuse(404, "There is nothing at this address. Use POST /agent/panels, GET /agent/panels/answers or GET /agent/panels/catalogue.");
@@ -2129,7 +2131,19 @@ export async function createApplication(
     if (op === null || typeof op !== "object" || Array.isArray(op)) return refuse(400, "Send one object with a \"tool\" field. Nothing was changed.");
     if (typeof op.op === "string" && op.op.startsWith("human.")) return refuse(403, "Only the person can do that. An agent cannot answer, pin, close or open a panel for them.");
     if (typeof op.tool !== "string" || !(AGENT_TOOLS as readonly string[]).includes(op.tool)) return refuse(400, `Say which tool: ${AGENT_TOOLS.join(", ")}. Nothing was changed.`);
-    const done = await applyAgentOpNow(op as unknown as AgentOp, name, owner.key_id);
+    // Design v3, section 2: a retry with the same request id returns the stored response and writes nothing. The same id with other
+    // contents is refused. The id's record is kept with the change, in the same commit.
+    const requestId = op.request_id;
+    if (requestId !== undefined && !validRequestId(requestId)) return refuse(400, BAD_REQUEST_ID_WORDS);
+    let dedupe: { readonly requestId: string; readonly fingerprint: string } | null = null;
+    if (typeof requestId === "string") {
+      const fingerprint = requestFingerprint(op);
+      const seen = await seenRequest(runtime.runtime.store, caller.tenant, requestId, fingerprint);
+      if (seen.kind === "reused") return refuse(409, REUSED_REQUEST_WORDS);
+      if (seen.kind === "replay") return Response.json(seen.response, { headers });
+      dedupe = { requestId, fingerprint };
+    }
+    const done = await applyAgentOpNow(op as unknown as AgentOp, name, owner.key_id, dedupe);
     return done.ok ? Response.json(done, { headers }) : Response.json(done, { status: done.code === "NOT_FOUND" ? 404 : done.code === "UNAVAILABLE" ? 503 : 400, headers });
   }
 
@@ -2181,18 +2195,33 @@ export async function createApplication(
     // Shared with the agent's writes: a person's change is refused while the records are migrating or after a failed migration.
     const paused = migrationBlock();
     if (paused !== null) return fail(503, paused);
+    // Design v3, section 2: every person operation takes a request id. The same id with the same body returns the response it got and
+    // writes nothing, so a retry never repeats a change (a retry after a new wait exists does not close it). The same id with other
+    // contents is refused. The id's record joins the operation's commit, so the change and its record are stored together or not at all.
+    const requestId = body.request_id;
+    if (requestId !== undefined && !validRequestId(requestId)) return fail(400, BAD_REQUEST_ID_WORDS);
+    const fingerprint = requestFingerprint(body);
+    if (typeof requestId === "string") {
+      const seen = await seenRequest(store, caller.tenant, requestId, fingerprint);
+      if (seen.kind === "reused") return fail(409, REUSED_REQUEST_WORDS);
+      if (seen.kind === "replay") return Response.json(seen.response, { headers });
+    }
+    const requestKeep = (response: { readonly ok: true; readonly message: string }): CommitRecord[] => (typeof requestId === "string" ? [requestRecord(caller.tenant, requestId, fingerprint, response)] : []);
     if (body.op === "human.stop_waiting") {
       if (typeof body.step !== "string" || body.step === "") return fail(400, "Say which step to stop waiting for.");
-      // The answers' stop and their conversation rows are one commit: both are there or neither is.
+      // The answers' stop, their conversation rows and the request's record are one commit: all are there or none is.
       const plan = await planStopWaiting(store, caller.tenant, body.step, deskWho, clock());
-      if (plan.count === 0) return Response.json({ ok: true, message: "Nothing was waiting." }, { headers });
-      try {
-        await store.commit({ appends: [], records: plan.records });
-      } catch {
-        return fail(500, NOTHING_SENT);
+      const response = plan.count === 0 ? { ok: true as const, message: "Nothing was waiting." } : { ok: true as const, message: "Stopped waiting. The step can be accepted now." };
+      const records = [...plan.records, ...requestKeep(response)];
+      if (records.length > 0) {
+        try {
+          await store.commit({ appends: [], records });
+        } catch {
+          return fail(500, NOTHING_SENT);
+        }
+        await rebuildBoard();
       }
-      await rebuildBoard();
-      return Response.json({ ok: true, message: "Stopped waiting. The step can be accepted now." }, { headers });
+      return Response.json(response, { headers });
     }
     if (boardRefused !== null) return fail(503, boardRefused);
     if (body.op === "human.reassign_owner") {
@@ -2220,12 +2249,13 @@ export async function createApplication(
         const when = clock().toISOString();
         const moveRow = newRowRecord(deskWho, { source: "you", kind: "note", words: `Moved the question "${openQuestion.question ?? "the agent's question"}" from ${fromName} to ${toName}.`, outcome: `${toName} now answers for it, since ${when}. Nothing has been answered yet.`, status: "done", refs: { panel_id: body.panel, ask_id: body.ask } }, clock());
         const movedOpen = moveQuestion(panelBoard, body.panel, body.ask, body.to_key_id, toName);
+        const response = { ok: true as const, message: `Moved to ${toName}. The question waits for them to answer.` };
         try {
-          await commitBoard(panelBoard, movedOpen, [moveRow]);
+          await commitBoard(panelBoard, movedOpen, [moveRow, ...requestKeep(response)]);
         } catch {
           return fail(500, NOTHING_SENT);
         }
-        return Response.json({ ok: true, message: `Moved to ${toName}. The question waits for them to answer.` }, { headers });
+        return Response.json(response, { headers });
       }
       const planned = await planReassign(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, question: askOf(body.panel, body.ask)?.question ?? "the agent's question", from_key: body.from_key_id, to_key: body.to_key_id, from_name: fromName, to_name: toEntry?.name ?? "", paired: true, pairedAgeMs: pairing.pairedAgeMs(request.headers.get("cookie")), targetRegistered: toEntry !== undefined, confirmed: body.confirmed === true, who: deskWho, now: clock() });
       if (!planned.ok) return fail(planned.message.startsWith("Nothing was sent") ? 500 : 409, planned.message);
@@ -2233,24 +2263,15 @@ export async function createApplication(
       // owner, so a route by the old key is refused from now on.
       const toName = toEntry?.name ?? "";
       const moved = moveQuestion(panelBoard, body.panel, body.ask, body.to_key_id, toName);
+      const response = { ok: true as const, message: `Moved to ${toName}. Its answer waits for them to say where it went.` };
       try {
-        await commitBoard(panelBoard, moved, planned.records);
+        await commitBoard(panelBoard, moved, [...planned.records, ...requestKeep(response)]);
       } catch {
         return fail(500, NOTHING_SENT);
       }
-      return Response.json({ ok: true, message: `Moved to ${toName}. Its answer waits for them to say where it went.` }, { headers });
+      return Response.json(response, { headers });
     }
     if (body.op === "human.answer") {
-      // Design v3, section 2: a request id makes a retry safe. The same id with the same body returns the response it got, and
-      // writes nothing; the same id with other contents is refused. The id's record joins the answer's commit below.
-      const requestId = body.request_id;
-      if (requestId !== undefined && !validRequestId(requestId)) return fail(400, BAD_REQUEST_ID_WORDS);
-      const fingerprint = requestFingerprint(body);
-      if (typeof requestId === "string") {
-        const seen = await seenRequest(store, caller.tenant, requestId, fingerprint);
-        if (seen.kind === "reused") return fail(409, REUSED_REQUEST_WORDS);
-        if (seen.kind === "replay") return Response.json(seen.response, { headers });
-      }
       const outcome = body.outcome;
       const value = checkValue(body.value);
       if (typeof body.panel !== "string" || typeof body.ask !== "string" || !(OUTCOMES as readonly unknown[]).includes(outcome) || !value.ok) return fail(400, "That answer could not be read. Nothing was sent.");
@@ -2272,14 +2293,13 @@ export async function createApplication(
       const deferredOnly = outcome === "deferred";
       const panelId: string = body.panel;
       const askId: string = body.ask;
-      const answerResponse = { ok: true, message: sentWords };
+      const answerResponse = { ok: true as const, message: sentWords };
       try {
         // The answer carries the question's fingerprint, so the same question cannot come back with other words (see agreedAltered).
         await recordAnswer(store, { tenant: caller.tenant, panel_id: panelId, ask: askId, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, fingerprint: askBlock === undefined ? null : questionFingerprint(askBlock), now: clock(), alsoRecords: async () => {
           const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: deferredOnly ? "Not yet. Nothing was sent to the agent." : WAITING_FOR_AGENT, status: deferredOnly ? "done" : "waiting", refs: { panel_id: panelId, ask_id: askId, ...(step ? { step_id: step } : {}) } }, clock());
           const panelRow = await panelRowWrite(state, panelId, deferredOnly ? "Not yet. You can answer it later." : "You answered. Waiting for the agent to say where it went.");
-          const keep = typeof requestId === "string" ? [requestRecord(caller.tenant, requestId, fingerprint, answerResponse)] : [];
-          return [...(await boardWrites(store, caller.tenant, before, state, { panel: panelId, ask: askId })), row.record, ...(panelRow === null ? [] : [panelRow]), ...keep];
+          return [...(await boardWrites(store, caller.tenant, before, state, { panel: panelId, ask: askId })), row.record, ...(panelRow === null ? [] : [panelRow]), ...requestKeep(answerResponse)];
         } });
       } catch (error) {
         if (error instanceof QuestionAlreadyAnswered) return fail(409, error.message);
@@ -2298,12 +2318,13 @@ export async function createApplication(
     const base = op.op === "human.open" ? withStored(panelBoard, storedPanels, openPanelId(op.template)) : panelBoard;
     const { state, result } = reduceHuman(base, op);
     if (!result.ok) return fail(409, result.message);
+    const response = { ok: true as const, message: "Done." };
     try {
-      await commitBoard(panelBoard, state);
+      await commitBoard(panelBoard, state, requestKeep(response));
     } catch {
       return fail(500, "The desk could not save the panel. Nothing was changed. Try again.");
     }
-    return Response.json({ ok: true, message: "Done." }, { headers });
+    return Response.json(response, { headers });
   }
 
   async function panelsData(): Promise<PanelsData> {
