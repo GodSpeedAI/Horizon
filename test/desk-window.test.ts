@@ -24,6 +24,23 @@ describe("the window always keeps what is still waiting", () => {
     expect(windowOf([row(1), row(2)])).toHaveLength(2);
   });
 
+  test("a hand off that is only partly done, or offers Try again or Open the step, is kept at the boundary", () => {
+    const partial = row(0, { kind: "handoff", status: "partial" });
+    const recovers = row(1, { kind: "handoff", status: "done", stages: [{ name: "Sent", status: "done", words: "ok" }, { name: "Started", status: "refused", words: "no", recovery: "Try again" }] });
+    const opens = row(2, { kind: "handoff", status: "done", stages: [{ name: "Given to an agent", status: "refused", words: "no", recovery: "Open the step" }] });
+    // 197 newer plain rows: exactly 200 in all, nothing has to go.
+    expect(windowOf([partial, recovers, opens, ...Array.from({ length: 197 }, (_, i) => row(i + 3))])).toHaveLength(200);
+    // 198 newer rows: one over. The three recoverable rows stay and the oldest plain rows go.
+    const w = windowOf([partial, recovers, opens, ...Array.from({ length: 198 }, (_, i) => row(i + 3))]);
+    expect(w).toHaveLength(200);
+    expect(w.slice(0, 3).map((r) => r.row_id)).toEqual([partial.row_id, recovers.row_id, opens.row_id]);
+    expect(w.some((r) => r.words === "w3")).toBe(false);
+    // A partly done row older than 250 newer rows is still there.
+    const far = windowOf([partial, ...Array.from({ length: 250 }, (_, i) => row(i + 3))]);
+    expect(far).toHaveLength(200);
+    expect(far[0]!.row_id).toBe(partial.row_id);
+  });
+
   test("more than 200 waiting rows are all kept", () => {
     const w = windowOf(Array.from({ length: 230 }, (_, i) => row(i, { status: "waiting" })));
     expect(w).toHaveLength(230);

@@ -81,16 +81,19 @@ export const byTime = (a: ConversationRow, b: ConversationRow): number => (a.at 
 /** Whether a row is still waiting for the person (an ask, a suggestion, a preview) or for the agent to say where an answer went. */
 export const isStillWaiting = (row: ConversationRow): boolean => row.status === "waiting";
 
+/** A row the person may still have to act on: it is waiting, or only partly done, or one of its stages offers Try again or Open the step. */
+export const needsAttention = (row: ConversationRow): boolean => isStillWaiting(row) || row.status === "partial" || (row.stages ?? []).some((g) => g.recovery !== undefined);
+
 /**
- * Every row that is still waiting, plus the newest of the others, up to 200 rows in all, oldest first. Waiting work never drops out
+ * Every row that is still waiting or can be recovered (partly done, or offering Try again or Open the step), plus the newest of the others, up to 200 rows in all, oldest first. Waiting work never drops out
  * of the window because newer rows pushed it down. (More than 200 waiting rows are all kept.) Older rows are reached through Find.
  */
 export function windowOf(rows: readonly ConversationRow[]): ConversationRow[] {
   const sorted = [...rows].sort(byTime);
   if (sorted.length <= CONVERSATION_WINDOW) return sorted;
-  const waiting = sorted.filter(isStillWaiting);
+  const waiting = sorted.filter(needsAttention);
   const room = Math.max(0, CONVERSATION_WINDOW - waiting.length);
-  const others = sorted.filter((r) => !isStillWaiting(r));
+  const others = sorted.filter((r) => !needsAttention(r));
   const keep = new Set([...waiting, ...others.slice(others.length - room)].map((r) => r.row_id));
   return sorted.filter((r) => keep.has(r.row_id));
 }
