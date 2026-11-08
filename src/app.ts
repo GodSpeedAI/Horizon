@@ -1662,8 +1662,11 @@ export async function createApplication(
       // The core answers an unreadable request in words.
     }
     const cardId = typeof sent.card_id === "string" ? sent.card_id : "";
-    const card = cardId === "" ? undefined : (await decideState(await recentMoves()).catch(() => null))?.cards.find((c) => c.id === cardId);
-    const response = await deskDecideCore(request);
+    // Step acceptance is one queued command: it reads the outstanding waits and decides, after every earlier panel command.
+    const { card, response } = await panelCommand(async () => {
+      const found = cardId === "" ? undefined : (await decideState(await recentMoves()).catch(() => null))?.cards.find((c) => c.id === cardId);
+      return { card: found, response: await deskDecideCore(request) };
+    });
     if (card === undefined || (response.status === 400 && !response.ok)) return response;
     const done = (await response.clone().json().catch(() => null)) as { ok?: boolean; message?: string; receipt?: string | null } | null;
     const verb = sent.choice === "hold" ? "Held" : sent.choice === "release" ? "Released" : sent.choice === "reject" ? "Rejected" : card.kind === "human_step" ? "Marked done" : "Accepted";
@@ -1863,6 +1866,14 @@ export async function createApplication(
   }
 
   // ---- Stage 4: panels from agents. The open panels are held here; the person's answers are kept in `horizon-panel-answers`. ----
+  // Design v3, step 1: every panel command (put, remove, annotate, withdraw, answer, route, reassign, stop waiting, and the acceptance
+  // check) runs through this one FIFO. One command runs at a time, in arrival order. A command that fails does not stop the next.
+  let panelTail: Promise<unknown> = Promise.resolve();
+  const panelCommand = <T>(command: () => Promise<T>): Promise<T> => {
+    const run = panelTail.then(command);
+    panelTail = run.catch(() => undefined);
+    return run;
+  };
   let panelBoard: PanelsBoard = NO_PANELS;
   // Answers from before the upgrade with no owner are closed once, at start. Panel reads wait for that to finish.
   const answersMigrated: Promise<number> = migratePreUpgradeAnswers(runtime.runtime.store, caller.tenant, clock()).catch(() => 0);
@@ -1907,6 +1918,11 @@ export async function createApplication(
 
   /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`, `ask.withdraw`, `answer.route`). To choose parts well an agent reads `GET /desk/panels/catalogue`. A reply on a panel clears the wait on the answers given there. */
   async function applyAgentOp(op: AgentOp, agentName?: string, keyId: string = UNKEYED_AGENT): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
+    return panelCommand(() => applyAgentOpNow(op, agentName, keyId));
+  }
+
+  /** The body of applyAgentOp. Runs only inside panelCommand. */
+  async function applyAgentOpNow(op: AgentOp, agentName: string | undefined, keyId: string): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
     await answersMigrated;
     const who = agentName ?? UNNAMED_AGENT;
     // An agent reads only the answers to the questions it asked itself.
@@ -1971,6 +1987,11 @@ export async function createApplication(
    */
   const AGENT_TOOLS = ["show_surface", "ask_human", "arrange", "annotate", "read_responses", "ask.withdraw", "answer.route"] as const;
   async function agentDoor(request: Request, pathname: string): Promise<Response> {
+    // Authentication runs inside the queued command, so the key is checked when the command runs, not when it was queued.
+    return panelCommand(() => agentDoorNow(request, pathname));
+  }
+
+  async function agentDoorNow(request: Request, pathname: string): Promise<Response> {
     const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
     const refuse = (status: number, message: string): Response => Response.json({ ok: false, message }, { status, headers });
     const given = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
@@ -1980,7 +2001,7 @@ export async function createApplication(
     const name = cleanAgentName(request.headers.get("x-horizon-agent-name"));
     if (pathname === "/agent/panels/catalogue" && request.method === "GET") return Response.json({ schema: SURFACE_SCHEMA, vocabulary: vocabulary(), blocks: CATALOGUE }, { headers });
     if (pathname === "/agent/panels/answers" && request.method === "GET") {
-      const done = await applyAgentOp({ tool: "read_responses" }, name, owner.key_id);
+      const done = await applyAgentOpNow({ tool: "read_responses" }, name, owner.key_id);
       return Response.json({ ok: true, responses: done.ok ? done.responses ?? [] : [] }, { headers });
     }
     if (pathname !== "/agent/panels" || request.method !== "POST") return refuse(404, "There is nothing at this address. Use POST /agent/panels, GET /agent/panels/answers or GET /agent/panels/catalogue.");
@@ -1996,7 +2017,7 @@ export async function createApplication(
     if (op === null || typeof op !== "object" || Array.isArray(op)) return refuse(400, "Send one object with a \"tool\" field. Nothing was changed.");
     if (typeof op.op === "string" && op.op.startsWith("human.")) return refuse(403, "Only the person can do that. An agent cannot answer, pin, close or open a panel for them.");
     if (typeof op.tool !== "string" || !(AGENT_TOOLS as readonly string[]).includes(op.tool)) return refuse(400, `Say which tool: ${AGENT_TOOLS.join(", ")}. Nothing was changed.`);
-    const done = await applyAgentOp(op as unknown as AgentOp, name, owner.key_id);
+    const done = await applyAgentOpNow(op as unknown as AgentOp, name, owner.key_id);
     return done.ok ? Response.json(done, { headers }) : Response.json(done, { status: done.code === "NOT_FOUND" ? 404 : 400, headers });
   }
 
@@ -2029,6 +2050,11 @@ export async function createApplication(
 
   /** The person's operations on panels: answer, pin, close, open, and stop waiting for an agent's reply. */
   async function deskPanelOp(request: Request): Promise<Response> {
+    return panelCommand(() => deskPanelOpNow(request));
+  }
+
+  /** The body of deskPanelOp. Runs only inside panelCommand. */
+  async function deskPanelOpNow(request: Request): Promise<Response> {
     const headers = { "cache-control": "no-store" };
     const fail = (status: number, message: string): Response => Response.json({ ok: false, message }, { status, headers });
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
