@@ -9,7 +9,6 @@ afterEach(async () => {
 
 /** Every GET route that shows a person's data, a config, a remote link or a case. None is open to an unpaired browser. */
 const HUMAN_READS = [
-  "/health",
   "/frame",
   "/surface",
   "/surface/schema",

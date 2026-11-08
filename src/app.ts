@@ -2435,6 +2435,15 @@ export async function createApplication(
             return Response.json({ ok: true, paired: false }, { headers: { "cache-control": "no-store", "set-cookie": clearedSessionCookie() } });
           }
           if (url.pathname === "/health") {
+            // An unpaired caller (scripts/setup-health.ts) learns only whether the world answers: no identity, counts or versions.
+            if (!paired) {
+              try {
+                await runtime.runtime.service.invoke(caller, { capability: "horizon.semantics.world", input: {} });
+                return Response.json({ ok: true }, { headers: { "cache-control": "no-store" } });
+              } catch {
+                return Response.json({ ok: false }, { status: 503, headers: { "cache-control": "no-store" } });
+              }
+            }
             const semantic = await runtime.runtime.service.invoke(caller, {
               capability: "horizon.semantics.world",
               input: {},
@@ -2904,7 +2913,7 @@ export function notPairedRefusal(): Response {
 }
 
 /** The only GET routes an unpaired browser may open: the page, its session check, its pairing route (POST) and the static client bundle that does the pairing. */
-export const OPEN_READS: ReadonlySet<string> = new Set(["/desk", "/desk/session", "/desk/pair", "/desk/app.js", "/desk/app.css"]);
+export const OPEN_READS: ReadonlySet<string> = new Set(["/desk", "/desk/session", "/desk/pair", "/desk/app.js", "/desk/app.css", "/health"]);
 
 /** A read from a browser that has not paired. Nothing is shown. */
 export function notPairedRead(): Response {

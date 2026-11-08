@@ -85,7 +85,7 @@ const workbenchCheck: Check = async (mapping) => {
 const horizonCheck: Check = async (mapping) => {
   const health = await healthOf(`http://127.0.0.1:${mapping.horizonPort}/health`);
   if (!health.ok) return { ok: false, detail: `Horizon GET /health on port ${mapping.horizonPort} failed: ${health.body.slice(0, 120)}` };
-  return /"status"\s*:\s*"ok"/.test(health.body) ? { ok: true, detail: `Horizon /health ok on port ${mapping.horizonPort}` } : { ok: false, detail: "Horizon /health did not say status ok" };
+  return /"status"\s*:\s*"ok"|"ok"\s*:\s*true/.test(health.body) ?{ ok: true, detail: `Horizon /health ok on port ${mapping.horizonPort}` } : { ok: false, detail: "Horizon /health did not say status ok" };
 };
 
 /** Stage 1: the session copier ran in the last 24 hours. Only the file's modification time is read, never its content. */
