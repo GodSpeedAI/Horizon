@@ -2340,10 +2340,7 @@ export async function createApplication(
     commitSurfaceIntent,
     researchContract: () => requireResearch(research),
     startServer(port = loaded.config.port): HttpServer {
-      const server: HttpServer = Bun.serve({
-        hostname: loaded.config.bind_host,
-        port,
-        async fetch(request) {
+      const route = async (request: Request): Promise<Response> => {
           const url = new URL(request.url);
           // Every request checks Host (DNS rebinding: the remote panel's GET carries the pairing link);
           // state-changing routes also check Origin and Sec-Fetch-Site (cross-site POSTs).
@@ -2357,9 +2354,10 @@ export async function createApplication(
             if (blocked !== null) return blocked;
           }
           // The person's writes must carry the token the desk page was served with.
-          if (page === null) {
-            const needsToken = request.method === "POST" && HUMAN_WRITES.has(url.pathname);
-            if (needsToken && !writeTokenOk(request.headers.get(WRITE_TOKEN_HEADER), deskWriteToken)) return writeTokenRefusal();
+          // Central rule: every route that is not a read needs the token (the header, or the form field a served form carries).
+          // /agent/panels returned above and keeps its own key. Adding a route cannot skip this check.
+          if (page === null && !READ_METHODS.has(request.method)) {
+            if (!writeTokenOk(request.headers.get(WRITE_TOKEN_HEADER) ?? (await formFieldToken(request)), deskWriteToken)) return writeTokenRefusal();
           }
           if (url.pathname === "/health") {
             const semantic = await runtime.runtime.service.invoke(caller, {
@@ -2746,6 +2744,12 @@ export async function createApplication(
             return Response.redirect("/workspace", 303);
           }
           return new Response("not found\n", { status: 404 });
+      };
+      const server: HttpServer = Bun.serve({
+        hostname: loaded.config.bind_host,
+        port,
+        async fetch(request) {
+          return withFormTokens(await route(request), deskWriteToken);
         },
       });
       return server;
@@ -2794,8 +2798,9 @@ export function pageAgentOf(request: Request): PageAgent | null {
 
 export const NOT_RECORDED_WORDS = "This was done, but it could not be added to the conversation. Check the desk log.";
 
-/** Every route that writes as the person. Each one needs the desk page's write token. */
-export const HUMAN_WRITES: ReadonlySet<string> = new Set(["/desk/handoff", "/desk/handoff/preview", "/desk/decide", "/desk/note", "/desk/draft", "/desk/panels/op", "/desk/conversation/discard", "/desk/start", "/desk/lesson", "/intent", "/surface/intent"]);
+/** Methods that only read. Every other method needs the desk page's write token. */
+export const READ_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS"]);
+export const WRITE_TOKEN_FIELD = "horizon_write";
 export const WRITE_TOKEN_HEADER = "x-horizon-write";
 export const WRITE_TOKEN_WORDS = "This did not come from the desk page, so nothing was changed. Reload the desk page and try again.";
 
@@ -2804,6 +2809,25 @@ export function writeTokenOk(given: string | null, expected: string): boolean {
   const a = Buffer.from(given);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** A plain HTML form cannot set a header, so a served form carries the token as a hidden field. */
+async function formFieldToken(request: Request): Promise<string | null> {
+  const type = request.headers.get("content-type") ?? "";
+  if (!type.includes("application/x-www-form-urlencoded") && !type.includes("multipart/form-data")) return null;
+  const form = await request.clone().formData().catch(() => null);
+  const value = form?.get(WRITE_TOKEN_FIELD);
+  return typeof value === "string" ? value : null;
+}
+
+/** Served pages (the compare page, the remote panel) post with plain forms: give each one the token field. */
+export async function withFormTokens(response: Response, token: string): Promise<Response> {
+  if (!(response.headers.get("content-type") ?? "").includes("text/html")) return response;
+  const html = await response.text();
+  const changed = html.replace(/<form\b([^>]*\bmethod="post"[^>]*)>/gi, (_all, attrs: string) => `<form${attrs}><input type="hidden" name="${WRITE_TOKEN_FIELD}" value="${token}">`);
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  return new Response(changed, { status: response.status, statusText: response.statusText, headers });
 }
 
 export function writeTokenRefusal(): Response {

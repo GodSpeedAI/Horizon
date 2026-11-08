@@ -34,6 +34,16 @@ function sendWriteToken(): void {
     headers.set("x-horizon-write", token);
     return nativeFetch(input, { ...init, headers });
   }, nativeFetch);
+  // A plain form post cannot set a header: give the form the token as a field just before it is sent.
+  document.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || form.method.toLowerCase() !== "post" || token === "" || form.querySelector('input[name="horizon_write"]') !== null) return;
+    const field = document.createElement("input");
+    field.type = "hidden";
+    field.name = "horizon_write";
+    field.value = token;
+    form.appendChild(field);
+  }, true);
 }
 sendWriteToken();
 

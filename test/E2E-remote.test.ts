@@ -111,7 +111,9 @@ suite("phone remote control, end to end in Chromium", () => {
     await page.getByLabel("Purpose of the case").fill("Phone opens the first case");
     await page.getByRole("button", { name: "Open a case" }).click();
     await (page.getByText("Phone opens the first case")).waitFor({ state: "visible", timeout: 15_000 });
-    const posted = await desktop.request.post(`${cockpitBase}/workspace/case`, { form: { purpose: "Desktop changes the case" }, maxRedirects: 0 });
+    // The desk page's own form carries the write token; this request acts like that form.
+    const token = /name="horizon-write-token" content="([0-9a-f]+)"/.exec(await (await desktop.request.get(`${cockpitBase}/desk`)).text())![1]!;
+    const posted = await desktop.request.post(`${cockpitBase}/workspace/case`, { form: { purpose: "Desktop changes the case", horizon_write: token }, maxRedirects: 0 });
     expect(posted.status()).toBe(303);
     await (page.getByText("Desktop changes the case")).waitFor({ state: "visible", timeout: 20_000 });
   }, 90_000);
