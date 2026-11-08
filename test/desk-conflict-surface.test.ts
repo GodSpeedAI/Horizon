@@ -6,6 +6,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { CONFLICT_WORDS, conflictLogLines, conflictViews } from "../src/ui/desk/conflict-model.ts";
 import { PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
 import { MIGRATION_COLLECTION } from "../src/capabilities/desk-migrations.ts";
+import { Database } from "bun:sqlite";
+import { join } from "node:path";
 import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
 const SECRET = "SECRET-ANSWER-WORDS-91";
@@ -73,5 +75,55 @@ describe("the desk tells the person about a conflicted question", () => {
     expect(lines[0]).toContain("p1");
     expect(errors.join("\n")).not.toContain(SECRET);
     expect(errors.join("\n")).not.toContain("other words");
+  });
+});
+
+/** Captures what the desk writes to the error stream while `run` runs, then puts the stream back. */
+async function captureErrors<T>(run: () => Promise<T>): Promise<{ result: T; errors: string[] }> {
+  const errors: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(" ")); };
+  try {
+    return { result: await run(), errors };
+  } finally {
+    console.error = original;
+  }
+}
+
+describe("startup reads the conflicts of a store that has none, or cannot be read", () => {
+  test("a fresh store logs nothing about conflicts, also when the application closes before its migrations finish", async () => {
+    const { errors } = await captureErrors(async () => {
+      const app = await startDeskApp({ awaitMigration: false });
+      apps.push(app);
+      // The `mcp` command closes the application at once; the startup listing must not run against the closed store.
+      await app.application.close();
+      await app.application.migrated;
+      await app.stop().catch(() => undefined);
+    });
+    expect(errors.filter((line) => line.includes("conflict") || line.includes("could not be listed"))).toEqual([]);
+  });
+
+  test("a store whose conflict read fails logs one line with the error class and message, and no answer text", async () => {
+    const first = await startDeskApp();
+    apps.push(first);
+    const root = first.root;
+    await first.stop();
+    apps.splice(apps.indexOf(first), 1);
+    // A record whose stored text is not JSON: the read of the collection fails, and the text it holds must not reach the log.
+    const db = new Database(join(root, "d.sqlite"));
+    try {
+      db.run("INSERT INTO records (collection, id, version, value) VALUES (?, ?, 1, ?)", [PANEL_ANSWERS_COLLECTION, "conflict:broken", `{"note":"${SECRET}"`]);
+    } finally {
+      db.close();
+    }
+    const { result, errors } = await captureErrors(async () => {
+      const app = await startDeskApp({ root });
+      apps.push(app);
+      return app;
+    });
+    expect(result).toBeDefined();
+    const lines = errors.filter((line) => line.includes("could not be listed"));
+    expect(lines).toHaveLength(1);
+    expect(errors.join("\n")).not.toContain(SECRET);
   });
 });

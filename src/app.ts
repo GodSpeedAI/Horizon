@@ -1993,16 +1993,24 @@ export async function createApplication(
   // Design v3, step 4 (item 4): the records are migrated under a versioned marker. Until that run finishes, every change is refused with
   // words saying so (503); a run that fails pauses changes for good until the desk restarts with the store fixed.
   let migrationState: "running" | "done" | "failed" = options.readOnly ? "done" : "running";
+  // The startup listing of conflicts reads the store. A caller that closes the application first (the `mcp` command does) must not
+  // leave that read running against a closed store: close() skips a listing that has not started and waits for one that has.
+  let closing = false;
+  let conflictsListed: Promise<void> = Promise.resolve();
   const answersMigrated: Promise<void> = options.readOnly ? Promise.resolve() : runDeskMigrations(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id), clock(), panelCommand, DESK_MIGRATIONS, options.migrationHold, soleOperator).then(
     async () => {
       migrationState = "done";
       // One line per conflicted question, with ids only: the answers' words are never logged (R2-10).
-      if (!options.readOnly) {
-        try {
-          for (const line of conflictLogLines((await listConflicts(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))).map((c) => ({ panel: c.panel_id, ask: c.ask })))) console.error(line);
-        } catch (error) {
-          console.error("desk: the conflicted answers could not be listed", error instanceof Error ? error.name : "unknown");
-        }
+      if (!options.readOnly && !closing) {
+        conflictsListed = (async (): Promise<void> => {
+          try {
+            for (const line of conflictLogLines((await listConflicts(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))).map((c) => ({ panel: c.panel_id, ask: c.ask })))) console.error(line);
+          } catch (error) {
+            // The error's class and message only: the log never carries answer text.
+            console.error("desk: the conflicted answers could not be listed", error instanceof Error ? error.name : "unknown", error instanceof Error ? error.message : "");
+          }
+        })();
+        await conflictsListed;
       }
     },
     (error: unknown) => {
@@ -3349,6 +3357,8 @@ export async function createApplication(
     },
     migrated: answersMigrated,
     async close() {
+      closing = true;
+      await conflictsListed;
       if (remote.listening) await remote.stop();
       for (const timer of windowTimers.values()) clearTimeout(timer);
       windowTimers.clear();
