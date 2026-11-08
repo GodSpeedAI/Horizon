@@ -72,3 +72,37 @@ describe("a read-only open never writes", () => {
     expect(existsSync(secretPath)).toBe(false);
   });
 });
+
+describe("a read-only open keeps the file as it was", () => {
+  const journalMode = (path: string): string => {
+    const db = new Database(path, { readonly: true });
+    try {
+      return (db.query("PRAGMA journal_mode").get() as { journal_mode: string }).journal_mode;
+    } finally {
+      db.close();
+    }
+  };
+
+  test("a read-only open of a current store in DELETE journal mode leaves the journal mode and the bytes unchanged", async () => {
+    const root = await runAndStop();
+    const path = join(root, "d.sqlite");
+    // A current-schema store in rollback-journal mode. The writable opener would switch it to WAL.
+    const db = new Database(path);
+    try {
+      db.exec("PRAGMA journal_mode = DELETE");
+    } finally {
+      db.close();
+    }
+    expect(journalMode(path)).toBe("delete");
+    const bytesBefore = readFileSync(path);
+
+    const reader = await startDeskApp({ root, readOnly: true });
+    apps.push(reader);
+    expect(reader.application.surface().ok).toBe(true);
+    await reader.stop();
+    apps.splice(apps.indexOf(reader), 1);
+
+    expect(journalMode(path)).toBe("delete");
+    expect(readFileSync(path)).toEqual(bytesBefore);
+  });
+});
