@@ -1,4 +1,5 @@
 /** @jsxImportSource react */
+import { revisionOf } from "./support/answer-revision.ts";
 import { afterEach, describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CONVERSATION_COLLECTION } from "../src/capabilities/conversation.ts";
@@ -23,7 +24,7 @@ describe("a recording failure reaches the person", () => {
     apps.push(app);
     const question = { id: "q", question: "Which plan?", why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }] };
     expect((await agent(app, { tool: "ask_human", panel: "p", ask: question })).status).toBe(200);
-    await fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a" }) });
+    await fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", panel: "p", ask: "q", ...(await revisionOf(app, "p", "q")), outcome: "answered", value: "a" }) });
 
     // The conversation store cannot write a row from here on. Other records still write.
     const store = app.application.runtime.runtime.store as unknown as { commit: (input: { records?: { collection: string }[] }) => Promise<unknown> };

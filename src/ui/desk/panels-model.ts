@@ -56,6 +56,9 @@ export const MAX_WITHDRAW_REASON = 200;
 export { REQUIRED_CANNOT_WITHDRAW };
 export const QUESTION_CHANGED = "This question changed after you looked at it. Look again, then answer.";
 export const OWNER_CHANGED = "The owner of this question changed after you looked at it. Look again, then answer.";
+/** An answer must say which version and owner revision of the question it was given under. Missing or malformed, it is refused. */
+export const ANSWER_NEEDS_REVISION = "This answer does not say which version of the question and which owner revision it was given under. Look again, then answer.";
+const VERSION_FORMAT = /^[0-9a-f]{14}$/;
 /**
  * A question id keeps its first wording, choices, consequences, input kind and target, whatever its state (unanswered, put off or
  * answered). A put that changes any of them is refused with these words (operator decision: "Use a new question ID for changes").
@@ -86,9 +89,11 @@ export const isOpenAsk = (b: PanelBlock): boolean => b.kind === "question" && b.
 export const hasOpenAsk = (p: Panel): boolean => p.blocks.some(isOpenAsk);
 
 export type HumanOp =
-  /** `version` is the version of the question the person was looking at. When it is sent and no longer matches, the answer is refused. */
-  /** `owner_rev` is the owner revision of the question the person was looking at. When it is sent and no longer matches, the answer is refused. */
-  | { readonly op: "human.answer"; readonly panel: string; readonly ask: string; readonly outcome: "answered" | "deferred" | "cancelled"; readonly value?: unknown; readonly note?: string | null; readonly version?: string; readonly owner_rev?: number }
+  /**
+   * `version` is the version of the question the person was looking at, and `owner_rev` its owner revision. Both are required on every
+   * answer, deferral and cancellation. A version or revision that no longer matches is refused.
+   */
+  | { readonly op: "human.answer"; readonly panel: string; readonly ask: string; readonly outcome: "answered" | "deferred" | "cancelled"; readonly value?: unknown; readonly note?: string | null; readonly version: string; readonly owner_rev: number }
   | { readonly op: "human.pin"; readonly id: string; readonly pinned: boolean }
   | { readonly op: "human.close"; readonly id: string }
   | { readonly op: "human.open"; readonly template: string; readonly title?: string; readonly step?: string | null };
@@ -265,9 +270,10 @@ export function reduceHuman(state: Panels, op: HumanOp): Reduced {
     case "human.answer": {
       const panel = state.open.find((p) => same(p.id, op.panel));
       const ask = panel?.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === op.ask);
+      if (typeof op.version !== "string" || !VERSION_FORMAT.test(op.version) || !Number.isInteger(op.owner_rev) || op.owner_rev < 0) return refuse(state, "SCHEMA", ANSWER_NEEDS_REVISION);
       if (panel === undefined || ask === undefined) return refuse(state, "NOT_FOUND", "That question is no longer open.");
-      if (op.version !== undefined && ask.version !== undefined && op.version !== ask.version) return refuse(state, "SCHEMA", QUESTION_CHANGED);
-      if (op.owner_rev !== undefined && op.owner_rev !== (ask.owner_rev ?? 0)) return refuse(state, "SCHEMA", OWNER_CHANGED);
+      if (ask.version !== op.version) return refuse(state, "SCHEMA", QUESTION_CHANGED);
+      if (op.owner_rev !== (ask.owner_rev ?? 0)) return refuse(state, "SCHEMA", OWNER_CHANGED);
       if (ask.answered !== null) return refuse(state, "SCHEMA", "That question was already answered.");
       if ((ask.withdrawn ?? null) !== null) return refuse(state, "SCHEMA", "The agent withdrew that question.");
       // Not now and Skip carry no value; an answer must fit the kind of question.

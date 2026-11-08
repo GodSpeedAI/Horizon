@@ -1,4 +1,5 @@
 /** @jsxImportSource react */
+import { reducerRevision } from "./support/answer-revision.ts";
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NO_PANELS, hasOpenAsk, reduceAgent, reduceHuman, type AskBlock, type Panels } from "../src/ui/desk/panels-model.ts";
@@ -9,7 +10,7 @@ const ask = { id: "q", question: "Which plan?", why_needed: "x", options: [{ opt
 const block = (s: Panels): AskBlock => s.open[0]!.blocks.find((b): b is AskBlock => b.kind === "question")!;
 const answered = (outcome: "answered" | "deferred" | "cancelled"): Panels => {
   const put = reduceAgent(NO_PANELS, { tool: "ask_human", panel: "p", ask }).state;
-  return reduceHuman(put, { op: "human.answer", panel: "p", ask: "q", outcome, ...(outcome === "answered" ? { value: "a" } : {}) }).state;
+  return reduceHuman(put, { op: "human.answer", panel: "p", ask: "q", ...reducerRevision(put, "p", "q"), outcome, ...(outcome === "answered" ? { value: "a" } : {}) }).state;
 };
 
 describe("Not yet means the agent will ask again", () => {
@@ -22,7 +23,7 @@ describe("Not yet means the agent will ask again", () => {
     expect(hasOpenAsk(again.state.open[0]!)).toBe(true);
     expect(block(again.state).earlier?.map((e) => e.outcome)).toEqual(["deferred"]);
     // It can be answered now, and the history keeps growing, not replacing.
-    const twice = reduceAgent(reduceHuman(again.state, { op: "human.answer", panel: "p", ask: "q", outcome: "deferred" }).state, { tool: "ask_human", panel: "p", ask });
+    const twice = reduceAgent(reduceHuman(again.state, { op: "human.answer", panel: "p", ask: "q", ...reducerRevision(again.state, "p", "q"), outcome: "deferred" }).state, { tool: "ask_human", panel: "p", ask });
     expect(block(twice.state).earlier?.map((e) => e.outcome)).toEqual(["deferred", "deferred"]);
   });
 

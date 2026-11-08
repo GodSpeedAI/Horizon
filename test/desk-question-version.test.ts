@@ -24,16 +24,16 @@ describe("each question has a version", () => {
 
   test("an answer to the version the person saw is accepted", () => {
     const s = put(NO_PANELS, ask());
-    const r = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: block(s).version });
+    const r = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: block(s).version, owner_rev: 0 });
     expect(r.result.ok).toBe(true);
   });
 
   test("an answer to a version the question does not have is refused with plain words", () => {
     // A question keeps its wording under its id, so the version a person saw can only go stale by a different version being sent.
     const s = put(NO_PANELS, ask());
-    const seen = "0000000000000";
+    const seen = "00000000000000";
     expect(seen).not.toBe(block(s).version);
-    const r = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: seen });
+    const r = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: seen, owner_rev: 0 });
     expect(r.result.ok).toBe(false);
     expect(r.result.ok === false && r.result.message).toBe("This question changed after you looked at it. Look again, then answer.");
     expect(QUESTION_CHANGED).toBe("This question changed after you looked at it. Look again, then answer.");
@@ -42,7 +42,7 @@ describe("each question has a version", () => {
 
   test("an agent cannot change a question the person already answered, by ask_human or show_surface", () => {
     let s = put(NO_PANELS, ask());
-    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: block(s).version }).state;
+    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: block(s).version, owner_rev: 0 }).state;
     const reworded = reduceAgent(s, { tool: "ask_human", panel: "p", ask: ask({ question: "Which plan, same as before?" }) });
     expect(reworded.result.ok).toBe(false);
     expect(reworded.result.ok === false && reworded.result.message).toBe(ANSWERED_CANNOT_CHANGE);
@@ -65,7 +65,7 @@ describe("each question has a version", () => {
     expect(edited.result.ok === false && edited.result.message).toBe(SAME_ID);
     expect(block(edited.state).question).toBe("Which plan?");
     expect(block(edited.state).version).toBe(before);
-    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: before }).state;
+    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: before, owner_rev: 0 }).state;
     const again = reduceAgent(s, { tool: "ask_human", panel: "p", ask: ask() });
     expect(again.result.ok).toBe(true);
     expect(block(again.state).answered?.value).toBe("a");
@@ -73,7 +73,7 @@ describe("each question has a version", () => {
 
   test("a question put off keeps its id's wording: a changed put is refused, the same words reopen it", () => {
     let s = put(NO_PANELS, ask());
-    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "deferred", version: block(s).version }).state;
+    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "deferred", version: block(s).version, owner_rev: 0 }).state;
     const changed = reduceAgent(s, { tool: "ask_human", panel: "p", ask: ask({ question: "Now which plan?" }) });
     expect(changed.result.ok).toBe(false);
     expect(changed.result.ok === false && changed.result.message).toBe(SAME_ID);
@@ -100,12 +100,12 @@ describe("over the desk", () => {
     const reworded = await app.application.applyAgentOp({ tool: "ask_human", panel: "web", ask: ask({ question: "Which plan, again?" }) });
     expect(reworded.ok).toBe(false);
     expect(reworded.ok === false && reworded.message).toBe(SAME_ID_WORDS);
-    const stale = await app.post("/desk/panels/op", { op: "human.answer", panel: "web", ask: "q", outcome: "answered", value: "a", version: "0000000000000" });
+    const stale = await app.post("/desk/panels/op", { op: "human.answer", panel: "web", ask: "q", outcome: "answered", value: "a", version: "00000000000000", owner_rev: 0 });
     expect(stale.status).toBe(409);
     expect(((await stale.json()) as any).message).toBe("This question changed after you looked at it. Look again, then answer.");
     expect(seen).toMatch(/^[0-9a-f]{14}$/);
     const now = (await app.state()).panels.open.find((p: any) => p.id === "web").blocks[0].version;
-    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "web", ask: "q", outcome: "answered", value: "a", version: now })).status).toBe(200);
+    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "web", ask: "q", outcome: "answered", value: "a", version: now, owner_rev: 0 })).status).toBe(200);
     const said = await app.application.applyAgentOp({ tool: "read_responses" });
     expect(said.ok && said.responses?.find((r) => r.panel_id === "web")?.version).toBe(now);
     const late = await app.application.applyAgentOp({ tool: "ask_human", panel: "web", ask: ask({ question: "Sneaky change" }) });

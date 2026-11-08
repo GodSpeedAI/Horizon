@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { revisionOf } from "./support/answer-revision.ts";
 import { createHash, randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -29,7 +30,7 @@ describe("an agent reads only the answers to its own questions", () => {
     expect((await as("Alice", "/agent/panels", { tool: "ask_human", panel: "alice_panel", ask: q("alice_q") })).status).toBe(200);
     expect((await as("Bob", "/agent/panels", { tool: "ask_human", panel: "bob_panel", ask: q("bob_q") })).status).toBe(200);
     for (const [panel, ask] of [["alice_panel", "alice_q"], ["bob_panel", "bob_q"]] as const) {
-      const sent = await fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", panel, ask, outcome: "answered", value: "a" }) });
+      const sent = await fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", panel, ask, ...(await revisionOf(app, panel, ask)), outcome: "answered", value: "a" }) });
       expect(sent.status).toBe(200);
     }
     expect((await answers("Alice")).map((a) => a.ask)).toEqual(["alice_q"]);
@@ -40,7 +41,7 @@ describe("an agent reads only the answers to its own questions", () => {
   test("a later put by another agent does not change who asked", async () => {
     await as("Alice", "/agent/panels", { tool: "ask_human", panel: "keep_panel", ask: q("keep_q") });
     await as("Bob", "/agent/panels", { tool: "ask_human", panel: "keep_panel", ask: q("keep_q") });
-    await fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", panel: "keep_panel", ask: "keep_q", outcome: "answered", value: "b" }) });
+    await fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", panel: "keep_panel", ask: "keep_q", ...(await revisionOf(app, "keep_panel", "keep_q")), outcome: "answered", value: "b" }) });
     expect((await answers("Alice")).some((a) => a.ask === "keep_q")).toBe(true);
     expect((await answers("Bob")).some((a) => a.ask === "keep_q")).toBe(false);
   });

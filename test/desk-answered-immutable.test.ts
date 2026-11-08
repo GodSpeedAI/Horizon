@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { reducerRevision } from "./support/answer-revision.ts";
 import { ANSWERED_CANNOT_CHANGE, NO_PANELS, reduceAgent, reduceHuman, type AskBlock, type Panels } from "../src/ui/desk/panels-model.ts";
 
 const ask = (over: Record<string, unknown> = {}) => ({ id: "q", question: "Which plan?", why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }], ...over });
 const asks = (state: Panels): AskBlock[] => state.open.flatMap((p) => p.blocks.filter((b): b is AskBlock => b.kind === "question"));
 const answeredBoard = (over: Record<string, unknown> = {}): Panels => {
   const put = reduceAgent(NO_PANELS, { tool: "ask_human", panel: "p", ask: ask(over) });
-  return reduceHuman(put.state, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a" }).state;
+  return reduceHuman(put.state, { op: "human.answer", panel: "p", ask: "q", ...reducerRevision(put.state, "p", "q"), outcome: "answered", value: "a" }).state;
 };
 const refused = (r: ReturnType<typeof reduceAgent>) => r.result.ok === false && r.result.message === ANSWERED_CANNOT_CHANGE;
 
@@ -27,7 +28,7 @@ describe("an answered question cannot be erased or changed", () => {
 
   test("a show_surface that leaves out only the answered question is refused", () => {
     const put = reduceAgent(NO_PANELS, { tool: "show_surface", surface: { id: "p", blocks: [{ type: "ask", ...ask() }, { type: "ask", ...ask({ id: "r", question: "Another?" }) }] } });
-    const s = reduceHuman(put.state, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a" }).state;
+    const s = reduceHuman(put.state, { op: "human.answer", panel: "p", ask: "q", ...reducerRevision(put.state, "p", "q"), outcome: "answered", value: "a" }).state;
     const dropped = reduceAgent(s, { tool: "show_surface", surface: { id: "p", blocks: [{ type: "ask", ...ask({ id: "r", question: "Another?" }) }] } });
     expect(refused(dropped)).toBe(true);
     expect(asks(dropped.state).map((b) => b.id).sort()).toEqual(["q", "r"]);

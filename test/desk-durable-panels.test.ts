@@ -3,6 +3,7 @@
  * fails is an error the desk shows, never an empty board. Each proof goes through the application's own entry points, and the
  * restart tests start a second application on the same store (the same `root`).
  */
+import { withRevision } from "./support/answer-revision.ts";
 import { afterAll, describe, expect, test } from "bun:test";
 import { createHash, randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
@@ -24,7 +25,7 @@ const question = (id: string, text = "Which plan?") => ({ id, question: text, wh
 const agent = (app: DeskApp, key: string, name: string, body: unknown) =>
   fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": name }, body: JSON.stringify(body) });
 const putQuestion = (app: DeskApp, panel: string, id: string, text?: string) => agent(app, keys.ag_alice, "Alice", { tool: "ask_human", panel, ask: question(id, text) });
-const person = (app: DeskApp, body: unknown) => app.post("/desk/panels/op", body);
+const person = async (app: DeskApp, body: unknown) => app.post("/desk/panels/op", await withRevision(app, body));
 const answer = (app: DeskApp, panel: string, ask: string, outcome: "answered" | "deferred" = "answered") => person(app, { op: "human.answer", panel, ask, outcome, value: outcome === "answered" ? "a" : undefined });
 const blockOf = (state: any, panel: string, ask: string): any => state.panels.open.find((p: { id: string }) => p.id === panel)?.blocks.find((b: { id: string }) => b.id === ask);
 const surface = (id: string) => ({ tool: "show_surface", surface: { id, title: `Panel ${id}`, blocks: [{ type: "callout", id: "c1", tone: "ok", text: "Looks fine" }] } });

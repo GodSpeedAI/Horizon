@@ -1,4 +1,5 @@
 /** Questions in agent panels: open questions are never evicted, withdraw, answers per input kind, and the "where it went" rule. */
+import { reducerRevision } from "./support/answer-revision.ts";
 import { describe, expect, test } from "bun:test";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
 import { acceptanceBlocked, answerFor, listAnswers, recordAnswer, routeAnswer } from "../src/capabilities/panel-answers.ts";
@@ -26,7 +27,7 @@ describe("a panel with an open question stays", () => {
     expect(state.open[0]!.id).toBe("waits");
     expect(state.open.map((p) => p.id)).not.toContain("p1");
     // Once answered (or put off) it can make room again.
-    state = reduceHuman(state, { op: "human.answer", panel: "waits", ask: "q1", outcome: "deferred" }).state;
+    state = reduceHuman(state, { op: "human.answer", panel: "waits", ask: "q1", ...reducerRevision(state, "waits", "q1"), outcome: "deferred" }).state;
     state = ok(reduceAgent(state, callout("p13")));
     expect(state.open.map((p) => p.id)).not.toContain("waits");
   });
@@ -40,7 +41,7 @@ describe("a panel with an open question stays", () => {
     expect(refused.state).toBe(state);
     expect(reduceAgent(state, { tool: "ask_human", panel: "late", ask: askOf("q1") }).result.ok).toBe(false);
     // Skipping one makes room.
-    state = reduceHuman(state, { op: "human.answer", panel: "w3", ask: "q1", outcome: "cancelled" }).state;
+    state = reduceHuman(state, { op: "human.answer", panel: "w3", ask: "q1", ...reducerRevision(state, "w3", "q1"), outcome: "cancelled" }).state;
     expect(reduceAgent(state, callout("late")).result.ok).toBe(true);
   });
 });
@@ -52,7 +53,7 @@ describe("withdrawing a question", () => {
   test("it shows the reason, no longer holds the panel, and cannot be answered", () => {
     const state = ok(withdraw(asked, "The release was cancelled."));
     expect(state.open[0]!.blocks[0]).toMatchObject({ kind: "question", withdrawn: { reason: "The release was cancelled." } });
-    expect(reduceHuman(state, { op: "human.answer", panel: "p", ask: "q1", outcome: "answered", value: "yes" }).result.ok).toBe(false);
+    expect(reduceHuman(state, { op: "human.answer", panel: "p", ask: "q1", ...reducerRevision(state, "p", "q1"), outcome: "answered", value: "yes" }).result.ok).toBe(false);
     // It no longer protects the panel from the cap.
     let full = state;
     for (let i = 1; i <= 8; i += 1) full = ok(reduceAgent(full, callout(`f${i}`)));
@@ -65,7 +66,7 @@ describe("withdrawing a question", () => {
     expect(withdraw(asked, "  ").result.ok).toBe(false);
     expect(withdraw(asked, "x".repeat(201)).result.ok).toBe(false);
     expect(withdraw(asked, "x".repeat(200)).result.ok).toBe(true);
-    const answered = reduceHuman(asked, { op: "human.answer", panel: "p", ask: "q1", outcome: "answered", value: "no" }).state;
+    const answered = reduceHuman(asked, { op: "human.answer", panel: "p", ask: "q1", ...reducerRevision(asked, "p", "q1"), outcome: "answered", value: "no" }).state;
     expect(withdraw(answered, "changed my mind").result.ok).toBe(false);
     expect(reduceAgent(asked, { tool: "ask.withdraw", panel_id: "p", ask_id: "nope", reason: "x" }).result).toMatchObject({ ok: false, code: "NOT_FOUND" });
   });
@@ -74,7 +75,7 @@ describe("withdrawing a question", () => {
 describe("answers fit the kind of question", () => {
   const answer = (ask: Record<string, unknown>, value: unknown) => {
     const state = ok(reduceAgent(NO_PANELS, { tool: "ask_human", panel: "p", ask }));
-    return reduceHuman(state, { op: "human.answer", panel: "p", ask: "q1", outcome: "answered", value });
+    return reduceHuman(state, { op: "human.answer", panel: "p", ask: "q1", ...reducerRevision(state, "p", "q1"), outcome: "answered", value });
   };
   test("confirm is yes or no", () => {
     const confirm = askOf("q1", { input: "confirm", options: undefined });
@@ -107,8 +108,8 @@ describe("answers fit the kind of question", () => {
   test("Not yet and Skip need no value, for any kind", () => {
     for (const input of ["confirm", "text", "multiselect"]) {
       const state = ok(reduceAgent(NO_PANELS, { tool: "ask_human", panel: "p", ask: askOf("q1", { input, options: input === "multiselect" ? two : undefined }) }));
-      expect(reduceHuman(state, { op: "human.answer", panel: "p", ask: "q1", outcome: "deferred" }).result.ok).toBe(true);
-      expect(reduceHuman(state, { op: "human.answer", panel: "p", ask: "q1", outcome: "cancelled" }).result.ok).toBe(true);
+      expect(reduceHuman(state, { op: "human.answer", panel: "p", ask: "q1", ...reducerRevision(state, "p", "q1"), outcome: "deferred" }).result.ok).toBe(true);
+      expect(reduceHuman(state, { op: "human.answer", panel: "p", ask: "q1", ...reducerRevision(state, "p", "q1"), outcome: "cancelled" }).result.ok).toBe(true);
     }
   });
 });
@@ -140,7 +141,7 @@ describe("the answer stays open until the agent says where it went", () => {
   });
   test("in the panel, the answered question shows where it went", () => {
     let state = ok(reduceAgent(NO_PANELS, { tool: "ask_human", panel: "p", ask: askOf("q1") }));
-    state = reduceHuman(state, { op: "human.answer", panel: "p", ask: "q1", outcome: "answered", value: "yes" }).state;
+    state = reduceHuman(state, { op: "human.answer", panel: "p", ask: "q1", ...reducerRevision(state, "p", "q1"), outcome: "answered", value: "yes" }).state;
     expect(reduceAgent(state, { tool: "answer.route", panel_id: "p", ask_id: "q1", routed_as: "no" }).result.ok).toBe(false);
     state = ok(reduceAgent(state, { tool: "answer.route", panel_id: "p", ask_id: "q1", routed_as: "no action: already shipped" }));
     expect(state.open[0]!.blocks[0]).toMatchObject({ answered: { value: "yes", routed_as: "no action: already shipped" } });

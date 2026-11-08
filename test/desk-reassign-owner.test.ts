@@ -2,6 +2,7 @@
  * Step 5: the person moves a waiting question to another registered agent (paired, recent pairing, registered target, second
  * confirm). The old key's late route is refused; the new key's route is accepted and labelled as a claim; the row names both.
  */
+import { revisionOf } from "./support/answer-revision.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash, randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
@@ -31,7 +32,7 @@ describe("the person moves a waiting question to another agent", () => {
     app = await startDeskApp();
     writeRegistry(app);
     expect((await agent(app, keys.ag_alice, "Alice", { tool: "ask_human", panel: "rot_panel", ask: q("rot_q") })).status).toBe(200);
-    expect((await person(app, { op: "human.answer", panel: "rot_panel", ask: "rot_q", outcome: "answered", value: "a" })).status).toBe(200);
+    expect((await person(app, { op: "human.answer", panel: "rot_panel", ask: "rot_q", ...(await revisionOf(app, "rot_panel", "rot_q")), outcome: "answered", value: "a" })).status).toBe(200);
   });
   afterAll(async () => app.stop());
 
@@ -64,7 +65,7 @@ describe("the person moves a waiting question to another agent", () => {
   test("the old key's late route is refused as not the owner", async () => {
     // The answer is already routed by the new owner; a second route is refused for either key. Ask a fresh question to test the old key.
     await agent(app, keys.ag_alice, "Alice", { tool: "ask_human", panel: "late_panel", ask: q("late_q") });
-    await person(app, { op: "human.answer", panel: "late_panel", ask: "late_q", outcome: "answered", value: "b" });
+    await person(app, { op: "human.answer", panel: "late_panel", ask: "late_q", ...(await revisionOf(app, "late_panel", "late_q")), outcome: "answered", value: "b" });
     const r = await move(app, { panel: "late_panel", ask: "late_q", confirmed: true, to_key_id: "ag_alice2" });
     expect(r.status).toBe(200);
     const late = await agent(app, keys.ag_alice, "Alice", { tool: "answer.route", panel_id: "late_panel", ask_id: "late_q", routed_as: "step handoff_0a49 in Seed" });
@@ -92,7 +93,7 @@ describe("a move needs a recent pairing", () => {
     try {
       writeRegistry(app);
       expect((await agent(app, keys.ag_alice, "Alice", { tool: "ask_human", panel: "old_panel", ask: q("old_q") })).status).toBe(200);
-      expect((await person(app, { op: "human.answer", panel: "old_panel", ask: "old_q", outcome: "answered", value: "a" })).status).toBe(200);
+      expect((await person(app, { op: "human.answer", panel: "old_panel", ask: "old_q", ...(await revisionOf(app, "old_panel", "old_q")), outcome: "answered", value: "a" })).status).toBe(200);
       time += 11 * 60_000;
       const r = await person(app, { op: "human.reassign_owner", panel: "old_panel", ask: "old_q", from_key_id: "ag_alice", to_key_id: "ag_alice2", confirmed: true });
       expect(r.status).toBe(409);

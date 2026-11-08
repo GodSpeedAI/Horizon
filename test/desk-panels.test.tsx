@@ -1,5 +1,7 @@
 /** @jsxImportSource react */
 /** Panels from agents (stage 4): mapped to Horizon's blocks, capped at eight, pinned panels stay put, and an unanswered agent holds up acceptance. */
+import { revisionOf } from "./support/answer-revision.ts";
+import { reducerRevision } from "./support/answer-revision.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
@@ -65,7 +67,7 @@ describe("panels from agents", () => {
     expect(reduceAgent(state, { tool: "arrange", action: { op: "surface.remove", id: "a" } }).state.open.map((p) => p.id)).toEqual(["b", "c"]);
     // An answered question stays answered when the agent redraws the panel.
     let asked = must(reduceAgent(NO_PANELS, { tool: "ask_human", panel: "q", ask }));
-    asked = reduceHuman(asked, { op: "human.answer", panel: "q", ask: "q1", outcome: "answered", value: "yes" }).state;
+    asked = reduceHuman(asked, { op: "human.answer", panel: "q", ask: "q1", ...reducerRevision(asked, "q", "q1"), outcome: "answered", value: "yes" }).state;
     asked = must(reduceAgent(asked, surface("q", { blocks: [{ type: "ask", ...ask }] })));
     expect(asked.open[0]!.blocks[0]).toMatchObject({ kind: "question", answered: { outcome: "answered", value: "yes" } });
   });
@@ -178,7 +180,7 @@ describe("acceptance through the application", () => {
     expect((await cardNow()).blocked).toBeNull();
     // An agent asks about the step; the person answers.
     expect((await app.application.applyAgentOp({ tool: "ask_human", panel: "release", ask, step: "signoff_release" })).ok).toBe(true);
-    const answered = await app.post("/desk/panels/op", { op: "human.answer", panel: "release", ask: "q1", outcome: "answered", value: "yes" });
+    const answered = await app.post("/desk/panels/op", { op: "human.answer", panel: "release", ask: "q1", ...(await revisionOf(app, "release", "q1")), outcome: "answered", value: "yes" });
     expect(answered.status).toBe(200);
     expect((await app.state()).panels.waiting).toEqual([{ step: "signoff_release", panel: "release" }]);
     // The card turns accept off, in words; the server refuses an accept anyway; nothing reaches the case keeper.
@@ -206,7 +208,7 @@ describe("acceptance through the application", () => {
   test("the person can stop waiting for an agent that will not reply", async () => {
     await app.application.applyAgentOp({ tool: "ask_human", panel: "release2", ask: { ...ask, id: "q9" }, step: "signoff_release" });
     // Answered (not put off): only an answer waits for the agent. A put-off question does not (store-design-v2 section 3).
-    await app.post("/desk/panels/op", { op: "human.answer", panel: "release2", ask: "q9", outcome: "answered", value: "yes" });
+    await app.post("/desk/panels/op", { op: "human.answer", panel: "release2", ask: "q9", ...(await revisionOf(app, "release2", "q9")), outcome: "answered", value: "yes" });
     expect((await cardNow()).blocked).not.toBeNull();
     const stopped = await app.post("/desk/panels/op", { op: "human.stop_waiting", step: "signoff_release" });
     expect(stopped.status).toBe(200);
@@ -214,9 +216,9 @@ describe("acceptance through the application", () => {
   });
 
   test("an answer to a question that is not open, or with no choice, is refused", async () => {
-    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "nope", ask: "q1", outcome: "answered", value: "yes" })).status).toBe(409);
+    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "nope", ask: "q1", ...(await revisionOf(app, "nope", "q1")), outcome: "answered", value: "yes" })).status).toBe(409);
     await app.application.applyAgentOp({ tool: "ask_human", panel: "p3", ask: { ...ask, id: "q3" } });
-    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "p3", ask: "q3", outcome: "answered" })).status).toBe(400);
+    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "p3", ask: "q3", ...(await revisionOf(app, "p3", "q3")), outcome: "answered" })).status).toBe(400);
     expect((await app.post("/desk/panels/op", { op: "human.pin", id: "p3", pinned: true })).status).toBe(200);
     expect((await app.state()).panels.open.find((p: any) => p.id === "p3").pinned).toBe(true);
   });

@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { revisionOf } from "./support/answer-revision.ts";
 import { statusWord } from "../src/ui/desk/Conversation.tsx";
 import { fakeCaseKeeper, type FakeKeeper } from "./support/fake-case-keeper.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
@@ -27,7 +28,7 @@ afterAll(async () => {
 /** The question settles `resolves` (a step id, or null). A route is checked only when it names that same step and the step is waiting. */
 async function answered(panel: string, resolves: string | null = null): Promise<void> {
   expect((await app.application.applyAgentOp({ tool: "ask_human", panel, ask: { ...ask("q"), resolves } })).ok).toBe(true);
-  expect((await app.post("/desk/panels/op", { op: "human.answer", panel, ask: "q", outcome: "answered", value: "a" })).status).toBe(200);
+  expect((await app.post("/desk/panels/op", { op: "human.answer", panel, ask: "q", ...(await revisionOf(app, panel, "q")), outcome: "answered", value: "a" })).status).toBe(200);
 }
 
 describe("an agent's \"I routed it\" is its claim, not proof", () => {

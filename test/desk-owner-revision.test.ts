@@ -22,7 +22,7 @@ describe("a reassignment starts a new owner revision that an answer must carry",
     const seen = alice();
     const before = qs(seen)[0]!.owner_rev ?? 0;
     const moved = moveQuestion(seen, "p", "q", "ag_bob", "Bob");
-    const r = reduceHuman(moved, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", owner_rev: before });
+    const r = reduceHuman(moved, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: qs(seen)[0]!.version!, owner_rev: before });
     expect(r.result).toEqual({ ok: false, code: "SCHEMA", message: OWNER_CHANGED });
     expect(r.state).toBe(moved);
     expect(qs(r.state)[0]!.answered).toBeNull();
@@ -30,14 +30,14 @@ describe("a reassignment starts a new owner revision that an answer must carry",
 
   test("an answer carrying the current revision is accepted", () => {
     const moved = moveQuestion(alice(), "p", "q", "ag_bob", "Bob");
-    const r = reduceHuman(moved, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", owner_rev: 1 });
+    const r = reduceHuman(moved, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: qs(moved)[0]!.version!, owner_rev: 1 });
     expect(r.result.ok).toBe(true);
     expect(qs(r.state)[0]!.answered?.value).toBe("a");
   });
 
   test("a deferral under the previous revision is refused too, and the question keeps its current revision", () => {
     const moved = moveQuestion(alice(), "p", "q", "ag_bob", "Bob");
-    const r = reduceHuman(moved, { op: "human.answer", panel: "p", ask: "q", outcome: "deferred", owner_rev: 0 });
+    const r = reduceHuman(moved, { op: "human.answer", panel: "p", ask: "q", outcome: "deferred", version: qs(moved)[0]!.version!, owner_rev: 0 });
     expect(r.result.ok).toBe(false);
     expect(qs(r.state)[0]!.owner_rev).toBe(1);
   });

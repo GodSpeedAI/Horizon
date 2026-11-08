@@ -3,6 +3,7 @@
  * withdrawn. The board's `answered` and `withdrawn` are derived from it, never stored. Each state is set through the desk's own entry
  * points, then read back from the records after the desk restarts on the same SQLite file.
  */
+import { revisionOf } from "./support/answer-revision.ts";
 import { afterAll, describe, expect, test } from "bun:test";
 import { PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
 import { PANELS_COLLECTION, questionStateOf } from "../src/capabilities/panel-records.ts";
@@ -35,11 +36,11 @@ async function setUpEveryState(app: DeskApp): Promise<void> {
   const put = (panel: string) => app.application.applyAgentOp({ tool: "ask_human", panel, ask: askOf("q") });
   await put("st-waiting");
   await put("st-put-off");
-  await app.post("/desk/panels/op", { op: "human.answer", panel: "st-put-off", ask: "q", outcome: "deferred" });
+  await app.post("/desk/panels/op", { op: "human.answer", panel: "st-put-off", ask: "q", ...(await revisionOf(app, "st-put-off", "q")), outcome: "deferred" });
   await put("st-agent");
-  await app.post("/desk/panels/op", { op: "human.answer", panel: "st-agent", ask: "q", outcome: "answered", value: "a" });
+  await app.post("/desk/panels/op", { op: "human.answer", panel: "st-agent", ask: "q", ...(await revisionOf(app, "st-agent", "q")), outcome: "answered", value: "a" });
   await put("st-finished");
-  await app.post("/desk/panels/op", { op: "human.answer", panel: "st-finished", ask: "q", outcome: "answered", value: "b" });
+  await app.post("/desk/panels/op", { op: "human.answer", panel: "st-finished", ask: "q", ...(await revisionOf(app, "st-finished", "q")), outcome: "answered", value: "b" });
   await app.application.applyAgentOp({ tool: "answer.route", panel_id: "st-finished", ask_id: "q", routed_as: "step handoff_0a49 in Seed: triage inbox" });
   await put("st-withdrawn");
   await app.application.applyAgentOp({ tool: "ask.withdraw", panel_id: "st-withdrawn", ask_id: "q", reason: "no longer needed" });

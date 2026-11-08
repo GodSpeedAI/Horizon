@@ -3,6 +3,7 @@
  * card outside the queue. Each proof goes through the application's own entry points. The body is held open by a stream that is
  * released by the test; the case keeper's approval listing is held by a hanging reply.
  */
+import { revisionOf } from "./support/answer-revision.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash, randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
@@ -139,7 +140,7 @@ describe("step acceptance looks up its card outside the queue", () => {
   test("a lookup that saw a wait, then the wait was stopped before the decision ran, is refused as stale", async () => {
     expect((await app.application.applyAgentOp({ tool: "ask_human", panel: "stale", ask: { id: "q1", question: "Ship it?", why_needed: "Release is waiting", options: [{ option_id: "yes", label: "Yes" }, { option_id: "no", label: "No" }] }, step: "signoff_release" })).ok).toBe(true);
     expect((await app.application.applyAgentOp({ tool: "ask_human", panel: "other", ask: q("other_q") })).ok).toBe(true);
-    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "stale", ask: "q1", outcome: "answered", value: "yes" })).status).toBe(200);
+    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "stale", ask: "q1", ...(await revisionOf(app, "stale", "q1")), outcome: "answered", value: "yes" })).status).toBe(200);
     const card = await cardNow();
     expect(card.blocked).not.toBeNull();
     const completedBefore = completed.length;
@@ -147,7 +148,7 @@ describe("step acceptance looks up its card outside the queue", () => {
     // reads the wait before the stop runs. When the queue reaches the accept, the wait is gone.
     const gate = gateCommit(app, PANEL_ANSWERS_COLLECTION);
     try {
-      const holding = app.post("/desk/panels/op", { op: "human.answer", panel: "other", ask: "other_q", outcome: "answered", value: "a" });
+      const holding = app.post("/desk/panels/op", { op: "human.answer", panel: "other", ask: "other_q", ...(await revisionOf(app, "other", "other_q")), outcome: "answered", value: "a" });
       await gate.reached;
       const stopping = app.post("/desk/panels/op", { op: "human.stop_waiting", step: "signoff_release" });
       await settle();

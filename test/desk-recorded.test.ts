@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { revisionOf } from "./support/answer-revision.ts";
 import { NOT_RECORDED_WORDS } from "../src/app.ts";
 import { listAnswers } from "../src/capabilities/panel-answers.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
@@ -40,7 +41,7 @@ describe("a move that could not be recorded says so", () => {
 
   test("an answer whose conversation row cannot be written is not saved at all, and says so in plain words", async () => {
     await app.application.applyAgentOp({ tool: "ask_human", panel: "rec", ask: { id: "q", question: "Which?", why_needed: "x", options: [{ option_id: "a", label: "A" }, { option_id: "b", label: "B" }] } });
-    const response = await withFailingConversation(() => app.post("/desk/panels/op", { op: "human.answer", panel: "rec", ask: "q", outcome: "answered", value: "a" }));
+    const response = await withFailingConversation(async () => app.post("/desk/panels/op", { op: "human.answer", panel: "rec", ask: "q", ...(await revisionOf(app, "rec", "q")), outcome: "answered", value: "a" }));
     const body = (await response.json()) as any;
     expect(response.status).toBe(500);
     expect(body.ok).toBe(false);
@@ -55,7 +56,7 @@ describe("a move that could not be recorded says so", () => {
   });
 
   test("the same answer goes through once the row can be written, and it is stored with its row", async () => {
-    const response = await app.post("/desk/panels/op", { op: "human.answer", panel: "rec", ask: "q", outcome: "answered", value: "a" });
+    const response = await app.post("/desk/panels/op", { op: "human.answer", panel: "rec", ask: "q", ...(await revisionOf(app, "rec", "q")), outcome: "answered", value: "a" });
     const body = (await response.json()) as any;
     expect(response.status).toBe(200);
     expect(body.ok).toBe(true);

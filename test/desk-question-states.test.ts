@@ -4,6 +4,7 @@
  * are each one store commit that holds the conversation row. The proofs go through the desk's own HTTP entry points. The restart
  * tests start a second desk on the same records (the same `root`). Commits are counted by wrapping the store's commit.
  */
+import { withRevision } from "./support/answer-revision.ts";
 import { afterAll, describe, expect, test } from "bun:test";
 import { createHash, randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
@@ -46,7 +47,7 @@ const question = (id: string, text = "Which plan?", extra: Record<string, unknow
 const agent = (app: DeskApp, key: string, name: string, body: unknown) =>
   fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": name }, body: JSON.stringify(body) });
 const putAs = (app: DeskApp, panel: string, ask: Record<string, unknown>, key = keys.ag_alice, step?: string) => agent(app, key, "Alice", { tool: "ask_human", panel, ask, ...(step === undefined ? {} : { step }) });
-const person = (app: DeskApp, body: unknown) => app.post("/desk/panels/op", body);
+const person = async (app: DeskApp, body: unknown) => app.post("/desk/panels/op", await withRevision(app, body));
 const answer = (app: DeskApp, panel: string, ask: string, outcome: "answered" | "deferred" = "answered") => person(app, { op: "human.answer", panel, ask, outcome, value: outcome === "answered" ? "a" : undefined });
 const route = (app: DeskApp, panel: string, ask: string, said: string, key = keys.ag_alice) => agent(app, key, "Alice", { tool: "answer.route", panel_id: panel, ask_id: ask, routed_as: said });
 const withdraw = (app: DeskApp, panel: string, ask: string, reason = "no longer needed") => agent(app, keys.ag_alice, "Alice", { tool: "ask.withdraw", panel_id: panel, ask_id: ask, reason });

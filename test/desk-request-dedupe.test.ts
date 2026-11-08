@@ -2,6 +2,7 @@
  * Design v3, section 2: every mutation takes a request id. A retry with the same id returns the stored response and writes nothing; the
  * same id with other contents is refused. A stop-waiting retried after a new wait exists does not close that new wait.
  */
+import { revisionOf } from "./support/answer-revision.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
@@ -21,14 +22,14 @@ const door = (body: unknown) => fetch(`${app.base}/agent/panels`, { method: "POS
 describe("every mutation is deduplicated by request id", () => {
   test("a stop-waiting retried with the same id after a new wait exists does not close the new wait", async () => {
     await app.application.applyAgentOp({ tool: "ask_human", panel: "dd-a", ask: ask("qa"), step: "step_dd" });
-    await app.post("/desk/panels/op", { op: "human.answer", panel: "dd-a", ask: "qa", outcome: "answered", value: "a" });
+    await app.post("/desk/panels/op", { op: "human.answer", panel: "dd-a", ask: "qa", ...(await revisionOf(app, "dd-a", "qa")), outcome: "answered", value: "a" });
     const first = await stop("step_dd", "stop-dd-1");
     expect(first.status).toBe(200);
     expect(await first.json()).toEqual({ ok: true, message: "Stopped waiting. The step can be accepted now." });
 
     // A new wait on the same step.
     await app.application.applyAgentOp({ tool: "ask_human", panel: "dd-b", ask: ask("qb"), step: "step_dd" });
-    await app.post("/desk/panels/op", { op: "human.answer", panel: "dd-b", ask: "qb", outcome: "answered", value: "b" });
+    await app.post("/desk/panels/op", { op: "human.answer", panel: "dd-b", ask: "qb", ...(await revisionOf(app, "dd-b", "qb")), outcome: "answered", value: "b" });
     expect((await waiting()).some((w) => w.step === "step_dd" && w.panel === "dd-b")).toBe(true);
 
     // The retry returns the stored response and does not touch the new wait.

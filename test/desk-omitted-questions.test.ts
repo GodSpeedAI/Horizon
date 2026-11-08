@@ -24,7 +24,7 @@ describe("a question is not deleted by a put that leaves it out", () => {
 
   test("Bob's question survives a deferral and Alice's empty put after it, and its id cannot be reused with other words", () => {
     let s = reassignedToBob();
-    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "deferred", version: qs(s)[0]!.version }).state;
+    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "deferred", version: qs(s)[0]!.version, owner_rev: qs(s)[0]!.owner_rev ?? 0 }).state;
     expect(qs(s)[0]!.answered?.outcome).toBe("deferred");
     const emptied = reduceAgent(s, { tool: "show_surface", surface: { id: "p", blocks: [] } }, "Alice", ALICE);
     expect(emptied.result.ok).toBe(false);
@@ -36,7 +36,7 @@ describe("a question is not deleted by a put that leaves it out", () => {
 
   test("Alice's own put-off question is kept when she leaves it out, so its wording stays bound to the id", () => {
     let s = reduceAgent(NO_PANELS, { tool: "ask_human", panel: "p", ask: ask() }, "Alice", ALICE).state;
-    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "deferred", version: qs(s)[0]!.version }).state;
+    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "deferred", version: qs(s)[0]!.version, owner_rev: qs(s)[0]!.owner_rev ?? 0 }).state;
     const emptied = reduceAgent(s, { tool: "show_surface", surface: { id: "p", blocks: [] } }, "Alice", ALICE);
     expect(emptied.result.ok).toBe(true);
     expect(qs(emptied.state).map((b) => b.id)).toEqual(["q"]);

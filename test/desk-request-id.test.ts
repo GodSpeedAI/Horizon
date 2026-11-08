@@ -4,6 +4,7 @@
  * a second answer nor a missing row. Each test goes through the desk's own HTTP entry point; the restart test reopens the desk's SQLite
  * file.
  */
+import { revisionOf } from "./support/answer-revision.ts";
 import { afterAll, describe, expect, test } from "bun:test";
 import { listAnswers } from "../src/capabilities/panel-answers.ts";
 import { CONVERSATION_COLLECTION } from "../src/capabilities/conversation.ts";
@@ -21,8 +22,8 @@ afterAll(async () => {
 });
 
 const askOf = (id: string) => ({ id, question: "Which plan?", why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }] });
-const answer = (app: DeskApp, panel: string, ask: string, requestId: string | undefined, value = "a") =>
-  app.post("/desk/panels/op", { op: "human.answer", panel, ask, outcome: "answered", value, ...(requestId === undefined ? {} : { request_id: requestId }) });
+const answer = async (app: DeskApp, panel: string, ask: string, requestId: string | undefined, value = "a") =>
+  app.post("/desk/panels/op", { op: "human.answer", panel, ask, ...(await revisionOf(app, panel, ask)), outcome: "answered", value, ...(requestId === undefined ? {} : { request_id: requestId }) });
 const rowsFor = async (app: DeskApp, ask: string): Promise<number> =>
   (await app.application.runtime.runtime.store.listRecords(CONVERSATION_COLLECTION, { tenant: app.application.caller.tenant })).filter((r) => (r.value as { refs?: { ask_id?: string } }).refs?.ask_id === ask).length;
 

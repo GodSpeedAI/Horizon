@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { revisionOf } from "./support/answer-revision.ts";
 import { readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -72,7 +73,7 @@ describe("the agent door", () => {
   });
 
   test("the person's operations are refused over the door", async () => {
-    for (const body of [{ op: "human.answer", panel: "plan", ask: "which_way", outcome: "answered", value: "plan_a" }, { op: "human.close", id: "plan" }, { op: "human.pin", id: "plan", pinned: true }]) {
+    for (const body of [{ op: "human.answer", panel: "plan", ask: "which_way", ...(await revisionOf(app, "plan", "which_way")), outcome: "answered", value: "plan_a" }, { op: "human.close", id: "plan" }, { op: "human.pin", id: "plan", pinned: true }]) {
       expect((await door("/agent/panels", body)).status).toBe(403);
     }
     expect((await door("/agent/panels", { tool: "nonsense" })).status).toBe(400);
@@ -82,7 +83,7 @@ describe("the agent door", () => {
   test("one entry per answer: labels, waiting, then done by answer.route; the panel entry is not left waiting", async () => {
     await door("/agent/panels", { tool: "ask_human", panel: "plan2", ask: select });
     await door("/agent/panels", { tool: "ask_human", panel: "plan2", ask: multi });
-    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "plan2", ask: "which_way", outcome: "answered", value: "plan_a" })).status).toBe(200);
+    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "plan2", ask: "which_way", ...(await revisionOf(app, "plan2", "which_way")), outcome: "answered", value: "plan_a" })).status).toBe(200);
     let mine = (await rows()).filter((r) => r.kind === "answer" && r.refs.panel_id === "plan2");
     expect(mine).toHaveLength(1);
     expect(mine[0].words).toBe("You answered: Plan A");
@@ -90,7 +91,7 @@ describe("the agent door", () => {
     expect(mine[0].outcome).toBe("Waiting for the agent to say where it went");
     // one question is still open, so the panel is still waiting for you
     expect((await rows()).find((r) => r.kind === "panel" && r.refs.panel_id === "plan2").status).toBe("waiting");
-    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "plan2", ask: "many", outcome: "answered", value: ["o1", "o2"] })).status).toBe(200);
+    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "plan2", ask: "many", ...(await revisionOf(app, "plan2", "many")), outcome: "answered", value: ["o1", "o2"] })).status).toBe(200);
     expect((await rows()).find((r) => r.kind === "panel" && r.refs.panel_id === "plan2").status).toBe("done");
     const waiting = await (await door("/agent/panels/answers")).json();
     expect(waiting.responses.filter((a: any) => a.panel_id === "plan2")).toHaveLength(2);

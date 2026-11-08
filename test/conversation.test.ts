@@ -2,6 +2,7 @@
  * The desk conversation (stage 8, steps 1 and 2): the pure reducer, the stored rows written by each desk operation, Presenting on
  * read, discard, the newest 200, and the agent caller that may suggest but never confirm.
  */
+import { revisionOf, withRevision } from "./support/answer-revision.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
 import { appendRow, listConversation } from "../src/capabilities/conversation.ts";
@@ -108,7 +109,7 @@ const rows = async (): Promise<ConversationRow[]> => (await app.get("/desk/conve
 const draftId = async (): Promise<string> => (await app.get("/desk/draft")).draftId;
 const asAgent = (path: string, body: unknown): Promise<Response> => fetch(`${app.base}${path}`, { method: "POST", headers: { "content-type": "application/json", ...AGENT }, body: JSON.stringify(body) });
 const post = async (path: string, body: unknown) => {
-  const r = await app.post(path, body);
+  const r = await app.post(path, await withRevision(app, body));
   return { status: r.status, body: (await r.json()) as Record<string, any> };
 };
 
@@ -197,7 +198,7 @@ describe("the agent caller", () => {
       ["/desk/handoff", { draft_id: "d", text: "x", plan_precondition: { ref: "r", expected_digest: "d" } }],
       ["/desk/decide", { card_id: "c", choice: "accept" }],
       ["/desk/conversation/discard", { row_id: (await rows()).at(-1)!.row_id }],
-      ["/desk/panels/op", { op: "human.answer", panel: "plan", ask: "a1", outcome: "answered", value: "x" }],
+      ["/desk/panels/op", { op: "human.answer", panel: "plan", ask: "a1", ...(await revisionOf(app, "plan", "a1")), outcome: "answered", value: "x" }],
       ["/desk/panels/op", { op: "human.pin", id: "plan", pinned: true }],
       ["/desk/start", {}],
       ["/desk/lesson", { text: "x" }],

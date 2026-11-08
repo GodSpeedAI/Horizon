@@ -1,4 +1,5 @@
 /** Step 2: "Not yet" keeps the question open. The same agent may put the same words again, and the person can still answer. */
+import { withRevision } from "./support/answer-revision.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash, randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
@@ -16,7 +17,7 @@ afterAll(async () => app.stop());
 
 const ask = { id: "deferred_q", question: "Which plan for the deferred case?", why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }] };
 const agent = (body: unknown) => fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": "Alice" }, body: JSON.stringify(body) });
-const person = (body: unknown) => fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+const person = async (body: unknown) => fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(await withRevision(app, body)) });
 
 describe("a question put off can still be answered", () => {
   test("defer, put the same words again, answer: the answer is stored", async () => {

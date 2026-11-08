@@ -1,5 +1,6 @@
 /** @jsxImportSource react */
 /** Beside each control on a question, one plain sentence says what it does. An agent cannot withdraw a question that settles a decision. */
+import { reducerRevision } from "./support/answer-revision.ts";
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { hasBannedWords } from "../src/ui/desk/banned-words.ts";
@@ -49,7 +50,7 @@ describe("a required decision cannot be withdrawn by an agent", () => {
 
   test("the person can still skip it, and an ordinary question can still be withdrawn", () => {
     const required = board(ask({ resolves: "Choice of plan" }));
-    expect(reduceHuman(required, { op: "human.answer", panel: "p", ask: "q", outcome: "cancelled" }).result.ok).toBe(true);
+    expect(reduceHuman(required, { op: "human.answer", panel: "p", ask: "q", ...reducerRevision(required, "p", "q"), outcome: "cancelled" }).result.ok).toBe(true);
     expect(reduceHuman(required, { op: "human.close", id: "p" }).result.ok).toBe(true);
     expect(reduceAgent(board(ask()), { tool: "ask.withdraw", panel_id: "p", ask_id: "q", reason: "Not needed" }).result.ok).toBe(true);
   });

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { revisionOf } from "./support/answer-revision.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
 /**
@@ -23,8 +24,8 @@ const question = (text: string, extra: Record<string, unknown> = {}) => ({
 const agent = (app: DeskApp, body: unknown) =>
   fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${app.application.loaded.agentKey}`, "content-type": "application/json", "x-horizon-agent-name": "Helper" }, body: JSON.stringify(body) });
 const putPanel = (app: DeskApp, text: string, extra: Record<string, unknown> = {}) => agent(app, { tool: "ask_human", panel: "p", ask: question(text, extra) });
-const answer = (app: DeskApp) =>
-  fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a" }) });
+const answer = async (app: DeskApp) =>
+  fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", panel: "p", ask: "q", ...(await revisionOf(app, "p", "q")), outcome: "answered", value: "a" }) });
 const removePanel = (app: DeskApp) => agent(app, { tool: "arrange", action: { op: "surface.remove", id: "p" } });
 
 describe("an answered question stays answered after its panel is removed", () => {

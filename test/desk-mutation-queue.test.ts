@@ -3,6 +3,7 @@
  * application's own entry points. The store is paused (or made to fail) at one commit to the panel answers collection, so the
  * other commands arrive while that one is still in its write.
  */
+import { withRevision } from "./support/answer-revision.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash, randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
@@ -24,7 +25,7 @@ const q = (id: string) => ({ id, question: `Which plan for ${id}?`, why_needed: 
 const surface = (id: string) => ({ tool: "show_surface" as const, surface: { id, title: `Panel ${id}`, blocks: [{ type: "callout", id: "c1", tone: "ok", text: "Looks fine" }] } });
 const agent = (app: DeskApp, key: string, name: string, body: unknown) =>
   fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": name }, body: JSON.stringify(body) });
-const person = (app: DeskApp, body: unknown) => app.post("/desk/panels/op", body);
+const person = async (app: DeskApp, body: unknown) => app.post("/desk/panels/op", await withRevision(app, body));
 const answer = (panel: string, ask: string) => ({ op: "human.answer", panel, ask, outcome: "answered", value: "a" });
 const routeBody = (panel: string, ask: string) => ({ tool: "answer.route", panel_id: panel, ask_id: ask, routed_as: "step handoff_0a49 in Seed" });
 
