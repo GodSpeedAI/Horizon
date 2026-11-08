@@ -73,6 +73,8 @@ beforeAll(async () => {
         return { json: { approvals: [] } };
       case "case_list":
         return { json: { cases: [{ case_id: CASE, case_state: "active", summary: "Ship the checkout fix", created_at: "2026-11-07T06:13:12.793Z" }], unreadable: [] } };
+      case "case_get_horizon":
+        return { json: { case_id: CASE, case_state: "active", items: [] } };
       case "case_add_item": {
         const item = r.item as { plan_item_id: string };
         if (r.dry_run === true) return { json: { ok: true, dry_run: true, outcome: "would_add", case_id: r.case_id, plan_item_id: item.plan_item_id, proposed_by: "operator_local", item, plan_precondition: { ref: `plan:${CASE}`, expected_digest: planDigest(r, item.plan_item_id) } } };
