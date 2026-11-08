@@ -24,8 +24,9 @@ afterAll(async () => {
   keeper.stop();
 });
 
-async function answered(panel: string): Promise<void> {
-  expect((await app.application.applyAgentOp({ tool: "ask_human", panel, ask: ask("q") })).ok).toBe(true);
+/** The question settles `resolves` (a step id, or null). A route is checked only when it names that same step and the step is waiting. */
+async function answered(panel: string, resolves: string | null = null): Promise<void> {
+  expect((await app.application.applyAgentOp({ tool: "ask_human", panel, ask: { ...ask("q"), resolves } })).ok).toBe(true);
   expect((await app.post("/desk/panels/op", { op: "human.answer", panel, ask: "q", outcome: "answered", value: "a" })).status).toBe(200);
 }
 
@@ -43,8 +44,19 @@ describe("an agent's \"I routed it\" is its claim, not proof", () => {
     expect(statusWord(mine)).toBe("Agent says so");
   });
 
-  test("a route that names a step the case keeper holds is shown as checked, with the step as a link", async () => {
-    await answered("p-real");
+  test("an existing, waiting step the question does not resolve does not upgrade the claim", async () => {
+    await answered("p-unrelated", "some_other_step");
+    await app.application.applyAgentOp({ tool: "answer.route", panel_id: "p-unrelated", ask_id: "q", routed_as: "step handoff_0a49 in Ship the checkout fix" });
+    const mine = (await rows()).find((r) => r.kind === "answer" && r.refs.panel_id === "p-unrelated");
+    expect(mine.status).toBe("claimed");
+    expect(mine.outcome).toContain("Not checked");
+    expect(mine.outcome).not.toContain("Checked:");
+    expect(mine.refs.step_id).toBeUndefined();
+    expect(statusWord(mine)).toBe("Agent says so");
+  });
+
+  test("a route that names a step the case keeper holds is shown as checked, with the step as a link, when the question resolves that step", async () => {
+    await answered("p-real", "handoff_0a49");
     await app.application.applyAgentOp({ tool: "answer.route", panel_id: "p-real", ask_id: "q", routed_as: "step handoff_0a49 in Ship the checkout fix" });
     const mine = (await rows()).find((r) => r.kind === "answer" && r.refs.panel_id === "p-real");
     expect(mine.outcome).toContain("The agent says it took it to: step handoff_0a49");

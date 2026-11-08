@@ -1881,16 +1881,19 @@ export async function createApplication(
     }
   }
 
-  /** A step the case keeper holds whose id the agent's words name. Null when none does (or cases are not connected). */
-  async function findRoutedStep(said: string): Promise<{ step_id: string; name: string; case_id: string; case_title: string } | null> {
-    if (caseKeeper === null) return null;
+  /**
+   * The step a route claim is checked against. The claim is checked only when the agent names the step the question resolves, and that
+   * step is waiting in an open case now. Any other step the words name leaves the claim as the agent's word. Null otherwise.
+   */
+  async function findRoutedStep(said: string, resolves: string | null): Promise<{ step_id: string; name: string; case_id: string; case_title: string } | null> {
+    if (caseKeeper === null || resolves === null || resolves.length < 4 || !said.split(/[^A-Za-z0-9_.:-]+/).includes(resolves)) return null;
     try {
       const listed = await listCases(caseKeeper);
       if (listed.kind !== "ok") return null;
-      for (const c of listed.value.cases.slice(0, 20)) {
+      for (const c of listed.value.cases.slice(0, 20).filter(isOpenCase)) {
         const horizon = await caseSteps(caseKeeper, c.case_id);
         if (horizon.kind !== "ok") continue;
-        const hit = horizon.value.steps.find((st) => st.plan_item_id.length >= 4 && said.split(/[^A-Za-z0-9_.:-]+/).includes(st.plan_item_id));
+        const hit = horizon.value.steps.find((st) => st.plan_item_id === resolves && st.execution === "pending");
         if (hit !== undefined) return { step_id: hit.plan_item_id, name: hit.name, case_id: c.case_id, case_title: await titleOf(c) };
       }
     } catch {
@@ -1920,6 +1923,8 @@ export async function createApplication(
       if (!routed.ok) return { ok: false, code: "SCHEMA", message: routed.message };
     }
     const question = op.tool === "answer.route" || op.tool === "ask.withdraw" ? askOf(op.panel_id, op.ask_id)?.question ?? null : null;
+    // What the question settles, as the board has it now: the only step a route claim may be checked against.
+    const resolves = op.tool === "answer.route" ? ((panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.find((b) => b.kind === "question" && b.id === op.ask_id) as { resolves?: string | null } | undefined)?.resolves ?? null) : null;
     const { state, result } = reduceAgent(panelBoard, op, who, keyId);
     if (!result.ok) return result;
     panelBoard = state;
@@ -1927,7 +1932,7 @@ export async function createApplication(
     if (op.tool === "answer.route") {
       // The agent's words are kept as its claim. They count as checked only when they name a step the case keeper really holds.
       const said = op.routed_as.trim();
-      const found = await findRoutedStep(said);
+      const found = await findRoutedStep(said, resolves);
       const where = found === null ? `The agent says it took it to: ${said}. Not checked: Horizon found no step with that name.` : `The agent says it took it to: ${said}. Checked: the step "${found.name}" is in the case "${found.case_title}".`;
       // One entry per answer: the one made when you answered is finished in place.
       const mine = await answerRowOf(runtime.runtime.store, deskWho, op.panel_id, op.ask_id);
