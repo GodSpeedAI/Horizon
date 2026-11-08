@@ -322,3 +322,57 @@ describe("states of answers written before this step", () => {
     expect(statusOfLegacy({ outcome: "answered", replied: false })).toBe("waiting_for_agent");
   });
 });
+
+describe("a person's change queued before logout does not run after it", () => {
+  /** Holds the panel queue: the first read of the answers blocks until `release`. Returns the release and a restore. */
+  function holdQueue(app: DeskApp): { readonly release: () => void; readonly restore: () => void } {
+    const store = app.application.runtime.runtime.store as unknown as { listRecords: (collection: string, options: unknown) => Promise<unknown> };
+    const real = store.listRecords.bind(store);
+    let gate!: () => void;
+    const held = new Promise<void>((resolve) => {
+      gate = resolve;
+    });
+    let armed = true;
+    store.listRecords = async (collection, options) => {
+      if (armed && collection === PANEL_ANSWERS_COLLECTION) {
+        armed = false;
+        await held;
+      }
+      return real(collection, options);
+    };
+    return { release: gate, restore: () => { store.listRecords = real; } };
+  }
+
+  test("control: with the session kept, the queued answer is accepted", async () => {
+    const app = await open();
+    expect((await putAs(app, "kept_p", question("q"))).status).toBe(200);
+    const queue = holdQueue(app);
+    const blocking = app.application.applyAgentOp({ tool: "read_responses" } as never);
+    await Bun.sleep(50);
+    const answering = answer(app, "kept_p", "q");
+    await Bun.sleep(100);
+    queue.release();
+    expect((await answering).status).toBe(200);
+    await blocking;
+    queue.restore();
+  });
+
+  test("an answer queued while the session is open is refused once the person has logged out", async () => {
+    const app = await open();
+    expect((await putAs(app, "logout_p", question("q"))).status).toBe(200);
+    const queue = holdQueue(app);
+    const blocking = app.application.applyAgentOp({ tool: "read_responses" } as never);
+    await Bun.sleep(50);
+    const answering = answer(app, "logout_p", "q");
+    await Bun.sleep(100);
+    expect((await fetch(`${app.base}/desk/pair/logout`, { method: "POST" })).status).toBe(200);
+    queue.release();
+    const refused = await answering;
+    expect(refused.status).toBe(403);
+    expect(((await refused.json()) as { outcome: string }).outcome).toBe("not_paired");
+    await blocking;
+    queue.restore();
+    const answers = await listAnswers(app.application.runtime.runtime.store, app.application.caller.tenant, "logout_p");
+    expect(answers.filter((a) => a.ask === "q" && a.outcome !== null)).toEqual([]);
+  });
+});

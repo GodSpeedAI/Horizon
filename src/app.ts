@@ -1691,6 +1691,8 @@ export async function createApplication(
     const looked = cardId === "" ? null : await decideState(await recentMoves()).catch(() => null);
     const lookedCard = looked?.cards.find((c) => c.id === cardId);
     const { card, response } = await panelCommand(async () => {
+      // Revalidated when the command runs, not when it was queued: a session that ended while it waited (logout) refuses it.
+      if (!pairing.paired(request.headers.get("cookie"))) return { card: undefined, response: notPairedRefusal() };
       if (looked !== null && lookedCard !== undefined) {
         const step = looked.stepOf.get(cardId) ?? null;
         const answers = await listAnswers(runtime.runtime.store, caller.tenant);
@@ -2168,6 +2170,8 @@ export async function createApplication(
     if (body === null || typeof body !== "object" || typeof body.op !== "string") return fail(400, "That could not be read. Nothing was changed.");
     const store = runtime.runtime.store;
     await answersMigrated;
+    // Revalidated when the command runs, not when it was queued: a session that ended while it waited (logout) refuses it.
+    if (!pairing.paired(request.headers.get("cookie"))) return notPairedRefusal();
     // Shared with the agent's writes: a person's change is refused while the records are migrating or after a failed migration.
     const paused = migrationBlock();
     if (paused !== null) return fail(503, paused);
