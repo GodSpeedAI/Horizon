@@ -13,11 +13,11 @@ Ask, then wait. Say where each answer went. You cannot answer or confirm for the
 
 ## Pairing and the desk's writes
 
-When Horizon starts it prints a pairing code in the terminal: "To open the desk, enter this pairing code: XXXX-XXXX. It works once and expires in 10 minutes." A browser opens the desk by typing that code on the "Pair this browser" screen. The code works once. The browser then holds a session cookie (HttpOnly, SameSite=Strict) for 12 hours, or until Horizon restarts or the browser logs out (`POST /desk/pair/logout`). Every write the desk makes sends that cookie.
+When Horizon starts it shows a pairing code on the terminal: "To open the desk, enter this pairing code: XXXX-XXXX. It works once and expires in 10 minutes." Horizon writes it to the controlling terminal (`/dev/tty`). Where there is no terminal (a service, a pipe), it writes the same line to standard output, followed by "(not a terminal: printed to output)". A browser opens the desk by typing that code on the "Pair this browser" screen. Every read of the desk, not only the writes, needs the session: an unpaired browser gets "Pair this browser first." The code works once. The browser then holds a session cookie (HttpOnly, SameSite=Strict) for 12 hours, or until Horizon restarts or the browser logs out (`POST /desk/pair/logout`). Every write the desk makes sends that cookie.
 
 - The desk page carries no secret. Reading `/desk` gives a program nothing it can write with.
-- Pairing gives agents nothing new. An agent on the page (`x-horizon-source: page-agent`) keeps the limits above. The agent door (`/agent/panels`) keeps its own key and never takes a session.
-- Limit, stated plainly: anyone who can read the terminal can see the code and pair. A local program with terminal access can pair. This is a boundary against other callers, not a sandbox.
+- Pairing gives agents nothing new. The `x-horizon-source: page-agent` header is a label, not a grant: it does not open a read to an unpaired caller, and it keeps the limits above on a paired one. The agent door (`/agent/panels`) keeps its own keys and never takes a session.
+- Limit, stated plainly: the code is shown on the terminal, so anyone who can read that terminal can pair. A local program with terminal access can pair. This is a boundary against other callers, not a sandbox.
 
 ## How to call it
 

@@ -44,6 +44,7 @@ describe("new sentences are plain", () => {
     clean("try again shows the steps", "Waiting to start now: Fix the footer, Call the supplier. Look again, then start it from Work.");
     clean("nothing waiting now", "Nothing is waiting to start in that case now.");
     clean("a step recorded but not in the conversation", "A step was recorded, but the conversation did not record it. Check the desk log.");
+    clean("pairing line without a terminal", "To open the desk, enter this pairing code: ABCD-EFGH. It works once and expires in 10 minutes. (not a terminal: printed to output)");
   });
 
   test("a conversation with stages, a claimed route and a partly done hand off", () => {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createDeskPairing, LOCK_MS, PAIRING_LIFETIME_MS, SESSION_LIFETIME_MS, WRONG_CODE_WORDS, LOCKED_WORDS, SPENT_CODE_WORDS } from "../src/desk/pairing.ts";
+import { createDeskPairing, deliverPairingLine, LOCK_MS, PAIRING_LIFETIME_MS, pairingLine, SESSION_LIFETIME_MS, WRONG_CODE_WORDS, LOCKED_WORDS, SPENT_CODE_WORDS } from "../src/desk/pairing.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { testCodeFor } from "./support/write-token.ts";
 
@@ -21,7 +21,7 @@ const pair = (app: DeskApp, code: string) =>
   fetch(`${app.base}/desk/pair`, { method: "POST", headers: { "content-type": "application/json", "x-test-no-session": "1" }, body: JSON.stringify({ code }) });
 
 describe("the pairing code", () => {
-  test("it is printed once, in plain words, and is not in the page or the desk state", async () => {
+  test("under the test sink nothing is printed, and the code is not in the page or the desk state", async () => {
     const lines: string[] = [];
     const log = console.log;
     console.log = (...args: unknown[]) => {
@@ -34,14 +34,27 @@ describe("the pairing code", () => {
       console.log = log;
     }
     apps.push(app);
-    const printed = lines.filter((line) => line.includes("pairing code"));
-    expect(printed.length).toBe(1);
-    expect(printed[0]).toMatch(/enter this pairing code: [2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}\. It works once and expires in 10 minutes\./);
+    expect(lines.filter((line) => line.includes("pairing code"))).toEqual([]);
     const code = testCodeFor(app.base)!;
     expect(code).toMatch(/^[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/);
     const page = await (await fetch(`${app.base}/desk`)).text();
     expect(page).not.toContain(code.replace("-", ""));
     expect(page).not.toContain(code);
+  });
+
+  test("the line says what it is, and goes to the terminal when there is one", () => {
+    const terminal: string[] = [];
+    const stdout: string[] = [];
+    deliverPairingLine("ABCD-EFGH", { terminal: (line) => (terminal.push(line), true), stdout: (line) => stdout.push(line) });
+    expect(terminal).toEqual([pairingLine("ABCD-EFGH")]);
+    expect(stdout).toEqual([]);
+    expect(terminal[0]).toMatch(/enter this pairing code: [2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}\. It works once and expires in 10 minutes\./);
+  });
+
+  test("without a terminal the same line goes to standard output, marked as printed to output", () => {
+    const stdout: string[] = [];
+    expect(deliverPairingLine("ABCD-EFGH", { terminal: () => false, stdout: (line) => stdout.push(line) })).toBe("stdout");
+    expect(stdout).toEqual([`${pairingLine("ABCD-EFGH")} (not a terminal: printed to output)`]);
   });
 
   test("a correct code pairs and sets an HttpOnly, SameSite=Strict session cookie", async () => {

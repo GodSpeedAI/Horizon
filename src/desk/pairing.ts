@@ -1,9 +1,10 @@
 /**
- * Pairing for the desk. When Horizon starts it makes one pairing code and prints it to the terminal log. A browser that
+ * Pairing for the desk. When Horizon starts it makes one pairing code and shows it on the terminal. A browser that
  * enters the code gets a session cookie; every later write from the desk must carry that cookie. Only a keyed hash of the
- * code is kept in memory, and the code is never written to a file. Anyone who can read the terminal can see the code and pair.
+ * code is kept in memory, and the code is never written to a file. Anyone who can read that terminal can pair.
  */
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { closeSync, openSync, writeSync } from "node:fs";
 
 export const PAIRING_LIFETIME_MS = 10 * 60 * 1000;
 export const SESSION_LIFETIME_MS = 12 * 60 * 60 * 1000;
@@ -123,9 +124,52 @@ export function receivePairingCodesForTests(sink: ((origin: string, code: string
   codeSink = sink;
 }
 
-/** Prints the pairing code once, in plain words. */
-export function printPairingCode(origin: string, code: string): void {
+/** Where the pairing line goes: the controlling terminal (/dev/tty) when there is one, else standard output. */
+export interface PairingOutput {
+  /** Writes the line to the terminal. False when there is no controlling terminal. */
+  readonly terminal: (line: string) => boolean;
+  readonly stdout: (line: string) => void;
+}
+
+export const terminalOutput = (): PairingOutput => ({
+  terminal: (line) => {
+    try {
+      const fd = openSync("/dev/tty", "w");
+      try {
+        writeSync(fd, `${line}\n`);
+      } finally {
+        closeSync(fd);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  stdout: (line) => console.log(line),
+});
+
+/** The pairing line, in plain words, for the terminal. */
+export function pairingLine(shown: string): string {
+  return `To open the desk, enter this pairing code: ${shown}. It works once and expires in 10 minutes.`;
+}
+
+/**
+ * Shows the pairing code once. On a terminal it goes to the terminal only. Without one (a service, a pipe) it goes to standard
+ * output, marked as such. Under the test sink nothing is printed: the sink receives the code instead.
+ */
+export function printPairingCode(origin: string, code: string, output: PairingOutput = terminalOutput()): void {
   const shown = `${code.slice(0, 4)}-${code.slice(4)}`;
-  console.log(`To open the desk, enter this pairing code: ${shown}. It works once and expires in 10 minutes.`);
-  codeSink?.(origin, shown);
+  if (codeSink !== null) {
+    codeSink(origin, shown);
+    return;
+  }
+  deliverPairingLine(shown, output);
+}
+
+/** Sends the pairing line to the terminal, or to standard output with the words that say so. Returns where it went. */
+export function deliverPairingLine(shown: string, output: PairingOutput): "terminal" | "stdout" {
+  const line = pairingLine(shown);
+  if (output.terminal(line)) return "terminal";
+  output.stdout(`${line} (not a terminal: printed to output)`);
+  return "stdout";
 }
