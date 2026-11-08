@@ -423,3 +423,22 @@ export async function migrateSealedQuestions(store: DurableStore, tenant: string
   if (records.length > 0) await store.commit({ appends: [], records });
   return records.length;
 }
+
+/**
+ * Migration (finding R2-9). Every standalone agreement (`agreed:<panel>:<ask>`) gets its guard, `question:<panel>:<ask>`, so the question
+ * stays sealed even when its answer record is gone. Runs once; a second run writes nothing. Returns how many guards it wrote.
+ */
+export async function migrateReconcile(store: DurableStore, tenant: string): Promise<number> {
+  const records: CommitRecord[] = [];
+  const guards = new Set((await store.listRecords(PANEL_ANSWERS_COLLECTION, { tenant })).map((r) => r.id));
+  for (const row of await store.listRecords(AGREED_COLLECTION, { tenant })) {
+    const value = row.value as { readonly panel_id?: unknown; readonly ask?: unknown; readonly fingerprint?: unknown; readonly at?: unknown };
+    if (typeof value.panel_id !== "string" || typeof value.ask !== "string") continue;
+    const id = guardIdOf(value.panel_id, value.ask);
+    if (guards.has(id)) continue;
+    guards.add(id);
+    records.push({ collection: PANEL_ANSWERS_COLLECTION, id, expectedVersion: 0, value: { tenant, panel_id: value.panel_id, ask: value.ask, outcome: "answered", n: 0, at: typeof value.at === "string" ? value.at : new Date(0).toISOString(), fingerprint: typeof value.fingerprint === "string" ? value.fingerprint : null, from_agreement: true } as { readonly [key: string]: Json } });
+  }
+  if (records.length > 0) await store.commit({ appends: [], records });
+  return records.length;
+}

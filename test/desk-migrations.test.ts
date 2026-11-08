@@ -69,7 +69,7 @@ describe("the desk's record migrations", () => {
     expect("replied" in raw).toBe(false);
     expect("waiting_on" in raw).toBe(false);
     const marker = await storeOf(second).getRecord(MIGRATION_COLLECTION, `marker:${second.application.caller.tenant}`);
-    expect((marker!.value as { version: number }).version).toBe(4);
+    expect((marker!.value as { version: number }).version).toBe(5);
   });
 
   test("a second start with nothing pending writes nothing", async () => {
@@ -208,7 +208,7 @@ describe("an agent op issued straight after startup", () => {
       expect(result.ok).toBe(true);
       await Promise.race([app.application.migrated, timeout]);
       const markers = await app.application.runtime.runtime.store.listRecords(MIGRATION_COLLECTION);
-      expect(markers.map((row) => (row.value as { version?: number }).version)).toEqual([4]);
+      expect(markers.map((row) => (row.value as { version?: number }).version)).toEqual([5]);
     } finally {
       if (timer !== undefined) clearTimeout(timer);
     }
