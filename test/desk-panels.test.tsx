@@ -104,15 +104,18 @@ describe("answers are kept", () => {
     const a = await recordAnswer(store, { tenant: "t", panel_id: "release", ask: "q1", outcome: "answered", value: "yes", step: "signoff", now });
     const b = await recordAnswer(store, { tenant: "t", panel_id: "release", ask: "q2", outcome: "deferred", step: "signoff", now });
     expect([a.n, b.n]).toEqual([1, 2]);
-    expect((await store.getRecord(PANEL_ANSWERS_COLLECTION, "answer:release:2"))?.value).toMatchObject({ replied: false, outcome: "deferred", step: "signoff" });
+    // "Not yet" is not an answer and waits for nobody (store-design-v2 section 3): it does not block the step.
+    expect((await store.getRecord(PANEL_ANSWERS_COLLECTION, "answer:release:2"))?.value).toMatchObject({ replied: true, outcome: null, waiting_on: "none", step: "signoff" });
+    // q1 is answered and waits for the agent, so the step is blocked; the put-off q2 waits for nobody.
     expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(true);
     expect(acceptanceBlocked(await listAnswers(store, "t"), "another_step")).toBe(false);
     // A later agent call is no reply; only a route that says where it went closes the answer.
     expect((await routeAnswer(store, "t", "release", "q1", "ok")).ok).toBe(false);
     expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(true);
     expect(await routeAnswer(store, "t", "release", "q1", "step handoff_0a49 in Seed: triage inbox")).toEqual({ ok: true, closed: 1 });
-    expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(true);
-    expect(await routeAnswer(store, "t", "release", "q2", "no action: put off by the person")).toEqual({ ok: true, closed: 1 });
+    expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(false);
+    // Nothing waits for the agent about the put-off question, so there is nothing to route.
+    expect(await routeAnswer(store, "t", "release", "q2", "no action: put off by the person")).toMatchObject({ ok: false });
     expect((await listAnswers(store, "t", "release"))[0]).toMatchObject({ replied: true, routed_as: "step handoff_0a49 in Seed: triage inbox" });
     expect(acceptanceBlocked(await listAnswers(store, "t"), "signoff")).toBe(false);
     await recordAnswer(store, { tenant: "t", panel_id: "other", ask: "q", outcome: "answered", value: "no", step: "s2", now });
@@ -194,7 +197,8 @@ describe("acceptance through the application", () => {
 
   test("the person can stop waiting for an agent that will not reply", async () => {
     await app.application.applyAgentOp({ tool: "ask_human", panel: "release2", ask: { ...ask, id: "q9" }, step: "signoff_release" });
-    await app.post("/desk/panels/op", { op: "human.answer", panel: "release2", ask: "q9", outcome: "deferred" });
+    // Answered (not put off): only an answer waits for the agent. A put-off question does not (store-design-v2 section 3).
+    await app.post("/desk/panels/op", { op: "human.answer", panel: "release2", ask: "q9", outcome: "answered", value: "yes" });
     expect((await cardNow()).blocked).not.toBeNull();
     const stopped = await app.post("/desk/panels/op", { op: "human.stop_waiting", step: "signoff_release" });
     expect(stopped.status).toBe(200);
