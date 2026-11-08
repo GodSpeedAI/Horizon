@@ -249,7 +249,7 @@ export interface HorizonApplication {
   readonly operatorActors: OperatorActors;
   /** The commit the phone makes, run as a session's Caller with its mapped SEA-Forge actor. Refuses any Caller that is not a mapped operator session. */
   /** Stage 4: an agent's panel tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`). */
-  applyAgentOp(op: AgentOp, agentName?: string, keyId?: string): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }>;
+  applyAgentOp(op: AgentOp & { readonly request_id?: unknown }, agentName?: string, keyId?: string): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }>;
   commitForSession(actionId: string, intentId: string, who: Caller): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }>;
   /** Healthy, or a typed degraded observation; never a startup prerequisite. */
   readonly research: ResearchStatus;
@@ -2040,15 +2040,32 @@ export async function createApplication(
   }
 
   /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`, `ask.withdraw`, `answer.route`). To choose parts well an agent reads `GET /desk/panels/catalogue`. A reply on a panel clears the wait on the answers given there. */
-  async function applyAgentOp(op: AgentOp, agentName?: string, keyId: string = UNKEYED_AGENT): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
-    return panelCommand(() => applyAgentOpNow(op, agentName, keyId, null));
+  type AgentReply = { readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string };
+  /** The one entry point for an agent's change, from the agent door and from inside the desk. Every caller goes through agentCommandNow. */
+  async function applyAgentOp(op: AgentOp & { readonly request_id?: unknown }, agentName?: string, keyId: string = UNKEYED_AGENT): Promise<AgentReply> {
+    return panelCommand(() => agentCommandNow(op, agentName, keyId));
+  }
+
+  /**
+   * The checks every agent change gets, whoever sent it: its types, its request id, and the id's stored receipt. A retry with the same
+   * id and the same contents returns the stored response and writes nothing; the same id with other contents is refused. Runs only
+   * inside panelCommand (applyAgentOp, or the door, which is queued already).
+   */
+  async function agentCommandNow(op: AgentOp & { readonly request_id?: unknown }, agentName: string | undefined, keyId: string): Promise<AgentReply> {
+    const typing = checkAgentOp(op);
+    if (typing !== null) return { ok: false, code: "SCHEMA", message: typing };
+    const requestId = (op as { readonly request_id?: unknown }).request_id;
+    if (requestId !== undefined && !validRequestId(requestId)) return { ok: false, code: "SCHEMA", message: BAD_REQUEST_ID_WORDS };
+    if (typeof requestId !== "string") return applyAgentOpNow(op, agentName, keyId, null);
+    const fingerprint = requestFingerprint(op as unknown as { readonly [key: string]: unknown });
+    const seen = await seenRequest(runtime.runtime.store, caller.tenant, requestId, fingerprint);
+    if (seen.kind === "reused") return { ok: false, code: "REUSED", message: REUSED_REQUEST_WORDS };
+    if (seen.kind === "replay") return seen.response as unknown as AgentReply;
+    return applyAgentOpNow(op, agentName, keyId, { requestId, fingerprint });
   }
 
   /** The body of applyAgentOp. Runs only inside panelCommand. `dedupe` is the request id and fingerprint of a retried call, if it has one. */
   async function applyAgentOpNow(op: AgentOp, agentName: string | undefined, keyId: string, dedupe: { readonly requestId: string; readonly fingerprint: string } | null): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
-    // Every field is checked by type before anything is read or stored, so a change the board cannot hold is refused whole (400).
-    const typing = checkAgentOp(op);
-    if (typing !== null) return { ok: false, code: "SCHEMA", message: typing };
     await answersMigrated;
     // The request's record, kept with the change it made: a retry with the same id returns this response and writes nothing.
     const agentKeep = (response: { readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] }): CommitRecord[] => (dedupe === null ? [] : [requestRecord(caller.tenant, dedupe.requestId, dedupe.fingerprint, JSON.parse(JSON.stringify(response)) as Json)]);
@@ -2178,22 +2195,13 @@ export async function createApplication(
     if (op === null || typeof op !== "object" || Array.isArray(op)) return refuse(400, "Send one object with a \"tool\" field. Nothing was changed.");
     if (typeof op.op === "string" && op.op.startsWith("human.")) return refuse(403, "Only the person can do that. An agent cannot answer, pin, close or open a panel for them.");
     if (typeof op.tool !== "string" || !(AGENT_TOOLS as readonly string[]).includes(op.tool)) return refuse(400, `Say which tool: ${AGENT_TOOLS.join(", ")}. Nothing was changed.`);
-    // Design v3, section 2: a retry with the same request id returns the stored response and writes nothing. The same id with other
-    // contents is refused. The id's record is kept with the change, in the same commit.
+    // Every change an agent makes carries its id (R2-11). Reading the answers changes nothing and needs none. The id's checks, its stored
+    // receipt and the change itself are one path, agentCommandNow, which the desk's own callers use too.
     const requestId = op.request_id;
-    if (requestId !== undefined && !validRequestId(requestId)) return refuse(400, BAD_REQUEST_ID_WORDS);
-    // Every change an agent makes carries its id (R2-11). Reading the answers changes nothing and needs none.
     if (op.tool !== "read_responses" && typeof requestId !== "string") return refuse(400, REQUEST_ID_REQUIRED_WORDS);
-    let dedupe: { readonly requestId: string; readonly fingerprint: string } | null = null;
-    if (typeof requestId === "string") {
-      const fingerprint = requestFingerprint(op);
-      const seen = await seenRequest(runtime.runtime.store, caller.tenant, requestId, fingerprint);
-      if (seen.kind === "reused") return refuse(409, REUSED_REQUEST_WORDS);
-      if (seen.kind === "replay") return Response.json(seen.response, { headers });
-      dedupe = { requestId, fingerprint };
-    }
-    const done = await applyAgentOpNow(op as unknown as AgentOp, name, owner.key_id, dedupe);
-    return done.ok ? Response.json(done, { headers }) : Response.json(done, { status: done.code === "NOT_FOUND" ? 404 : done.code === "UNAVAILABLE" ? 503 : 400, headers });
+    const done = await agentCommandNow(op as unknown as AgentOp, name, owner.key_id);
+    const status = done.ok ? 200 : done.code === "NOT_FOUND" ? 404 : done.code === "REUSED" ? 409 : done.code === "UNAVAILABLE" ? 503 : 400;
+    return Response.json(done, { status, headers });
   }
 
   /** Whether a put would change a question the person agreed to, judged against the durable record (not the panel, which may be gone). */
