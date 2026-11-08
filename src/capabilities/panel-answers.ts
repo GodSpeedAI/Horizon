@@ -199,6 +199,8 @@ function planFinish(read: ReadAnswer, by: FinishedBy, routedAs: string | null, n
 export async function planRoute(store: DurableStore, tenant: string, panelId: string, askId: string, routedAs: unknown, callerKey: string): Promise<{ readonly ok: true; readonly records: CommitRecord[]; readonly closed: number } | { readonly ok: false; readonly message: string }> {
   if (typeof callerKey !== "string" || callerKey.trim() === "") return { ok: false, message: NO_CALLER_KEY };
   const rows = (await readAnswerRows(store, tenant, panelId)).filter((r) => r.answer.ask === askId);
+  // A question whose answers contradict each other is refused for routing until the person decides (R2-10).
+  if (await conflictOf(store, panelId, askId)) return { ok: false, message: CONFLICTED_WORDS };
   const target = (rows.filter((r) => waitsForAgent(r.answer)).at(-1) ?? rows.at(-1))?.answer;
   if (target === undefined) {
     const words = checkRouteWords(routedAs);
@@ -207,6 +209,11 @@ export async function planRoute(store: DurableStore, tenant: string, panelId: st
   const state = answerState(target);
   const verdict = checkRoute({ state, callerKey, routedAs });
   if (!verdict.ok) return { ok: false, message: verdict.message };
+  // Every answer this commit finishes must be the caller's. One that is not refuses the whole commit (R2-10).
+  for (const r of rows.filter((x) => waitsForAgent(x.answer))) {
+    const own = checkRoute({ state: answerState(r.answer), callerKey, routedAs });
+    if (!own.ok) return { ok: false, message: own.message };
+  }
   const words = typeof routedAs === "string" ? routedAs.trim() : "";
   const records: CommitRecord[] = rows.filter((r) => waitsForAgent(r.answer)).map((r) => planFinish(r, "reported", words, null));
   return records.length === 0 ? { ok: false, message: NO_ANSWER_WAITING } : { ok: true, records, closed: records.length };
@@ -424,9 +431,25 @@ export async function migrateSealedQuestions(store: DurableStore, tenant: string
   return records.length;
 }
 
+/** The record that marks a question whose stored answers contradict each other (finding R2-10). `conflict:<panel>:<ask>`. */
+const conflictIdOf = (panel: string, ask: string): string => `conflict:${panel}:${ask}`;
+
+/** The words a route on a conflicted question gets. The person decides which answer stands; the desk never picks one. */
+export const CONFLICTED_WORDS = "Two answers to this question disagree about its value or its owner, so the desk will not route it. The person needs to decide which one stands. Nothing was changed.";
+
+/** Whether the question's answers were marked as contradictory. Reads only. */
+export async function conflictOf(store: DurableStore, panelId: string, askId: string): Promise<boolean> {
+  const row = await store.getRecord(PANEL_ANSWERS_COLLECTION, conflictIdOf(panelId, askId));
+  return row !== null && row !== undefined;
+}
+
 /**
- * Migration (finding R2-9). Every standalone agreement (`agreed:<panel>:<ask>`) gets its guard, `question:<panel>:<ask>`, so the question
- * stays sealed even when its answer record is gone. Runs once; a second run writes nothing. Returns how many guards it wrote.
+ * Migration (finding R2-9 and R2-10). Reconciles the sealed identities of the questions the store holds:
+ *  - every standalone agreement (`agreed:<panel>:<ask>`) gets its guard, `question:<panel>:<ask>`, so the question cannot be answered
+ *    again even when its answer record is gone;
+ *  - every question with two committed answers that differ in value or owner is marked `conflict:<panel>:<ask>`. Its answers are kept as
+ *    they are; routing refuses the question until the person decides. Nothing here picks an answer.
+ * Runs once; a second run writes nothing. Returns how many records it wrote.
  */
 export async function migrateReconcile(store: DurableStore, tenant: string): Promise<number> {
   const records: CommitRecord[] = [];
@@ -438,6 +461,20 @@ export async function migrateReconcile(store: DurableStore, tenant: string): Pro
     if (guards.has(id)) continue;
     guards.add(id);
     records.push({ collection: PANEL_ANSWERS_COLLECTION, id, expectedVersion: 0, value: { tenant, panel_id: value.panel_id, ask: value.ask, outcome: "answered", n: 0, at: typeof value.at === "string" ? value.at : new Date(0).toISOString(), fingerprint: typeof value.fingerprint === "string" ? value.fingerprint : null, from_agreement: true } as { readonly [key: string]: Json } });
+  }
+  const groups = new Map<string, PanelAnswer[]>();
+  for (const a of await listAnswers(store, tenant)) {
+    if (a.outcome === null) continue;
+    const key = `${a.panel_id}\n${a.ask}`;
+    groups.set(key, [...(groups.get(key) ?? []), a]);
+  }
+  for (const answers of groups.values()) {
+    const distinct = new Set(answers.map((a) => JSON.stringify([a.owner_key ?? null, a.outcome, a.value ?? null])));
+    if (distinct.size < 2) continue;
+    const { panel_id, ask } = answers[0]!;
+    const id = conflictIdOf(panel_id, ask);
+    if (await conflictOf(store, panel_id, ask)) continue;
+    records.push({ collection: PANEL_ANSWERS_COLLECTION, id, expectedVersion: 0, value: { tenant, panel_id, ask, answers: answers.map((a) => a.n), owners: [...new Set(answers.map((a) => a.owner_key ?? null))].map((k) => k ?? "") } as { readonly [key: string]: Json } });
   }
   if (records.length > 0) await store.commit({ appends: [], records });
   return records.length;
