@@ -8,112 +8,112 @@ bun test
 bun test v1.4.0 (34cbb9a40)
 
 test/desk-question-version.test.ts:
-To open the desk, enter this pairing code: DRZC-N8AB. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/gateway-installer.test.ts:
 skipped: setfattr missing or user xattrs unsupported on this filesystem
 
 test/desk-panels.test.tsx:
-To open the desk, enter this pairing code: BYC6-XGMR. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-review.test.ts:
-To open the desk, enter this pairing code: BUA5-P2ZG. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-render.test.tsx:
-To open the desk, enter this pairing code: V5ZM-V49V. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/case-titles.test.ts:
-To open the desk, enter this pairing code: RVTH-V7EF. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-agent-reads.test.tsx:
-To open the desk, enter this pairing code: M7UY-H6KU. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-decide.test.tsx:
-To open the desk, enter this pairing code: ZUYM-UQ6G. It works once and expires in 10 minutes.
-To open the desk, enter this pairing code: 2FBA-WBBE. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/workspace-onboarding.test.ts:
-To open the desk, enter this pairing code: JY53-3DSZ. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/app.test.ts:
-To open the desk, enter this pairing code: WPT5-XV5J. It works once and expires in 10 minutes.
-To open the desk, enter this pairing code: TS4F-HWCF. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-start-scope.test.tsx:
-To open the desk, enter this pairing code: DGV4-6968. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/handoff.test.ts:
-To open the desk, enter this pairing code: BPHK-G5HE. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-write-token-routes.test.ts:
-To open the desk, enter this pairing code: HADG-9ZJA. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-route-claim.test.ts:
-To open the desk, enter this pairing code: V2E3-FE9Y. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-write-token.test.ts:
-To open the desk, enter this pairing code: KPK4-R3N5. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/conversation.test.ts:
-To open the desk, enter this pairing code: TXBN-XC2Q. It works once and expires in 10 minutes.
-To open the desk, enter this pairing code: VYZ3-U9VG. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-recorded.test.ts:
-To open the desk, enter this pairing code: E9A8-XFFP. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-agent-door.test.tsx:
-To open the desk, enter this pairing code: 2RE8-RW97. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-teeth.test.tsx:
-To open the desk, enter this pairing code: 3K3M-M3AD. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-window.test.ts:
-To open the desk, enter this pairing code: VP4D-EGRC. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/adversarial-operator-input.test.ts:
-To open the desk, enter this pairing code: G8GJ-ADWY. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/presenting.test.ts:
-To open the desk, enter this pairing code: 939G-PJXN. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-pairing.test.ts:
-To open the desk, enter this pairing code: VTVV-GMEP. It works once and expires in 10 minutes.
-To open the desk, enter this pairing code: TW5U-HQG8. It works once and expires in 10 minutes.
-To open the desk, enter this pairing code: A2G5-BQ8S. It works once and expires in 10 minutes.
-To open the desk, enter this pairing code: QPTP-J8Q2. It works once and expires in 10 minutes.
-To open the desk, enter this pairing code: BY2V-RP2Z. It works once and expires in 10 minutes.
-To open the desk, enter this pairing code: 2PF3-VSGK. It works once and expires in 10 minutes.
-To open the desk, enter this pairing code: 45QX-Q5RZ. It works once and expires in 10 minutes.
-To open the desk, enter this pairing code: MGGM-D4FD. It works once and expires in 10 minutes.
-To open the desk, enter this pairing code: 2VJB-SBPT. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-handoff-stages.test.tsx:
-To open the desk, enter this pairing code: 5QDX-RU3H. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-live-state.test.tsx:
-To open the desk, enter this pairing code: ZJTD-BCAB. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-agent-own-answers.test.ts:
-To open the desk, enter this pairing code: MESY-7BCY. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-cost.test.tsx:
-To open the desk, enter this pairing code: 7D6X-AC5K. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/remote-controller.test.ts:
-To open the desk, enter this pairing code: BTNM-23TR. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/approval-inbox.test.ts:
-To open the desk, enter this pairing code: D7NG-THB5. It works once and expires in 10 minutes.
-To open the desk, enter this pairing code: RRBQ-9RGW. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/E2E-remote.test.ts:
-To open the desk, enter this pairing code: GRWC-S3PT. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-parity.test.tsx:
-To open the desk, enter this pairing code: G9YU-H4GP. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
 test/desk-panels-blocks.test.tsx:
-To open the desk, enter this pairing code: 4XJ5-QPRP. It works once and expires in 10 minutes.
+To open the desk, enter this pairing code: [redacted test code]. It works once and expires in 10 minutes.
 
  1069 pass
  16 skip
