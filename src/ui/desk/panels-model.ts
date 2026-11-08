@@ -61,6 +61,8 @@ export const QUESTION_CHANGED = "This question changed after you looked at it. L
  * The name is kept for the answered case, which is where it was first pinned.
  */
 export const ANSWERED_CANNOT_CHANGE = SAME_ID_OTHER_WORDS;
+/** Two blocks in one put share an id. Refused before anything is stored. */
+export const DUPLICATE_BLOCK_ID = "Two blocks on this panel use the same id. Give each block its own id.";
 /** A question the person answered (not put off, not skipped) is an agreement to those exact words. */
 const agreedTo = (b: AskBlock | undefined): b is AskBlock => b !== undefined && b.answered !== null && b.answered.outcome === "answered";
 /** Same words, options, consequences and input kind (the version), and the same thing it settles. */
@@ -135,6 +137,8 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
       const s = op.surface;
       if (!isRec(s) || typeof s.id !== "string" || !ID.test(s.id) || !Array.isArray(s.blocks)) return refuse(state, "SCHEMA", "A panel needs an id and a list of blocks.");
       const blocks = s.blocks.slice(0, 64).map(itemOf);
+      // A block id names one block on the panel. Two blocks with one id (two different questions, say) would both answer to it, so the put is refused whole.
+      if (new Set(blocks.map((b) => b.id)).size !== blocks.length) return refuse(state, "SCHEMA", DUPLICATE_BLOCK_ID);
       const existing = state.open.find((p) => same(p.id, s.id));
       if (existing !== undefined) {
         // An update keeps the panel where it is and keeps it pinned; answers already given stay on their questions.

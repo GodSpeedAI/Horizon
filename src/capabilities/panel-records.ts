@@ -39,6 +39,9 @@ export function readPanel(value: unknown): Panel {
   if (!isRec(value)) throw new PanelLoadError("A saved panel is not a record.");
   const ok = typeof value.id === "string" && typeof value.title === "string" && (typeof value.step === "string" || value.step === null) && typeof value.pinned === "boolean" && Array.isArray(value.blocks) && value.blocks.every((b) => isRec(b) && typeof b.kind === "string") && Array.isArray(value.notes) && (value.owner_key === undefined || value.owner_key === null || typeof value.owner_key === "string");
   if (!ok) throw new PanelLoadError("A saved panel is missing a field the board needs.");
+  // A block id is one block. Two blocks sharing an id would make one answer land on both, so such a record is refused as unreadable.
+  const ids = (value.blocks as { readonly id?: unknown }[]).map((b) => b.id);
+  if (new Set(ids).size !== ids.length) throw new PanelLoadError("A saved panel has two blocks with the same id.");
   return value as unknown as Panel;
 }
 
