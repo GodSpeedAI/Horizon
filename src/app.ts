@@ -84,13 +84,14 @@ import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
 import { acquireDeskLock, releaseDeskLock } from "./capabilities/desk-lock.ts";
 import { DESK_MIGRATIONS, MIGRATING_WORDS, MIGRATION_FAILED_WORDS, runDeskMigrations } from "./capabilities/desk-migrations.ts";
 import { BAD_REQUEST_ID_WORDS, REUSED_REQUEST_WORDS, requestFingerprint, requestRecord, seenRequest, validRequestId } from "./capabilities/desk-requests.ts";
-import { answerRowOf, appendRow, discardRow, listConversation, panelRowOf, planAppend, planUpdate, settleDraftRow } from "./capabilities/conversation.ts";
+import { answerRowOf, appendRow, discardRow, listConversation, newRowRecord, panelRowOf, planAppend, planUpdate, settleDraftRow } from "./capabilities/conversation.ts";
 import { answerEcho, cleanAgentName, MAX_WAITING_PROPOSALS, TOO_MANY_PROPOSALS, WAITING_FOR_AGENT, type ConversationRow, type RowSource, type RowStage } from "./ui/desk/conversation-model.ts";
 import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
 import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
 import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
+import { checkReassign } from "./capabilities/question-rules.ts";
 import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
 import { ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, openPanelId, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
@@ -2188,6 +2189,26 @@ export async function createApplication(
       }
       const toEntry = body.to_key_id === DEFAULT_AGENT_KEY_ID ? { key_id: DEFAULT_AGENT_KEY_ID, name: DEFAULT_AGENT_NAME } : registry.find((e) => e.key_id === body.to_key_id);
       const fromName = body.from_key_id === DEFAULT_AGENT_KEY_ID ? DEFAULT_AGENT_NAME : registry.find((e) => e.key_id === body.from_key_id)?.name ?? "an agent no longer listed";
+      // Design v3, step 4 (item 6): a question nobody has answered yet moves the same way. Its owner is the panel block's asked_by_key,
+      // and the move and its conversation row are one commit. A question with a waiting answer moves its answers (below).
+      const openQuestion = panelBoard.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { readonly question?: string; readonly answered?: unknown; readonly withdrawn?: unknown; readonly asked_by_key?: string | null } | undefined;
+      const waitingAnswers = (await listAnswers(store, caller.tenant, body.panel)).filter((a) => a.ask === body.ask && waitsForAgent(a));
+      if (openQuestion !== undefined && openQuestion.answered == null && openQuestion.withdrawn == null && waitingAnswers.length === 0) {
+        const toName = toEntry?.name ?? "";
+        const ownerNow = openQuestion.asked_by_key ?? null;
+        if (ownerNow !== body.from_key_id) return fail(409, "The owner changed while you were looking. Look again, then try. Nothing was changed.");
+        const verdict = checkReassign({ state: { owner_key: ownerNow, fingerprint: null, outcome: null, replied: true, waiting_on: "none", history: [], routed_as: null, version: null }, paired: true, pairedAgeMs: pairing.pairedAgeMs(request.headers.get("cookie")) ?? Number.POSITIVE_INFINITY, newOwnerKey: body.to_key_id, targetRegistered: toEntry !== undefined, confirmed: body.confirmed === true });
+        if (!verdict.ok) return fail(409, verdict.message);
+        const when = clock().toISOString();
+        const moveRow = newRowRecord(deskWho, { source: "you", kind: "note", words: `Moved the question "${openQuestion.question ?? "the agent's question"}" from ${fromName} to ${toName}.`, outcome: `${toName} now answers for it, since ${when}. Nothing has been answered yet.`, status: "done", refs: { panel_id: body.panel, ask_id: body.ask } }, clock());
+        const movedOpen = { ...panelBoard, open: panelBoard.open.map((p) => (p.id === body.panel ? { ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === body.ask ? { ...b, asked_by_key: body.to_key_id, asked_by: toName } : b)) } : p)) } as PanelsBoard;
+        try {
+          await commitBoard(panelBoard, movedOpen, [moveRow]);
+        } catch {
+          return fail(500, NOTHING_SENT);
+        }
+        return Response.json({ ok: true, message: `Moved to ${toName}. The question waits for them to answer.` }, { headers });
+      }
       const planned = await planReassign(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, question: askOf(body.panel, body.ask)?.question ?? "the agent's question", from_key: body.from_key_id, to_key: body.to_key_id, from_name: fromName, to_name: toEntry?.name ?? "", paired: true, pairedAgeMs: pairing.pairedAgeMs(request.headers.get("cookie")), targetRegistered: toEntry !== undefined, confirmed: body.confirmed === true, who: deskWho, now: clock() });
       if (!planned.ok) return fail(planned.message.startsWith("Nothing was sent") ? 500 : 409, planned.message);
       // The owner on the answers, the owner on the panel and the conversation row are one commit. The panel follows the stored

@@ -74,6 +74,8 @@ export const TOO_SHORT_ROUTE = "Say where the answer went in at least 6 characte
 export const TOO_LONG_ROUTE = `Keep "where it went" to ${MAX_ROUTE_WORDS} characters or fewer.`;
 export const NO_ANSWER_WAITING = "No answer to that question is waiting for the agent.";
 export const OTHER_AGENT_OWNS = "That question was asked by a different agent, so you cannot answer for it.";
+/** A question belongs to the agent that asked it (or the one the person moved it to); another agent cannot put it up again. */
+export const QUESTION_OTHER_AGENT = "That question belongs to another agent.";
 /** Same id, different wording, choices, consequences, input kind or target: refused on every state (unanswered, put off, answered). */
 export const SAME_ID_OTHER_WORDS = "That question id was already used for different wording. Use a new question id.";
 export const REQUIRED_CANNOT_WITHDRAW = "This question settles a decision, so only you can close it. The agent cannot take it back.";

@@ -9,7 +9,7 @@
 export const MAX_OPEN_PANELS = 8;
 
 import { answerFor } from "../../capabilities/panel-answers.ts";
-import { checkRouteWords, checkWithdraw, REQUIRED_CANNOT_WITHDRAW, SAME_ID_OTHER_WORDS, type QuestionState } from "../../capabilities/question-rules.ts";
+import { checkRouteWords, checkWithdraw, QUESTION_OTHER_AGENT, REQUIRED_CANNOT_WITHDRAW, SAME_ID_OTHER_WORDS, type QuestionState } from "../../capabilities/question-rules.ts";
 import { clip, itemOf, questionOf, toneOf, type PanelItem, type PanelTone, type QuestionItem } from "../surface2/panel-blocks.ts";
 
 export type Tone = PanelTone;
@@ -144,6 +144,7 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
         for (const b of blocks) {
           if (b.kind !== "question") continue;
           const old = before(b.id);
+          if (old !== undefined && old.asked_by_key != null && old.asked_by_key !== key) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
           if (old !== undefined && !sameQuestion(old, b)) return refuse(state, "SCHEMA", SAME_ID_OTHER_WORDS);
         }
         for (const o of existing.blocks) {
@@ -170,6 +171,8 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
       if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [{ ...block, asked_by: agent, asked_by_key: key }], notes: [], owner_key: key });
       if (panel.owner_key != null && panel.owner_key !== key) return refuse(state, "SCHEMA", PANEL_OWNED_ELSEWHERE);
       const old = panel.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === block.id);
+      // A question belongs to the agent that asked it, or to the one the person moved it to. Another agent cannot put it up again.
+      if (old !== undefined && old.asked_by_key != null && old.asked_by_key !== key) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
       if (old !== undefined && !sameQuestion(old, block)) return refuse(state, "SCHEMA", SAME_ID_OTHER_WORDS);
       // The very same question again keeps what the person said (an answer, or a put-off that reopens).
       const owner = ownerOf(old, agent, key);
