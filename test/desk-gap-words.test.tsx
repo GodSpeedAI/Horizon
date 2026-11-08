@@ -3,7 +3,9 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { startsWords } from "../src/ui/desk/Composer.tsx";
-import { AGENT_READ_WORDS, NOT_RECORDED_WORDS, WRITE_TOKEN_WORDS } from "../src/app.ts";
+import { AGENT_READ_WORDS, NOT_RECORDED_WORDS } from "../src/app.ts";
+import { LOCKED_WORDS, NOT_PAIRED_WORDS, SPENT_CODE_WORDS, WRONG_CODE_WORDS } from "../src/desk/pairing.ts";
+import { PAIR_BODY, PAIR_HEADING, PAIR_LIMIT, PAIR_NO_ANSWER, PAIR_FAILED } from "../src/ui/desk/pair-words.ts";
 import { WITHHELD_WORDS } from "../src/ui/desk/agent-view.ts";
 import { BANNED, hasBannedWords } from "../src/ui/desk/banned-words.ts";
 import { START } from "../src/ui/desk/attention.ts";
@@ -25,7 +27,7 @@ const clean = (label: string, words: string): void => {
 
 describe("new sentences are plain", () => {
   test("every refusal and note", () => {
-    const all: Record<string, string> = { WRITE_TOKEN_WORDS, NOT_RECORDED_WORDS, TOO_MANY_PROPOSALS, QUESTION_CHANGED, ANSWERED_CANNOT_CHANGE, REQUIRED_CANNOT_WITHDRAW, AGENT_READ_WORDS, WITHHELD_WORDS, INSPECT_WITHHELD, ...CONTROL_WORDS, ...STATUS_WORD, ...STAGE_WORD };
+    const all: Record<string, string> = { NOT_PAIRED_WORDS, WRONG_CODE_WORDS, LOCKED_WORDS, SPENT_CODE_WORDS, PAIR_HEADING, PAIR_BODY, PAIR_LIMIT, PAIR_NO_ANSWER, PAIR_FAILED, NOT_RECORDED_WORDS, TOO_MANY_PROPOSALS, QUESTION_CHANGED, ANSWERED_CANNOT_CHANGE, REQUIRED_CANNOT_WITHDRAW, AGENT_READ_WORDS, WITHHELD_WORDS, INSPECT_WITHHELD, ...CONTROL_WORDS, ...STATUS_WORD, ...STAGE_WORD };
     for (const [label, words] of Object.entries(all)) clean(label, words);
   });
 

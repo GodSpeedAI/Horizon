@@ -12,6 +12,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from "playwrig
 import { createApplication, type HorizonApplication } from "../src/app.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
+import { testCodeFor } from "./support/write-token.ts";
 
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -69,6 +70,8 @@ suite("phone remote control, end to end in Chromium", () => {
     cockpitBase = `http://127.0.0.1:${cockpit.port}`;
     chrome = await chromium.launch({ executablePath: browser.path ?? undefined, headless: true });
     desktop = await chrome.newContext({ viewport: { width: 1280, height: 860 } });
+    // The desktop browser pairs with the code the cockpit printed at start. The session cookie then lives in this context.
+    expect((await desktop.request.post(`${cockpitBase}/desk/pair`, { data: { code: testCodeFor(cockpitBase) } })).status()).toBe(200);
     desktopPage = await desktop.newPage();
   }, 120_000);
 
@@ -111,9 +114,8 @@ suite("phone remote control, end to end in Chromium", () => {
     await page.getByLabel("Purpose of the case").fill("Phone opens the first case");
     await page.getByRole("button", { name: "Open a case" }).click();
     await (page.getByText("Phone opens the first case")).waitFor({ state: "visible", timeout: 15_000 });
-    // The desk page's own form carries the write token; this request acts like that form.
-    const token = /name="horizon-write-token" content="([0-9a-f]+)"/.exec(await (await desktop.request.get(`${cockpitBase}/desk`)).text())![1]!;
-    const posted = await desktop.request.post(`${cockpitBase}/workspace/case`, { form: { purpose: "Desktop changes the case", horizon_write: token }, maxRedirects: 0 });
+    // The paired desktop browser sends its session cookie with this form post, as the desk's own form does.
+    const posted = await desktop.request.post(`${cockpitBase}/workspace/case`, { form: { purpose: "Desktop changes the case" }, maxRedirects: 0 });
     expect(posted.status()).toBe(303);
     await (page.getByText("Desktop changes the case")).waitFor({ state: "visible", timeout: 20_000 });
   }, 90_000);

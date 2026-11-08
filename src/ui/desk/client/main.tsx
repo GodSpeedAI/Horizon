@@ -3,7 +3,7 @@
  * Browser entry. It polls `/desk/state.json` every 2000 ms and hands the result to the reducer, which (rule 2) lets an
  * outside update change only the numbers, list ends and inspector. Drafts and pins are kept in this browser only.
  */
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import type { NoteView } from "../../../capabilities/notes.ts";
 import { START, deskReducer, type FirstMove, type Pin, type UiState } from "../attention.ts";
@@ -16,6 +16,7 @@ import type { ConversationRow } from "../conversation-model.ts";
 import { startDeskTools } from "../webmcp.ts";
 import { inspectForAgent, type DeskAgentInvoker } from "../webmcp-tools.ts";
 import { POLL_MS, itemsOf, shiftDay, withDetails, type DeskState, type SearchResult } from "../model.ts";
+import { PAIR_BODY, PAIR_BUTTON, PAIR_FAILED, PAIR_HEADING, PAIR_LIMIT, PAIR_NO_ANSWER } from "../pair-words.ts";
 
 const DRAFT_KEY = "horizon.desk.draft";
 const PINS_KEY = "horizon.desk.pins";
@@ -23,29 +24,63 @@ const PINS_KEY = "horizon.desk.pins";
 const ROWS_POLL_MS = 5000;
 const AGENT_HEADERS = { "x-horizon-source": "page-agent", "x-horizon-agent-name": "Agent on this page" } as const;
 
-/** The desk page is served with a write token. Every write the person makes sends it back; an agent's call (marked with the page-agent header) never does. */
-function sendWriteToken(): void {
-  const token = document.querySelector('meta[name="horizon-write-token"]')?.getAttribute("content") ?? "";
-  const nativeFetch = window.fetch.bind(window);
-  window.fetch = Object.assign((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
-    const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
-    if (method === "GET" || method === "HEAD" || headers.has("x-horizon-source") || token === "") return nativeFetch(input, init);
-    headers.set("x-horizon-write", token);
-    return nativeFetch(input, { ...init, headers });
-  }, nativeFetch);
-  // A plain form post cannot set a header: give the form the token as a field just before it is sent.
-  document.addEventListener("submit", (event) => {
-    const form = event.target;
-    if (!(form instanceof HTMLFormElement) || form.method.toLowerCase() !== "post" || token === "" || form.querySelector('input[name="horizon_write"]') !== null) return;
-    const field = document.createElement("input");
-    field.type = "hidden";
-    field.name = "horizon_write";
-    field.value = token;
-    form.appendChild(field);
-  }, true);
+/** The desk waits for a pairing: a browser with no session sees the pairing screen, and the desk loads once it has paired. */
+function PairScreen({ onPaired }: { readonly onPaired: () => void }) {
+  const [code, setCode] = useState("");
+  const [words, setWords] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const response = await fetch("/desk/pair", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code }) });
+      const body = (await response.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
+      if (response.ok && body?.ok === true) {
+        onPaired();
+        return;
+      }
+      setWords(body?.message ?? PAIR_FAILED);
+    } catch {
+      setWords(PAIR_NO_ANSWER);
+    }
+    setBusy(false);
+  };
+  return (
+    <main className="pair">
+      <h1>{PAIR_HEADING}</h1>
+      <p>{PAIR_BODY}</p>
+      <p className="muted">{PAIR_LIMIT}</p>
+      <form onSubmit={submit}>
+        <label htmlFor="pairing-code">Pairing code</label>
+        <input id="pairing-code" name="code" autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="XXXX-XXXX" value={code} onChange={(event) => setCode(event.target.value)} />
+        <button type="submit" disabled={busy || code.trim() === ""}>{PAIR_BUTTON}</button>
+      </form>
+      {words === "" ? null : <p role="alert">{words}</p>}
+    </main>
+  );
 }
-sendWriteToken();
+
+/** Asks the server whether this browser is paired, then shows the desk or the pairing screen. */
+function Gate() {
+  const [paired, setPaired] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch("/desk/session", { headers: { accept: "application/json" } })
+      .then((response) => response.json() as Promise<{ paired?: boolean }>)
+      .then((body) => {
+        if (live) setPaired(body.paired === true);
+      })
+      .catch(() => {
+        if (live) setPaired(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (paired === null) return null;
+  if (!paired) return <PairScreen onPaired={() => setPaired(true)} />;
+  return <App />;
+}
 
 /** A move that was done but not recorded says so after its own words. */
 const withRecordNote = (message: string, body: { recorded?: boolean; recorded_words?: string }): string => (body.recorded === false && body.recorded_words ? `${message} ${body.recorded_words}` : message);
@@ -505,4 +540,4 @@ function App() {
 }
 
 const root = document.getElementById("root");
-if (root) createRoot(root).render(<App />);
+if (root) createRoot(root).render(<Gate />);

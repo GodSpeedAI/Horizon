@@ -59,7 +59,7 @@ function ok(message: string): void {
  * Start the real server and wait for the line that names the port it actually bound. Reading
  * the port from the process's own output keeps this independent of a chosen fixed port.
  */
-async function startServer(store: string): Promise<{ url: string; stop: () => void }> {
+async function startServer(store: string): Promise<{ url: string; code: string; stop: () => void }> {
   const proc = Bun.spawn(["bun", "run", "src/main.ts"], {
     cwd: process.cwd(),
     env: isolatedEnv(store),
@@ -76,9 +76,11 @@ async function startServer(store: string): Promise<{ url: string; stop: () => vo
     if (chunk === null) continue;
     seen += decoder.decode(chunk.value, { stream: true });
     const match = /listening on (http:\/\/127\.0\.0\.1:\d+)\//.exec(seen);
-    if (match?.[1] !== undefined) {
+    // The child prints its pairing code once; the script holds it in memory to pair its own client. It is never printed here.
+    const code = /pairing code: ([2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4})\./.exec(seen)?.[1];
+    if (match?.[1] !== undefined && code !== undefined) {
       reader.releaseLock();
-      return { url: match[1], stop: () => proc.kill() };
+      return { url: match[1], code, stop: () => proc.kill() };
     }
     if (chunk.done) break;
   }
@@ -142,12 +144,13 @@ async function main(): Promise<void> {
   await withStore(async (store) => {
     const server = await startServer(store);
     try {
-      // Like the desk page, send back the write token the page was served with.
-      const token = /name="horizon-write-token" content="([0-9a-f]+)"/.exec(await (await fetch(`${server.url}/desk`)).text())?.[1] ?? "";
+      // Pair this client with the code the server printed, as a browser would; the session cookie then goes with the writes.
+      const paired = await fetch(`${server.url}/desk/pair`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: server.code }) });
+      const cookie = /horizon_desk=[^;]+/.exec(paired.headers.get("set-cookie") ?? "")?.[0] ?? "";
       const submit = async (body: unknown): Promise<number> => {
         const response = await fetch(`${server.url}/surface/intent`, {
           method: "POST",
-          headers: { "content-type": "application/json", accept: "application/json", "x-horizon-write": token },
+          headers: { "content-type": "application/json", accept: "application/json", cookie },
           body: JSON.stringify(body),
         });
         return response.status;

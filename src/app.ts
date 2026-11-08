@@ -103,6 +103,7 @@ import { caseItems, costSource, orderWork, sessionItems, type AcceptedKnowledge,
 import { readLedgerDay } from "./adapters/ledger-day.ts";
 import { recordReader, type RecordReader } from "./adapters/realitytrace-economics.ts";
 import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
+import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, printPairingCode } from "./desk/pairing.ts";
 import { setupMapping } from "./config/setup.ts";
 import type { RecordSource } from "./config/types.ts";
 import { existsSync as fileExists, mkdirSync as makeDir, readFileSync as readFileText, writeFileSync as writeFileText } from "node:fs";
@@ -1842,9 +1843,10 @@ export async function createApplication(
     return presenting ? applyStandIns(work, presentingKey(), data.repoNames) : work;
   }
 
-  /** The desk page carries a write token. The person's writes send it back; a caller that never loaded the page has none. */
-  const deskWriteToken = randomBytes(24).toString("hex");
-  const DESK_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="horizon-write-token" content="${deskWriteToken}"><title>Horizon desk</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/desk/app.css"></head><body><div id="root"></div><noscript>The desk needs JavaScript to show live updates. Turn it on for this page.</noscript><script type="module" src="/desk/app.js"></script></body></html>`;
+  /** The desk page holds no secret. A browser pairs with the code the terminal printed at start; the session cookie it gets then goes with every write. */
+  const { code: pairingCode, pairing } = createDeskPairing(clock);
+  let pairingPrinted = false;
+  const DESK_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon desk</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/desk/app.css"></head><body><div id="root"></div><noscript>The desk needs JavaScript to show live updates. Turn it on for this page.</noscript><script type="module" src="/desk/app.js"></script></body></html>`;
   const SETUP_GUIDE_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon setup guide</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:1rem auto;padding:0 1rem}code{overflow-wrap:anywhere}</style></head><body><p><a href="/workspace">Back to the desk</a></p><h1>Setup guide</h1><h2>Start Horizon with the case keeper and record keeper</h2><p>Start the whole set with <code>bun run ignite</code> (see docs/IGNITION.md).</p><h2>Record what agent work costs</h2><ol><li>Install the agent tap with the record keeper: <code>te-agents install --with-realitytrace</code></li><li>Enroll each repository you want measured: <code>te-agents rt enroll &lt;repo&gt;</code></li><li>Point Horizon at the record keeper and the tap's store: set <code>HORIZON_ECONOMICS_REALITYTRACE_BIN</code> (and, if the tap does not use the default location, <code>HORIZON_ECONOMICS_DATA_HOME</code> and <code>HORIZON_ECONOMICS_STATE_HOME</code>), or add an <code>[economics]</code> table with <code>realitytrace_bin</code> to the Horizon config.</li></ol></body></html>`;
   const deskPage = (): Response => new Response(DESK_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": DESK_CSP, "x-content-type-options": "nosniff" } });
   const DESK_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
@@ -2286,6 +2288,14 @@ export async function createApplication(
     return Response.json({ ...body, recorded: false, recorded_words: NOT_RECORDED_WORDS }, { status: response.status, headers: { "cache-control": "no-store" } });
   }
 
+  /** Pairing: a typed code that matches gives this browser a session cookie. Only the code is checked here; see desk/pairing.ts. */
+  async function pairDesk(request: Request): Promise<Response> {
+    const body = (await request.json().catch(() => null)) as { code?: unknown } | null;
+    const outcome = pairing.pair(typeof body?.code === "string" ? body.code : "");
+    if (!outcome.ok) return Response.json({ ok: false, paired: false, message: outcome.words }, { status: outcome.status, headers: { "cache-control": "no-store" } });
+    return Response.json({ ok: true, paired: true }, { headers: { "cache-control": "no-store", "set-cookie": outcome.cookie } });
+  }
+
   async function deskSaveNote(request: Request): Promise<Response> {
     const text = await request.text();
     if (text.length > 1_000_000) return Response.json({ ok: false, message: "That note is too large to save. Split it into smaller notes." }, { status: 413 });
@@ -2368,11 +2378,14 @@ export async function createApplication(
             const blocked = pageAgentRefusal(request.method, url.pathname);
             if (blocked !== null) return blocked;
           }
-          // The person's writes must carry the token the desk page was served with.
-          // Central rule: every route that is not a read needs the token (the header, or the form field a served form carries).
-          // /agent/panels returned above and keeps its own key. Adding a route cannot skip this check.
-          if (page === null && !READ_METHODS.has(request.method)) {
-            if (!writeTokenOk(request.headers.get(WRITE_TOKEN_HEADER) ?? (await formFieldToken(request)), deskWriteToken)) return writeTokenRefusal();
+          // Central rule: every route that is not a read needs a paired session cookie. /agent/panels returned above and keeps
+          // its own key; /desk/pair is how a browser gets the cookie. Adding a route cannot skip this check.
+          if (!READ_METHODS.has(request.method) && url.pathname !== "/desk/pair" && !pairing.paired(request.headers.get("cookie"))) return notPairedRefusal();
+          if (url.pathname === "/desk/session" && request.method === "GET") return Response.json({ paired: pairing.paired(request.headers.get("cookie")) }, { headers: { "cache-control": "no-store" } });
+          if (url.pathname === "/desk/pair" && request.method === "POST") return pairDesk(request);
+          if (url.pathname === "/desk/pair/logout" && request.method === "POST") {
+            pairing.end(request.headers.get("cookie"));
+            return Response.json({ ok: true, paired: false }, { headers: { "cache-control": "no-store", "set-cookie": clearedSessionCookie() } });
           }
           if (url.pathname === "/health") {
             const semantic = await runtime.runtime.service.invoke(caller, {
@@ -2764,9 +2777,13 @@ export async function createApplication(
         hostname: loaded.config.bind_host,
         port,
         async fetch(request) {
-          return withFormTokens(await route(request), deskWriteToken);
+          return route(request);
         },
       });
+      if (!pairingPrinted) {
+        pairingPrinted = true;
+        printPairingCode(server.url.origin, pairingCode);
+      }
       return server;
     },
     async close() {
@@ -2816,47 +2833,19 @@ const sameSet = (given: readonly unknown[], ids: readonly string[]): boolean => 
 
 export const NOT_RECORDED_WORDS = "This was done, but it could not be added to the conversation. Check the desk log.";
 
-/** Methods that only read. Every other method needs the desk page's write token. */
+/** Methods that only read. Every other method needs a paired session cookie. */
 export const READ_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS"]);
-export const WRITE_TOKEN_FIELD = "horizon_write";
-export const WRITE_TOKEN_HEADER = "x-horizon-write";
-export const WRITE_TOKEN_WORDS = "This did not come from the desk page, so nothing was changed. Reload the desk page and try again.";
 
-export function writeTokenOk(given: string | null, expected: string): boolean {
-  if (given === null) return false;
-  const a = Buffer.from(given);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
-/** A plain HTML form cannot set a header, so a served form carries the token as a hidden field. */
-async function formFieldToken(request: Request): Promise<string | null> {
-  const type = request.headers.get("content-type") ?? "";
-  if (!type.includes("application/x-www-form-urlencoded") && !type.includes("multipart/form-data")) return null;
-  const form = await request.clone().formData().catch(() => null);
-  const value = form?.get(WRITE_TOKEN_FIELD);
-  return typeof value === "string" ? value : null;
-}
-
-/** Served pages (the compare page, the remote panel) post with plain forms: give each one the token field. */
-export async function withFormTokens(response: Response, token: string): Promise<Response> {
-  if (!(response.headers.get("content-type") ?? "").includes("text/html")) return response;
-  const html = await response.text();
-  const changed = html.replace(/<form\b([^>]*\bmethod="post"[^>]*)>/gi, (_all, attrs: string) => `<form${attrs}><input type="hidden" name="${WRITE_TOKEN_FIELD}" value="${token}">`);
-  const headers = new Headers(response.headers);
-  headers.delete("content-length");
-  return new Response(changed, { status: response.status, statusText: response.statusText, headers });
-}
-
-export function writeTokenRefusal(): Response {
-  return Response.json({ ok: false, outcome: "no_token", code: "forbidden_write", message: WRITE_TOKEN_WORDS }, { status: 403, headers: { "cache-control": "no-store" } });
+/** A write from a browser that has not paired (or whose session has ended). Nothing is changed. */
+export function notPairedRefusal(): Response {
+  return Response.json({ ok: false, outcome: "not_paired", code: "forbidden_write", message: NOT_PAIRED_WORDS }, { status: 403, headers: { "cache-control": "no-store" } });
 }
 
 export const AGENT_NOTE_WORDS = "An agent can suggest a note; you save it.";
 export const AGENT_REFUSAL_WORDS = "Only you can confirm this. The agent's suggestion is waiting in the conversation.";
 
 /** Null when an agent on the page may make the call. Reads and the hand off preview pass; every other write is refused with 403. */
-export const AGENT_READS: ReadonlySet<string> = new Set(["/desk", "/workspace", "/desk/app.js", "/desk/app.css", "/desk/state.json", "/desk/search", "/desk/conversation", "/desk/panels/catalogue"]);
+export const AGENT_READS: ReadonlySet<string> = new Set(["/desk", "/workspace", "/desk/app.js", "/desk/app.css", "/desk/state.json", "/desk/search", "/desk/conversation", "/desk/panels/catalogue", "/desk/session"]);
 export const AGENT_READ_WORDS = "An agent on the page can read the summary, a find and the conversation. Other parts of the desk are for you.";
 
 export function pageAgentRefusal(method: string, pathname: string): Response | null {
