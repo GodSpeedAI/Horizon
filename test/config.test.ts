@@ -221,3 +221,44 @@ describe("local operator identity is configured, not the OS account", () => {
   });
 });
 
+
+describe("a read-only load never creates or rotates the agent key", () => {
+  const configFor = (root: string): string => {
+    const configPath = join(root, "horizon.toml");
+    writeFileSync(configPath, `${toToml(fixture({ secrets: { mode: "per_launch", path: join(root, "launch.secret") }, runtime_store: join(root, "app.sqlite") }))}\n`);
+    return configPath;
+  };
+
+  test("an absent agent key is refused and no file is created", () => {
+    const root = mkdtempSync(join(tmpdir(), "horizon-agent-key-ro-"));
+    const keyPath = join(root, "secrets", "agent.key");
+    process.env.HORIZON_AGENT_KEY_FILE = keyPath;
+    writeFileSync(join(root, "launch.secret"), `${"a".repeat(64)}\n`);
+    expect(() => loadConfig(configFor(root), { readOnly: true })).toThrow("no valid agent key");
+    expect(existsSync(keyPath)).toBe(false);
+  });
+
+  test("an invalid agent key is refused and its bytes are left unchanged", () => {
+    const root = mkdtempSync(join(tmpdir(), "horizon-agent-key-ro-"));
+    const keyPath = join(root, "agent.key");
+    process.env.HORIZON_AGENT_KEY_FILE = keyPath;
+    writeFileSync(join(root, "launch.secret"), `${"a".repeat(64)}\n`);
+    writeFileSync(keyPath, "not-a-key\n", { mode: 0o600 });
+    const before = readFileSync(keyPath);
+    expect(() => loadConfig(configFor(root), { readOnly: true })).toThrow("no valid agent key");
+    expect(readFileSync(keyPath).equals(before)).toBe(true);
+  });
+
+  test("a valid agent key is read and its bytes are left unchanged", () => {
+    const root = mkdtempSync(join(tmpdir(), "horizon-agent-key-ro-"));
+    const keyPath = join(root, "agent.key");
+    process.env.HORIZON_AGENT_KEY_FILE = keyPath;
+    writeFileSync(join(root, "launch.secret"), `${"a".repeat(64)}\n`);
+    const key = "b".repeat(64);
+    writeFileSync(keyPath, `${key}\n`, { mode: 0o600 });
+    const before = readFileSync(keyPath);
+    const loaded = loadConfig(configFor(root), { readOnly: true });
+    expect(loaded.agentKey).toBe(key);
+    expect(readFileSync(keyPath).equals(before)).toBe(true);
+  });
+});

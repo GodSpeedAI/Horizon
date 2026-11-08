@@ -388,7 +388,7 @@ export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.
   const secretPath = process.env.HORIZON_SECRET_FILE ?? withStore.secrets.path;
   const launchSecret = options.readOnly === true ? readLaunchSecret(secretPath) : writeLaunchSecret(secretPath);
   const agentKeyPath = resolve(agentKeyFileOf(setup));
-  const agentKey = agentKeyAt(agentKeyPath);
+  const agentKey = agentKeyAt(agentKeyPath, options.readOnly === true);
   return {
     config: withStore,
     operator: {
@@ -424,9 +424,10 @@ function agentKeyFileOf(setup: SetupName | undefined): string {
 
 /**
  * The agent door's key. It is kept across starts: an existing valid key (64 hex characters) is read
- * and never rewritten. A missing or invalid file gets a new key, written once with mode 0600.
+ * and never rewritten. A missing or invalid file gets a new key, written once with mode 0600. Read-only (a read-only open
+ * beside a running desk): the key must already exist and be valid; it is never created or rotated, and the file is never written.
  */
-function agentKeyAt(path: string): string {
+function agentKeyAt(path: string, readOnly: boolean): string {
   if (existsSync(path)) {
     let kept = "";
     try {
@@ -436,6 +437,7 @@ function agentKeyAt(path: string): string {
     }
     if (AGENT_KEY.test(kept)) return kept;
   }
+  if (readOnly) bounded(`no valid agent key at ${resolve(path)} to read; start the desk once so it writes one, then open read-only again`);
   const key = randomBytes(32).toString("hex");
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${key}\n`, { encoding: "utf8", mode: 0o600 });
