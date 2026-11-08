@@ -3,8 +3,9 @@
  * deliberately supports one local writer"). One record in `horizon-desk-lock` holds the token of the desk that owns the store, its
  * process id and the time it started. A desk takes the lock with a compare-and-set commit at startup, and gives it up on close.
  *
- * A lock is held by a desk that is still running: a token this process has not released, or a process id that is alive and is not
- * this one's own closed desk. A lock left behind by a process that stopped without releasing it does not block the next start.
+ * A lock is held by a desk that is still running: a token that has not been released, held by a process id that is alive. That includes
+ * a desk in this process, or a worker in this process, whose tokens this module cannot see. A lock left behind by a process that stopped
+ * without releasing it does not block the next start.
  */
 import { randomUUID } from "node:crypto";
 import type { DurableStore } from "@godspeedai/cognate-events";
@@ -39,8 +40,9 @@ export async function acquireDeskLock(store: DurableStore): Promise<string> {
   if (current !== undefined) {
     const holder = current.value as { readonly token?: unknown; readonly pid?: unknown };
     if (typeof holder.token === "string") {
-      const sameProcess = typeof holder.pid === "number" && holder.pid === process.pid;
-      const live = openTokens.has(holder.token) || (!sameProcess && typeof holder.pid === "number" && processAlive(holder.pid));
+      // A record that names this process is live too: another worker in this process holds it, and its tokens are not in this
+      // module's set. Only a record whose process has gone is stale.
+      const live = openTokens.has(holder.token) || (typeof holder.pid === "number" && processAlive(holder.pid));
       if (live) throw new DeskAlreadyRunning();
     }
   }

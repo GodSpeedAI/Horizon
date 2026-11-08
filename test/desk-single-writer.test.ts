@@ -4,7 +4,7 @@
  * a process that died does not block the next start. The tests start real application instances on one SQLite file.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { ALREADY_RUNNING_WORDS, LOCK_COLLECTION, LOCK_ID } from "../src/capabilities/desk-lock.ts";
+import { acquireDeskLock, ALREADY_RUNNING_WORDS, DeskAlreadyRunning, LOCK_COLLECTION, LOCK_ID } from "../src/capabilities/desk-lock.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
 const apps: DeskApp[] = [];
@@ -49,6 +49,17 @@ describe("one writer per desk database", () => {
     apps.splice(apps.indexOf(first), 1);
     const second = await open(root);
     expect((await second.state()).panels).toBeDefined();
+  });
+
+  test("a second acquirer in the same process, while the first holds the lock, is refused", async () => {
+    // A second worker in this process has its own copy of the lock module, so it cannot see the first desk's token. It sees the
+    // record instead: a live token named by this process's id. The record must still refuse it.
+    const first = await open();
+    const store = first.application.runtime.runtime.store;
+    const held = await store.getRecord(LOCK_COLLECTION, LOCK_ID);
+    await store.commit({ appends: [], records: [{ collection: LOCK_COLLECTION, id: LOCK_ID, expectedVersion: held?.version ?? 0, value: { token: "worker-desk", pid: process.pid, since: new Date().toISOString() } }] });
+    await expect(acquireDeskLock(store)).rejects.toBeInstanceOf(DeskAlreadyRunning);
+    expect((await store.getRecord(LOCK_COLLECTION, LOCK_ID))?.value).toMatchObject({ token: "worker-desk" });
   });
 
   test("a lock held by a live process other than this one is refused", async () => {
