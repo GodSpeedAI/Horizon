@@ -5,7 +5,7 @@
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
-import { listAnswers, PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
+import { acceptanceBlocked, listAnswers, PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
 import { MIGRATION_COLLECTION, MIGRATING_WORDS, runDeskMigrations, type DeskMigration } from "../src/capabilities/desk-migrations.ts";
 import type { PanelQueue } from "../src/capabilities/panel-answers.ts";
 
@@ -98,6 +98,19 @@ describe("the desk's record migrations", () => {
     await held.application.migrated;
     const after = await held.post("/desk/panels/op", { op: "human.pin", id: "none", pinned: true });
     expect(after.status).not.toBe(503);
+  });
+
+  test("a restart leaves an outstanding legacy wait waiting, with no owner recorded, and acceptance stays blocked", async () => {
+    const first = await open();
+    const store = storeOf(first);
+    const tenant = first.application.caller.tenant;
+    await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: "answer:legacy-wait:1", expectedVersion: 0, value: { tenant, panel_id: "legacy-wait", n: 1, ask: "q", outcome: "answered", value: "a", note: null, at: "2026-11-02T10:00:00.000Z", version: null, routed_as: null, step: "step-legacy", asked_by: null, asked_by_key: null, owner_key: null, fingerprint: null, history: [], replied: false } }] });
+    await forgetMarker(first);
+    const second = await restart(first);
+    const rows = await listAnswers(storeOf(second), second.application.caller.tenant, "legacy-wait");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ state: "waiting_for_agent", waiting_on: "agent", replied: false, finished_by: null, routed_as: null });
+    expect(acceptanceBlocked(rows, "step-legacy")).toBe(true);
   });
 
   test("the words for a pending migration are plain", () => {

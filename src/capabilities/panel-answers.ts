@@ -395,16 +395,10 @@ export async function migrateAnswerStates(store: DurableStore, tenant: string): 
 }
 
 /**
- * Closes answers written before the upgrade that have no owner and no route. They do not block acceptance after the upgrade
- * (store-design-v2 section 5). Runs once; a second run finds nothing to close. Returns how many it closed.
+ * The pre-upgrade close, retired. It used to finish every unrouted answer with no recorded owner as stopped, so acceptance went ahead
+ * without the person's decision. Those waits now stay outstanding: the person reassigns them or stops waiting. Legacy records are not
+ * rewritten here. The version stays in the migration list so an upgraded desk's marker still reads; this writes nothing and returns 0.
  */
-export async function migratePreUpgradeAnswers(store: DurableStore, tenant: string, _now: Date): Promise<number> {
-  let closed = 0;
-  for (const read of await readAnswerRows(store, tenant)) {
-    const a = read.answer;
-    if (!waitsForAgent(a) || a.owner_key !== null || a.outcome === null) continue;
-    await store.commit({ appends: [], records: [planFinish(read, "stopped", PRE_UPGRADE_WORDS, null)] });
-    closed += 1;
-  }
-  return closed;
+export async function migratePreUpgradeAnswers(_store: DurableStore, _tenant: string, _now: Date): Promise<number> {
+  return 0;
 }
