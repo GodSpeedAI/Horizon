@@ -93,7 +93,7 @@ import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistor
 import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
 import { checkReassign } from "./capabilities/question-rules.ts";
-import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, listConflicts, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
+import { acceptanceBlocked, AGREED_COLLECTION, agreedFingerprint, agreedFingerprintOf, agreedId, answerFor, guardIdOf, PANEL_ANSWERS_COLLECTION, answerState, listAnswers, listConflicts, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
 import { ANSWER_NEEDS_REVISION, ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, checkAgentOp, moveQuestion, openPanelId, reduceAgent, reduceHuman, type AgentOp, type AskBlock, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { boardWrites, deskScopeOf, loadBoard, movedStoredQuestion, PANEL_LOAD_WORDS, PANEL_UNREADABLE_WORDS, readsBack, stateWrites, withStored, type CommitRecord } from "./capabilities/panel-records.ts";
@@ -2108,6 +2108,18 @@ export async function createApplication(
     return null;
   }
 
+  /** The words a withdrawal of an answered or cancelled question gets. Same meaning as the rule's own refusal for that case. */
+  const SEALED_WITHDRAW_WORDS = "That question was already answered, so it cannot be withdrawn.";
+  /** Whether a question is sealed as answered or cancelled in the store: its guard, a legacy agreement, or a committed answer. Reads only. */
+  async function questionSealed(panelId: string, askId: string): Promise<boolean> {
+    const store = runtime.runtime.store;
+    const scope = deskScopeOf(caller.tenant, caller.actor.id);
+    const guard = await store.getRecord(PANEL_ANSWERS_COLLECTION, guardIdOf(scope, panelId, askId));
+    if (guard !== null && guard !== undefined && ["answered", "cancelled"].includes(String((guard.value as { readonly outcome?: unknown }).outcome))) return true;
+    if ((await store.getRecord(AGREED_COLLECTION, agreedId(scope, panelId, askId))) != null) return true;
+    return (await listAnswers(store, scope, panelId)).some((a) => a.ask === askId && (a.outcome === "answered" || a.outcome === "cancelled"));
+  }
+
   /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`, `ask.withdraw`, `answer.route`). To choose parts well an agent reads `GET /desk/panels/catalogue`. A reply on a panel clears the wait on the answers given there. */
   type AgentReply = { readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string };
   /** The one entry point for an agent's change, from the agent door and from inside the desk. Every caller goes through agentCommandNow. */
@@ -2149,6 +2161,9 @@ export async function createApplication(
     if (paused !== null) return { ok: false, code: "UNAVAILABLE", message: paused };
     if (boardRefused !== null) return { ok: false, code: "UNAVAILABLE", message: boardRefused };
     if (op.tool === "ask.withdraw") {
+      // A question sealed as answered or cancelled cannot be withdrawn, whether the board shows it as open or not. The seal is read from
+      // the store (the question's guard, its agreement, or its committed answer), never from the board, which a republish can show as unanswered.
+      if (await questionSealed(op.panel_id, op.ask_id)) return { ok: false, code: "SCHEMA", message: SEALED_WITHDRAW_WORDS };
       // A question still on the board is checked by the rule inside the board's withdraw (reduceAgent). One that is only on record
       // (its panel is closed) is checked here, with the same rule, before the board says it is not open.
       const onBoard = panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.some((b) => b.kind === "question" && b.id === op.ask_id) ?? false;
