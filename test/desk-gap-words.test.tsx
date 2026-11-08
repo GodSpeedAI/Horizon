@@ -14,6 +14,8 @@ import { STAGE_WORD, STATUS_WORD } from "../src/ui/desk/Conversation.tsx";
 import { TOO_MANY_PROPOSALS, type ConversationRow } from "../src/ui/desk/conversation-model.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";
 import { ANSWERED_CANNOT_CHANGE, QUESTION_CHANGED, REQUIRED_CANNOT_WITHDRAW } from "../src/ui/desk/panels-model.ts";
+import { NO_ANSWER_WAITING, TOO_LONG_ROUTE, TOO_SHORT_ROUTE } from "../src/capabilities/question-rules.ts";
+import { NOTHING_SENT, PRE_UPGRADE_WORDS, QuestionAlreadyAnswered } from "../src/capabilities/panel-answers.ts";
 import { INSPECT_WITHHELD } from "../src/ui/desk/webmcp-tools.ts";
 import { deskState } from "./support/desk-fixture.ts";
 import { quietIo } from "./support/desk-io.ts";
@@ -29,6 +31,21 @@ describe("new sentences are plain", () => {
   test("every refusal and note", () => {
     const all: Record<string, string> = { NOT_PAIRED_WORDS, WRONG_CODE_WORDS, LOCKED_WORDS, SPENT_CODE_WORDS, PAIR_HEADING, PAIR_BODY, PAIR_LIMIT, PAIR_NO_ANSWER, PAIR_FAILED, NOT_RECORDED_WORDS, TOO_MANY_PROPOSALS, QUESTION_CHANGED, ANSWERED_CANNOT_CHANGE, REQUIRED_CANNOT_WITHDRAW, AGENT_READ_WORDS, WITHHELD_WORDS, INSPECT_WITHHELD, ...CONTROL_WORDS, ...STATUS_WORD, ...STAGE_WORD };
     for (const [label, words] of Object.entries(all)) clean(label, words);
+  });
+
+  test("the store and the rules refuse in plain words (step 9)", () => {
+    const more: Record<string, string> = {
+      "route too short": TOO_SHORT_ROUTE,
+      "route too long": TOO_LONG_ROUTE,
+      "nothing waiting for the agent": NO_ANSWER_WAITING,
+      "withdraw by another agent": "That question was asked by a different agent, so you cannot withdraw it.",
+      "withdraw after an answer": "That question was already answered, so it cannot be withdrawn.",
+      "put by another agent": "That question belongs to another agent.",
+      "answered twice": new QuestionAlreadyAnswered().message,
+      "nothing sent": NOTHING_SENT,
+      "answered before the upgrade": PRE_UPGRADE_WORDS,
+    };
+    for (const [label, words] of Object.entries(more)) clean(label, words);
   });
 
   test("the sentences that say what will start, and the warnings shown after an answer or a note", () => {
