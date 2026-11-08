@@ -94,7 +94,7 @@ import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.t
 import { checkReassign } from "./capabilities/question-rules.ts";
 import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
-import { ANSWER_NEEDS_REVISION, ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, moveQuestion, openPanelId, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
+import { ANSWER_NEEDS_REVISION, ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, moveQuestion, openPanelId, reduceAgent, reduceHuman, type AgentOp, type AskBlock, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { boardWrites, loadBoard, PANEL_LOAD_WORDS, stateWrites, withStored, type CommitRecord } from "./capabilities/panel-records.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { readableTitle } from "./ui/desk/banned-words.ts";
@@ -2302,7 +2302,9 @@ export async function createApplication(
       if (typeof body.version !== "string" || !/^[0-9a-f]{14}$/.test(body.version) || typeof body.owner_rev !== "number" || !Number.isInteger(body.owner_rev) || body.owner_rev < 0) return fail(400, ANSWER_NEEDS_REVISION);
       const note = typeof body.note === "string" && body.note.trim() !== "" ? body.note.trim().slice(0, 600) : null;
       const before = panelBoard;
-      const step = before.open.find((p) => p.id === body.panel)?.step ?? null;
+      // The answer settles the step the question is about (its target), which is the panel's step for a question stored before targets.
+      const askBefore = before.open.find((p) => p.id === body.panel)?.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === body.ask);
+      const step = askBefore !== undefined && askBefore.target !== undefined ? askBefore.target : (before.open.find((p) => p.id === body.panel)?.step ?? null);
       const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note, version: body.version, owner_rev: body.owner_rev });
       if (!result.ok) return fail(409, result.message);
       // Store what the question accepted (a text answer is trimmed), not the raw body.

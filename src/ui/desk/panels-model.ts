@@ -10,7 +10,7 @@ export const MAX_OPEN_PANELS = 8;
 
 import { answerFor } from "../../capabilities/panel-answers.ts";
 import { checkRouteWords, checkWithdraw, QUESTION_OTHER_AGENT, REQUIRED_CANNOT_WITHDRAW, SAME_ID_OTHER_WORDS, type QuestionState } from "../../capabilities/question-rules.ts";
-import { clip, itemOf, questionOf, toneOf, type PanelItem, type PanelTone, type QuestionItem } from "../surface2/panel-blocks.ts";
+import { clip, itemOf, questionOf, questionVersion, toneOf, type PanelItem, type PanelTone, type QuestionItem } from "../surface2/panel-blocks.ts";
 
 export type Tone = PanelTone;
 export type PanelBlock = PanelItem;
@@ -70,8 +70,12 @@ export const DUPLICATE_BLOCK_ID = "Two blocks on this panel use the same id. Giv
 /** A question the person answered (not put off, not skipped) is an agreement to those exact words. */
 const agreedTo = (b: AskBlock | undefined): b is AskBlock => b !== undefined && b.answered !== null && b.answered.outcome === "answered";
 /** Same words, options, consequences and input kind (the version), and the same thing it settles. */
-const sameQuestion = (a: AskBlock, b: AskBlock): boolean => a.version === b.version && (a.resolves ?? null) === (b.resolves ?? null);
+const sameQuestion = (a: AskBlock, b: AskBlock): boolean => a.version === b.version && (a.resolves ?? null) === (b.resolves ?? null) && (a.target ?? null) === (b.target ?? null);
 /** Who owns a question: the agent (by name, for display) and the key that put it up. The first put decides both; a later put keeps them. */
+/** A question with the step it is about. Its version follows the step, so a question moved to another step is a changed question. */
+const withTarget = (q: AskBlock, target: string | null): AskBlock => ({ ...q, target, version: questionVersion({ question: q.question, input: q.input ?? "select", options: q.options, target }) });
+/** A stored question as a put compares it. A question stored before targets existed sits on its panel's step, so that step is its target. */
+const comparable = (old: AskBlock, step: string | null): AskBlock => withTarget(old, old.target !== undefined ? old.target : step);
 const ownerOf = (old: AskBlock | undefined, agent: string, key: string): { readonly asked_by: string; readonly asked_by_key: string; readonly owner_rev: number } => ({ asked_by: old?.asked_by ?? agent, asked_by_key: old?.asked_by_key ?? key, owner_rev: old?.owner_rev ?? 0 });
 /**
  * The very same question put up again. What the person agreed to or skipped stays. A question they put off ("Not yet") opens again,
@@ -143,14 +147,19 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
     case "show_surface": {
       const s = op.surface;
       if (!isRec(s) || typeof s.id !== "string" || !ID.test(s.id) || !Array.isArray(s.blocks)) return refuse(state, "SCHEMA", "A panel needs an id and a list of blocks.");
-      const blocks = s.blocks.slice(0, 64).map(itemOf);
+      const existing = state.open.find((p) => same(p.id, s.id));
+      // The step this put is about: the panel's step after the put. Each question in it is about that step too.
+      const target = existing !== undefined && s.step === undefined ? existing.step : (s.step ?? null);
+      const blocks = s.blocks.slice(0, 64).map(itemOf).map((b) => (b.kind === "question" ? withTarget(b, target) : b));
       // A block id names one block on the panel. Two blocks with one id (two different questions, say) would both answer to it, so the put is refused whole.
       if (new Set(blocks.map((b) => b.id)).size !== blocks.length) return refuse(state, "SCHEMA", DUPLICATE_BLOCK_ID);
-      const existing = state.open.find((p) => same(p.id, s.id));
       if (existing !== undefined) {
         // An update keeps the panel where it is and keeps it pinned; answers already given stay on their questions.
         if (existing.owner_key != null && existing.owner_key !== key) return refuse(state, "SCHEMA", PANEL_OWNED_ELSEWHERE);
-        const before = (id: string): AskBlock | undefined => existing.blocks.find((o): o is AskBlock => o.kind === "question" && o.id === id);
+        const before = (id: string): AskBlock | undefined => {
+          const o = existing.blocks.find((x): x is AskBlock => x.kind === "question" && x.id === id);
+          return o === undefined ? undefined : comparable(o, existing.step);
+        };
         // A question id keeps its first meaning on every state. A question the person answered must also come back, unchanged.
         for (const b of blocks) {
           if (b.kind !== "question") continue;
@@ -188,11 +197,14 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
     case "ask_human": {
       const panel = state.open.find((p) => same(p.id, op.panel));
       const id = typeof op.ask.id === "string" && ID.test(op.ask.id) ? op.ask.id : "";
-      const block = id === "" ? null : questionOf(op.ask, id);
-      if (block === null) return refuse(state, "SCHEMA", "A question needs an id, the question, and (for pick-one and pick-several) at least two options.");
+      const asked = id === "" ? null : questionOf(op.ask, id);
+      if (asked === null) return refuse(state, "SCHEMA", "A question needs an id, the question, and (for pick-one and pick-several) at least two options.");
+      const target = op.step === undefined ? (panel?.step ?? null) : (op.step ?? null);
+      const block = withTarget(asked, target);
       if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [{ ...block, asked_by: agent, asked_by_key: key, owner_rev: 0 }], notes: [], owner_key: key });
       if (panel.owner_key != null && panel.owner_key !== key) return refuse(state, "SCHEMA", PANEL_OWNED_ELSEWHERE);
-      const old = panel.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === block.id);
+      const found = panel.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === block.id);
+      const old = found === undefined ? undefined : comparable(found, panel.step);
       // A question belongs to the agent that asked it, or to the one the person moved it to. Another agent cannot put it up again.
       if (old !== undefined && old.asked_by_key != null && old.asked_by_key !== key) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
       if (old !== undefined && !sameQuestion(old, block)) return refuse(state, "SCHEMA", SAME_ID_OTHER_WORDS);

@@ -53,6 +53,8 @@ export interface QuestionItem extends Validated {
   readonly version?: string;
   /** The step or decision this answer settles, as the agent named it, or null. */
   readonly resolves?: string | null;
+  /** The step this question is about: the panel's step when the question was put up. Part of its version, so a question cannot be moved to another step under the same id. */
+  readonly target?: string | null;
   readonly answered: { readonly outcome: string; readonly value: unknown; readonly note: string | null; readonly routed_as?: string | null } | null;
   readonly withdrawn?: { readonly reason: string } | null;
   /** The agent that first put this question up (the agent door's name for it). Set once and never changed by a later put. */
@@ -77,9 +79,15 @@ const ID = /^[a-z][a-z0-9_-]{0,63}$/;
 const isRec = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 export const clip = (v: unknown, max: number): string => (typeof v === "string" ? v.slice(0, max) : v === null || v === undefined ? "" : String(v).slice(0, max));
 
-/** A short, steady fingerprint (53 bits, 14 hex characters) of what the person is asked to agree to: the words, the options, what each one does, and how they answer. */
-export function questionVersion(q: { readonly question: string; readonly input?: string; readonly options: readonly QuestionOption[] }): string {
-  const text = JSON.stringify([q.question, q.input ?? "select", q.options.map((o) => [o.option_id, o.label, o.consequence ?? null])]);
+/**
+ * A short, steady fingerprint (53 bits, 14 hex characters) of what the person is asked to agree to: the words, the options, what each one
+ * does, how they answer, and the step the answer settles (`target`, when there is one). A question with no target has the fingerprint it
+ * always had.
+ */
+export function questionVersion(q: { readonly question: string; readonly input?: string; readonly options: readonly QuestionOption[]; readonly target?: string | null }): string {
+  const parts: unknown[] = [q.question, q.input ?? "select", q.options.map((o) => [o.option_id, o.label, o.consequence ?? null])];
+  if (q.target !== undefined && q.target !== null) parts.push(q.target);
+  const text = JSON.stringify(parts);
   let h1 = 0xdeadbeef;
   let h2 = 0x41c6ce57;
   for (let i = 0; i < text.length; i += 1) {
