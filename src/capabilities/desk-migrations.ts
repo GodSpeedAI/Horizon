@@ -7,6 +7,7 @@
  */
 import type { DurableStore } from "@godspeedai/cognate-events";
 import { migratePreUpgradeAnswers, migrateAnswerStates } from "./panel-answers.ts";
+import { migrateQuestionStates } from "./panel-records.ts";
 
 export const MIGRATION_COLLECTION = "horizon-desk-migrations";
 export const MIGRATING_WORDS = "The desk is updating its saved records. Nothing was changed. Try again in a moment.";
@@ -22,6 +23,7 @@ export interface DeskMigration {
 export const DESK_MIGRATIONS: readonly DeskMigration[] = [
   { version: 1, name: "answer states", run: (store, tenant) => migrateAnswerStates(store, tenant) },
   { version: 2, name: "answers from before the upgrade", run: (store, tenant, now) => migratePreUpgradeAnswers(store, tenant, now) },
+  { version: 3, name: "question states", run: (store, tenant) => migrateQuestionStates(store, tenant) },
 ];
 
 const markerId = (tenant: string): string => `marker:${tenant}`;

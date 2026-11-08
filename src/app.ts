@@ -2240,7 +2240,7 @@ export async function createApplication(
           const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: deferredOnly ? "Not yet. Nothing was sent to the agent." : WAITING_FOR_AGENT, status: deferredOnly ? "done" : "waiting", refs: { panel_id: panelId, ask_id: askId, ...(step ? { step_id: step } : {}) } }, clock());
           const panelRow = await panelRowWrite(state, panelId, deferredOnly ? "Not yet. You can answer it later." : "You answered. Waiting for the agent to say where it went.");
           const keep = typeof requestId === "string" ? [requestRecord(caller.tenant, requestId, fingerprint, answerResponse)] : [];
-          return [...(await boardWrites(store, caller.tenant, before, state)), row.record, ...(panelRow === null ? [] : [panelRow]), ...keep];
+          return [...(await boardWrites(store, caller.tenant, before, state, { panel: panelId, ask: askId })), row.record, ...(panelRow === null ? [] : [panelRow]), ...keep];
         } });
       } catch (error) {
         if (error instanceof QuestionAlreadyAnswered) return fail(409, error.message);

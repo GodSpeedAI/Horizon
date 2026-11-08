@@ -8,7 +8,7 @@
  */
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
 import { listAnswers, PANEL_ANSWERS_COLLECTION, storedOf, type PanelAnswer } from "./panel-answers.ts";
-import { statusOfLegacy, type QuestionStatus } from "./question-rules.ts";
+import { QUESTION_STATES, statusOfLegacy, type QuestionStatus } from "./question-rules.ts";
 import { hasOpenAsk, MAX_OPEN_PANELS, type Panel, type Panels, type PanelBlock } from "../ui/desk/panels-model.ts";
 
 export const PANELS_COLLECTION = "horizon-panels";
@@ -24,6 +24,9 @@ export class PanelLoadError extends Error {
     this.name = "PanelLoadError";
   }
 }
+
+/** A question an answer in the same commit is for (its record holds the state, so the panel record keeps no copy of `answered`). */
+export type Answering = { readonly panel: string; readonly ask: string };
 
 export type CommitRecord = { readonly collection: string; readonly id: string; readonly expectedVersion: number; readonly value: { readonly [key: string]: Json } };
 
@@ -48,12 +51,14 @@ const latestOf = (answers: readonly PanelAnswer[], panelId: string, askId: strin
  */
 function derivedBlock(panelId: string, block: PanelBlock, answers: readonly PanelAnswer[]): PanelBlock {
   if (block.kind !== "question") return block;
+  // The stored state of a question with no answer record is kept on its panel record; the board does not show it.
+  const { state: _stored, ...plain } = block as PanelBlock & { readonly state?: unknown };
   const latest = latestOf(answers, panelId, block.id);
-  if (latest === undefined) return block;
+  if (latest === undefined) return plain as unknown as PanelBlock;
   const status: QuestionStatus = statusOfLegacy(latest);
   const answered = status === "put_off" ? { outcome: "deferred", value: null, note: latest.note, routed_as: null } : status === "waiting_for_agent" || status === "finished" ? { outcome: latest.outcome, value: latest.value, note: latest.note, routed_as: latest.routed_as ?? null } : null;
   const withdrawn = status === "withdrawn" ? (block.withdrawn ?? { reason: "" }) : null;
-  return { ...block, answered, withdrawn } as unknown as PanelBlock;
+  return { ...plain, answered, withdrawn } as unknown as PanelBlock;
 }
 
 /** The panel as the board shows it, with its question states derived. */
@@ -62,13 +67,65 @@ function derivedPanel(panel: Panel, answers: readonly PanelAnswer[]): Panel {
 }
 
 /** The panel as it is stored: a question whose answer record holds its state does not store `answered`. */
-function storedPanel(panel: Panel, tenant: string, answers: readonly PanelAnswer[]): { readonly [key: string]: Json } {
-  const blocks = panel.blocks.map((b) => {
-    if (b.kind !== "question" || latestOf(answers, panel.id, b.id) === undefined) return b;
-    const { answered: _answered, ...rest } = b as PanelBlock & { readonly answered?: unknown };
-    return rest as PanelBlock;
-  });
+function storedPanel(panel: Panel, tenant: string, answers: readonly PanelAnswer[], answering?: Answering): { readonly [key: string]: Json } {
+  const blocks = panel.blocks.map((b) => questionBlockFor(panel.id, b, answers, answering));
   return { ...(({ ...panel, blocks }) as unknown as { readonly [key: string]: Json }), tenant };
+}
+
+/**
+ * The question block as its panel record stores it (design v3, step 4, item 5). A question with an answer record keeps its state there,
+ * so the block stores neither `answered` nor a state. A question with no answer record stores its own state, explicitly: waiting for
+ * you, or withdrawn.
+ */
+function questionBlockFor(panelId: string, block: PanelBlock, answers: readonly PanelAnswer[], answering?: Answering): PanelBlock {
+  if (block.kind !== "question") return block;
+  const { state: _state, ...rest } = block as PanelBlock & { readonly state?: unknown };
+  // The answer being written in the same commit is not in `answers` yet: its record holds the state, so the block keeps no copy.
+  const answeredNow = answering !== undefined && answering.panel === panelId && answering.ask === block.id;
+  if (answeredNow || latestOf(answers, panelId, block.id) !== undefined) {
+    const { answered: _answered, ...kept } = rest as PanelBlock & { readonly answered?: unknown };
+    return kept as PanelBlock;
+  }
+  // No answer record: a block that still carries an answer (written before answer records) keeps it, the only copy there is.
+  if ((rest as { readonly answered?: unknown }).answered != null) return rest as PanelBlock;
+  const withdrawn = (rest as { readonly withdrawn?: unknown }).withdrawn;
+  return { ...rest, state: withdrawn ? "withdrawn" : "waiting_for_you" } as unknown as PanelBlock;
+}
+
+const isStored = (value: unknown): value is QuestionStatus => typeof value === "string" && (QUESTION_STATES as readonly string[]).includes(value);
+
+/**
+ * The state of one question, read from the records: its answer record when it has one, otherwise the state its panel record stores.
+ * Undefined when the question is not stored at all. Reads only.
+ */
+export async function questionStateOf(store: DurableStore, tenant: string, panelId: string, askId: string): Promise<QuestionStatus | undefined> {
+  const latest = latestOf(await listAnswers(store, tenant, panelId), panelId, askId);
+  if (latest !== undefined) return statusOfLegacy(latest);
+  const row = await store.getRecord(PANELS_COLLECTION, panelIdOf(panelId));
+  if (row === null || row === undefined) return undefined;
+  const block = readPanel(row.value).blocks.find((b) => b.kind === "question" && b.id === askId) as (PanelBlock & { readonly state?: unknown; readonly answered?: { readonly outcome?: string } | null; readonly withdrawn?: unknown }) | undefined;
+  if (block === undefined) return undefined;
+  if (isStored(block.state)) return block.state;
+  if (block.answered != null) return block.answered.outcome === "deferred" ? "put_off" : "finished";
+  return block.withdrawn ? "withdrawn" : "waiting_for_you";
+}
+
+/**
+ * Migration (design v3, step 4, item 5): every question with no answer record gets its explicit state on its panel record. Runs once;
+ * a second run finds nothing to change. Returns how many panel records it wrote.
+ */
+export async function migrateQuestionStates(store: DurableStore, tenant: string): Promise<number> {
+  const answers = await listAnswers(store, tenant);
+  const records: CommitRecord[] = [];
+  for (const row of await store.listRecords(PANELS_COLLECTION, { tenant })) {
+    const panel = readPanel(row.value);
+    const blocks = panel.blocks.map((b) => questionBlockFor(panel.id, b, answers));
+    const changed = blocks.some((b, i) => JSON.stringify(b) !== JSON.stringify(panel.blocks[i]));
+    if (!changed) continue;
+    records.push({ collection: PANELS_COLLECTION, id: row.id, expectedVersion: row.version, value: { ...(row.value as { readonly [key: string]: Json }), blocks: blocks as unknown as Json } });
+  }
+  if (records.length > 0) await store.commit({ appends: [], records });
+  return records.length;
 }
 
 /** The board as the records hold it, plus every stored panel (visible or not) so a closed panel can be brought back. */
@@ -108,7 +165,7 @@ export async function loadBoard(store: DurableStore, tenant: string): Promise<Bo
  * changed is written; the visible order is written when it changed. Each write carries the version it was checked against.
  * Nothing is deleted: a panel that left the visible list keeps its record.
  */
-export async function boardWrites(store: DurableStore, tenant: string, before: Panels, after: Panels): Promise<CommitRecord[]> {
+export async function boardWrites(store: DurableStore, tenant: string, before: Panels, after: Panels, answering?: Answering): Promise<CommitRecord[]> {
   const records: CommitRecord[] = [];
   const answers = await listAnswers(store, tenant);
   const was = new Map(before.open.map((p) => [p.id, JSON.stringify(p)] as const));
@@ -116,7 +173,7 @@ export async function boardWrites(store: DurableStore, tenant: string, before: P
     if (was.get(panel.id) === JSON.stringify(panel)) continue;
     const id = panelIdOf(panel.id);
     const current = await store.getRecord(PANELS_COLLECTION, id);
-    records.push({ collection: PANELS_COLLECTION, id, expectedVersion: current?.version ?? 0, value: storedPanel(panel, tenant, answers) });
+    records.push({ collection: PANELS_COLLECTION, id, expectedVersion: current?.version ?? 0, value: storedPanel(panel, tenant, answers, answering) });
   }
   const order = (p: Panels): string => p.open.map((x) => x.id).join("\n");
   if (order(before) !== order(after)) {
