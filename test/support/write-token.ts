@@ -12,6 +12,8 @@ const cookies = new Map<string, string>();
 
 receivePairingCodesForTests((origin, code) => {
   codes.set(origin, code);
+  // A new server on this origin (a port an earlier test's server used) has new sessions: the old session cookie is no longer valid.
+  cookies.delete(origin);
 });
 
 /** The pairing code printed for this origin, if a server has started there. Tests that pair by hand read it here. */
