@@ -79,6 +79,16 @@ describe("the pairing code", () => {
     expect(written).toEqual([]);
   });
 
+  test("with no terminal the code is written nowhere, and every pairing attempt is refused with the terminal words", () => {
+    const { code, pairing, refuseWithoutTerminal } = createDeskPairing(() => new Date("2026-11-06T10:00:00Z"));
+    const shown = `${code.slice(0, 4)}-${code.slice(4)}`;
+    expect(() => deliverPairingLine(shown, { terminal: () => false })).toThrow(PairingNeedsTerminal);
+    refuseWithoutTerminal();
+    expect(pairing.pair(shown)).toEqual({ ok: false, status: 403, words: NO_TERMINAL_WORDS });
+    expect(pairing.pair(code)).toEqual({ ok: false, status: 403, words: NO_TERMINAL_WORDS });
+    expect(pairing.paired(null)).toBe(false);
+  });
+
   test("a correct code pairs and sets an HttpOnly, SameSite=Strict session cookie", async () => {
     const { app, code } = await desk();
     const response = await pair(app, code);

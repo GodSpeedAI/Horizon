@@ -110,7 +110,7 @@ import { caseItems, costSource, orderWork, sessionItems, type AcceptedKnowledge,
 import { readLedgerDay } from "./adapters/ledger-day.ts";
 import { recordReader, type RecordReader } from "./adapters/realitytrace-economics.ts";
 import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
-import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, PAIR_FIRST_WORDS, printPairingCode } from "./desk/pairing.ts";
+import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, PAIR_FIRST_WORDS, PairingNeedsTerminal, printPairingCode } from "./desk/pairing.ts";
 import { DEFAULT_AGENT_KEY_ID, DEFAULT_AGENT_NAME, ownerOfKey, readRegistry } from "./desk/agent-keys.ts";
 import { checkWithdraw, questionFingerprint } from "./capabilities/question-rules.ts";
 import { notRecordedWarnings } from "./capabilities/reconciliation.ts";
@@ -1931,7 +1931,7 @@ export async function createApplication(
   }
 
   /** The desk page holds no secret. A browser pairs with the code the terminal printed at start; the session cookie it gets then goes with every write. */
-  const { code: pairingCode, pairing } = createDeskPairing(clock);
+  const { code: pairingCode, pairing, refuseWithoutTerminal } = createDeskPairing(clock);
   let pairingPrinted = false;
   const DESK_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon desk</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/desk/app.css"></head><body><div id="root"></div><noscript>The desk needs JavaScript to show live updates. Turn it on for this page.</noscript><script type="module" src="/desk/app.js"></script></body></html>`;
   const SETUP_GUIDE_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon setup guide</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:1rem auto;padding:0 1rem}code{overflow-wrap:anywhere}</style></head><body><p><a href="/workspace">Back to the desk</a></p><h1>Setup guide</h1><h2>Start Horizon with the case keeper and record keeper</h2><p>Start the whole set with <code>bun run ignite</code> (see docs/IGNITION.md).</p><h2>Record what agent work costs</h2><ol><li>Install the agent tap with the record keeper: <code>te-agents install --with-realitytrace</code></li><li>Enroll each repository you want measured: <code>te-agents rt enroll &lt;repo&gt;</code></li><li>Point Horizon at the record keeper and the tap's store: set <code>HORIZON_ECONOMICS_REALITYTRACE_BIN</code> (and, if the tap does not use the default location, <code>HORIZON_ECONOMICS_DATA_HOME</code> and <code>HORIZON_ECONOMICS_STATE_HOME</code>), or add an <code>[economics]</code> table with <code>realitytrace_bin</code> to the Horizon config.</li></ol></body></html>`;
@@ -3329,12 +3329,16 @@ export async function createApplication(
         },
       });
       if (!pairingPrinted) {
-        // No terminal means no pairing code, and no desk: the server is stopped rather than left serving a code nobody can read (R3-3).
+        // No terminal: the code is written nowhere, and the server still listens. Every human route stays refused until a browser
+        // pairs, and pairing is refused with words that say to run Horizon from an interactive terminal (R3-3).
         try {
           printPairingCode(server.url.origin, pairingCode);
         } catch (error) {
-          server.stop(true);
-          throw error;
+          if (!(error instanceof PairingNeedsTerminal)) {
+            server.stop(true);
+            throw error;
+          }
+          refuseWithoutTerminal();
         }
         pairingPrinted = true;
       }

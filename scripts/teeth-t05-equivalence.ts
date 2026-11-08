@@ -58,11 +58,16 @@ function ok(message: string): void {
 /**
  * Start the real server and wait for the line that names the port it actually bound. Reading
  * the port from the process's own output keeps this independent of a chosen fixed port.
+ *
+ * The server shows its pairing code only on its controlling terminal (/dev/tty), and it never writes the code to standard
+ * output or standard error. So the server runs under a pseudo-terminal (`script`), which is the terminal a person would use:
+ * the code appears there, and nowhere else. Without a terminal the server listens but refuses pairing (see desk/pairing.ts).
  */
 async function startServer(store: string): Promise<{ url: string; code: string; stop: () => void }> {
-  const proc = Bun.spawn(["bun", "run", "src/main.ts"], {
+  const proc = Bun.spawn(["script", "-qefc", "bun run src/main.ts", "/dev/null"], {
     cwd: process.cwd(),
     env: isolatedEnv(store),
+    stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -76,7 +81,7 @@ async function startServer(store: string): Promise<{ url: string; code: string; 
     if (chunk === null) continue;
     seen += decoder.decode(chunk.value, { stream: true });
     const match = /listening on (http:\/\/127\.0\.0\.1:\d+)\//.exec(seen);
-    // The child prints its pairing code once; the script holds it in memory to pair its own client. It is never printed here.
+    // The code arrives on the server's terminal only; the script holds it in memory to pair its own client. It is never printed here.
     const code = /pairing code: ([2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4})\./.exec(seen)?.[1];
     if (match?.[1] !== undefined && code !== undefined) {
       reader.releaseLock();

@@ -63,7 +63,12 @@ const normalize = (typed: string): string => typed.replace(/[\s-]/g, "").toUpper
  * Starts pairing for one run of Horizon. Returns the code (to print once) and the pairing that checks it. The code itself is
  * not kept: only an HMAC of it, under a key made for this run, is held in memory.
  */
-export function createDeskPairing(now: () => Date): { readonly code: string; readonly pairing: DeskPairing } {
+export function createDeskPairing(now: () => Date): {
+  readonly code: string;
+  readonly pairing: DeskPairing;
+  /** Called when the code has no terminal to be shown on. Every pairing attempt is then refused with NO_TERMINAL_WORDS. */
+  readonly refuseWithoutTerminal: () => void;
+} {
   const code = makeCode();
   const key = randomBytes(32);
   const keyed = (value: string): Buffer => createHmac("sha256", key).update(value).digest();
@@ -72,6 +77,7 @@ export function createDeskPairing(now: () => Date): { readonly code: string; rea
   let spent = false;
   let wrong = 0;
   let lockedUntil = 0;
+  let noTerminal = false;
   /** Each live session: when it expires, and when it was paired (for the changes that need a recent pairing). */
   const sessions = new Map<string, { readonly expires: number; readonly pairedAt: number }>();
   const sessionKey = (token: string): string => createHash("sha256").update(token).digest("hex");
@@ -91,8 +97,12 @@ export function createDeskPairing(now: () => Date): { readonly code: string; rea
 
   return {
     code,
+    refuseWithoutTerminal: () => {
+      noTerminal = true;
+    },
     pairing: {
       pair(typed) {
+        if (noTerminal) return { ok: false, status: 403, words: NO_TERMINAL_WORDS };
         const at = now().getTime();
         if (at < lockedUntil) return { ok: false, status: 429, words: LOCKED_WORDS };
         if (spent || at - issuedAt >= PAIRING_LIFETIME_MS) return { ok: false, status: 403, words: SPENT_CODE_WORDS };
@@ -133,7 +143,7 @@ export function receivePairingCodesForTests(sink: ((origin: string, code: string
 }
 
 /** The words for a start with no terminal to show the code on. Plain, and they never include the code. */
-export const NO_TERMINAL_WORDS = "Horizon needs a terminal to show the pairing code, so the desk did not start. Run the desk from an interactive terminal.";
+export const NO_TERMINAL_WORDS = "Horizon has no terminal to show the pairing code on, so this browser cannot be paired and nothing was changed. Run Horizon from an interactive terminal.";
 
 /** Raised when there is no controlling terminal (/dev/tty) for the pairing code. The code is then not shown anywhere. */
 export class PairingNeedsTerminal extends Error {
