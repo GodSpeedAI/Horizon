@@ -61,6 +61,10 @@ export interface QuestionItem extends Validated {
   readonly asked_by?: string | null;
   /** The key id of the agent that put the question up. Only that key reads its answers or routes or withdraws the question. */
   readonly asked_by_key?: string | null;
+  /** The key id of the agent that answers for the question now. Set when the question is put up, and moved by a reassignment (the author fields stay). */
+  readonly owner_key?: string | null;
+  /** The name of the agent that answers for the question now, for display. */
+  readonly owner_name?: string | null;
   /** Counts the owner changes of the question (each reassignment adds one). An answer carries the revision it was given under; a different one is refused. */
   readonly owner_rev?: number;
   /** Earlier answers the person put off ("Not yet") before the agent asked again. Oldest first. */

@@ -76,12 +76,17 @@ const sameQuestion = (a: AskBlock, b: AskBlock): boolean => a.version === b.vers
 const withTarget = (q: AskBlock, target: string | null): AskBlock => ({ ...q, target, version: questionVersion({ question: q.question, input: q.input ?? "select", options: q.options, target }) });
 /** A stored question as a put compares it. A question stored before targets existed sits on its panel's step, so that step is its target. */
 const comparable = (old: AskBlock, step: string | null): AskBlock => withTarget(old, old.target !== undefined ? old.target : step);
-const ownerOf = (old: AskBlock | undefined, agent: string, key: string): { readonly asked_by: string; readonly asked_by_key: string; readonly owner_rev: number } => ({ asked_by: old?.asked_by ?? agent, asked_by_key: old?.asked_by_key ?? key, owner_rev: old?.owner_rev ?? 0 });
+/** The author of a question: the agent that first put it up. Set once; a later put or a reassignment never changes it. */
+const authorOf = (old: AskBlock | undefined, agent: string, key: string): { readonly asked_by: string; readonly asked_by_key: string } => ({ asked_by: old?.asked_by ?? agent, asked_by_key: old?.asked_by_key ?? key });
+/** The agent that answers for a question now. A question stored before owners existed is owned by its author. */
+const ownerKey = (b: AskBlock): string | null => b.owner_key ?? b.asked_by_key ?? null;
+/** The author (kept) and the current owner (kept by a later put, moved by a reassignment) of a question. */
+const ownerOf = (old: AskBlock | undefined, agent: string, key: string) => ({ ...authorOf(old, agent, key), owner_key: old?.owner_key ?? old?.asked_by_key ?? key, owner_name: old?.owner_name ?? old?.asked_by ?? agent, owner_rev: old?.owner_rev ?? 0 });
 /**
  * The very same question put up again. What the person agreed to or skipped stays. A question they put off ("Not yet") opens again,
  * as the card promised ("The agent will ask again later"), and the earlier answer moves into its history.
  */
-function sameAgain(old: AskBlock, now: AskBlock, owner: { readonly asked_by: string; readonly asked_by_key: string; readonly owner_rev: number }): AskBlock {
+function sameAgain(old: AskBlock, now: AskBlock, owner: ReturnType<typeof ownerOf>): AskBlock {
   if (old.answered !== null && old.answered.outcome === "deferred") {
     return { ...now, ...owner, answered: null, withdrawn: old.withdrawn ?? null, earlier: [...(old.earlier ?? []), { outcome: old.answered.outcome, value: old.answered.value, note: old.answered.note }] };
   }
@@ -126,7 +131,7 @@ const replace = (state: Panels, id: string, change: (p: Panel) => Panel): Panels
 
 /** A question on the board as the rules read it. Committed means answered or cancelled: a question put off is still open. */
 const questionStateOfAsk = (ask: AskBlock): QuestionState => ({
-  owner_key: ask.asked_by_key ?? null,
+  owner_key: ownerKey(ask),
   fingerprint: null,
   outcome: ask.answered !== null && ask.answered.outcome !== "deferred" ? ask.answered.outcome : null,
   replied: false,
@@ -164,7 +169,7 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
         for (const b of blocks) {
           if (b.kind !== "question") continue;
           const old = before(b.id);
-          if (old !== undefined && old.asked_by_key != null && old.asked_by_key !== key) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
+          if (old !== undefined && ownerKey(old) !== null && ownerKey(old) !== key) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
           if (old !== undefined && !sameQuestion(old, b)) return refuse(state, "SCHEMA", SAME_ID_OTHER_WORDS);
         }
         for (const o of existing.blocks) {
@@ -173,7 +178,7 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
         }
         // A question another agent owns (put up by it, or moved to it by the person) cannot be left out by this agent.
         for (const o of existing.blocks) {
-          if (o.kind !== "question" || o.asked_by_key == null || o.asked_by_key === key) continue;
+          if (o.kind !== "question" || ownerKey(o) === null || ownerKey(o) === key) continue;
           if (!blocks.some((b) => b.kind === "question" && b.id === o.id)) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
         }
         // A block of another kind cannot take the id of a question the panel already holds: the question is kept, so the two would share an id.
@@ -192,7 +197,7 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
         if (new Set(merged.map((b) => b.id)).size !== merged.length) return refuse(state, "SCHEMA", DUPLICATE_BLOCK_ID);
         return { state: replace(state, s.id, (p) => ({ ...p, title: str(s.title, 120) || p.title, step: s.step === undefined ? p.step : (s.step ?? null), blocks: merged })), result: { ok: true, panel: s.id } };
       }
-      return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks: blocks.map((b) => (b.kind === "question" ? { ...b, asked_by: agent, asked_by_key: key, owner_rev: 0 } : b)), notes: [], owner_key: key });
+      return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks: blocks.map((b) => (b.kind === "question" ? { ...b, asked_by: agent, asked_by_key: key, owner_key: key, owner_name: agent, owner_rev: 0 } : b)), notes: [], owner_key: key });
     }
     case "ask_human": {
       const panel = state.open.find((p) => same(p.id, op.panel));
@@ -201,12 +206,12 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
       if (asked === null) return refuse(state, "SCHEMA", "A question needs an id, the question, and (for pick-one and pick-several) at least two options.");
       const target = op.step === undefined ? (panel?.step ?? null) : (op.step ?? null);
       const block = withTarget(asked, target);
-      if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [{ ...block, asked_by: agent, asked_by_key: key, owner_rev: 0 }], notes: [], owner_key: key });
+      if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [{ ...block, asked_by: agent, asked_by_key: key, owner_key: key, owner_name: agent, owner_rev: 0 }], notes: [], owner_key: key });
       if (panel.owner_key != null && panel.owner_key !== key) return refuse(state, "SCHEMA", PANEL_OWNED_ELSEWHERE);
       const found = panel.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === block.id);
       const old = found === undefined ? undefined : comparable(found, panel.step);
       // A question belongs to the agent that asked it, or to the one the person moved it to. Another agent cannot put it up again.
-      if (old !== undefined && old.asked_by_key != null && old.asked_by_key !== key) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
+      if (old !== undefined && ownerKey(old) !== null && ownerKey(old) !== key) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
       if (old !== undefined && !sameQuestion(old, block)) return refuse(state, "SCHEMA", SAME_ID_OTHER_WORDS);
       // The very same question again keeps what the person said (an answer, or a put-off that reopens).
       const owner = ownerOf(old, agent, key);
@@ -247,7 +252,7 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
         // Only the agent that put the panel up may remove it, and only when every question on it is that agent's too. Removing a panel
         // would also remove its unanswered questions, so another agent's question blocks the removal.
         if (target.owner_key !== key) return refuse(state, "SCHEMA", PANEL_OWNED_ELSEWHERE);
-        if (target.blocks.some((b) => b.kind === "question" && b.asked_by_key !== key)) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
+        if (target.blocks.some((b) => b.kind === "question" && ownerKey(b) !== key)) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
         if (target.pinned) return refuse(state, "PINNED", "You pinned this panel, so an agent cannot remove it.");
         return { state: { ...state, open: state.open.filter((p) => !same(p.id, target.id)) }, result: { ok: true, panel: target.id } };
       }
@@ -262,7 +267,7 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
  * looked at under the old owner is refused (see `human.answer`). Returns the board unchanged when the question is not on it.
  */
 export function moveQuestion(state: Panels, panelId: string, askId: string, toKey: string, toName: string): Panels {
-  return replace(state, panelId, (p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === askId ? { ...b, asked_by_key: toKey, asked_by: toName, owner_rev: (b.owner_rev ?? 0) + 1 } : b)) }));
+  return replace(state, panelId, (p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === askId ? { ...b, owner_key: toKey, owner_name: toName, owner_rev: (b.owner_rev ?? 0) + 1 } : b)) }));
 }
 
 /** The id a panel the person opens from a template gets. The same template always gives the same id. */

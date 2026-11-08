@@ -38,8 +38,8 @@ const person = (app: DeskApp, body: unknown) => fetch(`${app.base}/desk/panels/o
 const move = (app: DeskApp, extra: Record<string, unknown>) => person(app, { op: "human.reassign_owner", panel: "open_panel", ask: "open_q", from_key_id: "ag_alice", to_key_id: "ag_alice2", ...extra });
 const ownerOf = async (app: DeskApp): Promise<string | null | undefined> => {
   const row = await app.application.runtime.runtime.store.getRecord(PANELS_COLLECTION, "panel:open_panel");
-  const block = (row?.value as { blocks: { kind: string; id: string; asked_by_key?: string | null }[] } | undefined)?.blocks.find((b) => b.kind === "question" && b.id === "open_q");
-  return block?.asked_by_key;
+  const block = (row?.value as { blocks: { kind: string; id: string; owner_key?: string | null }[] } | undefined)?.blocks.find((b) => b.kind === "question" && b.id === "open_q");
+  return block?.owner_key;
 };
 
 /** Counts the store commits an action makes, and the collections each one writes. */

@@ -11,7 +11,7 @@ const BOB = "ag_bob";
 function reassignedToBob(): Panels {
   const put = reduceAgent(NO_PANELS, { tool: "ask_human", panel: "p", ask: ask() }, "Alice", ALICE);
   expect(put.result.ok).toBe(true);
-  return { ...put.state, open: put.state.open.map((p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" ? { ...b, asked_by: "Bob", asked_by_key: BOB } : b)) })) };
+  return { ...put.state, open: put.state.open.map((p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" ? { ...b, owner_name: "Bob", owner_key: BOB } : b)) })) };
 }
 
 describe("a question is not deleted by a put that leaves it out", () => {

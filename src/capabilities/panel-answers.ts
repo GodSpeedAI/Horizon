@@ -134,7 +134,7 @@ const guardIdOf = (panel: string, ask: string): string => `question:${panel}:${a
 
 export async function recordAnswer(
   store: DurableStore,
-  input: { readonly tenant: string; readonly panel_id: string; readonly ask: string; readonly outcome: Outcome; readonly value?: AnswerValue | null; readonly note?: string | null; readonly step?: string | null; readonly version?: string | null; readonly asked_by?: string | null; readonly asked_by_key?: string | null; readonly fingerprint?: string | null; readonly now: Date; /** The panel records that show the answer. Committed in the same commit as the answer. */ readonly alsoRecords?: () => Promise<readonly CommitRecord[]> },
+  input: { readonly tenant: string; readonly panel_id: string; readonly ask: string; readonly outcome: Outcome; readonly value?: AnswerValue | null; readonly note?: string | null; readonly step?: string | null; readonly version?: string | null; readonly asked_by?: string | null; readonly asked_by_key?: string | null; /** The agent that answers for the question now. Defaults to the author. */ readonly owner_key?: string | null; readonly fingerprint?: string | null; readonly now: Date; /** The panel records that show the answer. Committed in the same commit as the answer. */ readonly alsoRecords?: () => Promise<readonly CommitRecord[]> },
 ): Promise<PanelAnswer> {
   const committed = input.outcome === "answered" || input.outcome === "cancelled";
   for (let attempt = 0; ; attempt += 1) {
@@ -147,7 +147,7 @@ export async function recordAnswer(
     if (committed) {
       // A question an answer or cancel already sealed is refused, whether or not its guard was written (a legacy answer has none).
       const sealed = existing.find((a) => a.ask === input.ask && (a.outcome === "answered" || a.outcome === "cancelled"));
-      const state: QuestionState = { owner_key: input.asked_by_key ?? null, fingerprint: input.fingerprint ?? null, outcome: guard ? String((guard.value as { outcome?: unknown }).outcome) : (sealed?.outcome ?? null), replied: false, waiting_on: "none", history: [], routed_as: null, version: null };
+      const state: QuestionState = { owner_key: input.owner_key ?? input.asked_by_key ?? null, fingerprint: input.fingerprint ?? null, outcome: guard ? String((guard.value as { outcome?: unknown }).outcome) : (sealed?.outcome ?? null), replied: false, waiting_on: "none", history: [], routed_as: null, version: null };
       if (!checkAnswer({ state, seenVersion: null }).ok) throw new QuestionAlreadyAnswered();
     }
     const n = (existing.at(-1)?.n ?? 0) + 1;
@@ -158,7 +158,7 @@ export async function recordAnswer(
       outcome: deferred ? null : input.outcome,
       value: deferred ? null : input.value ?? null, note: input.note ?? null, at: input.now.toISOString(), version: input.version ?? null,
       routed_as: null, step: input.step ?? null, asked_by: input.asked_by ?? null, asked_by_key: input.asked_by_key ?? null,
-      owner_key: input.asked_by_key ?? null, fingerprint: input.fingerprint ?? null, history: deferred ? [{ outcome: "deferred", at: input.now.toISOString() }] : [],
+      owner_key: input.owner_key ?? input.asked_by_key ?? null, fingerprint: input.fingerprint ?? null, history: deferred ? [{ outcome: "deferred", at: input.now.toISOString() }] : [],
       state: deferred ? "put_off" : "waiting_for_agent", finished_by: null,
     };
     const records: { collection: string; id: string; expectedVersion: number; value: { readonly [key: string]: Json } }[] = [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(input.panel_id, n), expectedVersion: 0, value: storedOf(stored) }];

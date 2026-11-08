@@ -65,7 +65,7 @@ describe("an agent removes only its own panel", () => {
 
   test("a panel Alice owns but that holds a question another agent owns cannot be removed by Alice", () => {
     const s = alice();
-    const moved: Panels = { ...s, open: s.open.map((p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" ? { ...b, asked_by_key: "ag_bob" } : b)) })) };
+    const moved: Panels = { ...s, open: s.open.map((p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" ? { ...b, owner_key: "ag_bob" } : b)) })) };
     const r = remove(moved, "Alice", "ag_alice");
     expect(r.result).toMatchObject({ ok: false, message: "That question belongs to another agent." });
     expect(openIds(r.state, "a_panel")).toEqual(["a_q"]);

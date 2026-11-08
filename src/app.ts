@@ -2260,11 +2260,11 @@ export async function createApplication(
       const fromName = body.from_key_id === DEFAULT_AGENT_KEY_ID ? DEFAULT_AGENT_NAME : registry.find((e) => e.key_id === body.from_key_id)?.name ?? "an agent no longer listed";
       // Design v3, step 4 (item 6): a question nobody has answered yet moves the same way. Its owner is the panel block's asked_by_key,
       // and the move and its conversation row are one commit. A question with a waiting answer moves its answers (below).
-      const openQuestion = panelBoard.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { readonly question?: string; readonly answered?: unknown; readonly withdrawn?: unknown; readonly asked_by_key?: string | null } | undefined;
+      const openQuestion = panelBoard.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { readonly question?: string; readonly answered?: unknown; readonly withdrawn?: unknown; readonly asked_by_key?: string | null; readonly owner_key?: string | null } | undefined;
       const waitingAnswers = (await listAnswers(store, caller.tenant, body.panel)).filter((a) => a.ask === body.ask && waitsForAgent(a));
       if (openQuestion !== undefined && openQuestion.answered == null && openQuestion.withdrawn == null && waitingAnswers.length === 0) {
         const toName = toEntry?.name ?? "";
-        const ownerNow = openQuestion.asked_by_key ?? null;
+        const ownerNow = openQuestion.owner_key ?? openQuestion.asked_by_key ?? null;
         if (ownerNow !== body.from_key_id) return fail(409, "The owner changed while you were looking. Look again, then try. Nothing was changed.");
         const verdict = checkReassign({ state: { owner_key: ownerNow, fingerprint: null, outcome: null, replied: true, waiting_on: "none", history: [], routed_as: null, version: null }, paired: true, pairedAgeMs: pairing.pairedAgeMs(request.headers.get("cookie")) ?? Number.POSITIVE_INFINITY, newOwnerKey: body.to_key_id, targetRegistered: toEntry !== undefined, confirmed: body.confirmed === true });
         if (!verdict.ok) return fail(409, verdict.message);
@@ -2308,7 +2308,7 @@ export async function createApplication(
       const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note, version: body.version, owner_rev: body.owner_rev });
       if (!result.ok) return fail(409, result.message);
       // Store what the question accepted (a text answer is trimmed), not the raw body.
-      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { id: string; question: string; resolves?: string | null; version?: string; asked_by?: string | null; asked_by_key?: string | null; input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string; consequence?: string | null }[] } | undefined;
+      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { id: string; question: string; resolves?: string | null; version?: string; asked_by?: string | null; asked_by_key?: string | null; owner_key?: string | null; input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string; consequence?: string | null }[] } | undefined;
       const checked = outcome === "answered" && askBlock !== undefined ? answerFor({ input: askBlock.input ?? "select", options: askBlock.options }, value.value) : null;
       if (checked !== null && !checked.ok) return fail(400, checked.message);
       const stored = checked !== null && checked.ok ? checked.value : value.value;
@@ -2322,7 +2322,7 @@ export async function createApplication(
       const answerResponse = { ok: true as const, message: sentWords };
       try {
         // The answer carries the question's fingerprint, so the same question cannot come back with other words (see agreedAltered).
-        await recordAnswer(store, { tenant: caller.tenant, panel_id: panelId, ask: askId, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, fingerprint: askBlock === undefined ? null : questionFingerprint(askBlock), now: clock(), alsoRecords: async () => {
+        await recordAnswer(store, { tenant: caller.tenant, panel_id: panelId, ask: askId, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, owner_key: askBlock?.owner_key ?? askBlock?.asked_by_key ?? null, fingerprint: askBlock === undefined ? null : questionFingerprint(askBlock), now: clock(), alsoRecords: async () => {
           const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: deferredOnly ? "Not yet. Nothing was sent to the agent." : WAITING_FOR_AGENT, status: deferredOnly ? "done" : "waiting", refs: { panel_id: panelId, ask_id: askId, ...(step ? { step_id: step } : {}) } }, clock());
           const panelRow = await panelRowWrite(state, panelId, deferredOnly ? "Not yet. You can answer it later." : "You answered. Waiting for the agent to say where it went.");
           return [...(await boardWrites(store, caller.tenant, before, state, { panel: panelId, ask: askId })), row.record, ...(panelRow === null ? [] : [panelRow]), ...requestKeep(answerResponse)];

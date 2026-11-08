@@ -14,7 +14,7 @@ describe("a reassignment starts a new owner revision that an answer must carry",
   test("a question starts at owner revision 0 and each reassignment adds one", () => {
     expect(qs(alice())[0]!.owner_rev).toBe(0);
     const once = moveQuestion(alice(), "p", "q", "ag_bob", "Bob");
-    expect(qs(once)[0]).toMatchObject({ owner_rev: 1, asked_by_key: "ag_bob", asked_by: "Bob" });
+    expect(qs(once)[0]).toMatchObject({ owner_rev: 1, owner_key: "ag_bob", owner_name: "Bob", asked_by_key: "ag_alice", asked_by: "Alice" });
     expect(qs(moveQuestion(once, "p", "q", "ag_alice", "Alice"))[0]!.owner_rev).toBe(2);
   });
 
