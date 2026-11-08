@@ -222,6 +222,10 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
       const target = state.open.find((p) => same(p.id, op.action.id));
       if (target === undefined) return refuse(state, "NOT_FOUND", "That panel is not open.");
       if (op.action.op === "surface.remove") {
+        // Only the agent that put the panel up may remove it, and only when every question on it is that agent's too. Removing a panel
+        // would also remove its unanswered questions, so another agent's question blocks the removal.
+        if (target.owner_key !== key) return refuse(state, "SCHEMA", PANEL_OWNED_ELSEWHERE);
+        if (target.blocks.some((b) => b.kind === "question" && b.asked_by_key !== key)) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
         if (target.pinned) return refuse(state, "PINNED", "You pinned this panel, so an agent cannot remove it.");
         return { state: { ...state, open: state.open.filter((p) => !same(p.id, target.id)) }, result: { ok: true, panel: target.id } };
       }

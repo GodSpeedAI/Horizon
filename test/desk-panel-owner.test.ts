@@ -40,3 +40,34 @@ describe("a panel belongs to the agent that put it up", () => {
     expect(again.open[0]).toMatchObject({ owner_key: "ag_alice" });
   });
 });
+
+describe("an agent removes only its own panel", () => {
+  const alice = (): Panels => {
+    const r = reduceAgent(NO_PANELS, { tool: "ask_human", panel: "a_panel", ask: ask("a_q") }, "Alice", "ag_alice");
+    expect(r.result.ok).toBe(true);
+    return r.state;
+  };
+  const remove = (s: Panels, agent: string, key: string) => reduceAgent(s, { tool: "arrange", action: { op: "surface.remove", id: "a_panel" } }, agent, key);
+
+  test("Bob cannot remove Alice's panel, and her unanswered question stays", () => {
+    const before = alice();
+    const r = remove(before, "Bob", "ag_bob");
+    expect(r.result).toEqual({ ok: false, code: "SCHEMA", message: "That panel belongs to another agent." });
+    expect(r.state).toBe(before);
+    expect(openIds(r.state, "a_panel")).toEqual(["a_q"]);
+  });
+
+  test("Alice can remove her own panel", () => {
+    const r = remove(alice(), "Alice", "ag_alice");
+    expect(r.result).toEqual({ ok: true, panel: "a_panel" });
+    expect(r.state.open).toEqual([]);
+  });
+
+  test("a panel Alice owns but that holds a question another agent owns cannot be removed by Alice", () => {
+    const s = alice();
+    const moved: Panels = { ...s, open: s.open.map((p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" ? { ...b, asked_by_key: "ag_bob" } : b)) })) };
+    const r = remove(moved, "Alice", "ag_alice");
+    expect(r.result).toMatchObject({ ok: false, message: "That question belongs to another agent." });
+    expect(openIds(r.state, "a_panel")).toEqual(["a_q"]);
+  });
+});
