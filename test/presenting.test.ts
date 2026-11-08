@@ -61,6 +61,8 @@ describe("presenting on the comparison page and exports", () => {
   let application: HorizonApplication;
   let server: ReturnType<HorizonApplication["startServer"]>;
   let base: string;
+  /** An export is a POST of a form (the person's button), so the test sends the fields the same way. */
+  const exportOf = (query: string) => fetch(`${base}/workspace/export`, { method: "POST", body: new URLSearchParams(query) });
   let deskRoot: string;
   const COMPARE = "/workspace/compare?source=personal&repo=R1&day=2026-10-30&session=sess-A";
 
@@ -102,12 +104,12 @@ describe("presenting on the comparison page and exports", () => {
   test("export with Presenting on uses stand-ins", async () => {
     await post("/workspace/label", { session: "sess-A", event: "x1", verdict: "fail", first_failure: `${SECRET_NAME} did not build`, return: "" });
     await presenting(true);
-    const res = await fetch(`${base}/workspace/export?kind=labels`);
+    const res = await exportOf("kind=labels");
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).not.toContain(SECRET_NAME);
     expect(text).toMatch(/Project [A-Z2-7]{4}/);
-    const cmp = await (await fetch(`${base}/workspace/export?kind=comparison&source=personal&repo=R1&day=2026-10-30&session=sess-A&standins=0`)).text();
+    const cmp = await (await exportOf("kind=comparison&source=personal&repo=R1&day=2026-10-30&session=sess-A&standins=0")).text();
     expect(cmp).not.toContain(SECRET_NAME);
     const files = readdirSync(join(deskRoot, "exports"));
     expect(files.length).toBeGreaterThan(0);
@@ -116,13 +118,15 @@ describe("presenting on the comparison page and exports", () => {
 
   test("export with Presenting off needs an explicit choice and defaults to stand-ins", async () => {
     await presenting(false);
-    expect((await fetch(`${base}/workspace/export?kind=labels`)).status).toBe(400);
-    const one = await (await fetch(`${base}/workspace/export?kind=labels&standins=1`)).text();
+    expect((await exportOf("kind=labels")).status).toBe(400);
+    const one = await (await exportOf("kind=labels&standins=1")).text();
     expect(one).not.toContain(SECRET_NAME);
-    const zero = await (await fetch(`${base}/workspace/export?kind=labels&standins=0`)).text();
+    const zero = await (await exportOf("kind=labels&standins=0")).text();
     expect(zero).toContain(SECRET_NAME);
-    // The page offers standins=1 as the default link.
+    // The page offers the export as a POST form with standins=1 as the default, and no GET link to the export.
     const page = await (await fetch(`${base}${COMPARE}`)).text();
-    expect(page).toContain("kind=labels&amp;standins=1");
+    expect(page).toContain('action="/workspace/export"');
+    expect(page).toContain('name="standins" value="1"');
+    expect(page).not.toContain('href="/workspace/export');
   });
 });

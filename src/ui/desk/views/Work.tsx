@@ -11,6 +11,7 @@ import { caseStateWords } from "../work-build.ts";
 import { caseTitle } from "../model.ts";
 import { Cost } from "./Cost.tsx";
 import type { ViewProps } from "./Today.tsx";
+import { ExportButton } from "../../workspace/export-button.tsx";
 
 export interface WorkViewProps extends ViewProps {
   readonly saveLabel: SaveLabel;
@@ -142,10 +143,10 @@ export function Work({ ui, dispatch, saveLabel, startCase }: WorkViewProps): Rea
         </>
       ) : null}
       <p className="muted">
-        Export: <a href="/workspace/export?kind=labels&standins=1">labels</a>
+        Export: <ExportButton label="labels" fields={[["kind", "labels"], ["standins", "1"]]} />
         {compare.view ? (
           <>
-            , <a href={`/workspace/export?kind=comparison&source=${encodeURIComponent(compare.selection.source ?? "")}&repo=${encodeURIComponent(compare.selection.repo ?? "")}&day=${encodeURIComponent(compare.selection.day)}&session=${encodeURIComponent(compare.selection.session ?? "")}&standins=1`}>this comparison</a>
+            , <ExportButton label="this comparison" fields={[["kind", "comparison"], ["source", compare.selection.source ?? ""], ["repo", compare.selection.repo ?? ""], ["day", compare.selection.day], ["session", compare.selection.session ?? ""], ["standins", "1"]]} />
           </>
         ) : null}
         . Exports use stand-ins for project names by default.

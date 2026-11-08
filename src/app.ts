@@ -2482,14 +2482,24 @@ export async function createApplication(
             return Response.json(state, { headers });
           }
           if (url.pathname === "/desk/search" && request.method === "GET") {
+            // Read-only. Find as you type is not a move, and a GET never records one.
             const found = await deskSearch(url.searchParams, page !== null);
-            const asked = (url.searchParams.get("q") ?? "").trim();
-            // Find as you type is not a move. A find is recorded when the page asks for it (`record=1`) or an agent on the page runs it.
-            if (asked !== "" && (url.searchParams.get("record") === "1" || page !== null)) {
-              await logRow({ source: page ? "page-agent" : "you", ...(page?.name === undefined ? {} : { agent_name: page.name }), kind: "find", words: `Find: ${asked}`, outcome: `${found.notes.length} notes, ${found.cases.length} cases, ${found.days.length} days, ${found.tags.length} tags.`, status: "done" });
-            }
             if (page !== null) return agentJson(agentSearchOf(found), { "cache-control": "no-store", "x-content-type-options": "nosniff" });
             return Response.json(found, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+          }
+          if (url.pathname === "/desk/search" && request.method === "POST") {
+            // The Find action. It is recorded in the conversation only when the body asks for it (`record`), so a find is a move only when the person makes one.
+            const noStore = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
+            const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+            if (body === null || typeof body !== "object" || Array.isArray(body)) return Response.json({ ok: false, message: "That find could not be read." }, { status: 400, headers: noStore });
+            const params = new URLSearchParams();
+            for (const key of ["q", "day", "tag"]) if (typeof body[key] === "string") params.set(key, body[key] as string);
+            const found = await deskSearch(params, page !== null);
+            const asked = (params.get("q") ?? "").trim();
+            if (asked !== "" && (body.record === "1" || body.record === true)) {
+              await logRow({ source: "you", kind: "find", words: `Find: ${asked}`, outcome: `${found.notes.length} notes, ${found.cases.length} cases, ${found.days.length} days, ${found.tags.length} tags.`, status: "done" });
+            }
+            return Response.json(found, { headers: noStore });
           }
           if (url.pathname === "/desk/conversation" && request.method === "GET") {
             if (page !== null) return agentJson({ rows: agentRowsOf(await listConversation(runtime.runtime.store, deskWho)), withheld: WITHHELD_WORDS }, { "cache-control": "no-store", "x-content-type-options": "nosniff" });
@@ -2612,13 +2622,18 @@ export async function createApplication(
             await setPresenting(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, on: form.get("on") === "1" });
             return Response.redirect(`/workspace/compare?${safeReturn(form.get("return"))}`, 303);
           }
-          if (url.pathname === "/workspace/export" && request.method === "GET") {
-            const kind = url.searchParams.get("kind");
+          if (url.pathname === "/workspace/export" && request.method === "POST") {
+            // The export writes a file, so it is a POST from a form the person pressed, with the session. A GET is never served.
+            const form = await request.formData().catch(() => null);
+            if (form === null) return Response.json({ code: "invalid_argument", message: "EXPORT: body is not a form" }, { status: 400 });
+            const fields = new URLSearchParams();
+            for (const [key, value] of form.entries()) if (typeof value === "string") fields.set(key, value);
+            const kind = fields.get("kind");
             if (kind !== "labels" && kind !== "comparison") return Response.json({ code: "invalid_argument", message: "EXPORT: kind must be labels or comparison" }, { status: 400 });
             const presenting = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
-            const choice = chooseStandIns(presenting, url.searchParams.get("standins"));
+            const choice = chooseStandIns(presenting, fields.get("standins"));
             if (!choice.ok) return Response.json({ code: "invalid_argument", message: choice.message }, { status: choice.status });
-            const data = await compareData(url.searchParams);
+            const data = await compareData(fields);
             if (kind === "comparison" && data.view === null) return Response.json({ code: "not_found", message: "EXPORT: no such session in the record" }, { status: 404 });
             const built = buildExport({ kind, labels: data.labels, comparison: data.view, standins: choice.standins, key: presentingKey(), names: data.repoNames, now: clock() });
             writeExport(exportsDir, built);

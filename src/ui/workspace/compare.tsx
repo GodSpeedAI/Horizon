@@ -10,6 +10,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { RunLabel } from "../../capabilities/labels.ts";
 import { NOT_RECORDED, type CompareView, type SessionSummary } from "./compare-model.ts";
 import type { WorkspaceTheme } from "./model.ts";
+import { ExportButton } from "./export-button.tsx";
 
 export interface CompareSelection {
   readonly source: string | null;
@@ -199,8 +200,8 @@ export function ComparePage(props: ComparePageProps): ReactNode {
             </>
           ) : null}
           <p>
-            Export: <a href={`/workspace/export?kind=labels&standins=1`}>labels</a>
-            {props.view ? <>, <a href={`/workspace/export?kind=comparison&${query(selection)}&standins=1`}>this comparison</a></> : null}. Exports use stand-ins for project names by default.
+            Export: <ExportButton label="labels" fields={[["kind", "labels"], ["standins", "1"]]} />
+            {props.view ? <>, <ExportButton label="this comparison" fields={[...new URLSearchParams(`kind=comparison&${query(selection)}&standins=1`)]} /></> : null}. Exports use stand-ins for project names by default.
           </p>
         </main>
       </body>

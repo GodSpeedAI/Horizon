@@ -116,7 +116,7 @@ describe("rows from each desk operation", () => {
   test("a note, a find and a hand off leave rows with the right source, kind and status", async () => {
     const before = (await rows()).length;
     expect((await app.post("/desk/note", { body: "Check the checkout wording" })).status).toBe(200);
-    await fetch(`${app.base}/desk/search?q=checkout&record=1`);
+    await fetch(`${app.base}/desk/search`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ q: "checkout", record: "1" }) });
     await fetch(`${app.base}/desk/search?q=typing`); // find as you type is not recorded
     const id = await draftId();
     const p = await post("/desk/handoff/preview", { draft_id: id, text: "Fix the checkout total" });
@@ -187,7 +187,8 @@ describe("the agent caller", () => {
     expect(r.status).toBe(200);
     const all = await rows();
     expect(all.at(-1)).toMatchObject({ kind: "handoff-proposal", source: "page-agent", agent_name: "Helper", status: "waiting" });
-    expect(all.at(-2)).toMatchObject({ kind: "find", source: "page-agent", agent_name: "Helper" });
+    // A find is a read: an agent's find is not written into the conversation (only the person's Find records one).
+    expect(all.some((row) => row.kind === "find" && row.source === "page-agent")).toBe(false);
   });
 
   test("it cannot send, decide, save a note, discard, answer or do any human panel op, and nothing is appended", async () => {

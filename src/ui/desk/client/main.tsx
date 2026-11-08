@@ -185,7 +185,7 @@ function App() {
     };
     const invoker: DeskAgentInvoker = {
       state: () => call("/desk/state.json"),
-      find: (q) => call(`/desk/search?${new URLSearchParams({ q, record: "1" })}`).finally(() => void loadRows()),
+      find: (q) => call("/desk/search", { method: "POST", body: JSON.stringify({ q, record: "1" }) }).finally(() => void loadRows()),
       inspect: async (rowId) => {
         const listed = (await call("/desk/conversation")) as { rows?: ConversationRow[] };
         const row = listed.rows?.find((r) => r.row_id === rowId);
