@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { fakeCaseKeeper, type FakeKeeper } from "./support/fake-case-keeper.ts";
+import { withRequestId } from "./support/request-body.ts";
 
 const keys = { ag_alice: randomBytes(32).toString("hex") };
 const sha = (k: string) => createHash("sha256").update(k).digest("hex");
@@ -165,4 +166,97 @@ describe("step acceptance looks up its card outside the queue", () => {
     }
     expect(completed).toHaveLength(completedBefore);
   });
+});
+
+describe("the desk's panel change reads its body before queueing (R3-10)", () => {
+  let app: DeskApp;
+  beforeAll(async () => {
+    app = await startDeskApp();
+    writeRegistry(app);
+  });
+  afterAll(async () => app.stop());
+
+  test("a browser body that never finishes does not block a second valid mutation", async () => {
+    const encoder = new TextEncoder();
+    let finish!: () => void;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('{"op":"human.close","request_id":"held-browser-1","id":"'));
+        finish = () => {
+          controller.enqueue(encoder.encode('x"}'));
+          controller.close();
+        };
+      },
+    });
+    const held = fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body, duplex: "half" } as RequestInit);
+    await settle();
+    // The unfinished body is held outside the queue, so a valid agent change goes through while it waits.
+    const other = await within(app.application.applyAgentOp(surface("browser_free")), 2_000);
+    expect(other).not.toBe("timeout");
+    expect(other).toMatchObject({ ok: true });
+    // The held request is still waiting for its body: it did not finish before the body arrived.
+    expect(await within(held, 200)).toBe("timeout");
+    finish();
+    const response = await within(held, 5_000);
+    expect(response).not.toBe("timeout");
+    expect(((await app.state()) as { panels: { open: { id: string }[] } }).panels.open.map((p) => p.id)).toContain("browser_free");
+  });
+});
+
+describe("a route claim's step lookup does not hold the queue (R3-10)", () => {
+  const CASE = "case_20261107T061312Z_820737";
+  let keeper: FakeKeeper;
+  let app: DeskApp;
+  let holdCases = false;
+
+  beforeAll(async () => {
+    keeper = fakeCaseKeeper((r) => {
+      switch (r.verb) {
+        case "authority_approvals":
+          return { json: { ok: true, approvals: [] } };
+        case "approval_list":
+          return { json: { approvals: [] } };
+        case "case_list":
+          if (holdCases) return { hang: true };
+          return { json: { cases: [{ case_id: CASE, case_state: "active", summary: "Ship the checkout fix", created_at: "2026-11-07T06:13:12.793Z" }], unreadable: [] } };
+        default:
+          return { json: { ok: false, error_class: "unscripted_verb" } };
+      }
+    });
+    app = await startDeskApp({ approvals: { socketPath: keeper.socketPath, service: { actor_id: "cognate-service", role: "service" }, operator: { actor_id: "actor:operator", role: "operator" }, timeoutMs: 60_000 } });
+    writeRegistry(app);
+  });
+  afterAll(async () => {
+    holdCases = false;
+    await app.stop();
+    keeper.stop();
+  });
+
+  test("a route whose keeper lookup never answers finishes within its limit, and a panel command runs meanwhile", async () => {
+    const asked = await fetch(`${app.base}/agent/panels`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${keys.ag_alice}`, "content-type": "application/json", "x-horizon-agent-name": "Alice" },
+      body: JSON.stringify(withRequestId({ tool: "ask_human", panel: "route_lookup", ask: { id: "q1", question: "Ship it?", why_needed: "Release is waiting", resolves: "signoff_release", options: [{ option_id: "yes", label: "Yes" }, { option_id: "no", label: "No" }] } })),
+    });
+    expect(asked.status).toBe(200);
+    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "route_lookup", ask: "q1", ...(await revisionOf(app, "route_lookup", "q1")), outcome: "answered", value: "yes" })).status).toBe(200);
+    holdCases = true;
+    const routing = fetch(`${app.base}/agent/panels`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${keys.ag_alice}`, "content-type": "application/json", "x-horizon-agent-name": "Alice" },
+      body: JSON.stringify(withRequestId({ tool: "answer.route", panel_id: "route_lookup", ask_id: "q1", routed_as: "step signoff_release in Seed: triage inbox" })),
+    });
+    await settle();
+    const started = Date.now();
+    const put = await within(app.application.applyAgentOp(surface("route_free")), 1_000);
+    expect(put).not.toBe("timeout");
+    expect(put).toMatchObject({ ok: true });
+    expect(Date.now() - started).toBeLessThan(1_000);
+    const routed = await within(routing, 6_000);
+    holdCases = false;
+    expect(routed).not.toBe("timeout");
+    const routedBody = await (routed as Response).json();
+    expect(routedBody).toMatchObject({ ok: true });
+    expect((routed as Response).status).toBe(200);
+  }, 15_000);
 });

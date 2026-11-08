@@ -2030,11 +2030,42 @@ export async function createApplication(
     const planned = await planUpdate(runtime.runtime.store, deskWho, row.row_id, stillAskingIn(board, panelId, except) ? { status: "waiting", outcome: "An agent asks you a question." } : { status: "done", outcome });
     return planned === null ? null : planned.record;
   }
+  /** A route claim's step lookup, run before the command is queued (R3-10). `resolves` is the step it was run for. */
+  type RouteLookup = { readonly resolves: string | null; readonly found: { step_id: string; name: string; case_id: string; case_title: string } | null };
+  /** The lookup a route claim needs, or null for any other op. Reads the board and the case keeper only; nothing is written. */
+  async function routeLookupFor(op: AgentOp): Promise<RouteLookup | null> {
+    if (op.tool !== "answer.route" || typeof op.routed_as !== "string") return null;
+    const resolves = (panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.find((b) => b.kind === "question" && b.id === op.ask_id) as { resolves?: string | null } | undefined)?.resolves ?? null;
+    return { resolves, found: await findRoutedStep(op.routed_as.trim(), resolves) };
+  }
+  async function routeLookupForText(text: string): Promise<RouteLookup | null> {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return null;
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return routeLookupFor(parsed as AgentOp);
+  }
+  /** A keeper lookup that does not answer within the limit counts as not found: the claim is shown as not checked. */
+  const ROUTE_LOOKUP_MS = 2_000;
+  async function findRoutedStep(said: string, resolves: string | null): Promise<RouteLookup["found"]> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), ROUTE_LOOKUP_MS);
+    });
+    try {
+      return await Promise.race([findRoutedStepNow(said, resolves).catch(() => null), late]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
   /**
    * The step a route claim is checked against. The claim is checked only when the agent names the step the question resolves, and that
    * step is waiting in an open case now. Any other step the words name leaves the claim as the agent's word. Null otherwise.
    */
-  async function findRoutedStep(said: string, resolves: string | null): Promise<{ step_id: string; name: string; case_id: string; case_title: string } | null> {
+  async function findRoutedStepNow(said: string, resolves: string | null): Promise<{ step_id: string; name: string; case_id: string; case_title: string } | null> {
     if (caseKeeper === null || resolves === null || resolves.length < 4 || !said.split(/[^A-Za-z0-9_.:-]+/).includes(resolves)) return null;
     try {
       const listed = await listCases(caseKeeper);
@@ -2055,7 +2086,9 @@ export async function createApplication(
   type AgentReply = { readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string };
   /** The one entry point for an agent's change, from the agent door and from inside the desk. Every caller goes through agentCommandNow. */
   async function applyAgentOp(op: AgentOp & { readonly request_id?: unknown }, agentName?: string, keyId: string = UNKEYED_AGENT): Promise<AgentReply> {
-    return panelCommand(() => agentCommandNow(op, agentName, keyId));
+    // The optional step lookup runs before the command is queued (R3-10). The queued command checks the rest again.
+    const lookup = await routeLookupFor(op);
+    return panelCommand(() => agentCommandNow(op, agentName, keyId, lookup));
   }
 
   /**
@@ -2063,21 +2096,21 @@ export async function createApplication(
    * id and the same contents returns the stored response and writes nothing; the same id with other contents is refused. Runs only
    * inside panelCommand (applyAgentOp, or the door, which is queued already).
    */
-  async function agentCommandNow(op: AgentOp & { readonly request_id?: unknown }, agentName: string | undefined, keyId: string): Promise<AgentReply> {
+  async function agentCommandNow(op: AgentOp & { readonly request_id?: unknown }, agentName: string | undefined, keyId: string, lookup: RouteLookup | null = null): Promise<AgentReply> {
     const typing = checkAgentOp(op);
     if (typing !== null) return { ok: false, code: "SCHEMA", message: typing };
     const requestId = (op as { readonly request_id?: unknown }).request_id;
     if (requestId !== undefined && !validRequestId(requestId)) return { ok: false, code: "SCHEMA", message: BAD_REQUEST_ID_WORDS };
-    if (typeof requestId !== "string") return applyAgentOpNow(op, agentName, keyId, null);
+    if (typeof requestId !== "string") return applyAgentOpNow(op, agentName, keyId, null, lookup);
     const fingerprint = requestFingerprint(op as unknown as { readonly [key: string]: unknown });
     const seen = await seenRequest(runtime.runtime.store, caller.tenant, requestId, fingerprint);
     if (seen.kind === "reused") return { ok: false, code: "REUSED", message: REUSED_REQUEST_WORDS };
     if (seen.kind === "replay") return seen.response as unknown as AgentReply;
-    return applyAgentOpNow(op, agentName, keyId, { requestId, fingerprint });
+    return applyAgentOpNow(op, agentName, keyId, { requestId, fingerprint }, lookup);
   }
 
   /** The body of applyAgentOp. Runs only inside panelCommand. `dedupe` is the request id and fingerprint of a retried call, if it has one. */
-  async function applyAgentOpNow(op: AgentOp, agentName: string | undefined, keyId: string, dedupe: { readonly requestId: string; readonly fingerprint: string } | null): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
+  async function applyAgentOpNow(op: AgentOp, agentName: string | undefined, keyId: string, dedupe: { readonly requestId: string; readonly fingerprint: string } | null, lookup: RouteLookup | null = null): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
     await answersMigrated;
     // The request's record, kept with the change it made: a retry with the same id returns this response and writes nothing.
     const agentKeep = (response: { readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] }): CommitRecord[] => (dedupe === null ? [] : [requestRecord(caller.tenant, dedupe.requestId, dedupe.fingerprint, JSON.parse(JSON.stringify(response)) as Json)]);
@@ -2125,7 +2158,8 @@ export async function createApplication(
       // The agent's words are kept as its claim. A step the case keeper holds is shown as found, but it is not delivery: the row stays
       // claimed, and nothing marks it done without independent evidence that the step was delivered.
       const said = op.routed_as.trim();
-      const found = await findRoutedStep(said, resolves);
+      // The lookup ran before the queue for the same step; if the step changed since, the claim is shown as not checked.
+      const found = lookup !== null && lookup.resolves === resolves ? lookup.found : null;
       const where = found === null ? `The agent says it took it to: ${said}. Not checked: Horizon found no step with that name.` : `The agent says it took it to: ${said}. Step found: the step "${found.name}" is in the case "${found.case_title}".`;
       // One entry per answer: the one made when you answered is finished in place. The route, the row and the panel's row are one commit.
       const mine = await answerRowOf(store, deskWho, op.panel_id, op.ask_id);
@@ -2168,6 +2202,49 @@ export async function createApplication(
     return result;
   }
 
+  /** A request body as it was read before the queue: the text, or why it was not read (too large, or not in time). */
+  type BodyRead = { readonly kind: "ok"; readonly text: string } | { readonly kind: "large" } | { readonly kind: "late" };
+  const BODY_LIMIT_BYTES = 500_000;
+  const BODY_READ_MS = 10_000;
+  /**
+   * Reads a request body outside the command queue (R3-10). A body declared or sent past the limit is not read in full, and a body that
+   * does not finish within the time limit is given up (its stream is cancelled), so neither holds the queue or waits forever.
+   */
+  async function readBodyBounded(request: Request): Promise<BodyRead> {
+    const declared = Number(request.headers.get("content-length") ?? "0");
+    if (declared > BODY_LIMIT_BYTES) return { kind: "large" };
+    const reader = request.body?.getReader();
+    if (reader === undefined) return { kind: "ok", text: "" };
+    const decoder = new TextDecoder();
+    const read = (async (): Promise<BodyRead> => {
+      let text = "";
+      let total = 0;
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        total += chunk.value.byteLength;
+        if (total > BODY_LIMIT_BYTES) {
+          await reader.cancel().catch(() => undefined);
+          return { kind: "large" };
+        }
+        text += decoder.decode(chunk.value, { stream: true });
+      }
+      return { kind: "ok", text: text + decoder.decode() };
+    })().catch((): BodyRead => ({ kind: "late" }));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<BodyRead>((resolve) => {
+      timer = setTimeout(() => {
+        void reader.cancel().catch(() => undefined);
+        resolve({ kind: "late" });
+      }, BODY_READ_MS);
+    });
+    try {
+      return await Promise.race([read, late]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /**
    * The agents' door for panels: `POST /agent/panels` (one AgentOp), `GET /agent/panels/answers`, `GET /agent/panels/catalogue`.
    * It needs `Authorization: Bearer <an agent key>`. The setup's agent.key is the default agent; every other agent has its own key in the
@@ -2176,15 +2253,16 @@ export async function createApplication(
    */
   const AGENT_TOOLS = ["show_surface", "ask_human", "arrange", "annotate", "read_responses", "ask.withdraw", "answer.route"] as const;
   async function agentDoor(request: Request, pathname: string): Promise<Response> {
-    // The request body is read before the command is queued, so a slow client never holds the queue. A body larger than the limit
-    // is not read at all; the queued command refuses it after the key is checked.
-    const declared = Number(request.headers.get("content-length") ?? "0");
-    const text = pathname === "/agent/panels" && request.method === "POST" && declared <= 500_000 ? await request.text() : null;
+    // The request body is read before the command is queued, with a size and a time limit, so a slow client never holds the queue (R3-10).
+    const read = pathname === "/agent/panels" && request.method === "POST" ? await readBodyBounded(request) : null;
+    // A route claim's keeper lookup also runs here, for a key that is valid now. The queued command checks the key again.
+    const bearer = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
+    const lookup = read !== null && read.kind === "ok" && ownerOfKey(bearer, loaded.agentKey, loaded.agentRegistryPath) !== null ? await routeLookupForText(read.text) : null;
     // Authentication runs inside the queued command, so the key is checked when the command runs, not when it was queued.
-    return panelCommand(() => agentDoorNow(request, pathname, text));
+    return panelCommand(() => agentDoorNow(request, pathname, read, lookup));
   }
 
-  async function agentDoorNow(request: Request, pathname: string, text: string | null): Promise<Response> {
+  async function agentDoorNow(request: Request, pathname: string, read: BodyRead | null, lookup: RouteLookup | null): Promise<Response> {
     const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
     const refuse = (status: number, message: string): Response => Response.json({ ok: false, message }, { status, headers });
     const given = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
@@ -2198,10 +2276,11 @@ export async function createApplication(
       return Response.json({ ok: true, responses: done.ok ? done.responses ?? [] : [] }, { headers });
     }
     if (pathname !== "/agent/panels" || request.method !== "POST") return refuse(404, "There is nothing at this address. Use POST /agent/panels, GET /agent/panels/answers or GET /agent/panels/catalogue.");
-    if (text === null || text.length > 500_000) return refuse(413, "That is too large. Send a smaller panel.");
+    if (read === null || read.kind === "large") return refuse(413, "That is too large. Send a smaller panel.");
+    if (read.kind === "late") return refuse(408, "The request body did not arrive in time. Nothing was changed.");
     let body: unknown;
     try {
-      body = JSON.parse(text);
+      body = JSON.parse(read.text);
     } catch {
       return refuse(400, "That could not be read as JSON. Nothing was changed.");
     }
@@ -2213,7 +2292,7 @@ export async function createApplication(
     // receipt and the change itself are one path, agentCommandNow, which the desk's own callers use too.
     const requestId = op.request_id;
     if (op.tool !== "read_responses" && typeof requestId !== "string") return refuse(400, REQUEST_ID_REQUIRED_WORDS);
-    const done = await agentCommandNow(op as unknown as AgentOp, name, owner.key_id);
+    const done = await agentCommandNow(op as unknown as AgentOp, name, owner.key_id, lookup);
     const status = done.ok ? 200 : done.code === "NOT_FOUND" ? 404 : done.code === "REUSED" ? 409 : done.code === "UNAVAILABLE" ? 503 : 400;
     return Response.json(done, { status, headers });
   }
@@ -2278,14 +2357,24 @@ export async function createApplication(
 
   /** The person's operations on panels: answer, pin, close, open, and stop waiting for an agent's reply. */
   async function deskPanelOp(request: Request): Promise<Response> {
-    return panelCommand(() => deskPanelOpNow(request));
+    // The body is read before the command is queued, with a size and a time limit (R3-10).
+    const read = await readBodyBounded(request);
+    return panelCommand(() => deskPanelOpNow(request, read));
   }
 
   /** The body of deskPanelOp. Runs only inside panelCommand. */
-  async function deskPanelOpNow(request: Request): Promise<Response> {
+  async function deskPanelOpNow(request: Request, read: BodyRead): Promise<Response> {
     const headers = { "cache-control": "no-store" };
     const fail = (status: number, message: string): Response => Response.json({ ok: false, message }, { status, headers });
-    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    if (read.kind === "large") return fail(413, "That is too large. Nothing was changed.");
+    if (read.kind === "late") return fail(408, "The request body did not arrive in time. Nothing was changed.");
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(read.text);
+    } catch {
+      parsed = null;
+    }
+    const body = parsed as Record<string, unknown> | null;
     if (body === null || typeof body !== "object" || typeof body.op !== "string") return fail(400, "That could not be read. Nothing was changed.");
     const store = runtime.runtime.store;
     await answersMigrated;
