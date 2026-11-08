@@ -191,3 +191,26 @@ describe("the migration runner", () => {
     expect(ran).toEqual([1, 2]);
   });
 });
+
+describe("an agent op issued straight after startup", () => {
+  test("completes, and the migration completes after it, without a stall", async () => {
+    // The migration is queued at startup, before the agent op. The op waits for the migration; the migration must not wait behind the op.
+    const app = await open({ awaitMigration: false });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("the agent op stalled behind the migration")), 3_000);
+    });
+    try {
+      const result = await Promise.race([
+        app.application.applyAgentOp({ tool: "ask_human", panel: "w1", ask: { id: "q", question: "Which?", why_needed: "x", options: [{ option_id: "a", label: "A" }, { option_id: "b", label: "B" }] } }),
+        timeout,
+      ]);
+      expect(result.ok).toBe(true);
+      await Promise.race([app.application.migrated, timeout]);
+      const markers = await app.application.runtime.runtime.store.listRecords(MIGRATION_COLLECTION);
+      expect(markers.map((row) => (row.value as { version?: number }).version)).toEqual([4]);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  });
+});

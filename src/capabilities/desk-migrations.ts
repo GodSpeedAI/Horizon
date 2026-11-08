@@ -3,7 +3,7 @@
  * record `marker:<tenant>` in `horizon-desk-migrations` holds the highest version that has run. A start runs every migration above that
  * version, in order, and writes the marker after each one. A migration that has run is never run again, and a start with nothing
  * pending writes nothing. Until the run finishes, the desk refuses every change (see app.ts), so no change is taken against records that
- * are still being moved. Each migration and its marker run as one command in the desk's queue (`queue`), so no panel command runs between them.
+ * are still being moved. The whole run is one command in the desk's queue (`queue`), so no panel command runs between two migrations.
  */
 import type { DurableStore } from "@godspeedai/cognate-events";
 import { migratePreUpgradeAnswers, migrateAnswerStates, migrateSealedQuestions, type PanelQueue } from "./panel-answers.ts";
@@ -38,24 +38,25 @@ export async function appliedVersion(store: DurableStore, tenant: string): Promi
 
 /**
  * Runs every migration above the marker, in order, each once. The marker is written after each one, checked against the version it
- * was read at. Each migration and its marker are one command run in `queue`, the desk's mutation queue. `hold`, when given, is awaited
- * before anything runs (a test uses it to keep a migration pending). Returns the versions that ran, in order; a second run returns an
- * empty list and writes nothing.
+ * was read at. The whole run is one command in `queue`, the desk's mutation queue, so a panel command that is queued behind it waits
+ * for the run to finish and never sits between two migrations. (A command that waited for the migration while the migration waited
+ * for a later queue slot would stall both; one indivisible command cannot.) `hold`, when given, is awaited inside that command before
+ * anything runs (a test uses it to keep a migration pending). Returns the versions that ran, in order; a second run returns an empty list
+ * and writes nothing.
  */
 export async function runDeskMigrations(store: DurableStore, tenant: string, now: Date, queue: PanelQueue, migrations: readonly DeskMigration[] = DESK_MIGRATIONS, hold?: Promise<unknown>): Promise<number[]> {
-  if (hold !== undefined) await hold;
   const ordered = [...migrations].sort((a, b) => a.version - b.version);
-  const applied: number[] = [];
-  for (const migration of ordered) {
-    const ran = await queue(async (): Promise<boolean> => {
+  return await queue(async (): Promise<number[]> => {
+    if (hold !== undefined) await hold;
+    const applied: number[] = [];
+    for (const migration of ordered) {
       const current = await store.getRecord(MIGRATION_COLLECTION, markerId(tenant));
       const version = (current?.value as { readonly version?: unknown } | undefined)?.version;
-      if (typeof version === "number" && migration.version <= version) return false;
+      if (typeof version === "number" && migration.version <= version) continue;
       await migration.run(store, tenant, now);
       await store.commit({ appends: [], records: [{ collection: MIGRATION_COLLECTION, id: markerId(tenant), expectedVersion: current?.version ?? 0, value: { tenant, version: migration.version, name: migration.name, at: now.toISOString() } }] });
-      return true;
-    });
-    if (ran) applied.push(migration.version);
-  }
-  return applied;
+      applied.push(migration.version);
+    }
+    return applied;
+  });
 }
