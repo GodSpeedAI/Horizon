@@ -24,7 +24,7 @@ describe("each question has a version", () => {
 
   test("an answer to the version the person saw is accepted", () => {
     const s = put(NO_PANELS, ask());
-    const r = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: block(s).version, owner_rev: 0 });
+    const r = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: block(s).version!, owner_rev: 0 });
     expect(r.result.ok).toBe(true);
   });
 
@@ -33,7 +33,7 @@ describe("each question has a version", () => {
     const s = put(NO_PANELS, ask());
     const seen = "00000000000000";
     expect(seen).not.toBe(block(s).version);
-    const r = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: seen, owner_rev: 0 });
+    const r = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: seen!, owner_rev: 0 });
     expect(r.result.ok).toBe(false);
     expect(r.result.ok === false && r.result.message).toBe("This question changed after you looked at it. Look again, then answer.");
     expect(QUESTION_CHANGED).toBe("This question changed after you looked at it. Look again, then answer.");
@@ -42,7 +42,7 @@ describe("each question has a version", () => {
 
   test("an agent cannot change a question the person already answered, by ask_human or show_surface", () => {
     let s = put(NO_PANELS, ask());
-    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: block(s).version, owner_rev: 0 }).state;
+    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: block(s).version!, owner_rev: 0 }).state;
     const reworded = reduceAgent(s, { tool: "ask_human", panel: "p", ask: ask({ question: "Which plan, same as before?" }) });
     expect(reworded.result.ok).toBe(false);
     expect(reworded.result.ok === false && reworded.result.message).toBe(ANSWERED_CANNOT_CHANGE);
@@ -65,7 +65,7 @@ describe("each question has a version", () => {
     expect(edited.result.ok === false && edited.result.message).toBe(SAME_ID);
     expect(block(edited.state).question).toBe("Which plan?");
     expect(block(edited.state).version).toBe(before);
-    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: before, owner_rev: 0 }).state;
+    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "answered", value: "a", version: before!, owner_rev: 0 }).state;
     const again = reduceAgent(s, { tool: "ask_human", panel: "p", ask: ask() });
     expect(again.result.ok).toBe(true);
     expect(block(again.state).answered?.value).toBe("a");
@@ -73,7 +73,7 @@ describe("each question has a version", () => {
 
   test("a question put off keeps its id's wording: a changed put is refused, the same words reopen it", () => {
     let s = put(NO_PANELS, ask());
-    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "deferred", version: block(s).version, owner_rev: 0 }).state;
+    s = reduceHuman(s, { op: "human.answer", panel: "p", ask: "q", outcome: "deferred", version: block(s).version!, owner_rev: 0 }).state;
     const changed = reduceAgent(s, { tool: "ask_human", panel: "p", ask: ask({ question: "Now which plan?" }) });
     expect(changed.result.ok).toBe(false);
     expect(changed.result.ok === false && changed.result.message).toBe(SAME_ID);
