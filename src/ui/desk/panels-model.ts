@@ -26,7 +26,10 @@ export interface Panel {
   readonly pinned: boolean;
   readonly blocks: readonly PanelBlock[];
   readonly notes: readonly PanelNote[];
+  /** The agent key that first put this panel up. Only that key may put on it again. Null or missing on panels made before keys. */
+  readonly owner_key?: string | null;
 }
+export const PANEL_OWNED_ELSEWHERE = "That panel belongs to another agent.";
 export interface Panels {
   readonly open: readonly Panel[];
   readonly max: number;
@@ -117,6 +120,7 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
       const existing = state.open.find((p) => same(p.id, s.id));
       if (existing !== undefined) {
         // An update keeps the panel where it is and keeps it pinned; answers already given stay on their questions.
+        if (existing.owner_key != null && existing.owner_key !== key) return refuse(state, "SCHEMA", PANEL_OWNED_ELSEWHERE);
         const before = (id: string): AskBlock | undefined => existing.blocks.find((o): o is AskBlock => o.kind === "question" && o.id === id);
         // A question the person answered cannot be reworded under them; one they put off or skipped starts again when it changes.
         // Every answered question must come back unchanged: leaving it out, or changing it, is refused.
@@ -131,16 +135,19 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
           const owner = ownerOf(old, agent, key);
           return old !== undefined && sameQuestion(old, b) ? sameAgain(old, b, owner) : { ...b, ...owner };
         });
-        return { state: replace(state, s.id, (p) => ({ ...p, title: str(s.title, 120) || p.title, step: s.step === undefined ? p.step : (s.step ?? null), blocks: kept })), result: { ok: true, panel: s.id } };
+        // A put does not remove a question the person has not answered: it stays until it is answered, withdrawn or routed.
+        const unanswered = existing.blocks.filter((o): o is AskBlock => o.kind === "question" && o.answered === null && (o.withdrawn ?? null) === null && !kept.some((k) => k.kind === "question" && k.id === o.id));
+        return { state: replace(state, s.id, (p) => ({ ...p, title: str(s.title, 120) || p.title, step: s.step === undefined ? p.step : (s.step ?? null), blocks: [...kept, ...unanswered] })), result: { ok: true, panel: s.id } };
       }
-      return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks: blocks.map((b) => (b.kind === "question" ? { ...b, asked_by: agent, asked_by_key: key } : b)), notes: [] });
+      return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks: blocks.map((b) => (b.kind === "question" ? { ...b, asked_by: agent, asked_by_key: key } : b)), notes: [], owner_key: key });
     }
     case "ask_human": {
       const panel = state.open.find((p) => same(p.id, op.panel));
       const id = typeof op.ask.id === "string" && ID.test(op.ask.id) ? op.ask.id : "";
       const block = id === "" ? null : questionOf(op.ask, id);
       if (block === null) return refuse(state, "SCHEMA", "A question needs an id, the question, and (for pick-one and pick-several) at least two options.");
-      if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [{ ...block, asked_by: agent, asked_by_key: key }], notes: [] });
+      if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [{ ...block, asked_by: agent, asked_by_key: key }], notes: [], owner_key: key });
+      if (panel.owner_key != null && panel.owner_key !== key) return refuse(state, "SCHEMA", PANEL_OWNED_ELSEWHERE);
       const old = panel.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === block.id);
       if (agreedTo(old) && !sameQuestion(old, block)) return refuse(state, "SCHEMA", ANSWERED_CANNOT_CHANGE);
       // The very same question again keeps what the person said; a changed one starts again.
