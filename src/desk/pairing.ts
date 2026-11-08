@@ -33,6 +33,8 @@ export interface DeskPairing {
   readonly paired: (cookieHeader: string | null) => boolean;
   /** Ends the session the cookie header carries, if any. */
   readonly end: (cookieHeader: string | null) => void;
+  /** How long ago the session the cookie header carries was paired, in milliseconds. Null when there is no live session. */
+  readonly pairedAgeMs: (cookieHeader: string | null) => number | null;
 }
 
 /** The cookie that holds the session: HttpOnly, SameSite=Strict, for the desk's paths only. */
@@ -70,16 +72,17 @@ export function createDeskPairing(now: () => Date): { readonly code: string; rea
   let spent = false;
   let wrong = 0;
   let lockedUntil = 0;
-  const sessions = new Map<string, number>();
+  /** Each live session: when it expires, and when it was paired (for the changes that need a recent pairing). */
+  const sessions = new Map<string, { readonly expires: number; readonly pairedAt: number }>();
   const sessionKey = (token: string): string => createHash("sha256").update(token).digest("hex");
 
   const liveSession = (cookieHeader: string | null): string | null => {
     const match = /(?:^|;\s*)horizon_desk=([A-Za-z0-9_-]{20,})/.exec(cookieHeader ?? "");
     if (match === null) return null;
     const id = sessionKey(match[1]!);
-    const expires = sessions.get(id);
-    if (expires === undefined) return null;
-    if (now().getTime() >= expires) {
+    const session = sessions.get(id);
+    if (session === undefined) return null;
+    if (now().getTime() >= session.expires) {
       sessions.delete(id);
       return null;
     }
@@ -106,13 +109,18 @@ export function createDeskPairing(now: () => Date): { readonly code: string; rea
         wrong = 0;
         const token = randomBytes(32).toString("base64url");
         const expires = at + SESSION_LIFETIME_MS;
-        sessions.set(sessionKey(token), expires);
+        sessions.set(sessionKey(token), { expires, pairedAt: at });
         return { ok: true, cookie: sessionCookie(token, SESSION_LIFETIME_MS / 1000), expires };
       },
       paired: (cookieHeader) => liveSession(cookieHeader) !== null,
       end(cookieHeader) {
         const id = liveSession(cookieHeader);
         if (id !== null) sessions.delete(id);
+      },
+      pairedAgeMs(cookieHeader) {
+        const id = liveSession(cookieHeader);
+        const session = id === null ? undefined : sessions.get(id);
+        return session === undefined ? null : now().getTime() - session.pairedAt;
       },
     },
   };

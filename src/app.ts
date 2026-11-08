@@ -88,7 +88,7 @@ import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/wor
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
 import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
-import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, listAnswers, recordAnswer, rememberAgreed, routeAnswer, stopWaiting, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
+import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, listAnswers, recordAnswer, rememberAgreed, routeAnswer, stopWaiting, checkValue, reassignOwner, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
 import { ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
@@ -104,7 +104,7 @@ import { readLedgerDay } from "./adapters/ledger-day.ts";
 import { recordReader, type RecordReader } from "./adapters/realitytrace-economics.ts";
 import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
 import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, PAIR_FIRST_WORDS, printPairingCode } from "./desk/pairing.ts";
-import { ownerOfKey } from "./desk/agent-keys.ts";
+import { DEFAULT_AGENT_KEY_ID, DEFAULT_AGENT_NAME, ownerOfKey, readRegistry } from "./desk/agent-keys.ts";
 import { noteNotRecorded, notRecordedWarnings } from "./capabilities/reconciliation.ts";
 import { setupMapping } from "./config/setup.ts";
 import type { RecordSource } from "./config/types.ts";
@@ -2024,6 +2024,25 @@ export async function createApplication(
       if (typeof body.step !== "string" || body.step === "") return fail(400, "Say which step to stop waiting for.");
       const n = await stopWaiting(store, caller.tenant, body.step);
       return Response.json({ ok: true, message: n === 0 ? "Nothing was waiting." : "Stopped waiting. The step can be accepted now." }, { headers });
+    }
+    if (body.op === "human.reassign_owner") {
+      // The person moves a waiting question to another registered agent. Paired only (the route is paired), a recent pairing, a
+      // registered target, and an explicit second confirm that echoes the owner the person saw.
+      if (typeof body.panel !== "string" || typeof body.ask !== "string" || typeof body.from_key_id !== "string" || typeof body.to_key_id !== "string") return fail(400, "That change could not be read. Nothing was changed.");
+      let registry: ReturnType<typeof readRegistry>;
+      try {
+        registry = readRegistry(loaded.agentRegistryPath);
+      } catch {
+        return fail(500, "The agent list could not be read. Nothing was changed.");
+      }
+      const toEntry = body.to_key_id === DEFAULT_AGENT_KEY_ID ? { key_id: DEFAULT_AGENT_KEY_ID, name: DEFAULT_AGENT_NAME } : registry.find((e) => e.key_id === body.to_key_id);
+      const fromName = body.from_key_id === DEFAULT_AGENT_KEY_ID ? DEFAULT_AGENT_NAME : registry.find((e) => e.key_id === body.from_key_id)?.name ?? "an agent no longer listed";
+      const result = await reassignOwner(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, question: askOf(body.panel, body.ask)?.question ?? "the agent's question", from_key: body.from_key_id, to_key: body.to_key_id, from_name: fromName, to_name: toEntry?.name ?? "", paired: true, pairedAgeMs: pairing.pairedAgeMs(request.headers.get("cookie")), targetRegistered: toEntry !== undefined, confirmed: body.confirmed === true, who: deskWho, now: clock() });
+      if (!result.ok) return fail(result.message.startsWith("Nothing was sent") ? 500 : 409, result.message);
+      // The page's own copy of the question follows the stored owner, so a route by the old key is refused from now on.
+      const toName = toEntry?.name ?? "";
+      panelBoard = { ...panelBoard, open: panelBoard.open.map((p) => (p.id === body.panel ? { ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === body.ask ? { ...b, asked_by_key: body.to_key_id, asked_by: toName } : b)) } : p)) } as PanelsBoard;
+      return Response.json({ ok: true, message: `Moved to ${toName}. Its answer waits for them to say where it went.` }, { headers });
     }
     if (body.op === "human.answer") {
       const outcome = body.outcome;

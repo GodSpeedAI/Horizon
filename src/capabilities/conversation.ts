@@ -46,6 +46,15 @@ async function put(store: DurableStore, who: Who, row: ConversationRow): Promise
 }
 
 /**
+ * A new row as a record, for a commit that also changes other records (the reassign of a question writes its row in the same
+ * commit as the change). Always a new row: nothing is matched or updated in place.
+ */
+export function newRowRecord(who: Who, input: NewRow, now: Date): { readonly collection: string; readonly id: string; readonly expectedVersion: number; readonly value: { readonly [key: string]: Json } } {
+  const row = tidyRow({ row_id: rowIdOf(), at: now.toISOString(), source: input.source, ...(input.agent_name === undefined ? {} : { agent_name: input.agent_name }), kind: input.kind, words: input.words, outcome: input.outcome, status: input.status, refs: input.refs ?? {}, ...(input.stages === undefined ? {} : { stages: input.stages }) });
+  return { collection: CONVERSATION_COLLECTION, id: row.row_id, expectedVersion: 0, value: toJson(row, who) };
+}
+
+/**
  * Add a row. A panel row for a panel that already has one updates that row in place; a hand off preview for a draft that already
  * has a waiting preview updates that one. Returns the row as stored.
  */

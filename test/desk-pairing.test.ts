@@ -115,7 +115,7 @@ describe("the pairing code", () => {
 
   test("the pairing state keeps a hash, not the code (the object has no code field)", () => {
     const { pairing, code } = createDeskPairing(() => new Date("2026-11-06T10:00:00Z"));
-    expect(Object.keys(pairing).sort()).toEqual(["end", "pair", "paired"]);
+    expect(Object.keys(pairing).sort()).toEqual(["end", "pair", "paired", "pairedAgeMs"]);
     expect(JSON.stringify(pairing)).not.toContain(code);
   });
 });

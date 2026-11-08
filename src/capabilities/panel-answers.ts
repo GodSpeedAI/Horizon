@@ -6,6 +6,9 @@
  */
 import { createHash } from "node:crypto";
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
+import { newRowRecord } from "./conversation.ts";
+import { checkReassign } from "./question-rules.ts";
+import type { Who } from "./notes.ts";
 
 export const PANEL_ANSWERS_COLLECTION = "horizon-panel-answers";
 export const OUTCOMES = ["answered", "deferred", "cancelled"] as const;
@@ -203,4 +206,43 @@ export async function agreedFingerprintOf(store: DurableStore, panelId: string, 
 export async function rememberAgreed(store: DurableStore, tenant: string, panelId: string, ask: string, fingerprint: string, now: Date): Promise<void> {
   if ((await agreedFingerprintOf(store, panelId, ask)) !== null) return;
   await store.commit({ appends: [], records: [{ collection: AGREED_COLLECTION, id: agreedId(panelId, ask), expectedVersion: 0, value: { tenant, panel_id: panelId, ask, fingerprint, at: now.toISOString() } as unknown as { readonly [key: string]: Json } }] });
+}
+
+export const NOTHING_SENT = "Nothing was sent. Try again.";
+
+/**
+ * The person moves a question that waits for an agent to another registered agent. Every answer record of that question takes the
+ * new owner, and the conversation row that names both display names is written in the same commit. The commit is refused as a whole
+ * if any record has moved since it was read. The caller checks the pairing, the target and the second confirm (see checkReassign).
+ */
+export async function reassignOwner(
+  store: DurableStore,
+  input: {
+    readonly tenant: string; readonly panel_id: string; readonly ask: string; readonly question: string;
+    readonly from_key: string; readonly to_key: string; readonly from_name: string; readonly to_name: string;
+    readonly paired: boolean; readonly pairedAgeMs: number | null; readonly targetRegistered: boolean; readonly confirmed: boolean;
+    readonly who: Who; readonly now: Date;
+  },
+): Promise<{ readonly ok: true; readonly changed: number } | { readonly ok: false; readonly message: string }> {
+  const rows = (await listAnswers(store, input.tenant, input.panel_id)).filter((a) => a.ask === input.ask);
+  const waiting = rows.filter(waitsForAgent).at(-1);
+  if (waiting === undefined) return { ok: false, message: "No answer is waiting for an agent on that question, so there is no owner to change. Nothing was changed." };
+  const state = { owner_key: waiting.owner_key ?? null, fingerprint: waiting.fingerprint ?? null, outcome: waiting.outcome, replied: waiting.replied, waiting_on: waiting.waiting_on ?? "agent", history: waiting.history ?? [], routed_as: waiting.routed_as ?? null, version: waiting.version ?? null } as const;
+  if (state.owner_key !== input.from_key) return { ok: false, message: "The owner changed while you were looking. Look again, then try. Nothing was changed." };
+  const verdict = checkReassign({ state, paired: input.paired, pairedAgeMs: input.pairedAgeMs ?? Number.POSITIVE_INFINITY, newOwnerKey: input.to_key, targetRegistered: input.targetRegistered, confirmed: input.confirmed });
+  if (!verdict.ok) return { ok: false, message: verdict.message };
+  const records: { readonly collection: string; readonly id: string; readonly expectedVersion: number; readonly value: { readonly [key: string]: Json } }[] = [];
+  for (const row of rows) {
+    const current = await store.getRecord(PANEL_ANSWERS_COLLECTION, idOf(row.panel_id, row.n));
+    if (current === null || current === undefined) continue;
+    records.push({ collection: PANEL_ANSWERS_COLLECTION, id: idOf(row.panel_id, row.n), expectedVersion: current.version, value: { ...row, owner_key: input.to_key, asked_by_key: input.to_key, asked_by: input.to_name } as unknown as { readonly [key: string]: Json } });
+  }
+  const when = input.now.toISOString();
+  const row = newRowRecord(input.who, { source: "you", kind: "answer", words: `Moved the question "${input.question}" from ${input.from_name} to ${input.to_name}.`, outcome: `${input.to_name} now answers for it, since ${when}. Its answer is still waiting for them to say where it went.`, status: "waiting" }, input.now);
+  try {
+    await store.commit({ appends: [], records: [...records, row] });
+  } catch {
+    return { ok: false, message: NOTHING_SENT };
+  }
+  return { ok: true, changed: records.length };
 }
