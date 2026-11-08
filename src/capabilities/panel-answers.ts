@@ -9,7 +9,7 @@
 import { createHash } from "node:crypto";
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
 import { answerRowOf, newRowRecord, planAppend, planUpdate, type RowWrite } from "./conversation.ts";
-import { checkAnswer, checkReassign, checkRoute, checkRouteWords, checkStopWaiting, compatOf, finishedByOf, MAX_ROUTE_WORDS, MIN_ROUTE_WORDS, NO_ANSWER_WAITING, statusOfLegacy, TOO_SHORT_ROUTE, type FinishedBy, type QuestionState, type QuestionStatus, type WaitingOn } from "./question-rules.ts";
+import { checkAnswer, checkReassign, checkRoute, checkRouteWords, checkStopWaiting, compatOf, finishedByOf, LEGACY_DEFERRED, MAX_ROUTE_WORDS, MIN_ROUTE_WORDS, NO_ANSWER_WAITING, statusOfLegacy, TOO_SHORT_ROUTE, type FinishedBy, type QuestionState, type QuestionStatus, type WaitingOn } from "./question-rules.ts";
 import type { Who } from "./notes.ts";
 import type { CommitRecord } from "./panel-records.ts";
 
@@ -489,6 +489,28 @@ export async function migrateReconcile(store: DurableStore, tenant: string): Pro
     const id = conflictIdOf(panel_id, ask);
     if (await conflictOf(store, panel_id, ask)) continue;
     records.push({ collection: PANEL_ANSWERS_COLLECTION, id, expectedVersion: 0, value: { tenant, panel_id, ask, answers: answers.map((a) => a.n), owners: [...new Set(answers.map((a) => a.owner_key ?? null))].map((k) => k ?? "") } as { readonly [key: string]: Json } });
+  }
+  if (records.length > 0) await store.commit({ appends: [], records });
+  return records.length;
+}
+
+/**
+ * Migration (finding R3-6). An origin/main answer with outcome "deferred" was a "not yet": it waits for nobody. Before it was recognised,
+ * it was read as waiting for the agent, so a republish left it deferred and blocked the step. This repairs every stored record that still
+ * carries the legacy outcome: it becomes put off, its outcome is cleared as a new "not yet" clears it, and its history names the deferral.
+ * Runs once per tenant (the version is the list's next number); a second run finds no legacy outcome and writes nothing. Returns how many
+ * records it wrote.
+ */
+export async function migrateDeferredAnswers(store: DurableStore, tenant: string): Promise<number> {
+  const records: CommitRecord[] = [];
+  for (const row of await store.listRecords(PANEL_ANSWERS_COLLECTION, { tenant })) {
+    if (!row.id.startsWith("answer:")) continue;
+    const value = row.value as { readonly [key: string]: unknown };
+    if (value.outcome !== LEGACY_DEFERRED) continue;
+    const at = typeof value.at === "string" ? value.at : new Date(0).toISOString();
+    const history = Array.isArray(value.history) ? (value.history as { readonly outcome?: unknown }[]) : [];
+    const kept = history.some((h) => h.outcome === LEGACY_DEFERRED) ? history : [...history, { outcome: LEGACY_DEFERRED, at }];
+    records.push({ collection: PANEL_ANSWERS_COLLECTION, id: row.id, expectedVersion: row.version, value: storedOf({ ...value, outcome: null, value: null, state: "put_off", finished_by: null, history: kept }) });
   }
   if (records.length > 0) await store.commit({ appends: [], records });
   return records.length;

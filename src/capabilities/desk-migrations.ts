@@ -6,7 +6,7 @@
  * are still being moved. The whole run is one command in the desk's queue (`queue`), so no panel command runs between two migrations.
  */
 import type { DurableStore } from "@godspeedai/cognate-events";
-import { migratePreUpgradeAnswers, migrateAnswerStates, migrateReconcile, migrateSealedQuestions, type PanelQueue } from "./panel-answers.ts";
+import { migrateDeferredAnswers, migratePreUpgradeAnswers, migrateAnswerStates, migrateReconcile, migrateSealedQuestions, type PanelQueue } from "./panel-answers.ts";
 import { migrateQuestionStates } from "./panel-records.ts";
 
 export const MIGRATION_COLLECTION = "horizon-desk-migrations";
@@ -26,6 +26,7 @@ export const DESK_MIGRATIONS: readonly DeskMigration[] = [
   { version: 3, name: "question states", run: (store, tenant) => migrateQuestionStates(store, tenant) },
   { version: 4, name: "sealed questions", run: (store, tenant) => migrateSealedQuestions(store, tenant) },
   { version: 5, name: "reconciled identities", run: (store, tenant) => migrateReconcile(store, tenant) },
+  { version: 6, name: "answers put off before the upgrade", run: (store, tenant) => migrateDeferredAnswers(store, tenant) },
 ];
 
 const markerId = (tenant: string): string => `marker:${tenant}`;

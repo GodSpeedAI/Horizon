@@ -10,7 +10,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
-import { listAnswers, migrateAnswerStates, NOTHING_SENT, PANEL_ANSWERS_COLLECTION, QuestionAlreadyAnswered, recordAnswer, STOPPED_ROW } from "../src/capabilities/panel-answers.ts";
+import { acceptanceBlocked, listAnswers, migrateAnswerStates, NOTHING_SENT, PANEL_ANSWERS_COLLECTION, QuestionAlreadyAnswered, recordAnswer, STOPPED_ROW } from "../src/capabilities/panel-answers.ts";
+import { runDeskMigrations } from "../src/capabilities/desk-migrations.ts";
 import { compatOf, finishedByOf, legalTransition, SAME_ID_OTHER_WORDS, statusOfLegacy } from "../src/capabilities/question-rules.ts";
 import { CONVERSATION_COLLECTION } from "../src/capabilities/conversation.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
@@ -322,6 +323,30 @@ describe("states of answers written before this step", () => {
   test("statusOfLegacy keeps a state that is already stored", () => {
     expect(statusOfLegacy({ state: "withdrawn", outcome: null, replied: true })).toBe("withdrawn");
     expect(statusOfLegacy({ outcome: "answered", replied: false })).toBe("waiting_for_agent");
+  });
+
+  test("a legacy deferred answer is a put-off, and so is one already converted to waiting (R3-6)", async () => {
+    expect(statusOfLegacy({ outcome: "deferred", replied: false })).toBe("put_off");
+    const store = createMemoryStore();
+    await store.commit({ appends: [], records: [
+      legacy(1, "d", { outcome: "deferred", replied: false, routed_as: null }),
+      // Converted by an earlier build: stored as waiting for the agent, with the legacy outcome still on it.
+      legacy(2, "d", { outcome: "deferred", state: "waiting_for_agent", finished_by: null, history: [], routed_as: null }),
+      legacy(3, "d", { outcome: "answered", replied: false, waiting_on: "agent", routed_as: null }),
+    ] as never });
+    expect(await runDeskMigrations(store, tenant, new Date(), async (c) => c())).toEqual([1, 2, 3, 4, 5, 6]);
+    const rows = await listAnswers(store, tenant, "d");
+    expect(rows.map((r) => [r.n, r.state, r.outcome, r.replied, r.waiting_on])).toEqual([
+      [1, "put_off", null, true, "none"],
+      [2, "put_off", null, true, "none"],
+      [3, "waiting_for_agent", "answered", false, "agent"],
+    ]);
+    expect(rows[0]?.history).toEqual([{ outcome: "deferred", at: "2026-11-07T10:00:00.000Z" }]);
+    // The deferred answers do not block the step; the one that really waits does.
+    expect(acceptanceBlocked(rows.slice(0, 2), "s")).toBe(false);
+    expect(acceptanceBlocked(rows, "s")).toBe(true);
+    // Append-only: a second run finds nothing to repair.
+    expect(await runDeskMigrations(store, tenant, new Date(), async (c) => c())).toEqual([]);
   });
 });
 

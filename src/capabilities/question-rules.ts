@@ -70,6 +70,9 @@ export function finishedByOf(routedAs: string | null | undefined): FinishedBy {
   return typeof routedAs === "string" && routedAs.trim() !== "" && routedAs !== PRE_UPGRADE_ROUTE ? "reported" : "stopped";
 }
 
+/** The outcome origin/main stored for a "not yet" answer. Read as a put-off with deferred history (see `statusOfLegacy`). */
+export const LEGACY_DEFERRED = "deferred";
+
 /**
  * The state of an answer record. A record written with a `state` has that state. A record from before states existed is read
  * once by the rule that matches its old fields: an unanswered put-off is `put_off`; an answer that waits for the agent is
@@ -78,6 +81,8 @@ export function finishedByOf(routedAs: string | null | undefined): FinishedBy {
 export function statusOfLegacy(row: { readonly state?: unknown; readonly outcome?: string | null; readonly replied?: boolean; readonly waiting_on?: WaitingOn; readonly routed_as?: string | null }): QuestionStatus {
   if (typeof row.state === "string" && (QUESTION_STATES as readonly string[]).includes(row.state)) return row.state as QuestionStatus;
   if (row.outcome === null || row.outcome === undefined) return "put_off";
+  // The origin/main outcome "deferred" is a put-off, not an answer: it waits for nobody, and it reopens when the agent puts it up again.
+  if (row.outcome === LEGACY_DEFERRED) return "put_off";
   const waiting = row.waiting_on === "agent" || (row.waiting_on === undefined && row.replied !== true);
   return waiting ? "waiting_for_agent" : "finished";
 }
