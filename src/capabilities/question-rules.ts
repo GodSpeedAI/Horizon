@@ -1,7 +1,9 @@
 /**
  * The rules for an agent's question and the person's answer, as pure checks. No store, no clock, no I/O: each check takes the
  * record as it was read and says whether the operation may go ahead. The store commit that follows is written by the caller
- * (`panel-answers.ts`). Spec: `.agents/reports/v2-build/gaps/store-design-v2.md`, sections 3, 4 and 8.
+ * (`panel-answers.ts`), and the desk's in-memory board (`ui/desk/panels-model.ts`) calls the same checks. Spec:
+ * `.agents/reports/v2-build/gaps/store-design-v2.md`, sections 3, 4 and 8. Every plain-words refusal a store or board operation
+ * can give is a message in this file.
  */
 import { createHash } from "node:crypto";
 
@@ -28,10 +30,16 @@ export interface QuestionState {
 export type Verdict = { readonly ok: true } | { readonly ok: false; readonly message: string };
 
 export const MIN_ROUTE_WORDS = 6;
+export const MAX_ROUTE_WORDS = 300;
 export const PAIRING_MAX_AGE_MS = 10 * 60_000;
 
 /** The words the person's question shows when the question changed. */
 export const CHANGED_WORDS = "This question changed after you looked at it. Look again, then answer.";
+export const TOO_SHORT_ROUTE = "Say where the answer went in at least 6 characters, for example \"step handoff_0a49 in Seed: triage inbox\" or \"no action: <why>\".";
+export const TOO_LONG_ROUTE = `Keep "where it went" to ${MAX_ROUTE_WORDS} characters or fewer.`;
+export const NO_ANSWER_WAITING = "No answer to that question is waiting for the agent.";
+export const OTHER_AGENT_OWNS = "That question was asked by a different agent, so you cannot answer for it.";
+export const REQUIRED_CANNOT_WITHDRAW = "This question settles a decision, so only you can close it. The agent cannot take it back.";
 
 /** The question's own content, as far as its meaning goes. The id is the record key, so it is not part of the fingerprint. */
 export interface QuestionContent {
@@ -72,19 +80,31 @@ export function checkAnswer(input: { readonly state: QuestionState; readonly see
   return { ok: true };
 }
 
-/** The agent says where the answer went. Only the owner key, only while an answer waits for the agent, and at least 6 characters. */
-export function checkRoute(input: { readonly state: QuestionState; readonly callerKey: string; readonly routedAs: string }): Verdict {
-  if (input.state.owner_key !== input.callerKey) return refuse("That question was asked by a different agent, so you cannot answer for it.");
-  if (input.routedAs.trim().length < MIN_ROUTE_WORDS) return refuse(`Say where the answer went in at least ${MIN_ROUTE_WORDS} characters.`);
-  if (input.state.waiting_on !== "agent") return refuse("No answer to that question is waiting for the agent.");
+/** The length of the words an agent says where an answer went. Shared by the store and the board. */
+export function checkRouteWords(routedAs: unknown): Verdict {
+  const words = typeof routedAs === "string" ? routedAs.trim() : "";
+  if (words.length < MIN_ROUTE_WORDS) return refuse(TOO_SHORT_ROUTE);
+  if (words.length > MAX_ROUTE_WORDS) return refuse(TOO_LONG_ROUTE);
+  return { ok: true };
+}
+
+/**
+ * The agent says where the answer went. Owner key first, then the words, then the answer must be waiting for the agent. A question
+ * with no recorded owner (null) is refused for every real agent key, because no agent key is null.
+ */
+export function checkRoute(input: { readonly state: QuestionState; readonly callerKey: string | null; readonly routedAs: unknown }): Verdict {
+  if (input.state.owner_key !== input.callerKey) return refuse(OTHER_AGENT_OWNS);
+  const words = checkRouteWords(input.routedAs);
+  if (!words.ok) return words;
+  if (input.state.waiting_on !== "agent") return refuse(NO_ANSWER_WAITING);
   return { ok: true };
 }
 
 /** The agent withdraws a question: the owner only, unanswered only, never one that resolves a required step. */
 export function checkWithdraw(input: { readonly state: QuestionState; readonly callerKey: string; readonly resolvesRequiredStep: boolean }): Verdict {
   if (input.state.owner_key !== input.callerKey) return refuse("That question was asked by a different agent, so you cannot withdraw it.");
-  if (committed(input.state)) return refuse("This question was already answered, so it cannot be withdrawn.");
-  if (input.resolvesRequiredStep) return refuse("This question decides a step that must be done, so it cannot be withdrawn.");
+  if (committed(input.state)) return refuse("That question was already answered, so it cannot be withdrawn.");
+  if (input.resolvesRequiredStep) return refuse(REQUIRED_CANNOT_WITHDRAW);
   return { ok: true };
 }
 

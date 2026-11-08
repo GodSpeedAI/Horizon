@@ -8,7 +8,8 @@
  */
 export const MAX_OPEN_PANELS = 8;
 
-import { answerFor, MIN_ROUTED_AS, MAX_ROUTED_AS, TOO_SHORT_ROUTE } from "../../capabilities/panel-answers.ts";
+import { answerFor } from "../../capabilities/panel-answers.ts";
+import { checkRouteWords, checkWithdraw, REQUIRED_CANNOT_WITHDRAW, type QuestionState } from "../../capabilities/question-rules.ts";
 import { clip, itemOf, questionOf, toneOf, type PanelItem, type PanelTone, type QuestionItem } from "../surface2/panel-blocks.ts";
 
 export type Tone = PanelTone;
@@ -52,7 +53,7 @@ export type AgentOp =
   | { readonly tool: "answer.route"; readonly panel_id: string; readonly ask_id: string; readonly routed_as: string };
 
 export const MAX_WITHDRAW_REASON = 200;
-export const REQUIRED_CANNOT_WITHDRAW = "This question settles a decision, so only you can close it. The agent cannot take it back.";
+export { REQUIRED_CANNOT_WITHDRAW };
 export const QUESTION_CHANGED = "This question changed after you looked at it. Look again, then answer.";
 export const ANSWERED_CANNOT_CHANGE = "The person already answered this question, so it cannot be changed. Ask a new question with a different id.";
 /** A question the person answered (not put off, not skipped) is an agreement to those exact words. */
@@ -104,6 +105,18 @@ function admit(state: Panels, panel: Panel): Reduced {
 }
 
 const replace = (state: Panels, id: string, change: (p: Panel) => Panel): Panels => ({ ...state, open: state.open.map((p) => (same(p.id, id) ? change(p) : p)) });
+
+/** A question on the board as the rules read it. Committed means answered or cancelled: a question put off is still open. */
+const questionStateOfAsk = (ask: AskBlock): QuestionState => ({
+  owner_key: ask.asked_by_key ?? null,
+  fingerprint: null,
+  outcome: ask.answered !== null && ask.answered.outcome !== "deferred" ? ask.answered.outcome : null,
+  replied: false,
+  waiting_on: "none",
+  history: [],
+  routed_as: null,
+  version: ask.version ?? null,
+});
 
 /** The name an agent without one is known by. */
 export const UNNAMED_AGENT = "unnamed agent";
@@ -167,15 +180,16 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
       if (panel === undefined || ask === undefined) return refuse(state, "NOT_FOUND", "That question is not open.");
       const reason = typeof op.reason === "string" ? op.reason.trim() : "";
       if (reason === "" || reason.length > MAX_WITHDRAW_REASON) return refuse(state, "SCHEMA", `Say why you are withdrawing it, in 1 to ${MAX_WITHDRAW_REASON} characters.`);
-      if (ask.answered !== null) return refuse(state, "SCHEMA", "That question was already answered, so it cannot be withdrawn.");
-      // A question that names the decision it settles is a required decision: only the person closes it (Skip, or closing the panel).
-      if (ask.resolves) return refuse(state, "SCHEMA", REQUIRED_CANNOT_WITHDRAW);
+      // The owner, unanswered, and not a required decision (a question that names what it settles) are the rule's checks.
+      const verdict = checkWithdraw({ state: questionStateOfAsk(ask), callerKey: key, resolvesRequiredStep: Boolean(ask.resolves) });
+      if (!verdict.ok) return refuse(state, "SCHEMA", verdict.message);
       return { state: replace(state, panel.id, (p) => ({ ...p, blocks: p.blocks.map((b) => (b.kind === "question" && b.id === ask.id ? { ...b, withdrawn: { reason } } : b)) })), result: { ok: true, panel: panel.id } };
     }
     case "answer.route": {
       // The record of the answer lives in the store (`routeAnswer`); here the panel, if still open, shows where it went.
       const words = typeof op.routed_as === "string" ? op.routed_as.trim() : "";
-      if (words.length < MIN_ROUTED_AS || words.length > MAX_ROUTED_AS) return refuse(state, "SCHEMA", TOO_SHORT_ROUTE);
+      const routeWords = checkRouteWords(op.routed_as);
+      if (!routeWords.ok) return refuse(state, "SCHEMA", routeWords.message);
       const panel = state.open.find((p) => same(p.id, op.panel_id));
       const ask = panel?.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === op.ask_id);
       if (panel === undefined || ask === undefined || ask.answered === null) return { state, result: { ok: true, panel: op.panel_id } };

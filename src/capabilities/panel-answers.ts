@@ -7,8 +7,13 @@
 import { createHash } from "node:crypto";
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
 import { newRowRecord } from "./conversation.ts";
-import { checkReassign } from "./question-rules.ts";
+import { checkAnswer, checkReassign, checkRoute, checkRouteWords, checkStopWaiting, MAX_ROUTE_WORDS, MIN_ROUTE_WORDS, NO_ANSWER_WAITING, TOO_SHORT_ROUTE, type QuestionState } from "./question-rules.ts";
 import type { Who } from "./notes.ts";
+
+/** The route words' limits and refusal, as the rules define them (kept under these names for the desk's callers). */
+export const MIN_ROUTED_AS = MIN_ROUTE_WORDS;
+export const MAX_ROUTED_AS = MAX_ROUTE_WORDS;
+export { TOO_SHORT_ROUTE };
 
 export const PANEL_ANSWERS_COLLECTION = "horizon-panel-answers";
 export const OUTCOMES = ["answered", "deferred", "cancelled"] as const;
@@ -91,8 +96,13 @@ export async function recordAnswer(
   for (let attempt = 0; ; attempt += 1) {
     // The guard is the question's own record. Two answers that race both carry its version; the store refuses the second commit.
     const guard = await store.getRecord(PANEL_ANSWERS_COLLECTION, guardIdOf(input.panel_id, input.ask));
-    // A guard exists only once a committed answer (or cancel) is stored, so its presence refuses a new one.
-    if (committed && guard !== null && guard !== undefined) throw new QuestionAlreadyAnswered();
+    // A guard exists only once a committed answer (or cancel) is stored. The rule decides whether the question is still open.
+    // The version the person saw is checked by the desk's answer step (panels-model, reduceHuman), not here: the store has
+    // no version to compare with until an answer is committed, so this check passes the version through unchanged.
+    if (committed) {
+      const state: QuestionState = { owner_key: input.asked_by_key ?? null, fingerprint: input.fingerprint ?? null, outcome: guard ? String((guard.value as { outcome?: unknown }).outcome) : null, replied: false, waiting_on: "none", history: [], routed_as: null, version: null };
+      if (!checkAnswer({ state, seenVersion: null }).ok) throw new QuestionAlreadyAnswered();
+    }
     const existing = await listAnswers(store, input.tenant, input.panel_id);
     const n = (existing.at(-1)?.n ?? 0) + 1;
     // "Not yet" is not an answer: the outcome stays null, the question keeps its history, and nobody waits for it.
@@ -116,32 +126,38 @@ export async function recordAnswer(
   }
 }
 
-async function markWhere(store: DurableStore, tenant: string, pick: (a: PanelAnswer) => boolean, note: string | null, routedAs: string | null = null): Promise<number> {
-  let changed = 0;
-  for (const a of await listAnswers(store, tenant)) {
-    if (a.replied || !pick(a)) continue;
-    const row = await store.getRecord(PANEL_ANSWERS_COLLECTION, idOf(a.panel_id, a.n));
-    if (row === null || row === undefined) continue;
-    await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(a.panel_id, a.n), expectedVersion: row.version, value: { ...a, replied: true, waiting_on: "none", routed_as: routedAs, note: a.note ?? note } as unknown as { readonly [key: string]: Json } }] });
-    changed += 1;
-  }
-  return changed;
+/** An answer record as the rules read it. */
+export function answerState(a: PanelAnswer): QuestionState {
+  return { owner_key: a.owner_key ?? null, fingerprint: a.fingerprint ?? null, outcome: a.outcome, replied: a.replied, waiting_on: a.waiting_on ?? "none", history: a.history ?? [], routed_as: a.routed_as ?? null, version: a.version ?? null };
 }
 
-export const MIN_ROUTED_AS = 6;
-export const MAX_ROUTED_AS = 300;
-export const TOO_SHORT_ROUTE = "Say where the answer went in at least 6 characters, for example \"step handoff_0a49 in Seed: triage inbox\" or \"no action: <why>\".";
+/** Closes one answer that waits for the agent: it keeps its words, and its note or the given note. Returns false if it has gone. */
+async function closeAnswer(store: DurableStore, a: PanelAnswer, note: string | null, routedAs: string | null): Promise<boolean> {
+  const row = await store.getRecord(PANEL_ANSWERS_COLLECTION, idOf(a.panel_id, a.n));
+  if (row === null || row === undefined) return false;
+  await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(a.panel_id, a.n), expectedVersion: row.version, value: { ...a, replied: true, waiting_on: "none", routed_as: routedAs, note: a.note ?? note } as unknown as { readonly [key: string]: Json } }] });
+  return true;
+}
 
 /**
- * The agent says where an answer went: `answer.route { panel_id, ask_id, routed_as }`. Every open answer to that question is
- * closed and keeps the words. A `routed_as` that is too short is refused and nothing changes.
+ * The agent says where an answer went: `answer.route { panel_id, ask_id, routed_as }`. Every answer to that question that waits for
+ * the agent is closed and keeps the words. `callerKey` is the agent key asking; the owner, the words and the waiting state are
+ * checked by `checkRoute`. Without a `callerKey` (the store's own call, not the agent door) the owner is not checked.
  */
-export async function routeAnswer(store: DurableStore, tenant: string, panelId: string, askId: string, routedAs: unknown): Promise<{ readonly ok: true; readonly closed: number } | { readonly ok: false; readonly message: string }> {
+export async function routeAnswer(store: DurableStore, tenant: string, panelId: string, askId: string, routedAs: unknown, callerKey?: string): Promise<{ readonly ok: true; readonly closed: number } | { readonly ok: false; readonly message: string }> {
+  const rows = (await listAnswers(store, tenant, panelId)).filter((a) => a.ask === askId);
+  const target = rows.filter(waitsForAgent).at(-1) ?? rows.at(-1);
+  if (target === undefined) {
+    const words = checkRouteWords(routedAs);
+    return words.ok ? { ok: false, message: NO_ANSWER_WAITING } : { ok: false, message: words.message };
+  }
+  const state = answerState(target);
+  const verdict = checkRoute({ state, callerKey: callerKey ?? state.owner_key, routedAs });
+  if (!verdict.ok) return { ok: false, message: verdict.message };
   const words = typeof routedAs === "string" ? routedAs.trim() : "";
-  if (words.length < MIN_ROUTED_AS) return { ok: false, message: TOO_SHORT_ROUTE };
-  if (words.length > MAX_ROUTED_AS) return { ok: false, message: `Keep "where it went" to ${MAX_ROUTED_AS} characters or fewer.` };
-  const closed = await markWhere(store, tenant, (a) => a.panel_id === panelId && a.ask === askId, null, words);
-  return closed === 0 ? { ok: false, message: "No answer to that question is waiting for the agent." } : { ok: true, closed };
+  let closed = 0;
+  for (const a of rows.filter(waitsForAgent)) if (await closeAnswer(store, a, null, words)) closed += 1;
+  return closed === 0 ? { ok: false, message: NO_ANSWER_WAITING } : { ok: true, closed };
 }
 
 /** What an ask offers, as far as checking an answer needs it. */
@@ -178,7 +194,15 @@ export function answerFor(ask: AskShape, value: unknown): { readonly ok: true; r
 }
 
 /** The operator chose to stop waiting for the agent about this step. Kept in the record so it is not mistaken for a reply. */
-export const stopWaiting = (store: DurableStore, tenant: string, step: string): Promise<number> => markWhere(store, tenant, (a) => a.step === step, "You chose to stop waiting for the agent.");
+/** The operator stops waiting: every answer on the step that waits for the agent is closed, if the rule allows it. */
+export async function stopWaiting(store: DurableStore, tenant: string, step: string): Promise<number> {
+  let changed = 0;
+  for (const a of await listAnswers(store, tenant)) {
+    if (a.step !== step || !checkStopWaiting({ state: answerState(a) }).ok) continue;
+    if (await closeAnswer(store, a, "You chose to stop waiting for the agent.", null)) changed += 1;
+  }
+  return changed;
+}
 
 /**
  * The one test for whether an answer waits for the agent: `waiting_on = agent`. A record written before `waiting_on` existed reads as

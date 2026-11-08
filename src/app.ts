@@ -88,7 +88,7 @@ import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/wor
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
 import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
-import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, listAnswers, migratePreUpgradeAnswers, QuestionAlreadyAnswered, recordAnswer, routeAnswer, stopWaiting, checkValue, reassignOwner, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
+import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, migratePreUpgradeAnswers, QuestionAlreadyAnswered, recordAnswer, routeAnswer, stopWaiting, checkValue, reassignOwner, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
 import { ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
@@ -105,7 +105,7 @@ import { recordReader, type RecordReader } from "./adapters/realitytrace-economi
 import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
 import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, PAIR_FIRST_WORDS, printPairingCode } from "./desk/pairing.ts";
 import { DEFAULT_AGENT_KEY_ID, DEFAULT_AGENT_NAME, ownerOfKey, readRegistry } from "./desk/agent-keys.ts";
-import { questionFingerprint } from "./capabilities/question-rules.ts";
+import { checkWithdraw, questionFingerprint } from "./capabilities/question-rules.ts";
 import { noteNotRecorded, notRecordedWarnings } from "./capabilities/reconciliation.ts";
 import { setupMapping } from "./config/setup.ts";
 import type { RecordSource } from "./config/types.ts";
@@ -1912,18 +1912,22 @@ export async function createApplication(
     // An agent reads only the answers to the questions it asked itself.
     // Ownership is the key id that put the question up, never the display name: a name is a label any caller can send.
     if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.asked_by_key === keyId) };
-    if (op.tool === "answer.route" || op.tool === "ask.withdraw") {
-      // A question that exists and was put up by another key (or by none, if it predates keys) is not this agent's to route or withdraw.
-      const block = panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.find((b) => b.kind === "question" && b.id === op.ask_id) as { asked_by_key?: string | null } | undefined;
-      const record = block === undefined ? (await listAnswers(runtime.runtime.store, caller.tenant, op.panel_id)).find((a) => a.ask === op.ask_id) : undefined;
-      const owner = block !== undefined ? block.asked_by_key ?? null : record !== undefined ? record.asked_by_key ?? null : undefined;
-      if (owner !== undefined && owner !== keyId) return { ok: false, code: "SCHEMA", message: "That question was asked by a different agent, so you cannot answer for it." };
+    if (op.tool === "ask.withdraw") {
+      // A question still on the board is checked by the rule inside the board's withdraw (reduceAgent). One that is only on record
+      // (its panel is closed) is checked here, with the same rule, before the board says it is not open.
+      const onBoard = panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.some((b) => b.kind === "question" && b.id === op.ask_id) ?? false;
+      const record = onBoard ? undefined : (await listAnswers(runtime.runtime.store, caller.tenant, op.panel_id)).find((a) => a.ask === op.ask_id);
+      if (record !== undefined) {
+        const verdict = checkWithdraw({ state: answerState(record), callerKey: keyId, resolvesRequiredStep: false });
+        if (!verdict.ok) return { ok: false, code: "SCHEMA", message: verdict.message };
+      }
     }
     // A question the person agreed to cannot be recreated with other words, even after its panel was removed or the desk restarted.
     if (await agreedAltered(op)) return { ok: false, code: "SCHEMA", message: ANSWERED_CANNOT_CHANGE };
     // Only the agent saying where an answer went closes it; nothing else counts as a reply.
     if (op.tool === "answer.route") {
-      const routed = await routeAnswer(runtime.runtime.store, caller.tenant, op.panel_id, op.ask_id, op.routed_as);
+      // The owner, the words and the waiting state are checked by the rule inside routeAnswer, for this key.
+      const routed = await routeAnswer(runtime.runtime.store, caller.tenant, op.panel_id, op.ask_id, op.routed_as, keyId);
       if (!routed.ok) return { ok: false, code: "SCHEMA", message: routed.message };
     }
     const question = op.tool === "answer.route" || op.tool === "ask.withdraw" ? askOf(op.panel_id, op.ask_id)?.question ?? null : null;
