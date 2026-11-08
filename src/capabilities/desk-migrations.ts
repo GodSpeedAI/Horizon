@@ -6,7 +6,7 @@
  * are still being moved. The whole run is one command in the desk's queue (`queue`), so no panel command runs between two migrations.
  */
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
-import { AGREED_COLLECTION, agreedId, answerIdOf, conflictIdOf, guardIdOf, migrateDeferredAnswers, migratePreUpgradeAnswers, migrateAnswerStates, migrateReconcile, migrateSealedQuestions, PANEL_ANSWERS_COLLECTION, type PanelQueue } from "./panel-answers.ts";
+import { AGREED_COLLECTION, agreedId, answerIdOf, conflictIdOf, guardIdOf, migrateConflictRepair, migrateDeferredAnswers,migratePreUpgradeAnswers, migrateAnswerStates, migrateReconcile, migrateSealedQuestions, PANEL_ANSWERS_COLLECTION, type PanelQueue } from "./panel-answers.ts";
 import { BOARD_COLLECTION, boardIdOf, type CommitRecord, migrateQuestionStates, PANELS_COLLECTION, panelIdOf, parseDeskScope } from "./panel-records.ts";
 import { REQUESTS_COLLECTION, requestIdOf } from "./desk-requests.ts";
 
@@ -35,6 +35,7 @@ export const DESK_MIGRATIONS: readonly DeskMigration[] = [
   { version: 5, name: "reconciled identities", run: (store, tenant) => migrateReconcile(store, tenant) },
   { version: 6, name: "answers put off before the upgrade", run: (store, tenant) => migrateDeferredAnswers(store, tenant) },
   { version: 7, name: "operator scope", layout: true, run: (store, tenant, _now, sole) => migrateOperatorScope(store, tenant, sole) },
+  { version: 8, name: "conflicts from deferred answers", run: (store, tenant) => migrateConflictRepair(store, tenant) },
 ];
 
 const markerId = (tenant: string): string => `marker:${tenant}`;

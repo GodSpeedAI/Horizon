@@ -461,7 +461,7 @@ export const CONFLICTED_WORDS = "Two answers to this question disagree about its
 /** Whether the question's answers were marked as contradictory. Reads only. */
 export async function conflictOf(store: DurableStore, tenant: string, panelId: string, askId: string): Promise<boolean> {
   const row = await store.getRecord(PANEL_ANSWERS_COLLECTION, conflictIdOf(tenant, panelId, askId));
-  return row !== null && row !== undefined;
+  return row !== null && row !== undefined && (row.value as { readonly cleared?: unknown }).cleared !== true;
 }
 
 /** Every question whose stored answers were marked as contradictory, with the answer numbers they hold. Reads only. */
@@ -469,8 +469,8 @@ export async function listConflicts(store: DurableStore, tenant: string): Promis
   const out: { readonly panel_id: string; readonly ask: string; readonly answers: readonly number[] }[] = [];
   for (const row of await store.listRecords(PANEL_ANSWERS_COLLECTION, { tenant })) {
     if (!row.id.startsWith("conflict:")) continue;
-    const value = row.value as { readonly panel_id?: unknown; readonly ask?: unknown; readonly answers?: unknown };
-    if (typeof value.panel_id !== "string" || typeof value.ask !== "string") continue;
+    const value = row.value as { readonly panel_id?: unknown; readonly ask?: unknown; readonly answers?: unknown; readonly cleared?: unknown };
+    if (value.cleared === true || typeof value.panel_id !== "string" || typeof value.ask !== "string") continue;
     out.push({ panel_id: value.panel_id, ask: value.ask, answers: Array.isArray(value.answers) ? value.answers.filter((n): n is number => typeof n === "number") : [] });
   }
   return out.sort((a, b) => (a.panel_id === b.panel_id ? (a.ask < b.ask ? -1 : a.ask > b.ask ? 1 : 0) : a.panel_id < b.panel_id ? -1 : 1));
@@ -497,7 +497,8 @@ export async function migrateReconcile(store: DurableStore, tenant: string): Pro
   }
   const groups = new Map<string, PanelAnswer[]>();
   for (const a of await listAnswers(store, tenant)) {
-    if (a.outcome === null) continue;
+    // Only a committed answer or cancel can contradict another. A legacy "deferred" record is a not-yet and never counts (R4-3).
+    if (a.outcome !== "answered" && a.outcome !== "cancelled") continue;
     const key = `${a.panel_id}\n${a.ask}`;
     groups.set(key, [...(groups.get(key) ?? []), a]);
   }
@@ -506,8 +507,36 @@ export async function migrateReconcile(store: DurableStore, tenant: string): Pro
     if (distinct.size < 2) continue;
     const { panel_id, ask } = answers[0]!;
     const id = conflictIdOf(tenant, panel_id, ask);
-    if (await conflictOf(store, tenant, panel_id, ask)) continue;
+    if (await store.getRecord(PANEL_ANSWERS_COLLECTION, id)) continue;
     records.push({ collection: PANEL_ANSWERS_COLLECTION, id, expectedVersion: 0, value: { tenant, panel_id, ask, answers: answers.map((a) => a.n), owners: [...new Set(answers.map((a) => a.owner_key ?? null))].map((k) => k ?? "") } as { readonly [key: string]: Json } });
+  }
+  if (records.length > 0) await store.commit({ appends: [], records });
+  return records.length;
+}
+
+/** The version of the repair that clears conflict markers migration 5 wrongly raised (desk-migrations.ts, version 8). */
+export const CONFLICT_REPAIR_VERSION = 8;
+
+/**
+ * Migration 8 (finding R4-3). Migration 5 counted a legacy "deferred" record as a committed answer, so a "not yet" followed by a real answer
+ * was marked as a contradiction and routing refused a question with one committed answer. This recomputes every conflict marker over the
+ * committed answers (answered or cancelled) only. A marker whose committed answers no longer disagree is marked `cleared` with this version:
+ * the marker is not deleted, and no answer record is rewritten. A marker that still disagrees (a genuine contradiction) is left as it is.
+ * Runs once; a second run finds every marker already cleared or still genuine, and writes nothing. Returns how many markers it wrote.
+ */
+export async function migrateConflictRepair(store: DurableStore, tenant: string): Promise<number> {
+  const answers = await listAnswers(store, tenant);
+  const records: CommitRecord[] = [];
+  for (const row of await store.listRecords(PANEL_ANSWERS_COLLECTION, { tenant })) {
+    if (!row.id.startsWith("conflict:")) continue;
+    const value = row.value as { readonly [key: string]: Json };
+    if (value.cleared === true || typeof value.panel_id !== "string" || typeof value.ask !== "string") continue;
+    const panel = value.panel_id;
+    const ask = value.ask;
+    const committed = answers.filter((a) => a.panel_id === panel && a.ask === ask && (a.outcome === "answered" || a.outcome === "cancelled"));
+    const distinct = new Set(committed.map((a) => JSON.stringify([a.owner_key ?? null, a.outcome, a.value ?? null])));
+    if (distinct.size >= 2) continue;
+    records.push({ collection: PANEL_ANSWERS_COLLECTION, id: row.id, expectedVersion: row.version, value: { ...value, cleared: true, cleared_by: CONFLICT_REPAIR_VERSION } });
   }
   if (records.length > 0) await store.commit({ appends: [], records });
   return records.length;
