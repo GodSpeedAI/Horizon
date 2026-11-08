@@ -4,8 +4,8 @@
  * a process that died does not block the next start. The tests start real application instances on one SQLite file.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { acquireDeskLock, ALREADY_RUNNING_WORDS, DeskAlreadyRunning, LOCK_COLLECTION, LOCK_ID, storeLockPath } from "../src/capabilities/desk-lock.ts";
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { acquireDeskLock, acquireStoreLockFile, ALREADY_RUNNING_WORDS, DeskAlreadyRunning, LOCK_COLLECTION, LOCK_ID, releaseStoreLockFile, storeLockPath } from "../src/capabilities/desk-lock.ts";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
@@ -157,24 +157,22 @@ describe("the process-level lock file is checked before the store is opened", ()
     }
   };
 
-  test("a store at schema 3 with a live lock file is refused, and its schema version is still 3", async () => {
+  test("a store at schema 3 whose lock file is held is refused, and its schema version is still 3", async () => {
     const root = await stopAtSchema3();
     const path = join(root, "d.sqlite");
-    const lock = storeLockPath(path);
-    // A live process (this test's parent) holds the lock file. Its record in the store is not held, so only the file can refuse.
-    writeFileSync(lock, JSON.stringify({ pid: process.ppid, token: "other-desk", since: new Date().toISOString() }));
+    // Another start holds the kernel lock on the file. Its record in the store is not held, so only the file can refuse.
+    const held = await acquireStoreLockFile(path);
     try {
       expect(schemaVersion(path)).toBe(3);
       await expect(startDeskApp({ root })).rejects.toThrow(ALREADY_RUNNING_WORDS);
       expect(schemaVersion(path)).toBe(3);
-      // The refused start did not take the lock file over.
-      expect(existsSync(lock)).toBe(true);
+      expect(existsSync(storeLockPath(path))).toBe(true);
     } finally {
-      rmSync(lock, { force: true });
+      await releaseStoreLockFile(held);
     }
   });
 
-  test("a lock file whose process has gone is taken over, and removed when the desk stops", async () => {
+  test("a lock file left by a desk that died does not block the start, and the file is kept when the desk stops", async () => {
     const root = await stopAtSchema3();
     const path = join(root, "d.sqlite");
     const lock = storeLockPath(path);
@@ -182,9 +180,9 @@ describe("the process-level lock file is checked before the store is opened", ()
     const desk = await startDeskApp({ root });
     apps.push(desk);
     expect(schemaVersion(path)).toBe(4);
-    expect(JSON.parse(await Bun.file(lock).text())).toMatchObject({ pid: process.pid });
     await desk.stop();
     apps.splice(apps.indexOf(desk), 1);
-    expect(existsSync(lock)).toBe(false);
+    // The lock file is never removed: its lock is the kernel's, and removing it would let two starts lock different files.
+    expect(existsSync(lock)).toBe(true);
   });
 });

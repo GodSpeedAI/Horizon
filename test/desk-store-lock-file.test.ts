@@ -1,12 +1,15 @@
 /**
- * The process-level store lock file (`<store>.lock`). A stale file (its process has gone) is taken over, a live one refuses the start,
- * and two starts that both read the same stale file cannot both take it: exactly one holds the lock.
+ * The process-level store lock file (`<store>.lock`), held by the kernel through a `flock` child. Two starts in separate processes cannot
+ * both hold it; a holder that dies (SIGKILL) releases it; contenders never displace a live holder. The store-record lock is a second
+ * check and refuses a second holder in the same process.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import type { Subprocess } from "bun";
+import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { acquireStoreLockFile, DeskAlreadyRunning, lockIsStale, observeLockFile, storeLockPath, takeOverStaleLock } from "../src/capabilities/desk-lock.ts";
+import { acquireDeskLock, acquireStoreLockFile, DeskAlreadyRunning, FlockMissing, releaseDeskLock, releaseStoreLockFile, storeLockPath } from "../src/capabilities/desk-lock.ts";
+import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
 
 const dirs: string[] = [];
 const newStore = (): { readonly store: string; readonly lock: string } => {
@@ -15,57 +18,121 @@ const newStore = (): { readonly store: string; readonly lock: string } => {
   const store = join(dir, "d.sqlite");
   return { store, lock: storeLockPath(store) };
 };
-const stalePid = 2147483646; // no process has this id
 afterAll(() => {
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 });
 
+/** A separate process that tries the store lock file (see support/store-lock-holder.ts). */
+const HOLDER = join(import.meta.dir, "support", "store-lock-holder.ts");
+interface Start {
+  readonly proc: Subprocess<"pipe", "pipe", "pipe">;
+  /** The helper's first line: HELD, REFUSED or ERROR. */
+  readonly first: Promise<string>;
+}
+function start(store: string): Start {
+  const proc = Bun.spawn([process.execPath, HOLDER, store], { stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+  return { proc, first: firstLine(proc.stdout) };
+}
+async function firstLine(stream: ReadableStream<Uint8Array>): Promise<string> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  while (!text.includes("\n")) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    text += decoder.decode(value, { stream: true });
+  }
+  return text.split("\n")[0]!.trim();
+}
+/** Closes the helper's stdin, so a helper that holds the lock lets it go, and waits for it to exit. */
+async function stop(helper: Start): Promise<void> {
+  try {
+    helper.proc.stdin.end();
+  } catch {
+    // A helper that has already exited has no stdin left to close.
+  }
+  await helper.proc.exited;
+}
+
 describe("the store lock file", () => {
-  test("a lock file whose process has gone is taken over by a new start", () => {
-    const { store, lock } = newStore();
-    writeFileSync(lock, JSON.stringify({ pid: stalePid, token: "crashed-desk", since: "2026-11-01T00:00:00.000Z" }));
-    const taken = acquireStoreLockFile(store);
-    expect(JSON.parse(readFileSync(lock, "utf8"))).toMatchObject({ pid: process.pid, token: taken.token });
+  test("two acquirers in separate processes: exactly one gets the lock", async () => {
+    const { store } = newStore();
+    const a = start(store);
+    const b = start(store);
+    const outcomes = await Promise.all([a.first, b.first]);
+    expect([...outcomes].sort()).toEqual(["HELD", "REFUSED"]);
+    await stop(outcomes[0] === "HELD" ? a : b);
+    await stop(outcomes[0] === "HELD" ? b : a);
   });
 
-  test("a lock file whose process is alive refuses the start, and is left as it was", () => {
-    const { store, lock } = newStore();
-    // This test's parent is alive for as long as the test runs, and it is not this process.
-    const held = JSON.stringify({ pid: process.ppid, token: "other-desk", since: new Date().toISOString() });
-    writeFileSync(lock, held);
-    expect(() => acquireStoreLockFile(store)).toThrow(DeskAlreadyRunning);
-    expect(readFileSync(lock, "utf8")).toBe(held);
+  test("a holder killed with SIGKILL releases the lock, and a new start takes it", async () => {
+    const { store } = newStore();
+    const holder = start(store);
+    expect(await holder.first).toBe("HELD");
+    holder.proc.kill("SIGKILL");
+    await holder.proc.exited;
+    // The kernel drops the lock when the flock child sees its stdin close, which is just after the kill. A start in that moment is refused.
+    let next: Start | undefined;
+    let outcome = "";
+    for (let attempt = 0; attempt < 50 && outcome !== "HELD"; attempt += 1) {
+      if (next !== undefined) await stop(next);
+      next = start(store);
+      outcome = await next.first;
+      if (outcome !== "HELD") await Bun.sleep(100);
+    }
+    expect(outcome).toBe("HELD");
+    await stop(next!);
   });
 
-  test("two starts that both read the same stale lock: exactly one takes the lock", () => {
+  test("three contenders: none of them displaces a live holder", async () => {
     const { store, lock } = newStore();
-    writeFileSync(lock, JSON.stringify({ pid: stalePid, token: "crashed-desk", since: "2026-11-01T00:00:00.000Z" }));
-    // Both starts read the stale file before either removes it.
-    const seenByA = observeLockFile(lock);
-    const seenByB = observeLockFile(lock);
-    expect(seenByA).toBeDefined();
-    expect(seenByB).toBeDefined();
-    expect(lockIsStale(seenByA!)).toBe(true);
-    expect(lockIsStale(seenByB!)).toBe(true);
+    const holder = start(store);
+    expect(await holder.first).toBe("HELD");
+    const inode = statSync(lock).ino;
 
-    // A removes the stale file and takes a new lock.
-    expect(takeOverStaleLock(lock, seenByA!)).toBe(true);
-    const holderA = acquireStoreLockFile(store);
+    // Two more starts contend while the first is alive, and one more after them.
+    const contenders = [start(store), start(store)];
+    expect(await Promise.all(contenders.map((c) => c.first))).toEqual(["REFUSED", "REFUSED"]);
+    const late = start(store);
+    expect(await late.first).toBe("REFUSED");
 
-    // B resumes with its stale view. The file at the path is A's live lock, so B must not remove it.
-    expect(takeOverStaleLock(lock, seenByB!)).toBe(false);
-    expect(JSON.parse(readFileSync(lock, "utf8")).token).toBe(holderA.token);
-    // B's own start now refuses, and no moved copy of A's lock is left beside the file.
-    expect(() => acquireStoreLockFile(store)).toThrow(DeskAlreadyRunning);
-    expect(readdirSync(join(lock, "..")).filter((name) => name.includes(".claim-") || name.endsWith(".staging"))).toEqual([]);
-    expect(JSON.parse(readFileSync(lock, "utf8")).token).toBe(holderA.token);
-  });
-
-  test("a start leaves no staging file behind, whether it takes the lock or is refused", () => {
-    const { store, lock } = newStore();
-    const taken = acquireStoreLockFile(store);
-    expect(() => acquireStoreLockFile(store)).toThrow(DeskAlreadyRunning);
+    // The live holder's lock file is the same file (never renamed or replaced), and nothing else sits beside it.
+    expect(existsSync(lock)).toBe(true);
+    expect(statSync(lock).ino).toBe(inode);
     expect(readdirSync(join(lock, "..")).sort()).toEqual(["d.sqlite.lock"]);
-    expect(JSON.parse(readFileSync(lock, "utf8")).token).toBe(taken.token);
+    await stop(holder);
+  });
+
+  test("a leftover lock file does not block a start: only the kernel lock decides", async () => {
+    const { store, lock } = newStore();
+    // A file left by a desk that died, naming a process id: nothing is checked against it.
+    await Bun.write(lock, JSON.stringify({ pid: 2147483646, token: "crashed-desk", since: "2026-11-01T00:00:00.000Z" }));
+    const held = await acquireStoreLockFile(store);
+    await expect(acquireStoreLockFile(store)).rejects.toBeInstanceOf(DeskAlreadyRunning);
+    await releaseStoreLockFile(held);
+  });
+
+  test("the store record refuses a second holder in the same process, and a release lets the next one take it", async () => {
+    const { store } = newStore();
+    const db = openSqliteStore({ path: store });
+    const first = await acquireDeskLock(db);
+    await expect(acquireDeskLock(db)).rejects.toBeInstanceOf(DeskAlreadyRunning);
+    await releaseDeskLock(db, first);
+    const second = await acquireDeskLock(db);
+    expect(second).not.toBe(first);
+    await releaseDeskLock(db, second);
+    await db.close();
+  });
+
+  test("a missing flock command refuses the start with a clear message", async () => {
+    const { store, lock } = newStore();
+    const saved = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      await expect(acquireStoreLockFile(store)).rejects.toBeInstanceOf(FlockMissing);
+    } finally {
+      process.env.PATH = saved;
+    }
+    expect(existsSync(lock)).toBe(false);
   });
 });

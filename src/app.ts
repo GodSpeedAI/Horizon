@@ -436,12 +436,12 @@ export async function createApplication(
   // The process-level lock file comes before any open of the store: opening a store at an older schema migrates it, so a second desk
   // must be refused before that open (R3-4). The store's own record lock below stays as a second check.
   let storeLock: StoreLockFile | undefined;
-  if (!options.readOnly) storeLock = acquireStoreLockFile(storeFile);
+  if (!options.readOnly) storeLock = await acquireStoreLockFile(storeFile);
   let deskStore: DurableStore;
   try {
     deskStore = options.readOnly ? openReadOnlyStore(storeFile) : openSqliteStore({ path: storeFile });
   } catch (error) {
-    if (storeLock !== undefined) releaseStoreLockFile(storeLock);
+    if (storeLock !== undefined) await releaseStoreLockFile(storeLock);
     throw error;
   }
   let deskLockToken: string | undefined;
@@ -450,7 +450,7 @@ export async function createApplication(
       deskLockToken = await acquireDeskLock(deskStore);
     } catch (error) {
       await deskStore.close();
-      if (storeLock !== undefined) releaseStoreLockFile(storeLock);
+      if (storeLock !== undefined) await releaseStoreLockFile(storeLock);
       throw error;
     }
   }
@@ -487,7 +487,7 @@ export async function createApplication(
   }).catch(async (error: unknown): Promise<never> => {
     if (deskLockToken !== undefined) await releaseDeskLock(deskStore, deskLockToken);
     await deskStore.close();
-    if (storeLock !== undefined) releaseStoreLockFile(storeLock);
+    if (storeLock !== undefined) await releaseStoreLockFile(storeLock);
     throw error;
   });
   // A read-only open never migrates: until the desk has run every migration, its records cannot be surfaced read-only.
@@ -3382,7 +3382,7 @@ export async function createApplication(
       if (deskLockToken !== undefined) await releaseDeskLock(runtime.runtime.store, deskLockToken);
       await runtime.runtime.close();
       await deskStore.close();
-      if (storeLock !== undefined) releaseStoreLockFile(storeLock);
+      if (storeLock !== undefined) await releaseStoreLockFile(storeLock);
     },
   };
 }

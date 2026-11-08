@@ -8,7 +8,8 @@
  * without releasing it does not block the next start.
  */
 import { randomUUID } from "node:crypto";
-import { closeSync, fstatSync, linkSync, openSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync, type ChildProcessByStdio } from "node:child_process";
+import type { Readable, Writable } from "node:stream";
 import type { DurableStore } from "@godspeedai/cognate-events";
 
 export const LOCK_COLLECTION = "horizon-desk-lock";
@@ -67,128 +68,76 @@ export async function releaseDeskLock(store: DurableStore, token: string): Promi
 }
 
 /**
- * The process-level lock: a file next to the store (`<store>.lock`), taken before the store is opened at all. The store's own record
- * (above) lives inside the store, so a second desk would migrate an older store before that record could refuse it. This file is
- * checked first. It holds the owning process id and a random token.
+ * The process-level lock: a kernel-held advisory lock on `<store>.lock`, taken before the store is opened at all. Opening a store at an
+ * older schema migrates it, so a second desk must be refused before that open (R3-4). The store's own record lock (above) stays as a
+ * second check.
  *
- * The file is taken by a hard link, which is atomic: the holder's content is written to a staging file first, and `linkSync` to the
- * lock path fails with EEXIST when another start holds it. A held lock is never removed by a start that merely judged it stale: a
- * stale file is first renamed to a unique name (rename moves one inode, so only one start can move a given file), then the moved file
- * is checked against the one that was judged stale. A file that is not that one is put back.
+ * The lock is held by a `flock -n` child process (util-linux) on the lock file, for as long as the child's stdin stays open: its shell
+ * waits on `read`. Release closes stdin, so `read` ends, flock exits, and the kernel drops the lock. If the desk dies, its end of the
+ * pipe closes with it, and the kernel drops the lock the same way. Nothing is renamed, unlinked or judged by a process id to decide
+ * exclusion, so there is no stale lock to recover.
  */
+export const FLOCK_MISSING_WORDS = "Horizon needs the flock command (util-linux) to guard its database, and it is not installed. Install util-linux, then start again.";
+
+export class FlockMissing extends Error {
+  constructor() {
+    super(FLOCK_MISSING_WORDS);
+    this.name = "FlockMissing";
+  }
+}
+
+/** The held lock: the path of the lock file, and the flock child that holds it. Keep it open until the desk shuts down. */
 export interface StoreLockFile {
   readonly path: string;
-  readonly token: string;
+  readonly holder: ChildProcessByStdio<Writable, Readable, null>;
 }
 
 export function storeLockPath(storePath: string): string {
   return `${storePath}.lock`;
 }
 
-type LockHolder = { readonly pid?: unknown; readonly token?: unknown };
-
-/** One read of a lock file: its inode and exact content, and the holder that content names. */
-export interface LockObservation {
-  readonly ino: number;
-  readonly raw: string;
-  /** Undefined when the content cannot be read as a holder (it may be mid-write), which counts as live. */
-  readonly holder: LockHolder | undefined;
+function flockInstalled(): boolean {
+  return spawnSync("/bin/sh", ["-c", "command -v flock"], { stdio: "ignore" }).status === 0;
 }
 
-function parseHolder(raw: string): LockHolder | undefined {
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return typeof parsed === "object" && parsed !== null ? (parsed as LockHolder) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Reads the lock file at `path`, or undefined when there is no file. The inode and the content come from the same open file. */
-export function observeLockFile(path: string): LockObservation | undefined {
-  let fd: number;
-  try {
-    fd = openSync(path, "r");
-  } catch (error) {
-    if ((error as { code?: unknown }).code === "ENOENT") return undefined;
-    throw error;
-  }
-  try {
-    const ino = fstatSync(fd).ino;
-    const raw = readFileSync(fd, "utf8");
-    return { ino, raw, holder: parseHolder(raw) };
-  } finally {
-    closeSync(fd);
-  }
-}
-
-/** A lock is stale only when the process it names has gone and no token of this process holds it. */
-export function lockIsStale(observed: LockObservation): boolean {
-  const holder = observed.holder;
-  if (holder === undefined || typeof holder.pid !== "number") return false;
-  if (typeof holder.token === "string" && openTokens.has(holder.token)) return false;
-  return !processAlive(holder.pid);
-}
-
-/**
- * Removes the stale lock that `observed` describes, if it is still at `path`. Returns true when this call removed it. Returns false
- * when the file at `path` is not the one observed (another start took it in between): that file is put back, and the caller retries.
- */
-export function takeOverStaleLock(path: string, observed: LockObservation): boolean {
-  const claim = `${path}.claim-${randomUUID()}`;
-  try {
-    renameSync(path, claim);
-  } catch (error) {
-    if ((error as { code?: unknown }).code === "ENOENT") return false;
-    throw error;
-  }
-  const moved = observeLockFile(claim);
-  if (moved !== undefined && moved.ino === observed.ino && moved.raw === observed.raw) {
-    unlinkSync(claim);
-    return true;
-  }
-  // A live lock was moved. Put it back. If the path is taken again already, that start holds it and the moved copy is dropped.
-  try {
-    linkSync(claim, path);
-  } catch {
-    // The path is held by another start.
-  }
-  rmSync(claim, { force: true });
-  return false;
-}
-
-/** Takes the store's lock file, or throws DeskAlreadyRunning. Call this before the store is opened. */
-export function acquireStoreLockFile(storePath: string): StoreLockFile {
+/** Takes the store's lock file, or throws DeskAlreadyRunning when another start holds it. Call this before the store is opened. */
+export async function acquireStoreLockFile(storePath: string): Promise<StoreLockFile> {
+  if (!flockInstalled()) throw new FlockMissing();
   const path = storeLockPath(storePath);
-  const token = randomUUID();
-  const staging = `${path}.${token}.staging`;
-  writeFileSync(staging, JSON.stringify({ pid: process.pid, token, since: new Date().toISOString() }), { flag: "wx" });
-  try {
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      try {
-        linkSync(staging, path);
-        return { path, token };
-      } catch (error) {
-        if ((error as { code?: unknown }).code !== "EEXIST") throw error;
+  const holder = spawn("flock", ["-n", path, "-c", "echo LOCKED; read _"], { stdio: ["pipe", "pipe", "ignore"] });
+  // A holder that has already exited makes its stdin fail. That is not an error for the start.
+  holder.stdin.on("error", () => undefined);
+  return new Promise<StoreLockFile>((resolve, reject) => {
+    let out = "";
+    let settled = false;
+    holder.stdout.setEncoding("utf8");
+    holder.stdout.on("data", (chunk: string) => {
+      out += chunk;
+      if (!settled && out.includes("LOCKED\n")) {
+        settled = true;
+        resolve({ path, holder });
       }
-      const observed = observeLockFile(path);
-      if (observed === undefined) continue;
-      if (!lockIsStale(observed)) throw new DeskAlreadyRunning();
-      // The process that held it has gone: take the stale file over, then try the link again.
-      takeOverStaleLock(path, observed);
-    }
-    throw new DeskAlreadyRunning();
-  } finally {
-    rmSync(staging, { force: true });
-  }
+    });
+    holder.once("error", (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    });
+    // flock -n exits non-zero, without printing LOCKED, when another start holds the file.
+    holder.once("exit", () => {
+      if (settled) return;
+      settled = true;
+      reject(new DeskAlreadyRunning());
+    });
+  });
 }
 
-/** Removes the lock file, if it still holds this lock's token. Nothing is removed when another start has taken it. */
-export function releaseStoreLockFile(lock: StoreLockFile): void {
-  try {
-    if (observeLockFile(lock.path)?.holder?.token !== lock.token) return;
-    unlinkSync(lock.path);
-  } catch {
-    // Already gone: nothing to release.
-  }
+/** Gives the lock up: closes the holder's stdin so flock releases the file, and waits for the holder to exit. */
+export function releaseStoreLockFile(lock: StoreLockFile): Promise<void> {
+  const { holder } = lock;
+  if (holder.exitCode !== null || holder.signalCode !== null) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    holder.once("exit", () => resolve());
+    holder.stdin.end();
+  });
 }
