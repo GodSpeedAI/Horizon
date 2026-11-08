@@ -18,7 +18,7 @@ export interface DeskApp {
   readonly root: string;
 }
 
-export async function startDeskApp(options: { readonly repoPath?: string; readonly now?: () => Date; readonly approvals?: ApprovalAuthority; readonly economics?: EconomicsSource; readonly reader?: RecordReader; readonly workshop?: () => Access; readonly root?: string } = {}): Promise<DeskApp> {
+export async function startDeskApp(options: { readonly repoPath?: string; readonly now?: () => Date; readonly approvals?: ApprovalAuthority; readonly economics?: EconomicsSource; readonly reader?: RecordReader; readonly workshop?: () => Access; readonly root?: string; /** A promise the record migration waits for (a test holds it pending). */ readonly migrationHold?: Promise<unknown>; /** Default true: the call returns once the records are migrated, so a test can change them at once. */ readonly awaitMigration?: boolean } = {}): Promise<DeskApp> {
   const root = options.root ?? mkdtempSync(join(tmpdir(), "desk-"));
   const reader: RecordReader = options.reader ?? {
     repos: () => ({ ok: true, repos: options.repoPath ? [{ repo_id: "R1", path: options.repoPath }] : [] }),
@@ -39,11 +39,12 @@ export async function startDeskApp(options: { readonly repoPath?: string; readon
   };
   let application: HorizonApplication;
   try {
-    application = await createApplication({ configPath, recordReader: () => reader, deskRoot: join(root, "desk"), ...(options.approvals ? { approvals: options.approvals } : {}), ...(options.economics ? { economics: options.economics } : {}), ...(options.workshop ? { workshop: options.workshop } : {}), now: options.now ?? (() => new Date("2026-11-06T10:00:00Z")) });
+    application = await createApplication({ configPath, recordReader: () => reader, deskRoot: join(root, "desk"), ...(options.approvals ? { approvals: options.approvals } : {}), ...(options.economics ? { economics: options.economics } : {}), ...(options.workshop ? { workshop: options.workshop } : {}), ...(options.migrationHold ? { migrationHold: options.migrationHold } : {}), now: options.now ?? (() => new Date("2026-11-06T10:00:00Z")) });
   } catch (error) {
     restore();
     throw error;
   }
+  if (options.awaitMigration !== false) await application.migrated;
   const server = application.startServer(0);
   const base = `http://${server.hostname}:${server.port}`;
   return {

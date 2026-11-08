@@ -82,6 +82,7 @@ import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
 import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
 import { acquireDeskLock, releaseDeskLock } from "./capabilities/desk-lock.ts";
+import { DESK_MIGRATIONS, MIGRATING_WORDS, MIGRATION_FAILED_WORDS, runDeskMigrations } from "./capabilities/desk-migrations.ts";
 import { BAD_REQUEST_ID_WORDS, REUSED_REQUEST_WORDS, requestFingerprint, requestRecord, seenRequest, validRequestId } from "./capabilities/desk-requests.ts";
 import { answerRowOf, appendRow, discardRow, listConversation, panelRowOf, planAppend, planUpdate, settleDraftRow } from "./capabilities/conversation.ts";
 import { answerEcho, cleanAgentName, MAX_WAITING_PROPOSALS, TOO_MANY_PROPOSALS, WAITING_FOR_AGENT, type ConversationRow, type RowSource, type RowStage } from "./ui/desk/conversation-model.ts";
@@ -90,7 +91,7 @@ import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/wor
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
 import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
-import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, migrateAnswerStates, migratePreUpgradeAnswers, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
+import { acceptanceBlocked, agreedFingerprint, agreedFingerprintOf, answerFor, answerState, listAnswers, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
 import { ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, openPanelId, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
 import { boardWrites, loadBoard, PANEL_LOAD_WORDS, stateWrites, withStored, type CommitRecord } from "./capabilities/panel-records.ts";
@@ -306,6 +307,8 @@ export interface HorizonApplication {
   startObservation(commit: IntentCommit): Promise<RunView>;
   researchContract(): ReturnType<typeof requireResearch>;
   startServer(port?: number): HttpServer;
+  /** Resolves when the saved records are migrated. Until then every change is refused with words saying so (design v3, step 4). */
+  readonly migrated: Promise<void>;
   close(): Promise<void>;
 }
 
@@ -367,6 +370,8 @@ export async function createApplication(
     readonly delegationClient?: Pick<SeaForgeAuthority, "decide">;
     /** Stage 4: how work is handed to a workshop agent. Injected by tests; defaults to the workshop named in the config and its key file. */
     readonly workshop?: () => Access;
+    /** Test seam: a promise the desk's record migration waits for before it runs, so a test can hold a migration pending. */
+    readonly migrationHold?: Promise<unknown>;
   } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath);
@@ -1937,7 +1942,19 @@ export async function createApplication(
   }
   // Answers from before the upgrade with no owner are closed once, at start. Panel reads wait for that to finish.
   // The question states are written first (once per record); the pre-upgrade closing reads them.
-  const answersMigrated: Promise<number> = migrateAnswerStates(runtime.runtime.store, caller.tenant).catch(() => 0).then(() => migratePreUpgradeAnswers(runtime.runtime.store, caller.tenant, clock())).catch(() => 0);
+  // Design v3, step 4 (item 4): the records are migrated under a versioned marker. Until that run finishes, every change is refused with
+  // words saying so (503); a run that fails pauses changes for good until the desk restarts with the store fixed.
+  let migrationState: "running" | "done" | "failed" = "running";
+  const answersMigrated: Promise<void> = runDeskMigrations(runtime.runtime.store, caller.tenant, clock(), DESK_MIGRATIONS, options.migrationHold).then(
+    () => {
+      migrationState = "done";
+    },
+    (error: unknown) => {
+      migrationState = "failed";
+      console.error("desk: the saved records could not be migrated, so changes are paused", error instanceof Error ? error.name : "unknown");
+    },
+  );
+  const migrationRefusal = (): Response => Response.json({ ok: false, message: migrationState === "failed" ? MIGRATION_FAILED_WORDS : MIGRATING_WORDS }, { status: 503, headers: { "cache-control": "no-store" } });
 
   /** The question's own words and the open-question test for one panel, from the board. */
   const askOf = (panelId: string, askId: string): { readonly question: string } | null => {
@@ -2606,6 +2623,8 @@ export async function createApplication(
           // state-changing routes also check Origin and Sec-Fetch-Site (cross-site POSTs).
           const refused = crossSiteRefusal(request, server.port ?? port, request.method !== "POST");
           if (refused !== null) return refused;
+          // Reads are served while records are migrated; a change is refused until the migration has finished.
+          if (!READ_METHODS.has(request.method) && migrationState !== "done") return migrationRefusal();
           if (url.pathname.startsWith("/agent/panels")) return agentDoor(request, url.pathname);
           // Every read needs the pairing session, except the page itself, its session check and the static client bundle that pairs.
           // The page-agent header is a label, never a grant: an unpaired caller is refused whatever the header says.
@@ -3049,6 +3068,7 @@ export async function createApplication(
       }
       return server;
     },
+    migrated: answersMigrated,
     async close() {
       if (remote.listening) await remote.stop();
       for (const timer of windowTimers.values()) clearTimeout(timer);
