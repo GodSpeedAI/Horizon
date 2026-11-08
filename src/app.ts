@@ -104,6 +104,7 @@ import { readLedgerDay } from "./adapters/ledger-day.ts";
 import { recordReader, type RecordReader } from "./adapters/realitytrace-economics.ts";
 import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
 import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, PAIR_FIRST_WORDS, printPairingCode } from "./desk/pairing.ts";
+import { ownerOfKey } from "./desk/agent-keys.ts";
 import { setupMapping } from "./config/setup.ts";
 import type { RecordSource } from "./config/types.ts";
 import { existsSync as fileExists, mkdirSync as makeDir, readFileSync as readFileText, writeFileSync as writeFileText } from "node:fs";
@@ -1896,14 +1897,17 @@ export async function createApplication(
   }
 
   /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`, `ask.withdraw`, `answer.route`). To choose parts well an agent reads `GET /desk/panels/catalogue`. A reply on a panel clears the wait on the answers given there. */
-  async function applyAgentOp(op: AgentOp, agentName?: string): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
+  async function applyAgentOp(op: AgentOp, agentName?: string, keyId: string = UNKEYED_AGENT): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
     const who = agentName ?? UNNAMED_AGENT;
     // An agent reads only the answers to the questions it asked itself.
-    if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.asked_by === who) };
+    // Ownership is the key id that put the question up, never the display name: a name is a label any caller can send.
+    if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.asked_by_key === keyId) };
     if (op.tool === "answer.route" || op.tool === "ask.withdraw") {
-      const asker = (panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.find((b) => b.kind === "question" && b.id === op.ask_id) as { asked_by?: string | null } | undefined)?.asked_by
-        ?? (await listAnswers(runtime.runtime.store, caller.tenant, op.panel_id)).find((a) => a.ask === op.ask_id)?.asked_by;
-      if (asker !== undefined && asker !== null && asker !== who) return { ok: false, code: "SCHEMA", message: "That question was asked by a different agent, so you cannot answer for it." };
+      // A question that exists and was put up by another key (or by none, if it predates keys) is not this agent's to route or withdraw.
+      const block = panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.find((b) => b.kind === "question" && b.id === op.ask_id) as { asked_by_key?: string | null } | undefined;
+      const record = block === undefined ? (await listAnswers(runtime.runtime.store, caller.tenant, op.panel_id)).find((a) => a.ask === op.ask_id) : undefined;
+      const owner = block !== undefined ? block.asked_by_key ?? null : record !== undefined ? record.asked_by_key ?? null : undefined;
+      if (owner !== undefined && owner !== keyId) return { ok: false, code: "SCHEMA", message: "That question was asked by a different agent, so you cannot answer for it." };
     }
     // Only the agent saying where an answer went closes it; nothing else counts as a reply.
     if (op.tool === "answer.route") {
@@ -1911,7 +1915,7 @@ export async function createApplication(
       if (!routed.ok) return { ok: false, code: "SCHEMA", message: routed.message };
     }
     const question = op.tool === "answer.route" || op.tool === "ask.withdraw" ? askOf(op.panel_id, op.ask_id)?.question ?? null : null;
-    const { state, result } = reduceAgent(panelBoard, op, who);
+    const { state, result } = reduceAgent(panelBoard, op, who, keyId);
     if (!result.ok) return result;
     panelBoard = state;
     const by = agentName === undefined ? {} : { agent_name: agentName };
@@ -1941,22 +1945,22 @@ export async function createApplication(
 
   /**
    * The agents' door for panels: `POST /agent/panels` (one AgentOp), `GET /agent/panels/answers`, `GET /agent/panels/catalogue`.
-   * It needs `Authorization: Bearer <the agent key>`: a key Horizon keeps (mode 0600) in the setup's secrets folder as agent.key, the same across restarts.
-   * The page-agent header is not a key and is refused here. Only agent tools pass; the person's operations never do.
+   * It needs `Authorization: Bearer <an agent key>`. The setup's agent.key is the default agent; every other agent has its own key in the
+   * registry (agents.json, hashes only; `scripts/agent-key.ts add <name>` makes one). The key decides the owner of each question the
+   * agent puts up. The page-agent header is not a key and is refused here. Only agent tools pass; the person's operations never do.
    */
   const AGENT_TOOLS = ["show_surface", "ask_human", "arrange", "annotate", "read_responses", "ask.withdraw", "answer.route"] as const;
   async function agentDoor(request: Request, pathname: string): Promise<Response> {
     const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
     const refuse = (status: number, message: string): Response => Response.json({ ok: false, message }, { status, headers });
     const given = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
-    const a = Buffer.from(given);
-    const b = Buffer.from(loaded.agentKey);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return refuse(401, "This door needs the agent key. Send it as: Authorization: Bearer <key>. The key is in the setup's secrets folder, in agent.key.");
+    const owner = ownerOfKey(given, loaded.agentKey, loaded.agentRegistryPath);
+    if (owner === null) return refuse(401, "This door needs an agent key. Send it as: Authorization: Bearer <key>. The setup's default key is in the secrets folder, in agent.key; other agents' keys are shown once, when they are added.");
     if (pageAgentOf(request) !== null) return refuse(403, "An agent on the page cannot use this door.");
     const name = cleanAgentName(request.headers.get("x-horizon-agent-name"));
     if (pathname === "/agent/panels/catalogue" && request.method === "GET") return Response.json({ schema: SURFACE_SCHEMA, vocabulary: vocabulary(), blocks: CATALOGUE }, { headers });
     if (pathname === "/agent/panels/answers" && request.method === "GET") {
-      const done = await applyAgentOp({ tool: "read_responses" }, name);
+      const done = await applyAgentOp({ tool: "read_responses" }, name, owner.key_id);
       return Response.json({ ok: true, responses: done.ok ? done.responses ?? [] : [] }, { headers });
     }
     if (pathname !== "/agent/panels" || request.method !== "POST") return refuse(404, "There is nothing at this address. Use POST /agent/panels, GET /agent/panels/answers or GET /agent/panels/catalogue.");
@@ -1972,7 +1976,7 @@ export async function createApplication(
     if (op === null || typeof op !== "object" || Array.isArray(op)) return refuse(400, "Send one object with a \"tool\" field. Nothing was changed.");
     if (typeof op.op === "string" && op.op.startsWith("human.")) return refuse(403, "Only the person can do that. An agent cannot answer, pin, close or open a panel for them.");
     if (typeof op.tool !== "string" || !(AGENT_TOOLS as readonly string[]).includes(op.tool)) return refuse(400, `Say which tool: ${AGENT_TOOLS.join(", ")}. Nothing was changed.`);
-    const done = await applyAgentOp(op as unknown as AgentOp, name);
+    const done = await applyAgentOp(op as unknown as AgentOp, name, owner.key_id);
     return done.ok ? Response.json(done, { headers }) : Response.json(done, { status: done.code === "NOT_FOUND" ? 404 : 400, headers });
   }
 
@@ -1999,12 +2003,12 @@ export async function createApplication(
       const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note, ...(typeof body.version === "string" ? { version: body.version } : {}) });
       if (!result.ok) return fail(409, result.message);
       // Store what the question accepted (a text answer is trimmed), not the raw body.
-      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { version?: string; asked_by?: string | null; input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string }[] } | undefined;
+      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { version?: string; asked_by?: string | null; asked_by_key?: string | null; input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string }[] } | undefined;
       const checked = outcome === "answered" && askBlock !== undefined ? answerFor({ input: askBlock.input ?? "select", options: askBlock.options }, value.value) : null;
       if (checked !== null && !checked.ok) return fail(400, checked.message);
       const stored = checked !== null && checked.ok ? checked.value : value.value;
       try {
-        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, now: clock() });
+        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, now: clock() });
       } catch {
         return fail(500, "Your answer was not saved. Nothing was sent. Try again.");
       }
@@ -2867,6 +2871,9 @@ export const OPEN_READS: ReadonlySet<string> = new Set(["/desk", "/desk/session"
 export function notPairedRead(): Response {
   return Response.json({ ok: false, outcome: "not_paired", code: "unauthorized", message: PAIR_FIRST_WORDS }, { status: 401, headers: { "cache-control": "no-store" } });
 }
+
+/** The owner of a call that carries no agent key. No question is ever owned by it, so such a call reads and routes nothing. */
+export const UNKEYED_AGENT = "unkeyed";
 
 export const AGENT_NOTE_WORDS = "An agent can suggest a note; you save it.";
 export const AGENT_REFUSAL_WORDS = "Only you can confirm this. The agent's suggestion is waiting in the conversation.";

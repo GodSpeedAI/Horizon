@@ -377,11 +377,17 @@ export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.
     secretPath: resolve(secretPath),
     agentKey,
     agentKeyPath,
+    agentRegistryPath: join(dirname(agentKeyPath), "agents.json"),
     ...(setup === undefined ? {} : { setup }),
   };
 }
 
 const AGENT_KEY = /^[0-9a-f]{64}$/;
+
+/** Where the agents' registry lives for the active setup: `agents.json` beside `agent.key`. Used by `scripts/agent-key.ts`. */
+export function agentRegistryPath(): string {
+  return join(dirname(resolve(agentKeyFileOf(parseSetup(process.env)))), "agents.json");
+}
 
 /**
  * Where the agent door's key lives: `HORIZON_AGENT_KEY_FILE`, else the active setup's `secrets/agent.key`

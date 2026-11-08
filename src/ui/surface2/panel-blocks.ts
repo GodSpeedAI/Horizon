@@ -57,6 +57,8 @@ export interface QuestionItem extends Validated {
   readonly withdrawn?: { readonly reason: string } | null;
   /** The agent that first put this question up (the agent door's name for it). Set once and never changed by a later put. */
   readonly asked_by?: string | null;
+  /** The key id of the agent that put the question up. Only that key reads its answers or routes or withdraws the question. */
+  readonly asked_by_key?: string | null;
   /** Earlier answers the person put off ("Not yet") before the agent asked again. Oldest first. */
   readonly earlier?: readonly { readonly outcome: string; readonly value: unknown; readonly note: string | null }[];
 }

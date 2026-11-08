@@ -1,17 +1,27 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { createHash, randomBytes } from "node:crypto";
+import { writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 
 let app: DeskApp;
-let key: string;
+/** Each name is its own agent with its own key, in the registry beside agent.key. The name alone never decides who it is. */
+const keys = new Map<string, string>();
 beforeAll(async () => {
   app = await startDeskApp();
-  key = app.application.loaded.agentKey;
+  const registry = join(dirname(app.application.loaded.agentKeyPath), "agents.json");
+  const entries = ["Alice", "Bob", "Carol"].map((name) => {
+    const key = randomBytes(32).toString("hex");
+    keys.set(name, key);
+    return { key_id: `ag_${name.toLowerCase()}`, name, sha256: createHash("sha256").update(key).digest("hex"), added: "2026-11-07T09:00:00.000Z" };
+  });
+  writeFileSync(registry, JSON.stringify({ schema: "horizon.agents/1", agents: entries }));
 });
 afterAll(async () => app.stop());
 
 const q = (id: string) => ({ id, question: `Which plan for ${id}?`, why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }] });
 const as = (name: string, path: string, body?: unknown) =>
-  fetch(`${app.base}${path}`, { method: body === undefined ? "GET" : "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": name }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  fetch(`${app.base}${path}`, { method: body === undefined ? "GET" : "POST", headers: { authorization: `Bearer ${keys.get(name)}`, "content-type": "application/json", "x-horizon-agent-name": name }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 const answers = async (name: string): Promise<any[]> => ((await (await as(name, "/agent/panels/answers")).json()) as any).responses;
 
 describe("an agent reads only the answers to its own questions", () => {

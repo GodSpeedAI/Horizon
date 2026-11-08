@@ -30,6 +30,8 @@ export interface PanelAnswer {
   readonly step: string | null;
   /** The agent that asked the question. Only that agent reads this answer. Missing on older answers, which no agent reads. */
   readonly asked_by?: string | null;
+  /** The key id of the agent that asked. Only that key reads this answer. Missing on older answers, which no agent reads. */
+  readonly asked_by_key?: string | null;
 }
 
 const idOf = (panel: string, n: number): string => `answer:${panel}:${n}`;
@@ -49,12 +51,12 @@ export async function listAnswers(store: DurableStore, tenant: string, panelId?:
 
 export async function recordAnswer(
   store: DurableStore,
-  input: { readonly tenant: string; readonly panel_id: string; readonly ask: string; readonly outcome: Outcome; readonly value?: AnswerValue | null; readonly note?: string | null; readonly step?: string | null; readonly version?: string | null; readonly asked_by?: string | null; readonly now: Date },
+  input: { readonly tenant: string; readonly panel_id: string; readonly ask: string; readonly outcome: Outcome; readonly value?: AnswerValue | null; readonly note?: string | null; readonly step?: string | null; readonly version?: string | null; readonly asked_by?: string | null; readonly asked_by_key?: string | null; readonly now: Date },
 ): Promise<PanelAnswer> {
   for (let attempt = 0; ; attempt += 1) {
     const existing = await listAnswers(store, input.tenant, input.panel_id);
     const n = (existing.at(-1)?.n ?? 0) + 1;
-    const answer: PanelAnswer = { tenant: input.tenant, panel_id: input.panel_id, n, ask: input.ask, outcome: input.outcome, value: input.value ?? null, note: input.note ?? null, at: input.now.toISOString(), version: input.version ?? null, replied: false, step: input.step ?? null, asked_by: input.asked_by ?? null };
+    const answer: PanelAnswer = { tenant: input.tenant, panel_id: input.panel_id, n, ask: input.ask, outcome: input.outcome, value: input.value ?? null, note: input.note ?? null, at: input.now.toISOString(), version: input.version ?? null, replied: false, step: input.step ?? null, asked_by: input.asked_by ?? null, asked_by_key: input.asked_by_key ?? null };
     try {
       await store.commit({ appends: [], records: [{ collection: PANEL_ANSWERS_COLLECTION, id: idOf(input.panel_id, n), expectedVersion: 0, value: answer as unknown as { readonly [key: string]: Json } }] });
       return answer;

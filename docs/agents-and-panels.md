@@ -25,7 +25,9 @@ The door is on the desk's own address (for example `http://127.0.0.1:<port>`). E
 
     Authorization: Bearer <key>
 
-The key is in the setup's secrets folder, in `agent.key`: `~/.horizon/setups/<setup>/secrets/agent.key`. (Without a setup it is `.cognate/agent.key`; `HORIZON_AGENT_KEY_FILE` names another file.) Horizon creates the key once and keeps it, so it stays the same across restarts. The file is private to you (mode 0600). Only you can read it. Read it in your script; never print it, log it or paste it into a panel. Clearing the setup removes the file with the rest of the setup's folder, and the next start creates a new key. A call with no key or a wrong key gets 401 and changes nothing. The page-agent header is not a key and is refused here.
+Every agent has its own key. The setup's default agent uses `agent.key` in the setup's secrets folder: `~/.horizon/setups/<setup>/secrets/agent.key`. (Without a setup it is `.cognate/agent.key`; `HORIZON_AGENT_KEY_FILE` names another file.) Horizon creates that key once and keeps it, so it stays the same across restarts. The file is private to you (mode 0600). Only you can read it. Read it in your script; never print it, log it or paste it in.
+
+To add another agent, run `bun run scripts/agent-key.ts add <name>`. The key is printed once, to the terminal, with the agent's key id. Horizon keeps only a hash of each key, in `agents.json` beside `agent.key`, so a lost key cannot be read back: add the agent again under another name. Each question records the key that put it up. Only that key reads its answers, and only that key can say where an answer went or take the question back. A display name is a label; it never changes who owns a question.
 
 Optional header `x-horizon-agent-name: <your name>` (60 characters at most). The Conversation shows it on your entries.
 

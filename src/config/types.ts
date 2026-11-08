@@ -153,6 +153,8 @@ export interface LoadedConfig {
   /** The agent door's key: stable across starts, read from `agentKeyPath`. */
   readonly agentKey: string;
   readonly agentKeyPath: string;
+  /** The agents' registry, beside agent.key: each agent's key id, name and the hash of its key. Never a key. */
+  readonly agentRegistryPath: string;
   /** `HORIZON_SETUP`; undefined when unset (Horizon behaves as before). */
   readonly setup?: SetupName;
 }

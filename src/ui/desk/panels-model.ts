@@ -56,15 +56,17 @@ export const ANSWERED_CANNOT_CHANGE = "The person already answered this question
 const agreedTo = (b: AskBlock | undefined): b is AskBlock => b !== undefined && b.answered !== null && b.answered.outcome === "answered";
 /** Same words, options, consequences and input kind (the version), and the same thing it settles. */
 const sameQuestion = (a: AskBlock, b: AskBlock): boolean => a.version === b.version && (a.resolves ?? null) === (b.resolves ?? null);
+/** Who owns a question: the agent (by name, for display) and the key that put it up. The first put decides both; a later put keeps them. */
+const ownerOf = (old: AskBlock | undefined, agent: string, key: string): { readonly asked_by: string; readonly asked_by_key: string } => ({ asked_by: old?.asked_by ?? agent, asked_by_key: old?.asked_by_key ?? key });
 /**
  * The very same question put up again. What the person agreed to or skipped stays. A question they put off ("Not yet") opens again,
  * as the card promised ("The agent will ask again later"), and the earlier answer moves into its history.
  */
-function sameAgain(old: AskBlock, now: AskBlock, asked_by: string): AskBlock {
+function sameAgain(old: AskBlock, now: AskBlock, owner: { readonly asked_by: string; readonly asked_by_key: string }): AskBlock {
   if (old.answered !== null && old.answered.outcome === "deferred") {
-    return { ...now, asked_by, answered: null, withdrawn: old.withdrawn ?? null, earlier: [...(old.earlier ?? []), { outcome: old.answered.outcome, value: old.answered.value, note: old.answered.note }] };
+    return { ...now, ...owner, answered: null, withdrawn: old.withdrawn ?? null, earlier: [...(old.earlier ?? []), { outcome: old.answered.outcome, value: old.answered.value, note: old.answered.note }] };
   }
-  return { ...now, asked_by, answered: old.answered, withdrawn: old.withdrawn ?? null, ...(old.earlier === undefined ? {} : { earlier: old.earlier }) };
+  return { ...now, ...owner, answered: old.answered, withdrawn: old.withdrawn ?? null, ...(old.earlier === undefined ? {} : { earlier: old.earlier }) };
 }
 export const ALL_WAITING = "Eight panels are waiting for answers. Answer or skip one first.";
 /** A question still waiting for the person: not answered (not even put off) and not withdrawn. */
@@ -104,7 +106,7 @@ const replace = (state: Panels, id: string, change: (p: Panel) => Panel): Panels
 export const UNNAMED_AGENT = "unnamed agent";
 
 /** `agent` is who is calling (the agent door's name for it). A question remembers the agent that first put it up. */
-export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_AGENT): Reduced {
+export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_AGENT, key: string = "unkeyed"): Reduced {
   switch (op.tool) {
     case "read_responses":
       return { state, result: { ok: true, panel: null } };
@@ -126,24 +128,24 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
         const kept = blocks.map((b) => {
           if (b.kind !== "question") return b;
           const old = before(b.id);
-          const asked_by = old?.asked_by ?? agent;
-          return old !== undefined && sameQuestion(old, b) ? sameAgain(old, b, asked_by) : { ...b, asked_by };
+          const owner = ownerOf(old, agent, key);
+          return old !== undefined && sameQuestion(old, b) ? sameAgain(old, b, owner) : { ...b, ...owner };
         });
         return { state: replace(state, s.id, (p) => ({ ...p, title: str(s.title, 120) || p.title, step: s.step === undefined ? p.step : (s.step ?? null), blocks: kept })), result: { ok: true, panel: s.id } };
       }
-      return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks: blocks.map((b) => (b.kind === "question" ? { ...b, asked_by: agent } : b)), notes: [] });
+      return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks: blocks.map((b) => (b.kind === "question" ? { ...b, asked_by: agent, asked_by_key: key } : b)), notes: [] });
     }
     case "ask_human": {
       const panel = state.open.find((p) => same(p.id, op.panel));
       const id = typeof op.ask.id === "string" && ID.test(op.ask.id) ? op.ask.id : "";
       const block = id === "" ? null : questionOf(op.ask, id);
       if (block === null) return refuse(state, "SCHEMA", "A question needs an id, the question, and (for pick-one and pick-several) at least two options.");
-      if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [{ ...block, asked_by: agent }], notes: [] });
+      if (panel === undefined) return admit(state, { id: op.panel, title: op.panel, step: op.step ?? null, pinned: false, blocks: [{ ...block, asked_by: agent, asked_by_key: key }], notes: [] });
       const old = panel.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === block.id);
       if (agreedTo(old) && !sameQuestion(old, block)) return refuse(state, "SCHEMA", ANSWERED_CANNOT_CHANGE);
       // The very same question again keeps what the person said; a changed one starts again.
-      const asked_by = old?.asked_by ?? agent;
-      const next = old !== undefined && sameQuestion(old, block) ? sameAgain(old, block, asked_by) : { ...block, asked_by };
+      const owner = ownerOf(old, agent, key);
+      const next = old !== undefined && sameQuestion(old, block) ? sameAgain(old, block, owner) : { ...block, ...owner };
       return { state: replace(state, panel.id, (p) => ({ ...p, step: op.step === undefined ? p.step : (op.step ?? null), blocks: [...p.blocks.filter((b) => b.id !== block.id), next] })), result: { ok: true, panel: panel.id } };
     }
     case "annotate": {
