@@ -5,7 +5,7 @@
  * places it where it was put up. A card with no open question folds to its title and summary. Every piece of text is drawn as text.
  */
 import { answerEcho, WAITING_FOR_AGENT } from "./conversation-model.ts";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { BlockGuard, Question, drawBlock, type BlockCtx } from "./blocks/index.tsx";
 import { CtxContext } from "./blocks/ctx.tsx";
 import { MAX_OPEN_PANELS, hasOpenAsk, type Panel, type PanelBlock } from "./panels-model.ts";
@@ -82,12 +82,17 @@ export interface PanelCardProps {
 
 export function PanelCard({ panel, io, presenting = false, onAction = () => undefined, onSubmit = () => undefined, openRef = () => undefined }: PanelCardProps): ReactNode {
   const needsYou = hasOpenAsk(panel);
+  // What came back from the last answer: a refusal, or a warning that it was sent but not recorded. It stays on the card.
+  const [outcome, setOutcome] = useState<{ readonly ok: boolean; readonly message: string } | null>(null);
   const ctx: BlockCtx = {
     presenting,
     onAnswer: (askId, outcome, value, note) => {
       const ask = panel.blocks.find((b) => b.kind === "question" && b.id === askId);
       const listed = ask?.kind === "question" && ask.input === "multiselect";
-      void io.answer({ panel: panel.id, ask: askId, outcome, ...(ask?.kind === "question" && ask.version !== undefined ? { version: ask.version } : {}), ...(value === undefined ? {} : { value: listed ? value.split(",").filter((v) => v !== "") : value }), ...(note === undefined ? {} : { note }) });
+      setOutcome(null);
+      void io
+        .answer({ panel: panel.id, ask: askId, outcome, ...(ask?.kind === "question" && ask.version !== undefined ? { version: ask.version } : {}), ...(value === undefined ? {} : { value: listed ? value.split(",").filter((v) => v !== "") : value }), ...(note === undefined ? {} : { note }) })
+        .then(setOutcome, () => setOutcome({ ok: false, message: "The answer could not be sent. Nothing was changed. Try again." }));
     },
     onSubmit,
     onAction,
@@ -145,6 +150,11 @@ export function PanelCard({ panel, io, presenting = false, onAction = () => unde
           {body}
         </details>
       )}
+      {outcome !== null && outcome.message !== "" ? (
+        <p className={outcome.ok ? "muted" : "error"} role={outcome.ok ? "status" : "alert"} data-answer-outcome={outcome.ok ? "ok" : "refused"}>
+          {outcome.message}
+        </p>
+      ) : null}
     </article>
   );
 }

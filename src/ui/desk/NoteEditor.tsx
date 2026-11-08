@@ -75,12 +75,15 @@ export function NoteEditor({ note, io, timeZone, onDone }: { readonly note: Note
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [shared, setShared] = useState(note.shared_with_agents === true);
+  // A note that was saved but not recorded in the conversation stays open until its warning has been seen.
+  const [saved, setSaved] = useState<{ readonly note: NoteView; readonly warning: string } | null>(null);
   const save = async (): Promise<void> => {
     setBusy(true);
     const result = await io.saveNote({ note_id: note.note_id, body, tags: tags.split(/[,\s]+/).filter(Boolean), shared_with_agents: shared });
     setBusy(false);
-    if (result.ok) onDone(result.note);
-    else setMessage(result.message);
+    if (!result.ok) setMessage(result.message);
+    else if (result.recorded_words) setSaved({ note: result.note, warning: result.recorded_words });
+    else onDone(result.note);
   };
   return (
     <form
@@ -109,13 +112,26 @@ export function NoteEditor({ note, io, timeZone, onDone }: { readonly note: Note
           {message}
         </p>
       ) : null}
+      {saved !== null ? (
+        <p role="status" className="warn" data-recorded-warning>
+          The note was saved. {saved.warning}
+        </p>
+      ) : null}
       <div className="row">
-        <button type="submit" className="primary" disabled={busy}>
-          {busy ? "Saving…" : "Save changes"}
-        </button>
-        <button type="button" onClick={() => onDone(null)}>
-          Cancel (Esc)
-        </button>
+        {saved !== null ? (
+          <button type="button" className="primary" onClick={() => onDone(saved.note)}>
+            Close
+          </button>
+        ) : (
+          <>
+            <button type="submit" className="primary" disabled={busy}>
+              {busy ? "Saving…" : "Save changes"}
+            </button>
+            <button type="button" onClick={() => onDone(null)}>
+              Cancel (Esc)
+            </button>
+          </>
+        )}
       </div>
     </form>
   );
