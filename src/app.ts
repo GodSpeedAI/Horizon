@@ -382,7 +382,7 @@ export async function createApplication(
     readonly readOnly?: boolean;
   } = {},
 ): Promise<HorizonApplication> {
-  const loaded = loadConfig(options.configPath);
+  const loaded = loadConfig(options.configPath, { readOnly: options.readOnly === true });
   const economics = options.economics ?? realityTraceEconomics(economicsFromEnv(process.env, loaded.config.economics));
   const world = loadWorld(loaded.config.world_ref);
   const research = await observeResearch(loaded.config.research_command);

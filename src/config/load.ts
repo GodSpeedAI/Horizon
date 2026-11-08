@@ -298,6 +298,24 @@ export function configFromDocument(document: unknown): HorizonConfig {
   };
 }
 
+const LAUNCH_SECRET = /^[0-9a-f]{64}$/;
+
+/**
+ * A read-only open takes the running desk's launch secret as it is. It never creates or rotates the file: a missing or invalid one is
+ * refused, so the surface cannot replace the secret a running desk was started with.
+ */
+function readLaunchSecret(path: string): string {
+  const full = resolve(path);
+  let kept = "";
+  try {
+    kept = readFileSync(full, "utf8").trim();
+  } catch {
+    kept = "";
+  }
+  if (!LAUNCH_SECRET.test(kept)) bounded(`no per-launch secret at ${full} to read; start the desk once so it writes one, then surface again`);
+  return kept;
+}
+
 function writeLaunchSecret(path: string): string {
   const secret = randomBytes(32).toString("hex");
   const full = resolve(path);
@@ -348,7 +366,11 @@ export function assertAgentPrincipal(config: HorizonConfig, caller: { readonly a
   }
 }
 
-export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.toml"): LoadedConfig {
+/**
+ * Loads the config and the launch secret. With `readOnly`, the launch secret must already exist and is only read: a read-only open never
+ * writes the secret file.
+ */
+export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.toml", options: { readonly readOnly?: boolean } = {}): LoadedConfig {
   const setup = readSetup();
   let document: unknown;
   try {
@@ -364,7 +386,7 @@ export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.
     : { ...config.identity, operator_ref: assertOperatorRef(operatorEnv, "HORIZON_OPERATOR_REF") };
   const withStore = { ...(store ? { ...config, runtime_store: store } : config), identity: identityWithOperator };
   const secretPath = process.env.HORIZON_SECRET_FILE ?? withStore.secrets.path;
-  const launchSecret = writeLaunchSecret(secretPath);
+  const launchSecret = options.readOnly === true ? readLaunchSecret(secretPath) : writeLaunchSecret(secretPath);
   const agentKeyPath = resolve(agentKeyFileOf(setup));
   const agentKey = agentKeyAt(agentKeyPath);
   return {

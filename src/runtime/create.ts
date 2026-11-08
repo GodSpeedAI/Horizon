@@ -1,5 +1,7 @@
-import { existsSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { Database } from "bun:sqlite";
 import type { AgentDefinition, Caller } from "@godspeedai/cognate-runtime-api";
 import { createRuntime, type ActionPolicy, type GovernanceOptions, type PendingEvent, type Runtime } from "@godspeedai/cognate-runtime-bun";
 import type { DurableStore, OutboxIntent } from "@godspeedai/cognate-events";
@@ -84,12 +86,51 @@ export class ReadOnlyStoreWrite extends Error {
   }
 }
 
+/** The schema version a store records for its newest applied migration (0 when none is recorded). Reads through a read-only connection. */
+function storedSchemaVersion(storePath: string): number {
+  const db = new Database(storePath, { readonly: true });
+  try {
+    const table = db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_versions'").get();
+    if (table === null || table === undefined) return 0;
+    const row = db.query("SELECT MAX(version) AS version FROM schema_versions").get() as { version: number | null } | null;
+    return row?.version ?? 0;
+  } finally {
+    db.close();
+  }
+}
+
+let buildSchemaVersionCache: number | undefined;
 /**
- * Opens an existing desk database for reading while a desk may be writing it. It never creates the file. Every write method is
- * replaced by one that rejects, so a read-only open cannot change the store even where the runtime tries to.
+ * The schema version this build's store opener brings a store to. The opener's migrations are not exported, so it is read from a
+ * fresh store the opener creates in a scratch directory, once per process.
+ */
+function buildSchemaVersion(): number {
+  if (buildSchemaVersionCache === undefined) {
+    const dir = mkdtempSync(join(tmpdir(), "horizon-schema-"));
+    try {
+      const probe = join(dir, "probe.sqlite");
+      void openSqliteStore({ path: probe }).close();
+      buildSchemaVersionCache = storedSchemaVersion(probe);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  return buildSchemaVersionCache;
+}
+
+/**
+ * Opens an existing desk database for reading while a desk may be writing it. It never creates the file. A store older than this build
+ * is refused before anything is opened, because the opener would migrate it. Every write method is replaced by one that rejects, so a
+ * read-only open cannot change the store even where the runtime tries to.
+ *
+ * The SQLite opener cannot open a file read-only (it always runs its migrations), so the schema check above is what keeps this open from
+ * writing the file; the write guard covers the runtime's own writes.
  */
 export function openReadOnlyStore(storePath: string): DurableStore {
   if (!existsSync(storePath)) fail(`no desk database at ${storePath} yet, so there is nothing to surface`);
+  const stored = storedSchemaVersion(storePath);
+  const built = buildSchemaVersion();
+  if (stored < built) fail(`the desk's database is at schema version ${stored}, older than this build (${built}), so it cannot be surfaced read-only. Start the desk once to upgrade it, then surface again.`);
   const store = openSqliteStore({ path: storePath });
   return new Proxy(store, {
     get(target, property) {
