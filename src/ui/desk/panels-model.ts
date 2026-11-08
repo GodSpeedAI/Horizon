@@ -162,6 +162,8 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
           if (o.kind !== "question" || o.asked_by_key == null || o.asked_by_key === key) continue;
           if (!blocks.some((b) => b.kind === "question" && b.id === o.id)) return refuse(state, "SCHEMA", QUESTION_OTHER_AGENT);
         }
+        // A block of another kind cannot take the id of a question the panel already holds: the question is kept, so the two would share an id.
+        if (blocks.some((b) => b.kind !== "question" && existing.blocks.some((o) => o.kind === "question" && o.id === b.id))) return refuse(state, "SCHEMA", DUPLICATE_BLOCK_ID);
         const kept = blocks.map((b) => {
           if (b.kind !== "question") return b;
           const old = before(b.id);
@@ -171,7 +173,10 @@ export function reduceAgent(state: Panels, op: AgentOp, agent: string = UNNAMED_
         // A put does not remove a question: every question the panel holds keeps its id and wording, whatever state it is in (unanswered,
         // put off, answered, withdrawn), whether or not this put shows it. Only a question the put shows again is replaced by that put.
         const retained = existing.blocks.filter((o): o is AskBlock => o.kind === "question" && !kept.some((k) => k.kind === "question" && k.id === o.id));
-        return { state: replace(state, s.id, (p) => ({ ...p, title: str(s.title, 120) || p.title, step: s.step === undefined ? p.step : (s.step ?? null), blocks: [...kept, ...retained] })), result: { ok: true, panel: s.id } };
+        // The merged panel is checked as a whole: one block id, one block. Refused before anything is stored.
+        const merged = [...kept, ...retained];
+        if (new Set(merged.map((b) => b.id)).size !== merged.length) return refuse(state, "SCHEMA", DUPLICATE_BLOCK_ID);
+        return { state: replace(state, s.id, (p) => ({ ...p, title: str(s.title, 120) || p.title, step: s.step === undefined ? p.step : (s.step ?? null), blocks: merged })), result: { ok: true, panel: s.id } };
       }
       return admit(state, { id: s.id, title: str(s.title, 120) || s.id, step: s.step ?? null, pinned: false, blocks: blocks.map((b) => (b.kind === "question" ? { ...b, asked_by: agent, asked_by_key: key, owner_rev: 0 } : b)), notes: [], owner_key: key });
     }
