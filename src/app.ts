@@ -103,7 +103,7 @@ import { caseItems, costSource, orderWork, sessionItems, type AcceptedKnowledge,
 import { readLedgerDay } from "./adapters/ledger-day.ts";
 import { recordReader, type RecordReader } from "./adapters/realitytrace-economics.ts";
 import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
-import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, printPairingCode } from "./desk/pairing.ts";
+import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, PAIR_FIRST_WORDS, printPairingCode } from "./desk/pairing.ts";
 import { setupMapping } from "./config/setup.ts";
 import type { RecordSource } from "./config/types.ts";
 import { existsSync as fileExists, mkdirSync as makeDir, readFileSync as readFileText, writeFileSync as writeFileText } from "node:fs";
@@ -2372,6 +2372,10 @@ export async function createApplication(
           const refused = crossSiteRefusal(request, server.port ?? port, request.method !== "POST");
           if (refused !== null) return refused;
           if (url.pathname.startsWith("/agent/panels")) return agentDoor(request, url.pathname);
+          // Every read needs the pairing session, except the page itself, its session check and the static client bundle that pairs.
+          // The page-agent header is a label, never a grant: an unpaired caller is refused whatever the header says.
+          const paired = pairing.paired(request.headers.get("cookie"));
+          if (READ_METHODS.has(request.method) && !OPEN_READS.has(url.pathname) && !paired) return notPairedRead();
           // An agent on the page may read, find, inspect and preview a hand off. Every other write is the person's alone.
           const page = pageAgentOf(request);
           if (page !== null) {
@@ -2380,8 +2384,8 @@ export async function createApplication(
           }
           // Central rule: every route that is not a read needs a paired session cookie. /agent/panels returned above and keeps
           // its own key; /desk/pair is how a browser gets the cookie. Adding a route cannot skip this check.
-          if (!READ_METHODS.has(request.method) && url.pathname !== "/desk/pair" && !pairing.paired(request.headers.get("cookie"))) return notPairedRefusal();
-          if (url.pathname === "/desk/session" && request.method === "GET") return Response.json({ paired: pairing.paired(request.headers.get("cookie")) }, { headers: { "cache-control": "no-store" } });
+          if (!READ_METHODS.has(request.method) && url.pathname !== "/desk/pair" && !paired) return notPairedRefusal();
+          if (url.pathname === "/desk/session" && request.method === "GET") return Response.json({ paired }, { headers: { "cache-control": "no-store" } });
           if (url.pathname === "/desk/pair" && request.method === "POST") return pairDesk(request);
           if (url.pathname === "/desk/pair/logout" && request.method === "POST") {
             pairing.end(request.headers.get("cookie"));
@@ -2839,6 +2843,14 @@ export const READ_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTION
 /** A write from a browser that has not paired (or whose session has ended). Nothing is changed. */
 export function notPairedRefusal(): Response {
   return Response.json({ ok: false, outcome: "not_paired", code: "forbidden_write", message: NOT_PAIRED_WORDS }, { status: 403, headers: { "cache-control": "no-store" } });
+}
+
+/** The only GET routes an unpaired browser may open: the page, its session check, its pairing route (POST) and the static client bundle that does the pairing. */
+export const OPEN_READS: ReadonlySet<string> = new Set(["/desk", "/desk/session", "/desk/pair", "/desk/app.js", "/desk/app.css"]);
+
+/** A read from a browser that has not paired. Nothing is shown. */
+export function notPairedRead(): Response {
+  return Response.json({ ok: false, outcome: "not_paired", code: "unauthorized", message: PAIR_FIRST_WORDS }, { status: 401, headers: { "cache-control": "no-store" } });
 }
 
 export const AGENT_NOTE_WORDS = "An agent can suggest a note; you save it.";

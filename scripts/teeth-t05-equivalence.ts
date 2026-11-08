@@ -80,6 +80,9 @@ async function startServer(store: string): Promise<{ url: string; code: string; 
     const code = /pairing code: ([2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4})\./.exec(seen)?.[1];
     if (match?.[1] !== undefined && code !== undefined) {
       reader.releaseLock();
+      // Pair this client once, as a browser would. Reads and writes after this carry the session cookie; the code is spent.
+      const paired = await fetch(`${match[1]}/desk/pair`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code }) });
+      sessions.set(match[1], /horizon_desk=[^;]+/.exec(paired.headers.get("set-cookie") ?? "")?.[0] ?? "");
       return { url: match[1], code, stop: () => proc.kill() };
     }
     if (chunk.done) break;
@@ -88,8 +91,11 @@ async function startServer(store: string): Promise<{ url: string; code: string; 
   fail(`server did not report a listener: ${seen}`);
 }
 
+/** The session cookie this client holds for each server it paired with. */
+const sessions = new Map<string, string>();
+
 async function get(url: string, accept: string): Promise<{ status: number; body: string }> {
-  const response = await fetch(url, { headers: { accept } });
+  const response = await fetch(url, { headers: { accept, cookie: sessions.get(new URL(url).origin) ?? "" } });
   return { status: response.status, body: await response.text() };
 }
 
@@ -144,9 +150,7 @@ async function main(): Promise<void> {
   await withStore(async (store) => {
     const server = await startServer(store);
     try {
-      // Pair this client with the code the server printed, as a browser would; the session cookie then goes with the writes.
-      const paired = await fetch(`${server.url}/desk/pair`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: server.code }) });
-      const cookie = /horizon_desk=[^;]+/.exec(paired.headers.get("set-cookie") ?? "")?.[0] ?? "";
+      const cookie = sessions.get(server.url) ?? "";
       const submit = async (body: unknown): Promise<number> => {
         const response = await fetch(`${server.url}/surface/intent`, {
           method: "POST",

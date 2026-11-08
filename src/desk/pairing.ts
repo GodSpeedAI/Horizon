@@ -18,6 +18,7 @@ const CODE_LENGTH = 8;
 export const WRONG_CODE_WORDS = "That code does not match. Check the terminal and try again.";
 export const LOCKED_WORDS = "Too many tries. Wait a minute and try again.";
 export const SPENT_CODE_WORDS = "That pairing code has expired or was already used. Restart Horizon to get a new code from the terminal.";
+export const PAIR_FIRST_WORDS = "Pair this browser first.";
 export const NOT_PAIRED_WORDS = "This browser is not paired with the desk, so nothing was changed. Enter the pairing code from the terminal.";
 
 export type PairOutcome =

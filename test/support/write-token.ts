@@ -1,7 +1,7 @@
 /**
  * Test preload: a test client acts like a paired browser. The server prints each pairing code through a test-only sink
  * (receivePairingCodesForTests); this preload takes the code for an origin and pairs with it, through pairTestClient, the
- * first time that origin sees a write. Later writes send the session cookie back. A request that sets `x-test-no-session`
+ * first time that origin sees a request. Later requests send the session cookie back. A request that sets `x-test-no-session`
  * is sent as it is (it tests the refusal). Nothing here reads the terminal log.
  */
 import { receivePairingCodesForTests } from "../../src/desk/pairing.ts";
@@ -41,7 +41,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const method = (init?.method ?? request?.method ?? "GET").toUpperCase();
     const headers = new Headers(init?.headers ?? request?.headers);
     const exempt = url.pathname.startsWith("/agent/panels") || url.pathname === "/desk/pair" || headers.has("x-test-no-session");
-    if (!["GET", "HEAD", "OPTIONS"].includes(method) && !exempt && !headers.has("cookie")) {
+    if (!exempt && !headers.has("cookie")) {
       const session = cookies.get(url.origin) ?? (await pairTestClient(url.origin));
       if (session !== null && session !== undefined) {
         headers.set("cookie", session);
