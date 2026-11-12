@@ -252,7 +252,8 @@ describe("enrolment: the invitation proposes a controller and the active control
     const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
     expect((await rig!.phone.authorize(seeded.controller, pendingId)).status).toBe(200);
     const replayed = await rig!.phone.replay();
-    expect(replayed.status).not.toBe(200);
+    expect(replayed.status).toBe(410);
+    expect(((await replayed.json()) as { code?: string }).code).toBe("authorization_not_pending");
     expect((await new Client(() => rig!).awaitAuthorization(pendingId)).status).toBe(200);
     expect(await activeDevices(rig!)).toHaveLength(1);
   });
@@ -397,8 +398,8 @@ describe("stop and refresh: a waiting or authorized enrolment does not come back
     const committed = await new Client(() => rig!).awaitAuthorization(pendingId);
     expect(committed.status).not.toBe(200);
     expect(cookieOf(committed)).toBe("");
-    // Only the controller seeded by the other route is active; the confirmed enrolment created nothing.
-    expect(await activeDevices(rig!)).toHaveLength(1);
+    // Only the controller seeded by the other route is active; the confirmed enrolment created no device.
+    expect((await activeDevices(rig!)).map((device) => device.label)).toEqual(["other controller"]);
   });
 
   test("PE-67: stop invalidates an authorized phone's credential, so the old cookie is refused once the listener returns", async () => {
@@ -512,27 +513,34 @@ describe("concurrency and window: a late authorization or commit authorizes noth
 });
 
 describe("the designated writer: no bypass, no partial device, four roles in the record", () => {
-  test("NE-68: only the enrolment commit writes a device credential, and the identity service is its only writer", () => {
-    const writers: string[] = [];
+  test("NE-68: in src/ and scripts/, device credentials are written only by the enrolment commit, and the approval only by the authority (source scan)", () => {
+    const root = join(import.meta.dir, "..");
+    const hits: Array<{ file: string; token: string }> = [];
     const walk = (dir: string): void => {
       for (const name of readdirSync(dir)) {
         const path = join(dir, name);
         if (statSync(path).isDirectory()) walk(path);
         else if (path.endsWith(".ts")) {
-          readFileSync(path, "utf8").split("\n").forEach((line, index) => {
-            if (/\.replaceDevices\(|\.enrolDevice\(|\baddDevice\(/.test(line) && !/export (async )?function/.test(line)) writers.push(`${path}:${index + 1}`);
-          });
+          const text = readFileSync(path, "utf8");
+          for (const token of ["replaceDevices(", "enrolDevice(", "addDevice(", "DEVICE_COLLECTION", "APPROVALS_COLLECTION"]) {
+            if (text.includes(token)) hits.push({ file: path.slice(root.length + 1), token });
+          }
         }
       }
     };
-    walk(join(import.meta.dir, "..", "src"));
-    expect(writers.map((entry) => entry.replace(/:\d+$/, "")).sort()).toEqual([
-      join(import.meta.dir, "..", "src", "remote", "server.ts"),
-      join(import.meta.dir, "..", "src", "remote", "server.ts"),
-    ]);
+    walk(join(root, "src"));
+    walk(join(root, "scripts"));
+    const sites = (token: string) => hits.filter((hit) => hit.token === token).map((hit) => hit.file).sort();
+    // Identity writes and the ledger's device creation: the enrolment commit only.
+    expect(sites("replaceDevices(")).toEqual(["src/remote/server.ts"]);
+    expect(sites("enrolDevice(")).toEqual([]);
+    expect(sites("addDevice(")).toEqual(["src/capabilities/remote-records.ts", "src/remote/server.ts"]);
+    // The device collection is written by the records module alone; the approval collection by the authority alone.
+    expect(sites("DEVICE_COLLECTION")).toEqual(["src/capabilities/remote-records.ts"]);
+    expect(sites("APPROVALS_COLLECTION")).toEqual(["src/remote/enrollment.ts"]);
   });
 
-  test("NE-69: a confirmation with no approval recorded by a current controller is refused at commit", async () => {
+  test("NE-69: a confirmation with no approval recorded by a current controller is refused at commit as unapproved", async () => {
     const store = createMemoryStore();
     const authority = new EnrollmentAuthority(store, () => 1_000_000);
     const registration = { credentialId: "cred-no-approval", publicKey: "key", alg: -7, signCount: 0 };
@@ -543,17 +551,17 @@ describe("the designated writer: no bypass, no partial device, four roles in the
     const confirmed = await authority.authorize({ tenant: "t", pendingId: ghost.pendingId, now: new Date(1_000_000), generation: 1, currentControllers: ["c1"], authorizer: { deviceId: "ghost", credentialId: "g" }, verify: async () => 1 });
     expect(confirmed.ok).toBe(true);
     const refusedGhost = await authority.commit({ pendingId: ghost.pendingId, tenant: "t", generation: 1, currentControllers: ["c1"], now: new Date(1_000_000) });
-    expect(refusedGhost.ok).toBe(false);
+    expect(refusedGhost.ok ? "" : refusedGhost.code).toBe("unapproved");
     // A confirmation with no approval record at all is refused too.
     const bare = await authority.request({ ...base, registration: { ...registration, credentialId: "cred-bare" } as never });
     if (!bare.ok) throw new Error("request refused");
     await confirmWithProof(store, { tenant: "t", pendingId: bare.pendingId, now: new Date(1_000_000), reason: "confirmed without an approval" }, async () => undefined);
     const refusedBare = await authority.commit({ pendingId: bare.pendingId, tenant: "t", generation: 1, currentControllers: ["c1"], now: new Date(1_000_000) });
     expect(refusedBare.ok).toBe(false);
-    expect(refusedBare.ok ? "" : refusedBare.code).toBe("not_authorized");
+    expect(refusedBare.ok ? "" : refusedBare.code).toBe("unapproved");
   });
 
-  test("NE-70: the digest binds the permissions, so an altered stored grant is refused at commit and creates nothing", async () => {
+  test("NE-70: the digest binds the permissions: an altered stored grant is refused at commit, and its confirmation is spent, not applied", async () => {
     const store = createMemoryStore();
     const authority = new EnrollmentAuthority(store, () => 1_000_000);
     const registration = { credentialId: "cred-grant", publicKey: "key", alg: -7, signCount: 0 };
@@ -565,9 +573,10 @@ describe("the designated writer: no bypass, no partial device, four roles in the
     await store.commit({ appends: [], records: [{ collection: ENROLMENTS_COLLECTION, id: opened.pendingId, expectedVersion: 1, value: { ...stored, permissions: ["everything"] } as never }] });
     const committed = await authority.commit({ pendingId: opened.pendingId, tenant: "t", generation: 1, currentControllers: [], now: new Date(1_000_000) });
     expect(committed.ok).toBe(false);
+    expect(await stateOf(store, opened.pendingId)).toBe("expired");
   });
 
-  test("NE-71: a failure after the identity service enrols the phone leaves no partially authorized device", async () => {
+  test("NE-71: a failure after identity enrolment leaves no partially authorized device and refuses the pairing; the replaced controllers stay revoked, so recovery needs a fresh invitation from a live controller", async () => {
     const seeded = await controlledRig();
     rig = seeded.rig;
     const newPhone = await new SoftwareAuthenticator().generate();

@@ -9,9 +9,11 @@
  * key and sign count, and the pending record moves to confirmed by one compare-and-swap. Only the commit,
  * which rechecks that confirmation, its window and its generation, creates the credential.
  *
- * A proof is evidence, not the authority. The authority is the pending record the designated writer
- * (cognate_local_continuation) moves to applied. Nothing typed on a terminal and nothing clicked in a
- * browser can produce the proof, because it needs the controller's own user-verified passkey.
+ * Three responsibilities, kept apart (see contracts/identity/v1/operations.yaml, device.pair rows). The P3
+ * approver's A3-UV proof is the authorization evidence, recorded as an approval. The identity service is the
+ * designated state writer for the credential. Store compare-and-swap enforces the atomic transition. The
+ * pending record is not an authority: it only records that the approval was made. Nothing typed on a terminal
+ * and nothing clicked in a browser can produce the proof, because it needs the controller's own user-verified passkey.
  */
 import type { DurableStore, Json } from "@godspeedai/cognate-events";
 import {
@@ -76,7 +78,7 @@ export type AuthorizeOutcome =
 
 export type CommitOutcome =
   | { readonly ok: true; readonly request: EnrolmentRequest; readonly approval: Approval }
-  | { readonly ok: false; readonly code: "not_authorized" | "expired" | "stale" | "used" | "unknown"; readonly state: PendingState | null };
+  | { readonly ok: false; readonly code: "not_authorized" | "unapproved" | "expired" | "stale" | "used" | "unknown"; readonly state: PendingState | null };
 
 export function sameIds(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((id, index) => id === right[index]);
@@ -207,8 +209,9 @@ export class EnrollmentAuthority {
     }
     // The authority decision the commit needs: an approval written with the confirmation, by a controller still active.
     const approval = await this.approvalOf(input.pendingId);
+    // A confirmation with no approval by a current controller can never be committed: it is reported as unapproved.
     if (approval === null || !input.currentControllers.includes(approval.authorizer_device_id)) {
-      return { ok: false, code: "not_authorized", state };
+      return { ok: false, code: "unapproved", state };
     }
     const applied = await applyConfirmed(this.store, input.pendingId, input.now, "enrolment committed");
     if (!applied) return { ok: false, code: "used", state: await stateOf(this.store, input.pendingId) };

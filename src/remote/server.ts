@@ -249,6 +249,7 @@ export class RemoteController {
     });
     if (!committed.ok) {
       if (committed.code === "not_authorized") return json(202, { status: "awaiting_phone_authorization" });
+      if (committed.code === "unapproved") return refusal(409, "authorization_incomplete", "The desktop has no recorded authorization for this phone. Refresh the QR on your desktop and scan again.");
       if (committed.code === "stale") return refusal(409, "controller_changed", "The desktop's controller changed while this phone waited. Refresh the QR on your desktop and scan again.");
       if (committed.code === "expired") return refusal(410, "authorization_expired", "The desktop did not authorize this phone in time. Refresh the QR on your desktop and scan again.");
       return refusal(410, "authorization_used", "This authorization was already used or is not valid. Refresh the QR on your desktop and scan again.");

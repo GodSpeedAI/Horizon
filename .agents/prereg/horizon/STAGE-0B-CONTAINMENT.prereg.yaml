@@ -18,7 +18,7 @@ preregistration:
   upstream_pins:
     spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
     plan: { id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23", line: 1725, reference: "contain Horizon's reserved operations with an immutable pending descriptor and a local terminal confirmation (A3-T)" }
-    design: { file: design_draft.md, sha256: "68f11d7832ad254703f10e3bb57d52c70979f911dcaeb992ef54508e46973365", lines: 972, sections: "12" }
+    design: { file: design_draft.md, sha256: "edf171db2e743e2205eda172f96e8a706080f95e3ca049593761c44eec78c3dd", lines: 972, sections: "12" }
     prior_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-REMEDIATION-4.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-REMEDIATION-4, relationship: "the Stage 0A unit this containment follows" }
   # This unit settles no specification requirement. It adds a local confirmation to reserved
   # human writes. The Stage 0A requirements remain open until the sixth independent review rules.

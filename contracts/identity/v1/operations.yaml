@@ -51,7 +51,7 @@ authority_writers:
   cognate_local_continuation: "Cognate continuation for a local decision."
   sea_forge: "SEA-Forge decision, epoch, and bounded grant."
   issuer_root: "Cognate/issuer root, local console only."
-  identity_service: "The identity service. The designated device-enrolment state writer: it enrols and replaces device credentials. It decides no authorization; the P3 approval and the A3-UV evidence are checked before its write, and store compare-and-swap makes the transition atomic."
+  identity_service: "The identity service. The designated device-enrolment state writer: it enrols and replaces device credentials. It decides no authorization, and its vendored API checks no evidence: Horizon checks the P3 approval and the A3-UV proof before calling it, which is a disclosed Stage 0B gap. Store compare-and-swap makes the transition atomic."
   case_record.authority: "Selected per record: local → Cognate continuation; governed → SEA-Forge."
 
 budget_units: [currency, tokens, calls, bytes]
@@ -704,9 +704,11 @@ operations:
         was requested under. No SEA-Forge P3 authority decision exists for this enrolment in Stage 0B;
         that integration gap is recorded in live_enforcement, not treated as satisfied. Identity
         lifecycle: the identity service is the designated state writer for the credential itself.
-        Atomic persistence: store compare-and-swap moves the pending record pending to confirmed, once,
-        and writes the approval record with it. The proof is human-authentication evidence (A3-UV). It
-        does not commit anything. A browser cannot produce it, and a terminal's typed text cannot either.
+        Atomic persistence: store compare-and-swap moves the pending record pending to confirmed, once.
+        The approval record is written by a second store write after that confirmation; the commit refuses
+        a confirmation that has no approval, so a failed approval write fails closed. The proof is
+        human-authentication evidence (A3-UV). It does not commit anything. A browser cannot produce it,
+        and a terminal's typed text cannot either.
     - id: device.pair
       separation_of_duty: { requester: prospective_device, approver: operator_with_active_controller, executor: credential_issuer }
       binding: verified
@@ -716,7 +718,7 @@ operations:
       human_evidence: A3-UV
       pending_expiry: 5m
       params_schema: params.device_pair_await
-      ownership: caller_own_session
+      ownership: none_required
       note: >-
         P3. The authorized credential issuer creates the active credential only for an enrolment
         that device.pair.authorize confirmed, inside its window, for the same generation and
@@ -1741,10 +1743,10 @@ live_enforcement:
       required_stage: "Stage 0B"
       production_stage: "Stage 3"
       note: >-
-        The authorization is A3-UV evidence from the controller's own passkey. It is not the
-        authority writer: the authority is the confirmed pending record and the commit that
-        applies it. The SEA-Forge authority is not yet published, so this row is not enforced as
-        a governed decision.
+        The authorization is A3-UV evidence from the controller's own passkey, recorded as the approval
+        for the exact operation digest. It is not a SEA-Forge authority decision and not the state writer:
+        the state writer is the identity service, and store compare-and-swap enforces the transition. The
+        SEA-Forge authority is not yet published, so this row is not enforced as a governed decision.
     - id: device.pair
       caller_path: authorized_pending_record
       enforced_today: false
