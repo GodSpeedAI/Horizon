@@ -32,6 +32,8 @@ interface Mutant {
   readonly replace?: string;
   /** The id of a case to delete, for a mutation that removes a case from the shared fixture set. */
   readonly removeFixtureCase?: string;
+  /** Several textual mutations, one per file, for a claim that is layered across files. */
+  readonly edits?: readonly { readonly file: string; readonly find: string; readonly replace: string }[];
 }
 
 const CONTRACT_TEST = "test/identity-contract.test.ts";
@@ -39,6 +41,7 @@ const RECORDS_TEST = "test/identity-records.test.ts";
 const DEFECTS_TEST = "test/identity-defects.test.ts";
 const REMEDIATION_2_TEST = "test/identity-remediation-2.test.ts";
 const REMEDIATION_3_TEST = "test/identity-remediation-3.test.ts";
+const REMEDIATION_4_TEST = "test/identity-remediation-4.test.ts";
 
 const RECORDS_SPAN = "      const successors = allowed[from] ?? [];\n      const match = successors.find((entry) => entry.to === to);\n      if (match === undefined) fail(\"pending_transition_chain\");\n      else if (!match.reasons.includes(reason)) fail(\"pending_transition_chain\");\n      // The chain: the state this transition leaves is the state the operation's prior transitions\n      // leave it in, and `pending` when it is the first.\n      const prior = context?.pending_transitions ?? [];\n      const previous = prior.length === 0 ? \"pending\" : stringOf(prior[prior.length - 1]!, \"to_state\");\n      if (previous !== from) fail(\"pending_transition_chain\");\n";
 
@@ -196,7 +199,7 @@ const MUTANTS: readonly Mutant[] = [
     file: "contracts/identity/v1/operations.yaml",
     testFile: DEFECTS_TEST,
     title: "an agent's route claim records the key that made it, and the catalog row names it (PE-15)",
-    find: "      executor: agent_execution\n      caller_authentication: registered_agent_key\n      authority_writer: case_record.authority\n      ownership: caller_owns_question",
+    find: "      executor: registered_agent\n      caller_authentication: registered_agent_key\n      authority_writer: case_record.authority\n      ownership: caller_owns_question",
     replace: "      executor: human_session\n      authority_writer: case_record.authority\n      ownership: caller_owns_question",
   },
   // The round-2 remediation unit (STAGE-0A-REMEDIATION). The entitlement is an external record,
@@ -263,8 +266,16 @@ const MUTANTS: readonly Mutant[] = [
     file: "src/remote/server.ts",
     testFile: REMEDIATION_3_TEST,
     title: "the phone must never settle or approve (NE-31)",
-    find: '    if (resolved.class === "P2" || resolved.class === "P3") {',
-    replace: "    if (false) {",
+    // Two layers hold the phone's governed rows: the server's class branch and the catalog's
+    // refusal the phone's command resolves through. The claim is tested only when both are gone.
+    edits: [
+      { file: "src/remote/server.ts", find: '    if (resolved.class === "P2" || resolved.class === "P3") {', replace: "    if (false) {" },
+      {
+        file: "src/app.ts",
+        find: 'const refusal = frozenRefusal(catalog, operation, { route: "POST /m/api/command", codeOp: kind });',
+        replace: "const refusal = undefined as ReturnType<typeof frozenRefusal>;",
+      },
+    ],
   },
   {
     // The round-4 remediation. The contract's claim about the owner's published artifact is
@@ -334,6 +345,61 @@ const MUTANTS: readonly Mutant[] = [
     title: "the frozen fixture set must never lose a preregistered negative case (NE-37)",
     removeFixtureCase: "PENDING-NONCE-REUSED",
   },
+  {
+    // The round-5 remediation. A fact whose bind names a record field the records contract does
+    // not declare is a claim about nothing, so the checker must refuse it.
+    id: "M29 a fact binds to a record field the records contract does not declare",
+    expectation: "NE-38",
+    file: "scripts/check-external-interface-facts.ts",
+    testFile: REMEDIATION_4_TEST,
+    title: "NE-38: a fact with no component, an undeclared struct, or an unbound target fails the check",
+    find: "if (!names.includes(field)) fail(",
+    replace: "if (false && !names.includes(field)) fail(",
+  },
+  {
+    // The round-5 remediation. A fact is checked in the owner struct that carries it, not in the
+    // joined source of every file, so a struct the owner does not declare must fail.
+    id: "M30 a fact is checked against the joined source instead of its named struct",
+    expectation: "NE-38",
+    file: "scripts/check-external-interface-facts.ts",
+    testFile: REMEDIATION_4_TEST,
+    title: "NE-38: a fact with no component, an undeclared struct, or an unbound target fails the check",
+    find: "const scope = source.struct === null ? text : structBody(text, source.struct);",
+    replace: "const scope = text;",
+  },
+  {
+    // The round-5 remediation. The reachable desk P3 rows are refused on every path, so a row
+    // the catalog stops refusing must fail its own test.
+    id: "M31 a reachable desk P3 row stops being refused",
+    expectation: "PE-47",
+    file: "src/contracts/identity/enforcement.ts",
+    testFile: REMEDIATION_4_TEST,
+    title: "PE-47: the reachable desk P3 rows are refused on every path",
+    find: "if (entry === undefined) return null;",
+    replace: "if (entry === undefined || entry.id === \"approval.approve\") return null;",
+  },
+  {
+    // The round-5 remediation. A phone commit is refused with no device delegation; a refusal
+    // that lapses would let the device credential stand in for the operator.
+    id: "M32 a phone commit stops being refused for lack of device delegation",
+    expectation: "PE-49",
+    file: "src/contracts/identity/enforcement.ts",
+    testFile: REMEDIATION_4_TEST,
+    title: "PE-49: a phone commit is refused with no device delegation",
+    find: "if (entry === undefined) return null;",
+    replace: "if (entry === undefined || entry.id === \"device.surface.intent.commit\") return null;",
+  },
+  {
+    // The round-5 remediation. An anonymous row states no human evidence; a loader that gives it
+    // an assurance predicate instead would let a health probe claim an A0 it cannot produce.
+    id: "M33 a row that sets no separation of duty is treated as requiring it",
+    expectation: "PE-52",
+    file: "src/contracts/identity/manifest.ts",
+    testFile: REMEDIATION_4_TEST,
+    title: "PE-52: anonymous and code-holder rows state no human evidence",
+    find: "    separationOfDuty: raw.separation_of_duty ?? base.separation_of_duty ?? null,",
+    replace: "    separationOfDuty: raw.separation_of_duty ?? base.separation_of_duty ?? true,",
+  },
 ];
 
 function copyTree(): string {
@@ -366,6 +432,17 @@ function applyMutant(dir: string, mutant: Mutant): string | null {
       return `the fixture case ${mutant.removeFixtureCase} is not in ${mutant.file} — the tooth is stale`;
     }
     fs.writeFileSync(target, `${JSON.stringify(document, null, 2)}\n`);
+    return null;
+  }
+  if (mutant.edits !== undefined) {
+    // A containment that is layered across files is removed in every layer at once: a single
+    // removed layer leaves the claim holding, so one edit cannot show the claim is tested.
+    for (const edit of mutant.edits) {
+      const site = path.join(dir, edit.file);
+      const text = fs.readFileSync(site, "utf8");
+      if (!text.includes(edit.find)) return `${edit.file}: the mutation site no longer exists — the tooth is stale`;
+      fs.writeFileSync(site, text.replace(edit.find, edit.replace));
+    }
     return null;
   }
   if (mutant.find === undefined || mutant.replace === undefined) {

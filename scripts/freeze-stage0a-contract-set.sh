@@ -15,7 +15,7 @@ for file in operations.yaml policy.yaml params.yaml platform-claims.yaml records
   cp "$ROOT/contracts/identity/v1/$file" "$DEST/contracts/identity/v1/$file"
 done
 cp "$ROOT/contracts/identity/v1/fixtures/record-cases.json" "$DEST/contracts/identity/v1/fixtures/record-cases.json"
-for file in T23.prereg.yaml STAGE-0A.prereg.yaml STAGE-0A-DEFECTS.prereg.yaml STAGE-0A-REMEDIATION.prereg.yaml STAGE-0A-REMEDIATION-2.prereg.yaml STAGE-0A-REMEDIATION-3.prereg.yaml; do
+for file in T23.prereg.yaml STAGE-0A.prereg.yaml STAGE-0A-DEFECTS.prereg.yaml STAGE-0A-REMEDIATION.prereg.yaml STAGE-0A-REMEDIATION-2.prereg.yaml STAGE-0A-REMEDIATION-3.prereg.yaml STAGE-0A-REMEDIATION-4.prereg.yaml; do
   cp "$ROOT/.agents/prereg/horizon/$file" "$DEST/.agents/prereg/horizon/$file"
 done
 

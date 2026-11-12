@@ -49,7 +49,11 @@ const fixtures = JSON.parse(readFileSync(path.join(ROOT, "contracts/identity/v1/
 const appSource = readFileSync(path.join(ROOT, "src/app.ts"), "utf8");
 const remoteSource = readFileSync(path.join(ROOT, "src/remote/server.ts"), "utf8");
 
-/** The thirty-four facts the pinned owner's envelope actually carries. */
+/**
+ * The facts the pinned owner's envelope actually carries. The first thirty-four are the round-4
+ * set; the last three are the Merkle inclusion fields the round-5 split added (R5-06), each read
+ * from its named owner struct and checked by scripts/check-external-interface-facts.ts.
+ */
 const PUBLISHED_FACTS = [
   "envelope_id", "cep_version", "envelope_kind", "created_at", "created_by", "decision", "decision_id",
   "operation_id", "request_ref", "ledger_entry", "policy_bundle_hash", "action_request_hash",
@@ -57,6 +61,7 @@ const PUBLISHED_FACTS = [
   "approval_expires_at", "approved_by", "entry_hash", "previous_entry_hash", "payload_hash", "append_ordinal",
   "committed_at", "writer_identity_ref", "subject_refs", "canonicalization", "hash_algorithm",
   "checkpoint_hash", "mmr_root", "signing_algorithm", "signing_key_id", "signature",
+  "mmr_leaf_index", "leaf_index", "proof_hashes",
 ];
 
 const byId = new Map(fixtures.cases.map((entry) => [entry.id, entry]));
@@ -277,7 +282,9 @@ describe("the round-4 review's corrections", () => {
     // The containment is the only thing between the phone and a P3 ruling, so its absence is
     // visible: the source no longer refuses by class.
     expect(remoteSource).toContain("no_protected_confirmation_path");
-    expect(remoteSource).toContain('resolved.class === "P2" || resolved.class === "P3"');
+    // The class branch itself, not the flag that also spells the same test: a branch that is
+    // silenced while the flag remains would otherwise pass this check.
+    expect(remoteSource).toContain('if (resolved.class === "P2" || resolved.class === "P3") {');
     // And the rows it would reach are governed, so the refusal is load-bearing.
     expect(manifest.byId.get("device.settlement.rule")!.class).toBe("P3");
     expect(manifest.byId.get("device.approval.approve")!.class).toBe("P3");
