@@ -96,7 +96,10 @@ class_defaults:
       A P2 effect is reserved: it changes shared state or another principal's holding, so it needs
       a named owner of the target (a panel, a question, the board, a session) or an explicit
       statement that the effect is local and self-owned. A row that names no owner because it
-      changes only the caller's own local state says so here.
+      changes only the caller's own local state says so here. P2 is set by the authority boundary,
+      not the technical one: an operation that crosses a paired device or a network transport but
+      only exercises an authority the session already holds stays P2. Such an operation creates no
+      authority of its own, and it may not widen the scope or lifetime of the authority it uses.
   P3:
     executor: human_session
     authority_writer: sea_forge
@@ -106,7 +109,10 @@ class_defaults:
     writable: true
     ownership: none_required
     scope_rule: >-
-      A P3 effect commits outside the trust domain or a person. It is never owned by the caller:
+      A P3 effect commits an external commitment or changes authority outside Horizon's own scoped
+      authority: a SEA-Forge decision, a grant issued or widened, a run or handoff that binds beyond
+      the caller's envelope. Crossing a technical trust boundary (a paired device, a network
+      transport) is not by itself P3. It is never owned by the caller:
       the authority decision and the fence carry the responsibility, and the pending record names
       the requester, the executor and the approver separately. Separation of duty is a per-row
       requirement and not a property of the class: every P3 row states it, and the catalog refuses
@@ -634,16 +640,29 @@ operations:
       routes: ["POST /workspace/remote/start"]
       params_schema: params.remote_control
       fixed_parameters: { action: start }
+      note: >-
+        P2 by architectural decision, not an exception to PE-47. Starting remote control opens a
+        pairing window bound to 127.0.0.1 and creates no device, credential or grant. It exercises
+        the existing scoped authority of the session and creates none. Enrolling a device is the
+        separate row `device.pair`.
     - id: remote.refresh
       binding: verified
       routes: ["POST /workspace/remote/refresh"]
       params_schema: params.remote_control
       fixed_parameters: { action: refresh }
+      note: >-
+        P2 by architectural decision. Refresh revokes the devices currently paired and issues a
+        new pairing link. It must not extend a session beyond its maximum expiry, and it must
+        respect revocation of the session's authority. It widens no scope. Refresh is a second
+        replacement path beside `device.pair`, and that gap is recorded as an open item.
     - id: remote.stop
       binding: verified
       routes: ["POST /workspace/remote/stop"]
       params_schema: params.remote_control
       fixed_parameters: { action: stop }
+      note: >-
+        P2 by architectural decision. Stop revokes the session's devices and closes the transport.
+        It removes access and creates none.
     - id: device.pair
       binding: verified
       routes: ["POST /m/api/pair/finish"]
@@ -684,13 +703,7 @@ operations:
         Recovery is its own ceremony and never inherits the class default. The recovery code plus
         local presence plus a fresh passkey is the evidence; A3-T is not enough and is not a
         substitute for it.
-    - { id: expert.install, binding: candidate, params_schema: params.expert_install }
-    - { id: expert.configure, binding: candidate, params_schema: params.expert_configure }
     - { id: expert.answer, binding: candidate, params_schema: params.expert_answer }
-    - { id: expert.remove, binding: candidate, params_schema: params.expert_remove }
-    - { id: grant.create, binding: reserved, params_schema: params.grant_create, authority_writer: sea_forge }
-    - { id: grant.revoke, binding: reserved, params_schema: params.grant_revoke, authority_writer: sea_forge }
-    - { id: gauntlet.run.cancel, binding: reserved, params_schema: params.run_cancel, authority_writer: sea_forge }
     - id: trust.rotate
       binding: reserved
       executor: local_console
@@ -716,6 +729,12 @@ operations:
         to redelegate the named live parent, since a human session has no delegation head.
 
   P3:
+    - { id: grant.create, binding: reserved, params_schema: params.grant_create, authority_writer: sea_forge, separation_of_duty: true }
+    - { id: grant.revoke, binding: reserved, params_schema: params.grant_revoke, authority_writer: sea_forge, separation_of_duty: true }
+    - { id: gauntlet.run.cancel, binding: reserved, params_schema: params.run_cancel, authority_writer: sea_forge, separation_of_duty: true }
+    - { id: expert.install, binding: candidate, params_schema: params.expert_install, separation_of_duty: true, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
+    - { id: expert.configure, binding: candidate, params_schema: params.expert_configure, separation_of_duty: true, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
+    - { id: expert.remove, binding: candidate, params_schema: params.expert_remove, separation_of_duty: true, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
     - id: approval.approve
       binding: verified
       routes: ["POST /desk/decide"]

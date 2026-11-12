@@ -85,3 +85,15 @@ Deleted: none.
 - **PE-53 and PE-59 have no mutation tooth.** Both are exercised by tests, but no mutant breaks them specifically.
 - **Governed-mode tests are mostly skipped or opt-in.** The J02 live tests need a SEA-Forge binary. The remote-sessions test uses a test seam, `unpublishedAuthorityForTests`, to drive governed mode in process.
 - **No PR, merge, or branch or worktree deletion.** These wait for a clean critic verdict.
+
+## Addendum: six decisions applied (2026-11-11)
+
+- **Decision 1.** `grant.create`, `grant.revoke`, `gauntlet.run.cancel` are P3 (SEA-Forge writer, separation of duty). Both prereg design pins now name `adcf06f6…` (design_draft.md). Frozen evidence directories are unchanged. Open: `grant.revoke` and `gauntlet.run.cancel` have no route, and their accessibility through SEA-Forge is unverified because that interface is unpublished.
+- **Decision 2.** `remote.start`, `remote.refresh`, `remote.stop` stay P2, with notes stating the reason.
+- **Decisions 3 and 4.** design_draft.md §3 defines a technical trust boundary and an authority boundary. P2 and P3 scope rules follow the authority boundary. `external` in the Stage 0B table is delivery semantics, not an authority class.
+- **Decision 5.** `remote.start` creates no device, credential or grant (`src/remote/server.ts` `start()`). `remote.refresh` revokes paired devices and issues a new link. It is a second replacement path, outside the three paths in `a3-mechanism.yaml`, and its maximum-expiry behaviour has no test. `device.pair` enrols a device from a one-time code alone (`executor: code_holder`, `human_evidence: null`) and revokes the previous device. That does not meet the requirement for higher-class governance of pairing. It is not reclassified in this commit (open).
+- **Decision 6.** `expert.install`, `expert.configure`, `expert.remove` are P3 candidates with `binding: candidate` (non-executable) and `separation_of_duty: true`. `expert.answer` is unchanged.
+
+Verification: `bun test` 1590 pass, 0 fail; `tsc --noEmit` clean; teeth 44 of 44 caught; prereg coverage 14 and 13 linked; design/contract consistency 14 agree; external-interface facts ok; Python fixtures 146 passed.
+
+Remaining contradictions: `device.pair` (decision 5, above); `handoff.send` is in the P2 section while the design names `sea_forge` as its writer and the Stage 0B boundary calls it P3; `horizon.settlement.observe` and `grant.redelegate` stay P2 (F1 open); F5 and F6 owner questions open.

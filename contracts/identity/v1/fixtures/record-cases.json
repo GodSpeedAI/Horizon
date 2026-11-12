@@ -5627,7 +5627,7 @@
       "proof": "no_fabricated_grant",
       "catalog": {
         "operation_id": "grant.revoke",
-        "class": "P2",
+        "class": "P3",
         "params_schema": "params.grant_revoke",
         "authority_writer": "sea_forge",
         "params_schema_spec": {

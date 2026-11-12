@@ -755,7 +755,7 @@ describe("manifest is loadable from source, not only from disk", () => {
     expect(() =>
       parseOperationManifest(
         source.replace(
-          "    scope_rule: >-\n      A P2 effect is reserved: it changes shared state or another principal's holding, so it needs\n      a named owner of the target (a panel, a question, the board, a session) or an explicit\n      statement that the effect is local and self-owned. A row that names no owner because it\n      changes only the caller's own local state says so here.\n",
+          "    scope_rule: >-\n      A P2 effect is reserved: it changes shared state or another principal's holding, so it needs\n      a named owner of the target (a panel, a question, the board, a session) or an explicit\n      statement that the effect is local and self-owned. A row that names no owner because it\n      changes only the caller's own local state says so here. P2 is set by the authority boundary,\n      not the technical one: an operation that crosses a paired device or a network transport but\n      only exercises an authority the session already holds stays P2. Such an operation creates no\n      authority of its own, and it may not widen the scope or lifetime of the authority it uses.\n",
           '    scope_rule: ""\n',
         ),
       ),
