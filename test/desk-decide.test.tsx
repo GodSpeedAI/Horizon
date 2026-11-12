@@ -212,39 +212,37 @@ describe("decisions through the application and a fake case keeper", () => {
     expect(state.status.waiting).toBe(1);
   });
 
-  test("stale decision is refused by the case keeper, not only on screen", async () => {
+  test("an approval decision is refused before it reaches the case keeper", async () => {
     const card = (await app.state()).decide.cards[0];
     // The operator looked at version d1. The case keeper's record then moved on to d2.
     currentDigest = "sha256:d2";
     const before = keeper.received.filter((r) => r.verb === "approval_decide").length;
     const refused = await send({ card_id: card.id, choice: "accept", preview_code: card.preview.code, records: card.preview.records });
-    expect(refused.status).toBe(409);
-    expect(refused.body.outcome).toBe("stale");
-    expect(refused.body.message).toContain("The case keeper refused this");
-    expect(refused.body.message).toContain("changed after you looked");
-    // The refusal came from the case keeper: the request that reached it carried the operator's old version.
-    const sent = keeper.received.filter((r) => r.verb === "approval_decide");
-    expect(sent.length).toBe(before + 1);
-    expect(sent.at(-1)).toMatchObject({ approval_id: "ap1", decision: "approve", preconditions: { records: [{ ref: "approval:ap1", expected_digest: "sha256:d1" }] } });
-    expect(sent.at(-1)!.request_id).toBe("horizon:decide:ap1:accept");
+    // A P3 approval needs the pending record, the protected confirmation, the authority decision
+    // and the separation-of-duty check, and the row has none of them at this freeze (R5-01).
+    expect(refused.status).toBe(403);
+    expect(refused.body.outcome).toBe("refused");
+    expect(refused.body.message).toContain("refused at this release");
+    // Nothing was sent to the case keeper, so no version was pinned and nothing was decided.
+    expect(keeper.received.filter((r) => r.verb === "approval_decide").length).toBe(before);
     expect(decided).toHaveLength(0);
     expect((await app.state()).decide.cards).toHaveLength(1);
   });
 
-  test("approval confirm works from the card: the version the operator looked at is pinned and the decision is written once", async () => {
+  test("an approval confirm is refused too: the version the operator looked at is never sent, and the decision is not written", async () => {
     currentDigest = "sha256:d2";
     const card = (await app.state()).decide.cards[0];
     expect(card.preview.records[0].expected_digest).toBe("sha256:d2");
-    const ok = await send({ card_id: card.id, choice: "accept", preview_code: card.preview.code, records: card.preview.records, reason: "looks right" });
-    expect(ok.status).toBe(200);
-    expect(ok.body.ok).toBe(true);
-    expect(decided).toHaveLength(1);
-    expect(decided[0]).toMatchObject({ verb: "approval_decide", case_id: "case_1", decision: "approve", note: "looks right", request_id: "horizon:decide:ap1:accept:a1", on_behalf_of: { actor_id: "actor:operator" } });
-    // It is no longer waiting, so a second press does nothing and says so.
+    const refused = await send({ card_id: card.id, choice: "accept", preview_code: card.preview.code, records: card.preview.records, reason: "looks right" });
+    expect(refused.status).toBe(403);
+    expect(refused.body.outcome).toBe("refused");
+    expect(decided).toHaveLength(0);
+    expect(keeper.received.filter((r) => r.verb === "approval_decide")).toHaveLength(0);
+    // The card is still waiting, so pressing again is refused again rather than reported as gone.
     const again = await send({ card_id: card.id, choice: "accept", preview_code: card.preview.code, records: card.preview.records });
-    expect(again.status).toBe(404);
-    expect(again.body.message).toContain("no longer waiting");
-    expect(decided).toHaveLength(1);
+    expect(again.status).toBe(403);
+    expect(decided).toHaveLength(0);
+    expect((await app.state()).decide.cards).toHaveLength(1);
   });
 
   test("a decision with no card, no choice or unreadable text is refused in words and does nothing", async () => {
@@ -296,10 +294,11 @@ describe("lessons", () => {
   const lessons = async () => ((await app.get("/desk/lessons.json")) as { lessons: { status: string; decided_by: string | null; decided_at: string | null; lesson_id: string }[] }).lessons;
 
   test("a lesson becomes active only after a person accepts", async () => {
-    const proposed = await (await app.post("/desk/lesson", { text: "Check the rollback note before release.", source: "case_1/review_2", proposed_by: "a review" })).json();
+    // The proposer is the signed-in session, so the body does not name one.
+    const proposed = await (await app.post("/desk/lesson", { text: "Check the rollback note before release.", source: "case_1/review_2" })).json();
     expect(proposed).toMatchObject({ ok: true, status: "proposed" });
     // Proposing again changes nothing; waiting is not active.
-    await app.post("/desk/lesson", { text: "Check the rollback note before release.", source: "case_1/review_2", proposed_by: "a review" });
+    await app.post("/desk/lesson", { text: "Check the rollback note before release.", source: "case_1/review_2" });
     expect(await lessons()).toHaveLength(1);
     expect((await lessons())[0]).toMatchObject({ status: "proposed", decided_by: null, decided_at: null });
     const card = (await app.state()).decide.cards.find((c: any) => c.id === proposed.lesson_id);
@@ -323,7 +322,7 @@ describe("lessons", () => {
   });
 
   test("a rejected lesson never becomes active", async () => {
-    const proposed = await (await app.post("/desk/lesson", { text: "Always rewrite the tests.", proposed_by: "an agent" })).json();
+    const proposed = await (await app.post("/desk/lesson", { text: "Always rewrite the tests." })).json();
     const card = (await app.state()).decide.cards.find((c: any) => c.id === proposed.lesson_id);
     expect((await app.post("/desk/decide", { card_id: card.id, choice: "reject", preview_code: card.preview.code })).status).toBe(200);
     expect((await lessons()).find((l) => l.lesson_id === proposed.lesson_id)!.status).toBe("rejected");

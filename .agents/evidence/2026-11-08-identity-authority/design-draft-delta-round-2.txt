@@ -1,0 +1,288 @@
+# Difference: the Stage 0A round-2 frozen copy vs live design_draft.md
+Base (the exact bytes the round-2 independent review read, mode 0444, hash-pinned in its
+MANIFEST.sha256 and declared to the reviewer before the read):
+  .agents/evidence/2026-11-09-stage-0a-defects/frozen-round-2/design_draft.md
+  SHA-256 df55e921c0c62e22737a91fcdcbb5ba4bb6160492fbd0de7a1db274f24bd65b7, 747 lines
+Live now: 7ca6416af57fb42a9df4ab8479d470890aff55f20edc4e4fb6d2a990eee37dd6
+Lines: 789
+The delta is confined to the corrections recorded in design-freeze-record.md and the Review Record
+paragraphs describing them. No architectural recommendation changes.
+This is the second correction wave: the round-2 independent review of the re-frozen contract set
+returned REJECT with five blocking findings, seven must-fix findings and four advisories, and
+every one of them was corrected in the contract set and in this file together. The parameter table
+in section 12 is now generated from contracts/identity/v1/params.yaml and checked against it by
+scripts/check-design-contract-consistency.ts; the P2/P3 policy table in Appendix A uses the
+canonical evidence vocabulary the A3 mechanism declares; the A3Receipt row carries the
+protected-terminal-presence claim beside the predicate; the Stage 0B tables name only the
+operations Stage 0B can actually run; the pairing route's caller path is the code holder; the
+Review Record states that the third verdict is recorded beside the frozen copy it read rather than
+in this document, so this file's hash stays pinned by the remediation preregistration; and section
+9.1 now carries the external-interface table, generated from
+contracts/identity/v1/external-interfaces.json, that names the SEA-Forge interfaces Horizon
+consumes — including the human entitlement, whose facts the record contract binds and whose owner
+has published no artifact yet.
+The earlier wave's delta, against the immutable final-acceptance copy, is
+design-draft-delta.txt. Its diff base no longer exists on disk; this file's base does, and is
+retained read-only, so the round-2 correction history is reconstructible from the frozen tree.
+--- .agents/evidence/2026-11-09-stage-0a-defects/frozen-round-2/design_draft.md	2026-11-10 07:15:25.302208662 -0500
++++ design_draft.md	2026-11-10 13:30:02.156474904 -0500
+@@ -173,7 +173,7 @@
+ |---|---|---|---|
+ | Local human | P0/P1 human-session work and a **local** P2 reserved decision | Durable human session, local ownership/scope policy, plus A3 for local P2 | None for P0/P1; Cognate continuation for local P2 |
+ | Local agent | P0/P1 agent-owned work inside an existing local scope | Issuer execution proof plus local ownership/scope policy | None; `authority_ref` is null |
+-| Governed human | A SEA-Forge-owned P2 decision and any P3 operation whose catalog row permits a human session (for example `approval.approve`, `workspace.export`) | Durable human session, the row's assurance predicate (A3 where human-reserved), and a SEA-Forge entitlement/decision; the fence where the row is P3 | SEA-Forge approval/decision; execution/attempt/delegation references stay null, entitlement/fence references are explicit, `grant_ref` stays null |
++| Governed human | A SEA-Forge-owned P2 decision and any P3 operation whose catalog row permits a human session (for example `approval.approve`, `workspace.export`) | Durable human session, the row's assurance predicate (A3 where human-reserved), and a SEA-Forge entitlement/decision (the entitlement is the external interface of section 9.1); the fence where the row is P3 | SEA-Forge approval/decision; execution/attempt/delegation references stay null, entitlement/fence references are explicit, `grant_ref` stays null |
+ | Governed agent | Every P3 commitment whose catalog row permits an agent execution | Issuer execution proof, SEA-Forge grant, and policy-required human evidence | SEA-Forge decision/fence |
+ 
+ There is no local path for agent P2/P3 or for a P3 commitment, and no fallback from governed to local. A local human path does not require an agent execution proof; it does require the A3 receipt for a P2 decision. A local P2 continuation and a governed P2 approval are never both written.
+@@ -309,6 +309,20 @@
+ 
+ **RealityTrace.** RealityTrace records its own observations and references the execution and attempt that produced the observed artifact. It never converts an observation into authority or approval.
+ 
++### 9.1 External interfaces Horizon consumes
++
++Horizon consumes authority from systems it does not own. Those systems mint their own records, and Horizon neither mints nor defines them. The contract that names them is `contracts/identity/v1/external-interfaces.json`: for each interface it states the owner, the version, the commit the interface was read at, the facts the interface must carry, the checks Horizon applies to those facts, and the rule that applies when the interface cannot be read or does not cover the operation. An interface that is not named there is not consumed, and a named interface whose owner has not published it fails closed rather than degrading to a local policy, a session, or a grant. Horizon's own records never stand in for an external one: an `entitlement_ref` names a SEA-Forge entitlement, and nothing in Horizon mints one.
++
++<!-- BEGIN GENERATED: external-interface-table -->
++| Interface | Version | Owner | Pin | Publication | Horizon binding | Facts the interface must carry |
++|---|---|---|---|---|---|---|
++| `sea_forge.authority_decision` | `1` | GodSpeedAI/SEA-Forge | `b072ec50` | published | `AuthorityDecision.decision_ref` | `decision_id`, `operation`, `identity_binding`, `outcome`, `policy_refs`, `decided_at` |
++| `sea_forge.action_grant` | `1` | GodSpeedAI/SEA-Forge | `b072ec50` | published | `DelegationGrant.grant_ref, AuthorityDecision.grant_ref` | `action`, `boundaries`, `expires_at`, `committed_decision` |
++| `sea_forge.human_entitlement` | `1` | GodSpeedAI/SEA-Forge | no pin | specified_not_published | `AuthorityDecision.entitlement_ref, EffectFence.entitlement_ref` | `entitlement_ref`, `subject_ref`, `issuer_ref`, `operation_digest`, `resource_refs`, `amount`, `authority_epoch`, `expires_at`, `revocation_state` |
++<!-- END GENERATED: external-interface-table -->
++
++The human entitlement is the one interface Horizon consumes that SEA-Forge has not published, so it is specified rather than assumed. `sea_forge.human_entitlement` version `1` names the facts an entitlement must carry — its own reference, the subject it was issued to, its issuer, the operation it permits, the resource scope and spend ceiling it covers, the authority epoch, its expiry, and its revocation state — and the record contract binds a Horizon `AuthorityDecision` or `EffectFence` to those facts rather than to a name. An entitlement that is absent, names another subject or operation, covers a narrower scope or a smaller ceiling, carries another epoch, expires before the record it authorizes, or is not active is refused. Whether an entitlement is still current is a property of the authority that owns it, so it is named in the record contract's `not_enforceable_from_one_record` rather than pretended into a field. While the interface is unpublished, no human authority may rest on an entitlement: the governed human path refuses rather than falling back to a grant, a session, or a policy decision, and SEA-Forge publishing the artifact is an external dependency of that path, whose commit Horizon pins when it exists.
++
+ ### 10. Evidence and user-facing truth
+ 
+ The evidence contract is versioned with the identity contract. Each record contains `schema_version`, producer, producer record ID, `tenant_ref`, `trust_domain_ref`, `trace_id`, `operation_digest`, the reference graph, assurance predicate, `authority_epoch`, `issuer_generation`, outcome (`none`, `uncertain`, `committed`), and timestamps. It excludes credentials, private keys, cookies, raw WebAuthn assertions, private content, and any field not needed for audit.
+@@ -373,7 +387,7 @@
+ | Caller path | Live-bound operations enforced today | Enforced by |
+ |---|---|---|
+ | `none` | `horizon.health` | The route answers before any authentication and reports no identity, count, or version |
+-| `local_console` | `session.pair` | The one-time code shown at the local console; the cookie it returns is the session's only credential, and no credential is enrolled and no authority is granted |
++| `code_holder` | `session.pair` | The one-time code shown at the local console. The route proves possession of the code and cannot prove who presented it, so it establishes neither local-console presence nor any authority over anything else. The cookie it returns is the session's only credential, and no credential is enrolled and no authority is granted |
+ | `human_session` | `horizon.economics.read`, `horizon.remote.status`, `horizon.search.read`, `horizon.search.record`, `horizon.navigation.intent.commit`, `horizon.surface.intent.commit`, `horizon.note.save`, `horizon.draft.save`, `horizon.conversation.discard`, `horizon.case.open`, `horizon.lesson.propose`, `horizon.onboarding.skip`, `horizon.onboarding.resume`, `horizon.workspace.presenting`, `session.logout`, `human.panel.open`, `human.panel.close` | The paired desk session cookie. `horizon.surface.intent.commit` also refuses a body that names its own role or actor; `horizon.search.read` and `horizon.search.record` also refuse a `record` value outside the catalog's two actions before the search runs |
+ | `agent_execution` | `agent.response.read`, `agent.surface.publish`, `agent.surface.arrange`, `agent.surface.annotate`, `agent.question.ask` | The agent key in the `Authorization` header, checked against the key registry when the command runs. A body that names an actor, a role, or an executor is refused, so the recorded executor is the authenticated key |
+ 
+@@ -415,21 +429,22 @@
+ - OS authentication and identity are separate. On Linux/macOS require `isatty(stdin)`, a controlling terminal where `tcgetpgrp(stdin) == getpgrp()`, a local session, and `SSH_CONNECTION`/`SSH_TTY` both absent; reject a remote PTY even if it has a TTY. On Windows require `GetConsoleWindow()` plus `!GetSystemMetrics(SM_REMOTESESSION)` and a console process list containing the CLI. Unsupported platforms fail closed for Stage 0B rather than using a browser or remote fallback. These checks establish **presence**, not identity. The authorizing principal recorded as `confirmer_ref` is the configured durable operator actor that REQ-SEC-006 binds to a registered WebAuthn credential and maps to a SEA-Forge actor, resolved through the existing operator-actor validation; it must equal the pending record's requester actor, and the receipt binds that actor together with its registered credential reference. The OS login principal is recorded separately as `presence_evidence.os_session` and is **diagnostic only**: it corroborates that a local session was used and never establishes identity, membership in the operator set, or authority. A local terminal with the wrong operator actor fails exactly as a remote PTY does.
+ - `src/app.ts` page-agent gate and request router: remove caller-label authority at the `x-horizon-source` boundary; route reserved actions through the pending-operation check.
+ - `src/remote/server.ts` approval/rejection command: refuse a browser/phone session that lacks an operation-bound receipt; do not treat a signed-in session as A3.
+-- `src/capabilities/panel-answers.ts`, `src/capabilities/decisions.ts`, `src/capabilities/handoff.ts`, and the existing `desk`/workspace write handlers: require an exact pending record before Cognate-owned local P2 operations (`human.answer`, local `ask.route`, local `ask.reassign`, local `ask.withdraw`, `owner.pin`, `workspace.label`, `lesson.decide`, `remote.start`, `remote.refresh`, `remote.stop`, `device.remove`, and local expert settings). `handoff.send`, `approval.approve`, `approval.reject`, `grant.create`, `grant.revoke`, and every P3 operation remain refused in Stage 0B until their SEA-Forge authorization and human evidence exist; a local pending record or interim A3-T receipt cannot enable them.
++- `src/capabilities/panel-answers.ts`, `src/capabilities/decisions.ts`, `src/capabilities/handoff.ts`, and the existing `desk`/workspace write handlers: require an exact pending record before Cognate-owned local P2 operations (`human.answer`, local `ask.reassign`, local `ask.withdraw`, `owner.pin`, `workspace.label`, `lesson.decide`, `remote.start`, `remote.refresh`, `remote.stop`, `device.remove`, and local expert settings). `handoff.send`, `approval.approve`, `approval.reject`, `grant.create`, `grant.revoke`, and every P3 operation remain refused in Stage 0B until their SEA-Forge authorization and human evidence exist; a local pending record or interim A3-T receipt cannot enable them.
+ - Reads, navigation, private notes, drafts, ordinary layout, and agent-owned reversible work remain on their existing ownership and scope checks. A refusal preserves any entered draft text; it performs no write and reports the missing confirmation.
+ 
+ **Stage 0B effect classes.** A single transaction claim is only true for effects inside the same SQLite database. Every Stage 0B operation is therefore classified, and the confirmation record carries its class:
+ 
+ | Class | Stage 0B operations | Guarantee | Failure handling |
+ |---|---|---|---|
+-| `db_local` | `human.answer`, `ask.route`, `ask.reassign`, `ask.withdraw`, `owner.pin`, `workspace.label`, `lesson.decide` | Atomic: recheck, effect, and `applied` commit together, so exactly one application or none | Crash rolls back the effect; within the same launch the record remains `confirmed` and redeemable once; restart expires it under the launch-generation rule |
++| `db_local` | `human.answer`, `ask.reassign`, `ask.withdraw`, `owner.pin`, `workspace.label`, `lesson.decide` | Atomic: recheck, effect, and `applied` commit together, so exactly one application or none | Crash rolls back the effect; within the same launch the record remains `confirmed` and redeemable once; restart expires it under the launch-generation rule |
+ | `external` | `remote.start`, `remote.refresh`, `remote.stop`, `expert.install`, `expert.configure`, `expert.remove`, and the transport-revocation half of `device.remove` | At-most-once dispatch under `effect_idempotency_key`; not exactly-once delivery | Crash after the claim leaves `uncertain`; reconciliation queries the effect sink before any retry |
+ 
++**`ask.route` is not a Stage 0B operation.** The row is agent-executed, its authority is the case record's, and it needs a live bounded grant, which Stage 0B does not have and Stage 2 supplies. Listing it as a Stage 0B success would claim an execution Stage 0B cannot authorise, so it stays refused there and its closure belongs to the stage that supplies both the grant and the evidence. The two tables above therefore name the operations Stage 0B can actually run, and a request for `ask.route` refuses with the missing grant named.
+ `effect_idempotency_key` is derived from the pending ID and descriptor digest, so a retry of the same confirmation reuses it and a replacement confirmation produces a different key. A sink that cannot be queried leaves the record `uncertain` rather than failed. `uncertain` is a reported state, never a silent retry: the human sees that the effect may have landed, and the operation is not re-dispatched under a new key without an explicit decision. `device.remove` is split because its store change is `db_local` while its session-termination effect is `external`; the store change commits first and the transport revocation is dispatched idempotently, so a failed revocation leaves a visible `uncertain` record rather than a removal that silently did not take effect.
+ 
+ **Stage 0B boundary.** Successful interim A3-T is restricted to Cognate-owned local P2 operations. Governed P2 and all P3 operations, including `handoff.send`, `approval.approve`, and `approval.reject`, stay refused until Stage 2/3. Initial `device.pair` follows the local bootstrap ceremony and records `local_enrollment_presence`, never A3-T. The Stage 0B gate must demonstrate each of these refusals even when a valid interim receipt exists.
+ 
+-**The browser's pairing route is `session.pair`, not `device.pair`.** `POST /desk/pair` exchanges the one-time code printed at the local console for a session cookie. It enrolls no credential, holds no delegation, and grants no authority beyond the caller's own local scope; the catalog classifies it P1 with the local console as its caller path. `device.pair` is a **reserved** P2 row: it is device enrollment, it is not reachable from the browser session, and it records `local_enrollment_presence` rather than A3 or A3-T. A browser that presents the console code has therefore obtained a session and not a device, and a Stage 0B confirmation never turns that session into an enrolled device.
++**The browser's pairing route is `session.pair`, not `device.pair`.** `POST /desk/pair` exchanges the one-time code printed at the local console for a session cookie. It enrolls no credential, holds no delegation, and grants no authority beyond the caller's own local scope; the catalog classifies it P1 with the code holder as its caller path, because the route proves possession of the one-time code and cannot prove who presented it, so it never claims local-console presence. `device.pair` is a **reserved** P2 row: it is device enrollment, it is not reachable from the browser session, and it records `local_enrollment_presence` rather than A3 or A3-T. A browser that presents the console code has therefore obtained a session and not a device, and a Stage 0B confirmation never turns that session into an enrolled device.
+ 
+ The interim confirmation is the local A3-T terminal challenge in section 7. It reads the pending record from the local store, displays the canonical operation and revision, requires the one-use code shown only in that terminal, and consumes the record atomically. Its receipt is marked `interim_local`, signed with the per-launch local secret, and is not accepted by SEA-Forge or after Stage 3 as a production A3 claim. It is not an issuer credential and does not create a delegation. The phone A3-UV path may replace it for local reservations only after Stage 3 without changing the pending-record or refusal semantics.
+ 
+@@ -618,103 +633,129 @@
+ | `Credential` | `iss`, `sub`, `aud`, `jti`, `iat`, `nbf`, `exp`, `execution_ref`, `attempt_ref`, `holder_jwk`, `delegation_ref`, `authority_epoch`, `issuer_generation` | `delegation_ref` is required and nullable only for a local P0/P1 execution; it is non-null for governed execution. A human caller has no credential. |
+ | `OperationDescriptor` | `operation_id`, `caller_kind` (`human_session`, `agent_execution`, or `local_console`), `caller_ref`, `parameters`, `params_schema_ref`, `nonce`, `issued_at`, `expires_at`, `resource_refs`, `expected_revision`, `world_ref`, `case_ref`, `frame_ref`, `execution_ref`, `delegation_ref`, `policy_digest`, `idempotency_key` | `execution_ref`/`delegation_ref` required for `agent_execution` except a local P0/P1 execution may have null delegation; null for human/console. `case_ref`/`frame_ref` required for P2/P3 and per row for P0/P1. `caller_ref` is the session, execution, or console principal, never a target execution |
+ | `DelegationGrant` | `grant_ref`, `parent_ref`, `delegator_ref`, `agent_ref`, `execution_ref`, `audience`, `operations[]`, `resource_selectors[]`, `data_labels[]`, `budget` (`amount`,`unit`,`remaining`), `not_before`, `expires_at`, `depth_remaining`, `redelegate`, `offline`, `human_evidence`, `authority_epoch` | `parent_ref` and `execution_ref` are null for a root grant; a child grant requires a live parent and may bind an execution |
+-| `AuthorityDecision` | `decision_ref`, `grant_ref`, `entitlement_ref`, `operation_digest`, `resource_refs`, `amount`, `decision`, `policy_digest`, `authority_epoch`, `expires_at`, `approver_ref` (null if policy-only), `reservation_ref` | `grant_ref` null only for root `grant.create` or an entitlement-backed human P2/P3; `entitlement_ref` must then be non-null and current. `approver_ref` null only for an autonomous policy decision; a human-reserved decision requires it |
++| `AuthorityDecision` | `decision_ref`, `grant_ref`, `entitlement_ref`, `operation_digest`, `resource_refs`, `amount`, `decision`, `policy_digest`, `authority_epoch`, `expires_at`, `approver_ref` (null if policy-only), `reservation_ref` | `grant_ref` null only for root `grant.create` or an entitlement-backed human P2/P3; `entitlement_ref` must then be non-null and current, and it names a record of the `sea_forge.human_entitlement` interface that binds the same subject, operation, scope, ceiling, epoch, and expiry (section 9.1). `approver_ref` null only for an autonomous policy decision; a human-reserved decision requires it |
+ | `Approval` | `approval_ref`, `operation_digest`, `requester_ref`, `executor_ref`, `approver_ref`, `tenant_ref`, `policy_digest`, `expires_at`, `nonce`, `state` (`pending`,`consumed`,`rejected`,`expired`) | `approver_ref` must differ from requester/executor; `executor_ref` is null for a human-only decision; `nonce` single use |
+-| `EffectFence` | `fence_ref`, `caller_ref`, `decision_ref`, `grant_ref`, `entitlement_ref`, `execution_ref`, `attempt_ref`, `resource_refs`, `amount`, `operation_digest`, `expires_at`, `authority_epoch`, `dispatch_epoch`, `supersedes_ref` | `grant_ref` null for an entitlement-backed human P2/P3; `entitlement_ref` is then required. `execution_ref`/`attempt_ref` null for a human/console caller; `supersedes_ref` null only for the first attempt; fence is immutable |
+-| `A3Receipt` | `verifier_ref`, `key_id`, `device_ref`, `principal_ref`, `tenant_ref`, `trust_domain_ref`, `operation_digest`, `challenge_digest`, `policy_digest`, `up`, `uv`, `sign_count`, `assurance_predicate`, `verified_at`, `expires_at` | No raw assertion; `uv` must be true for A3-UV; A3-T records `protected_terminal_presence` instead |
++| `EffectFence` | `fence_ref`, `caller_ref`, `decision_ref`, `grant_ref`, `entitlement_ref`, `execution_ref`, `attempt_ref`, `resource_refs`, `amount`, `operation_digest`, `expires_at`, `authority_epoch`, `dispatch_epoch`, `supersedes_ref` | `grant_ref` null for an entitlement-backed human P2/P3; `entitlement_ref` is then required and names a record of the `sea_forge.human_entitlement` interface that binds the same subject, operation, scope, ceiling, epoch, and expiry (section 9.1). `execution_ref`/`attempt_ref` null for a human/console caller; `supersedes_ref` null only for the first attempt; fence is immutable |
++| `A3Receipt` | `verifier_ref`, `key_id`, `device_ref`, `principal_ref`, `tenant_ref`, `trust_domain_ref`, `operation_digest`, `challenge_digest`, `policy_digest`, `up`, `uv`, `sign_count`, `assurance_predicate`, `protected_terminal_presence`, `verified_at`, `expires_at` | No raw assertion. `assurance_predicate` is exactly `A3-UV` or `A3-T`. `uv` must be true for A3-UV. `protected_terminal_presence` is a separate boolean claim: true for A3-T, false for A3-UV. A receipt that claims one without the other is refused, and the claim is never spelled as a predicate |
+ | `EvidenceRecord` | `producer`, `producer_record_id`, `trace_id`, `operation_digest`, `refs[]`, `assurance_predicate`, `authority_epoch`, `issuer_generation`, `outcome`, `content_hash`, `supersedes_ref` | `supersedes_ref` null for first record; no credential or private content |
+ | `PendingOperation` | `pending_id`, `operation_id`, `caller_kind`, `requester_ref`, `params_schema_ref`, `parameters`, `nonce`, `operation_digest`, `resource_refs[]`, `expected_revision`, `world_ref`, `case_ref`, `frame_ref`, `case_authority` (`local`,`governed`), `policy_digest`, `execution_ref`, `delegation_ref`, `session_ref`, `confirmer_ref`, `presence_evidence`, `created_at`, `expires_at`, `confirmation_code`, `launch_generation`, `state` (`pending`,`confirmed`,`dispatching`,`applied`,`uncertain`,`expired`), `effect_class` (`db_local`,`external`), `effect_idempotency_key`, `supersedes_ref`, `local_receipt` | `confirmer_ref`, `presence_evidence`, and `local_receipt` are null while the state is `pending` and are written only by the confirmation step, never by the caller; a `confirmed`, `dispatching`, `applied`, or `uncertain` record carries all three. `execution_ref`/`delegation_ref` are null for a human or console caller. `case_authority` is immutable for the record. The confirmation code is single use |
+ | `Refusal` | `code`, `boundary`, `operation_id`, `effect` (`none`,`uncertain`,`committed`), `missing_or_expired`, `repair` | `repair` may be null only when no lawful repair exists |
+ 
+-`params_schema_ref` is `params.<operation_id with dots replaced by underscores>` for every P2/P3 row, except the explicit aliases: `remote.start`, `remote.refresh`, `remote.stop` → `params.remote_control`; `approval.approve`, `approval.reject` → `params.approval`; `gauntlet.run.cancel` → `params.run_cancel`. The alias operation ID fixes `action`/`resolution`; a supplied value that disagrees with the operation ID is refused. `expert.install`, `expert.configure`, `expert.answer`, and `expert.remove` have separate schemas. P0 uses `params.read`, P1 uses `params.local_write`, and any operation-specific P1 row must declare its own ref at 0A.
++`params_schema_ref` is `params.<operation_id with dots replaced by underscores>` for every P2/P3 row, except the explicit aliases: `remote.start`, `remote.refresh`, `remote.stop` → `params.remote_control`; `approval.approve`, `approval.reject` → `params.approval`; `gauntlet.run.cancel` → `params.run_cancel`. The alias operation ID fixes `action`/`resolution`; a supplied value that disagrees with the operation ID is refused. `expert.install`, `expert.configure`, `expert.answer`, and `expert.remove` have separate schemas. **Every live-bound P0/P1 row names its own schema.** `params.read` and `params.local_write` are the class defaults for a row that has no parameters of its own, and a live-bound row that reads a body, a form or a query names the schema that describes exactly those fields: the generic defaults do not name `operation_ref`, `expected_outcome`, `row_id`, `draft_id`, `text` or `mode`, so a confirmation digest made from a generic default would be made from a description of the operation other than the one that runs. The build check compares every one of the thirty-seven verified rows against the handler that reads it.
+ 
+ **A parameter schema names the wire fields the handler consumes.** A schema that names a field the handler does not read describes an effect that cannot happen; a schema that omits a field the handler reads cannot cover the effect it does. The frozen schemas therefore carry each field's **wire name** (the name on the wire, which differs from the contract's own name where the protocol uses another), and the manifest's binding check compares every governed row and every agent-door row against the live source: a field the handler reads and the schema does not name, or a field the schema names and the handler does not read, fails the build. The `op` and `tool` selectors and the `request_id` are the protocol's own and are excluded from that comparison.
+ 
+ The frozen parameter schemas are:
+ 
++<!-- BEGIN GENERATED: parameter-table -->
+ | Schema | Fields (wire names) |
+ |---|---|
+ | `params.read` | `target_ref:string`, `query:string|null`, `expected_revision:uint64|null` |
+ | `params.local_write` | `target_ref:string`, `expected_revision:uint64`, `value:json` |
+-| `params.human_answer` | `panel:string`, `ask:string`, `outcome:"answered"\|"deferred"\|"cancelled"`, `value:string|string[]`, `version:string`, `owner_rev:uint64`, `note:string|null` |
++| `params.human_answer` | `panel:string`, `ask:string`, `outcome:"answered"\|"deferred"\|"cancelled"`, `value:string_or_string_array`, `version:string`, `owner_rev:integer`, `note:string|null?` |
+ | `params.ask_route` | `panel_id:string`, `ask_id:string`, `routed_as:string` |
+ | `params.ask_reassign` | `panel:string`, `ask:string`, `from_key_id:string|null`, `to_key_id:string`, `confirmed:boolean` |
+-| `params.ask_withdraw` | discriminated by the code operation: **`human.stop_waiting`** → `step:string`; **`ask.withdraw`** → `panel_id:string`, `ask_id:string`, `reason:string` |
++| `params.ask_withdraw` | discriminated by `code_op`: **`ask.withdraw`** → `panel_id:string`, `ask_id:string`, `reason:string`; **`human.stop_waiting`** → `step:string` |
+ | `params.owner_pin` | `id:string`, `pinned:boolean` |
+-| `params.workspace_label` | `session:string`, `event:string`, `record_seq:uint64|null`, `verdict:string|null`, `first_failure:string`, `return:string|null` |
+-| `params.handoff_send` | `draft_id:string`, `text:string`, `case_id:string`, `review:{step_id:string}`, `also_starts:string[]`, `plan_precondition:{ref:string,expected_digest:string}`, `assign:boolean` |
+-| `params.lesson_decide` | `card_id:string`, `choice:"hold"\|"release"\|"reject"`, `preview_code:string`, `records:object`, `reason:string` |
+-| `params.remote_control` | `action:"start"\|"refresh"\|"stop"` — fixed by the row's operation ID, never supplied by the caller |
++| `params.workspace_label` | `session:string`, `event:string`, `record_seq:uint64|null`, `verdict:string|null`, `first_failure:string`, `return:string?` |
++| `params.handoff_send` | `draft_id:string`, `text:string`, `case_id:string`, `review:{step_id:string}`, `also_starts:string_array?`, `plan_precondition:{ref:string, expected_digest:string}`, `assign:boolean?` |
++| `params.lesson_decide` | `card_id:string`, `choice:"hold"\|"release"\|"reject"`, `preview_code:string`, `records:object`, `reason:string?` |
++| `params.remote_control` | `action:"start"\|"refresh"\|"stop"` |
+ | `params.device_pair` | `device_label:string`, `credential_id:string`, `public_key:jwk` |
+ | `params.device_remove` | `device_ref:string`, `expected_revision:uint64` |
+-| `params.device_recover` | discriminated by `via`: `"code_console"` → `recovery_code:string`, `new_credential_id:string`, `public_key:jwk`; `"paired_device"` → `approving_device_ref:string`, `new_credential_id:string`, `public_key:jwk`. `recovery_code` is required and `approving_device_ref` absent for `code_console`, and the reverse for `paired_device`. `approving_device_ref` must name an already-paired device that is not the device being replaced |
++| `params.device_recover` | discriminated by `via`: **`code_console`** → `recovery_code:string`, `new_credential_id:string`, `public_key:jwk`; **`paired_device`** → `approving_device_ref:string`, `new_credential_id:string`, `public_key:jwk` |
+ | `params.expert_install` | `expert_id:string`, `manifest_ref:string`, `public_key:jwk`, `expected_revision:uint64` |
+ | `params.expert_configure` | `expert_id:string`, `config:json`, `expected_revision:uint64` |
+-| `params.expert_answer` | `expert_id:string`, `ask_id:string`, `value:string|string[]`, `expected_revision:uint64` |
++| `params.expert_answer` | `expert_id:string`, `ask_id:string`, `value:string_or_string_array`, `expected_revision:uint64` |
+ | `params.expert_remove` | `expert_id:string`, `reason:string`, `expected_revision:uint64` |
+-| `params.grant_create` | `sponsor_ref:string`, `agent_ref:string`, `operations:string[]`, `resources:string[]`, `budget:{amount:decimal,unit:string}`, `audience:string`, `expires_at:timestamp`, `depth_remaining:uint64`, `redelegate:boolean`, `offline:boolean` |
++| `params.grant_create` | `sponsor_ref:string`, `agent_ref:string`, `operations:string_array`, `resources:string_array`, `budget:{amount:decimal, unit:string}`, `audience:string`, `expires_at:timestamp`, `depth_remaining:uint64`, `redelegate:boolean`, `offline:boolean` |
+ | `params.grant_revoke` | `grant_ref:string`, `reason:string`, `expected_revision:uint64` |
+-| `params.grant_redelegate` | `parent_ref:string`, `child:{agent_ref:string, operations:string[], resources:string[], budget:object, expires_at:timestamp, depth_remaining:uint64}` |
++| `params.grant_redelegate` | `parent_ref:string`, `child:{agent_ref:string, operations:string_array, resources:string_array, budget:{amount:decimal, unit:string}, expires_at:timestamp, depth_remaining:uint64}` |
+ | `params.run_cancel` | `run_ref:string`, `reason:string`, `expected_revision:uint64` |
+ | `params.trust_rotate` | `new_root_ref:string`, `reason:string` |
+ | `params.approval` | `approval_id:string`, `resolution:"approved"\|"rejected"`, `expected_revision:uint64` |
+-| `params.capability_invoke` | `target_operation:string`, `parameters:json`, `resource_refs:string[]`, `amount:{value:decimal,unit:string}|null`, `idempotency_key:string` |
+-| `params.external_commit` | `target_operation:string`, `parameters:json`, `resource_refs:string[]`, `amount:{value:decimal,unit:string}` |
+-| `params.run_start` | discriminated by the caller: **agent execution** → `plan_ref:string`, `resolved_operations:string[]`, `resolved_predicates:object`, `grant_ref:string|null`, `expected_revision:uint64`, where `grant_ref` is required when any resolved target is P2/P3 and null only when every resolved target is local P0/P1; **human session** → `plan_ref:string`, `resolved_operations:string[]`, `resolved_predicates:object`, `expected_revision:uint64`. `entitlement_ref` is never caller-supplied. A human-session request that carries `grant_ref` is refused rather than ignored |
+-| `params.workspace_export` | `kind:"labels"\|"comparison"`, `standins:string`, `source:string`, `day:string`, `only:string`, `repo:string`, `session:string`, `label_error:string` |
++| `params.capability_invoke` | `target_operation:string|null`, `parameters:json`, `resource_refs:string_array`, `amount:{value:decimal, unit:string}|null`, `idempotency_key:string` |
++| `params.external_commit` | `target_operation:string`, `parameters:json`, `resource_refs:string_array`, `amount:{value:decimal, unit:string}` |
++| `params.run_start` | discriminated by `caller_kind`: **`agent_execution`** → `case_id:string`, `also_starts:string_array`, `grant_ref:string|null`; **`human_session`** → `case_id:string`, `also_starts:string_array` |
++| `params.workspace_export` | `kind:"labels"\|"comparison"`, `standins:string?`, `source:string?`, `day:string?`, `only:string?`, `repo:string?`, `session:string?`, `label_error:string?` |
+ | `params.isolation_request` | `operation_ref:string`, `isolation_class:"isolated"` |
+-| `params.horizon_search_read` | `q:string`, `day:string`, `tag:string` — the find that records nothing |
+-| `params.horizon_search_record` | `q:string`, `day:string`, `tag:string`, `record:true` — the recorded find; `q` must be non-empty and `record` is fixed true |
+-| `params.agent_response_read` | no fields — the scope is the authenticated agent key |
+-| `params.session_logout` | no fields — the session ended is the caller's own |
+-| `params.session_pair` | `code:string` — the one-time code shown at the local console; it grants no authority and enrolls no credential |
++| `params.horizon_search_read` | `q:string|null`, `day:string|null`, `tag:string|null` |
++| `params.horizon_search_record` | `q:string`, `day:string|null`, `tag:string|null`, `record:true` |
++| `params.agent_response_read` | no fields |
++| `params.session_pair` | `code:string` |
++| `params.session_logout` | no fields |
+ | `params.agent_surface_publish` | `surface:{id:string, title:string, step:string, blocks:object}` |
+ | `params.agent_surface_arrange` | `action:{op:"surface.remove"\|"view.focus"\|"view.place", id:string}` |
+-| `params.agent_surface_annotate` | `panel:string`, `text:string`, `tone:string` |
+-| `params.agent_question_ask` | `panel:string`, `ask:{id:string, question:string, input:"select"\|"multiselect"\|"confirm"\|"text", why_needed:string, options:object, resolves:string}`, `step:string` |
+-| `params.human_panel_open` | `template:string`, `title:string` |
++| `params.agent_surface_annotate` | `panel:string`, `text:string`, `tone:string|null` |
++| `params.agent_question_ask` | `panel:string`, `ask:{id:string, question:string, input:"select"\|"multiselect"\|"confirm"\|"text", why_needed:string, options:object, resolves:string}`, `step:string|null` |
++| `params.human_panel_open` | `template:string`, `title:string|null` |
+ | `params.human_panel_close` | `id:string` |
+-
+-
+-| Schema | Fields |
+-|---|---|
+-
++| `params.horizon_health` | no fields |
++| `params.horizon_economics_read` | no fields |
++| `params.horizon_remote_status` | no fields |
++| `params.horizon_navigation_intent_commit` | `operation_ref:string`, `expected_outcome:json|null?` |
++| `params.horizon_surface_intent_commit` | `transport:"gui"\|"cli"\|"mcp"`, `node_id:string?`, `operation:string?`, `frame_id:string?`, `intent_id:string?` |
++| `params.horizon_note_save` | `body:string`, `case_ref:string|null?`, `tags:string_array?`, `links:object_array?`, `note_id:string?`, `shared_with_agents:boolean?` |
++| `params.horizon_draft_save` | `draft_id:string`, `text:string`, `mode:string?` |
++| `params.horizon_conversation_discard` | `row_id:string` |
++| `params.horizon_case_open` | `purpose:string` |
++| `params.horizon_lesson_propose` | `text:string`, `source:string?`, `proposed_by:string?` |
++| `params.horizon_onboarding_skip` | no fields |
++| `params.horizon_onboarding_resume` | no fields |
++| `params.horizon_workspace_presenting` | `on:string?`, `return:string|null?` |
++<!-- END GENERATED: parameter-table -->
++
++The table is generated from `contracts/identity/v1/params.yaml` and checked field for field by
++`scripts/check-design-contract-consistency.ts`, so the design and the frozen contract cannot
++disagree about what a parameter is. A field marked `?` is optional and a field marked `|null`
++may be null; the two are independent, so a field may be both. A parameter is declared with the
++type its value carries across the boundary: a JSON body field the handler reads as a number is
++`integer`, and a form field the handler reads as text is `uint64` or `string`. The
++`remote.start`, `remote.refresh` and `remote.stop` rows fix `action` and the
++`approval.approve` and `approval.reject` rows fix `resolution`; the field is named in the
++schema so the fixed value has one home, and a supplied value that disagrees with the row's
++operation ID is refused rather than ignored. The `device.recover` row is discriminated by
++`via`: `code_console` is the local console path with the recovery code, and `paired_device`
++is authorised by A3-UV from a different already-paired device, each with a fresh passkey
++enrollment. The `grant.redelegate` row's agent variant needs no human evidence: it is gated by
++the parent's `redelegate` permission, its remaining depth and the ancestor budget.
+ 
+ Integer values are encoded as JSON strings, never JavaScript numbers; `uint64` and monetary decimals are strings. A nonce is a 128-bit base64url value generated by the authority; it is never reused for another operation.
+ 
+-`run.start` resolves its target operations from the pinned plan before authorization: every target must have exactly one reviewed operation row and one assurance predicate. Resolution authority follows the target classes, so a SEA-Forge outage never disables local work. A plan whose every target is local P0/P1 is resolved against the 0A manifest by Cognate, needs no grant, and makes no SEA-Forge call; a local P0/P1 execution therefore starts normally while SEA-Forge is unreachable. A plan containing any governed target is resolved and verified by SEA-Forge, and a mixed plan is bound at the highest class present and takes the SEA-Forge path for the whole run. In the governed path the caller-supplied `resolved_operations`/`resolved_predicates` are declarations only; SEA-Forge re-derives both from `plan_ref` and requires an exact match, refusing a mismatch as Px. The re-derived IDs and predicates are bound into the descriptor. A missing, duplicate, or conflicting target mapping makes the whole run Px; `run.start` has no generic fallback. Authority is never taken from the request: for an agent caller SEA-Forge verifies the declared `grant_ref` against the credential's delegation head and rejects a mismatch, while in the local-only path `grant_ref` must be null and the execution acts under its own local scope; for a human caller the entitled path resolves the caller's entitlement server-side from the authenticated principal. A human caller has no grant, so no grant is fabricated, defaulted, or synthesized to satisfy a shared schema.
++`run.start` resolves its target operations from the pinned plan before authorization: every target must have exactly one reviewed operation row and one assurance predicate. Resolution authority follows the target classes, so a SEA-Forge outage never disables local work. A plan whose every target is local P0/P1 is resolved against the 0A manifest by Cognate, needs no grant, and makes no SEA-Forge call; a local P0/P1 execution therefore starts normally while SEA-Forge is unreachable. A plan containing any governed target is resolved and verified by SEA-Forge, and a mixed plan is bound at the highest class present and takes the SEA-Forge path for the whole run. **The caller never supplies the resolution.** The request names the case and the steps the person previewed, and the handler resolves the plan itself from the pinned plan; in the governed path SEA-Forge re-derives the same resolution and a request has nothing to disagree with. The resolved IDs and predicates are bound into the descriptor. A missing, duplicate, or conflicting target mapping makes the whole run Px; `run.start` has no generic fallback. Authority is never taken from the request: for an agent caller SEA-Forge verifies the declared `grant_ref` against the credential's delegation head and rejects a mismatch, while in the local-only path `grant_ref` must be null and the execution acts under its own local scope; for a human caller the entitled path resolves the caller's entitlement server-side from the authenticated principal. A human caller has no grant, so no grant is fabricated, defaulted, or synthesized to satisfy a shared schema.
+ 
+ #### P2/P3 policy rows
+ 
+ 
+ `params_schema_ref` is the exact parameter schema frozen at 0A; this table fixes executor, authority, evidence, and expiry. `offline` is never allowed for P2/P3.
+ 
+-| Operation | Executor | Authority writer | Human predicate | Pending expiry |
++| Operation | Executor | Authority writer | Human evidence | Pending expiry |
+ |---|---|---|---|---|
+-| `human.answer` | human session | Cognate local continuation | A3-UV | 10m |
+-| `ask.route` | agent execution, authenticated by its registered key | `case_record.authority` (`local` → Cognate; `governed` → SEA-Forge) | A3-UV | 10m |
+-| `ask.reassign` | human session | `case_record.authority` | A3-UV | 10m |
+-| `ask.withdraw` | human session on the desk route; agent execution, authenticated by its registered key, on the agent door | `case_record.authority` | A3-UV | 10m |
+-| `owner.pin` | human session | Cognate local continuation | A3-UV | 10m |
+-| `workspace.label` | human session | Cognate local continuation | A3-UV | 10m |
+-| `handoff.send` | human session | SEA-Forge case approval | A3-UV | 10m |
+-| `lesson.decide` | human session | Cognate local continuation | A3-UV | 10m |
+-| `remote.start`, `remote.refresh`, `remote.stop` | human session | Cognate local continuation | A3-UV | 10m |
+-| `device.pair` | local console | Cognate local continuation | `local_enrollment_presence` | 5m |
+-| `device.remove` | human session | Cognate local continuation | A3-UV | 10m |
+-| `device.recover` | local console (`via: code_console`) or human session on a distinct paired device (`via: paired_device`) | Cognate local continuation | recovery code + local presence + fresh passkey, or A3-UV from a different already-paired device + fresh passkey | 5m |
+-| `expert.install`, `expert.configure`, `expert.answer`, `expert.remove` | human session | Cognate local continuation | A3-UV | 10m |
+-| `grant.create`, `grant.revoke` | human session | SEA-Forge | A3-UV | 10m |
+-| `grant.redelegate` | agent execution inside a live redelegable parent, or human session | SEA-Forge | agent execution: `none`, gated by the parent's `redelegate` permission, remaining depth, and ancestor budget; human session: A3-UV | bound by parent grant expiry for an agent execution; 10m for a human session |
+-| `gauntlet.run.cancel` | human session | SEA-Forge | A3-UV | 10m |
+-| `trust.rotate` | local console | Cognate/issuer root | `admin_presence` + independent admin | 30m |
+-| `approval.approve`, `approval.reject` | human session | SEA-Forge | A3-UV, separation of duty | 10m |
+-| `capability.invoke` | inherited from the resolved target row | inherited from the resolved target row | inherited from the resolved target row | the resolved target row's expiry evaluated for the actual caller kind; an unresolvable target is Px and has no expiry |
+-| `external.commit` | agent execution | SEA-Forge | `none` or A3 as the target row requires | grant expiry |
+-| `run.start` | inherited from the resolved target rows | inherited from the resolved target rows | inherited from the resolved target rows | the strictest expiry among the resolved target rows; an unresolvable plan is Px and has no expiry |
+-| `workspace.export` | human session | SEA-Forge | A3-UV | 15m |
+-| `isolation.request` | agent execution | SEA-Forge | `none`; capability gate fails if unsupported | grant expiry |
++| `human.answer` | `human_session` | `cognate_local_continuation` | `A3-UV` | 10m |
++| `ask.route` | `agent_execution` | `case_record.authority` | `A3-UV` | 10m |
++| `ask.reassign` | `human_session` | `case_record.authority` | `A3-UV` | 10m |
++| `ask.withdraw` | `agent_execution_or_human_session` | `case_record.authority` | `A3-UV` | 10m |
++| `owner.pin` | `human_session` | `cognate_local_continuation` | `A3-UV` | 10m |
++| `workspace.label` | `human_session` | `cognate_local_continuation` | `A3-UV` | 10m |
++| `handoff.send` | `human_session` | `sea_forge` | `A3-UV` | 10m |
++| `lesson.decide` | `human_session` | `cognate_local_continuation` | `A3-UV` | 10m |
++| `remote.start`, `remote.refresh`, `remote.stop` | `human_session` | `cognate_local_continuation` | `A3-UV` | 10m |
++| `device.pair` | `local_console` | `cognate_local_continuation` | `LOCAL_ENROLLMENT_PRESENCE` | 5m |
++| `device.remove` | `human_session` | `cognate_local_continuation` | `A3-UV` | 10m |
++| `device.recover` | `local_console` | `cognate_local_continuation` | `RECOVERY_CODE_PRESENCE_FRESH_PASSKEY` | 5m |
++| `expert.install`, `expert.configure`, `expert.answer`, `expert.remove` | `human_session` | `cognate_local_continuation` | `A3-UV` | 10m |
++| `grant.create`, `grant.revoke` | `human_session` | `sea_forge` | `A3-UV` | 10m |
++| `grant.redelegate` | `agent_execution_or_human_session` | `sea_forge` | `AGENT_NONE_HUMAN_A3_UV` | bound by parent grant expiry for an agent execution; 10m for a human session |
++| `gauntlet.run.cancel` | `human_session` | `sea_forge` | `A3-UV` | 10m |
++| `trust.rotate` | `local_console` | `issuer_root` | `ADMIN_PRESENCE_INDEPENDENT_ADMIN` | 30m |
++| `approval.approve`, `approval.reject` | `human_session` | `sea_forge` | `A3-UV` | 10m |
++| `capability.invoke` | inherited from the resolved target row | inherited from the resolved target row | `PER_TARGET_ROW` | the resolved target row's expiry evaluated for the actual caller kind; an unresolvable target is Px and has no expiry |
++| `external.commit` | `agent_execution` | `sea_forge` | `PER_TARGET_ROW` | grant expiry |
++| `run.start` | inherited from the resolved target rows | inherited from the resolved target rows | `PER_TARGET_ROW` | the strictest expiry among the resolved target rows; an unresolvable plan is Px and has no expiry |
++| `workspace.export` | `human_session` | `sea_forge` | `A3-UV` | 15m |
++| `isolation.request` | `agent_execution` | `sea_forge` | `NONE` | grant expiry |
+ 
++The executor, authority writer and human evidence columns use the canonical vocabulary the contracts declare: the executors `human_session`, `agent_execution`, `agent_execution_or_human_session`, `local_console` and `code_holder`; the authority writers `cognate_local_continuation`, `case_record.authority`, `sea_forge` and `issuer_root`; and the evidence requirement ids the A3 mechanism declares, which are the only ids a catalog row may name. `case_record.authority` is `local` when the case record carries a local continuation and `governed` when it carries a SEA-Forge decision. The `approval.approve` and `approval.reject` rows additionally require separation of duty: the approver is distinct from the initiating human, the requesting execution and the executor. The `isolation.request` row's capability gate fails closed where isolation is unsupported. `PER_TARGET_ROW` means the resolved target row's requirement, and `NONE` means the row needs no human evidence because its authority comes from somewhere else.
+ P0/P1 operations use the common local rules: P0 A0 read authority, P1 A0/A1 local scope, no delegation creation, no pending approval; `offline` is allowed only for P0/P1 under the five-minute rule. Their per-operation parameter schemas and route mappings are part of the same 0A manifest.
+ 
+ Two catalog clarifications are normative rather than descriptive. Dispatcher rows (`capability.invoke`, `run.start`) carry no authority of their own, so they previously stated per-caller expiry here; that phrasing was replaced because the invariant it protected — no grant for a human caller — is carried by the resolved target row, which already sets `grant_ref` null for a human caller. `grant.redelegate` moved out of the `grant.create`/`grant.revoke` row because those two remain human-only while redelegation is a narrowing operation an agent may perform inside a redelegable parent.
+@@ -742,6 +783,7 @@
+ 
+ Each correction was made in the contract set, not in prose alone. The manifest carries a `live_enforcement` block that states, for every live-bound row, the caller path it runs on, whether the runtime enforces it at this freeze, what enforces it, what is still missing, and the stage that closes the gap; the manifest loader refuses a governed row that claims enforcement it does not have. The parameter schemas are checked against the live handlers by a build check that compares every governed row and every agent-door row field by field, so a schema that drifts from its handler fails the build. The `PendingOperation` record kind and its three constraints are in the record contract, with cross-language fixtures on both sides. This file's section 11 names every reconciled row, its section 12's frozen parameter table matches the frozen schemas field for field, its Appendix A names the pending record and its authority rule, and the Stage 0B boundary states that the browser's pairing route is `session.pair` and not the reserved `device.pair`.
+ 
+-A second independent review against a re-frozen copy of the corrected contract set is the condition for Stage 0A to settle. It has not run yet, and nothing here claims that it has. The first verdict, the frozen copy it read, and the disposition of every finding are retained in [`.agents/evidence/2026-11-09-stage-0a-defects/`](.agents/evidence/2026-11-09-stage-0a-defects/).
++A second independent review against a re-frozen copy of the corrected contract set did run, on a fresh critic reading only the frozen tree, and its verdict was **REJECT**: five blocking findings, seven must-fix findings, and four advisories. The blocking findings were real. The A3-T receipt named `protected_terminal_presence` both as a predicate and as a claim that cannot satisfy it; the pending record's anti-substitution rules were listed in prose but excluded the pending record itself from their own `applies_to`; an operation the identity catalog did not know was not refused at the live intent boundary, so a current frame could turn it into a real write; the governed fixtures and the live wire types disagreed about `owner_rev` and about the fields a workspace-label descriptor carries; and Stage 0B listed `ask.route` as a success while the same catalog row required a bounded grant that Stage 0B does not have. The must-fix findings added the missing operation-specific schemas for every verified live P0/P1 handler, made the design's parameter table field-for-field with the contract, made the approval aliases data rather than prose, split the pairing caller path from local-console presence, checked the agent door's refused prefixes against the field the route actually uses, declared separation of duty on the export row, and stopped the two exceptional P2 ceremonies from inheriting A3-T. The advisories separated a candidate's observed locators from its bindings, registered the ninth signed record, froze a versioned external entitlement interface reference, removed a reference to a field the record does not carry, and encoded the A0-or-A1 disjunction as an explicit `any_of` rather than a list that read as a conjunction. The entitlement reference is now a frozen interface contract and not a name: section 9.1 names the owner, the version, the facts an entitlement must carry, and the rule that refuses while the owner has not published one.
++Each correction was made in the contract set and in this file together. The A3 vocabulary is exactly two predicates with the terminal-presence claim beside them; the pending record carries the descriptor's own anti-substitution rules; the intent boundary classifies every reference before anything runs and refuses one the catalog does not know; the live P0/P1 handlers each name their own parameter schema and the binding check compares all thirty-seven verified rows against the source; the design's parameter table is generated from the contract and checked; the Stage 0B tables name only the operations Stage 0B can actually run; the pairing route's caller path is the code holder rather than the local console; and an entitlement-backed decision or fence binds to the facts the external interface declares, so a name alone is not authority. A third independent review against a re-frozen copy of this corrected set is the condition for Stage 0A to settle. **This file is frozen with the contract set, so the third verdict is recorded beside the frozen copy it read rather than in this document.** A verdict binds the bytes it read; editing this file afterwards to record the verdict would break that binding and invalidate the design hash the remediation preregistration pins. The first and second verdicts, the third verdict when it lands, the frozen copies they read, and the disposition of every finding are retained in [`.agents/evidence/2026-11-09-stage-0a-defects/`](.agents/evidence/2026-11-09-stage-0a-defects/).
+ 
+ Implementation has begun at Stage 0A: the contract set, the issuer profile, the A3 mechanism, the cross-language fixtures, and the negative tests for the two recorded identity defects exist and are checked. The full finding-to-disposition record, the closure-round findings, reviewer identities, retained outputs, and the final acceptance verdict are in [`.agents/reports/2026-11-08-identity-authority-adversarial-review.md`](.agents/reports/2026-11-08-identity-authority-adversarial-review.md).

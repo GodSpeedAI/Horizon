@@ -12,6 +12,7 @@ import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { deskState } from "./support/desk-fixture.ts";
 import { quietIo } from "./support/desk-io.ts";
 import { withRequestId } from "./support/request-body.ts";
+import { agentInProcess } from "./support/agent-door.ts";
 
 const select = { id: "which_way", question: "Which plan should we use?", why_needed: "Two plans", options: [{ option_id: "plan_a", label: "Plan A" }, { option_id: "plan_b", label: "Plan B" }] };
 const multi = { id: "many", input: "multiselect", question: "Which parts?", why_needed: "x", options: [{ option_id: "o1", label: "Part one" }, { option_id: "o2", label: "Part two" }] };
@@ -27,6 +28,12 @@ afterAll(async () => app.stop());
 const door = (path: string, body?: unknown, auth: string | null = `Bearer ${key}`, extra: Record<string, string> = {}) =>
   fetch(`${app.base}${path}`, { method: body === undefined ? "GET" : "POST", headers: { ...(auth === null ? {} : { authorization: auth }), "content-type": "application/json", ...extra }, ...(body === undefined ? {} : { body: JSON.stringify(withRequestId(body)) }) });
 const rows = async (): Promise<any[]> => (await (await fetch(`${app.base}/desk/conversation`)).json()).rows;
+/**
+ * The door's own machinery, at the function the door calls after its checks. The door refuses
+ * `answer.route` and `ask.withdraw` at this freeze (R5-01); the rules they enforce are still the
+ * things these tests are about, so they are exercised where the door would run them.
+ */
+const inProcess = (body: unknown) => agentInProcess(app.application, "default", undefined, body);
 
 describe("the agent door", () => {
   test("no key and a wrong key are refused, and nothing changes", async () => {
@@ -74,8 +81,15 @@ describe("the agent door", () => {
   });
 
   test("the person's operations are refused over the door", async () => {
-    for (const body of [{ op: "human.answer", panel: "plan", ask: "which_way", ...(await revisionOf(app, "plan", "which_way")), outcome: "answered", value: "plan_a" }, { op: "human.close", id: "plan" }, { op: "human.pin", id: "plan", pinned: true }]) {
+    // The route's action field is `tool`, so the reserved-operation refusal is read from `tool`
+    // and from nowhere else (R2-10). A reserved operation named in any other field is not an
+    // action the door performs, so it is refused as an unreadable request rather than silently
+    // ignored.
+    for (const body of [{ tool: "human.answer", panel: "plan", ask: "which_way", ...(await revisionOf(app, "plan", "which_way")), outcome: "answered", value: "plan_a" }, { tool: "human.close", id: "plan" }, { tool: "human.pin", id: "plan", pinned: true }]) {
       expect((await door("/agent/panels", body)).status).toBe(403);
+    }
+    for (const body of [{ op: "human.answer", panel: "plan", ask: "which_way", ...(await revisionOf(app, "plan", "which_way")), outcome: "answered", value: "plan_a" }, { op: "human.close", id: "plan" }, { op: "human.pin", id: "plan", pinned: true }]) {
+      expect((await door("/agent/panels", body)).status).toBe(400);
     }
     expect((await door("/agent/panels", { tool: "nonsense" })).status).toBe(400);
     expect((await app.state()).panels.open.find((p: any) => p.id === "plan").pinned).toBe(false);
@@ -96,8 +110,11 @@ describe("the agent door", () => {
     expect((await rows()).find((r) => r.kind === "panel" && r.refs.panel_id === "plan2").status).toBe("done");
     const waiting = await (await door("/agent/panels/answers")).json();
     expect(waiting.responses.filter((a: any) => a.panel_id === "plan2")).toHaveLength(2);
-    expect((await door("/agent/panels", { tool: "answer.route", panel_id: "plan2", ask_id: "which_way", routed_as: "no" })).status).toBe(400);
-    expect((await door("/agent/panels", { tool: "answer.route", panel_id: "plan2", ask_id: "which_way", routed_as: "step s1 in Seed: triage" })).status).toBe(200);
+    // The door refuses the row itself at this freeze, before any effect (R5-01).
+    expect((await door("/agent/panels", { tool: "answer.route", panel_id: "plan2", ask_id: "which_way", routed_as: "step s1 in Seed: triage" })).status).toBe(403);
+    // The rule the route applies is unchanged: words that say nothing about where it went are refused, real words are taken.
+    expect((await inProcess({ tool: "answer.route", panel_id: "plan2", ask_id: "which_way", routed_as: "no" })).status).toBe(400);
+    expect((await inProcess({ tool: "answer.route", panel_id: "plan2", ask_id: "which_way", routed_as: "step s1 in Seed: triage" })).status).toBe(200);
     mine = (await rows()).filter((r) => r.kind === "answer" && r.refs.panel_id === "plan2" && r.refs.ask_id === "which_way");
     expect(mine).toHaveLength(1);
     expect(mine[0].status).toBe("claimed");
@@ -109,9 +126,10 @@ describe("the agent door", () => {
     expect(text).not.toContain("Your answer to which_way");
   });
 
-  test("withdraw closes the question's entry with the reason", async () => {
+  test("withdraw closes the question's entry with the reason; the door refuses the row itself at this freeze", async () => {
     await door("/agent/panels", { tool: "ask_human", panel: "plan3", ask: select });
-    expect((await door("/agent/panels", { tool: "ask.withdraw", panel_id: "plan3", ask_id: "which_way", reason: "Found it myself" })).status).toBe(200);
+    expect((await door("/agent/panels", { tool: "ask.withdraw", panel_id: "plan3", ask_id: "which_way", reason: "Found it myself" })).status).toBe(403);
+    expect((await inProcess({ tool: "ask.withdraw", panel_id: "plan3", ask_id: "which_way", reason: "Found it myself" })).status).toBe(200);
     const row = (await rows()).find((r) => r.kind === "panel" && r.refs.panel_id === "plan3");
     expect(row.status).toBe("done");
     expect(row.outcome).toBe("The agent withdrew this question: Found it myself");

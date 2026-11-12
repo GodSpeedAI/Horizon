@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
 import { listDevices } from "../src/capabilities/remote-records.ts";
+import { readIntentRecords } from "../src/capabilities/navigation-intent.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
@@ -24,6 +25,8 @@ let phone: { readonly origin: string } | null = null;
 let cookie = "";
 let authenticator: SoftwareAuthenticator;
 let phoneLink = "";
+
+const intents = async () => (await readIntentRecords(application.runtime.runtime.store)).length;
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
 beforeAll(async () => {
@@ -275,7 +278,12 @@ describe("commands: one command id, one outcome; claims stay distinct", () => {
     expect((await postJson("/m/api/command", { command_id: randomUUID(), kind: "delete_everything" })).status).toBe(400);
   });
 
-  test("a commit with a stale frame revision is refused as stale_surface and commits nothing", async () => {
+  test("a commit from the phone is refused before the frame is even checked, and nothing commits", async () => {
+    // The commit runs under the person's own principal, and a device credential proves which
+    // device is at the route and never which person is holding it: there is no device-attributed
+    // delegation from the operator at this freeze, so the row is refused in the catalog's own
+    // words before any commit is attempted. A stale frame is therefore not the reason, and
+    // nothing at all is written (R5-03).
     const response = await postJson("/m/api/command", {
       command_id: randomUUID(),
       kind: "commit",
@@ -283,11 +291,17 @@ describe("commands: one command id, one outcome; claims stay distinct", () => {
       frame_revision: 0,
       action_id: "horizon-health",
     });
-    expect(response.status).toBe(409);
-    expect(((await response.json()) as { outcome: { code: string } }).outcome.code).toBe("stale_surface");
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as { accepted: boolean; outcome: { state: string; code: string; message: string } };
+    expect(body.accepted).toBe(false);
+    expect(body.outcome).toMatchObject({ state: "refused", code: "refused" });
+    expect(body.outcome.message).toContain("delegation");
+    const audit = await (await fetch(`${cockpitBase}/desk/state.json`)).json();
+    expect(JSON.stringify(audit)).not.toContain("horizon-health");
+    expect(await intents()).toBe(0);
   });
 
-  test("a commit of an offered move from the phone is the cockpit's commit, and the desktop shows its receipt", async () => {
+  test("a commit of an offered move from the phone is refused: no receipt, no intent, and the desktop sees nothing", async () => {
     const state = (await (await phoneRequest("/m/api/state")).json()) as {
       frame: { frame_id: string; revision: number };
       actions: { action_id: string }[];
@@ -301,20 +315,17 @@ describe("commands: one command id, one outcome; claims stay distinct", () => {
       frame_revision: state.frame.revision,
       action_id: action.action_id,
     });
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as { accepted: boolean; outcome: { intent_id: string; receipt: { found: boolean } | null } };
-    expect(body.accepted).toBe(true);
-    expect(body.outcome.receipt?.found).toBe(true);
-    const desktop = (await (await fetch(`${cockpitBase}/desk/state.json?receipt=${body.outcome.intent_id}`)).json()) as { home: { receipt: { found: boolean } | null } };
-    expect(desktop.home.receipt?.found).toBe(true);
-    const { Desk } = await import("../src/ui/desk/Desk.tsx");
-    const { START } = await import("../src/ui/desk/attention.ts");
-    const { quietIo } = await import("./support/desk-io.ts");
-    const { renderToStaticMarkup } = await import("react-dom/server");
-    const { createElement } = await import("react");
-    const drawn = renderToStaticMarkup(createElement(Desk, { ui: { ...START, data: desktop as never }, dispatch: () => undefined, io: quietIo() }));
-    expect(drawn).toContain('data-claim="decided"');
-    expect(drawn).toContain("Recorded by Horizon, ");
+    // The action is genuinely offered and the frame genuinely holds; the refusal is about who is
+    // asking, not about the move. The phone answers in the catalog's words and the desktop is
+    // never told a move happened, because none did (R5-01, R5-03).
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as { accepted: boolean; outcome: { state: string; code: string; message: string } };
+    expect(body.accepted).toBe(false);
+    expect(body.outcome.state).toBe("refused");
+    expect(body.outcome.message).toContain("delegation");
+    expect(await intents()).toBe(0);
+    const desktop = (await (await fetch(`${cockpitBase}/desk/state.json`)).json()) as { home: { receipt: { found: boolean } | null } };
+    expect(desktop.home.receipt).toBeNull();
   });
 });
 

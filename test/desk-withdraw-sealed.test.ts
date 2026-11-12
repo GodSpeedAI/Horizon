@@ -7,6 +7,7 @@ import { AGREED_COLLECTION, agreedFingerprint, listAnswers } from "../src/capabi
 import { MIGRATION_COLLECTION } from "../src/capabilities/desk-migrations.ts";
 import { PANELS_COLLECTION, panelIdOf } from "../src/capabilities/panel-records.ts";
 import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
+import { agentInProcess } from "./support/agent-door.ts";
 
 const apps: DeskApp[] = [];
 const open = async (root?: string) => {
@@ -44,7 +45,9 @@ describe("a question sealed as answered cannot be withdrawn after a republish (R
     const put = await fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json" }, body: JSON.stringify({ tool: "ask_human", panel: "sealed_panel", ask: question, request_id: "put-r54-1" }) });
     expect(put.status).toBe(200);
 
-    const withdrawn = await fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json" }, body: JSON.stringify({ tool: "ask.withdraw", panel_id: "sealed_panel", ask_id: "q1", reason: "No longer needed", request_id: "withdraw-r54-1" }) });
+    // The door refuses `ask.withdraw` at this freeze (R5-01); the machinery is called where the
+    // door calls it, so the sealed-question rule is still the thing under test.
+    const withdrawn = await agentInProcess(app.application, "default", undefined, { tool: "ask.withdraw", panel_id: "sealed_panel", ask_id: "q1", reason: "No longer needed", request_id: "withdraw-r54-1" });
     expect(withdrawn.status).toBeGreaterThanOrEqual(400);
     expect(withdrawn.status).toBeLessThan(500);
     expect((await withdrawn.json()).message).toBe("That question was already answered, so it cannot be withdrawn.");

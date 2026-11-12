@@ -1,0 +1,1148 @@
+{
+  "records_version": "horizon.identity.records/1",
+  "contract_id": "horizon.identity.records",
+  "contract_version": "1.3.0",
+  "frozen_at": "2026-11-10",
+  "authority": {
+    "design": "design_draft.md Appendix A (record schemas) and sections 7, 9.1, 14",
+    "spec": {
+      "id": "HORIZON-001",
+      "version": "1.2.0",
+      "sha256": "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435"
+    },
+    "note": "A JSON descriptor rather than YAML so the same bytes are read by the TypeScript contract and an independent Python checker with no new dependency. The descriptor decides field names, types, and nullability; cross-field rules are listed in `constraints` and implemented once per language. The interfaces this contract consumes from other projects are declared in `contracts/identity/v1/external-interfaces.json`; Horizon mints none of them."
+  },
+  "encoding": {
+    "uint64": "JSON string of canonical decimal digits, no sign, no leading zero, at most 2^64-1. Never a JSON number.",
+    "decimal": "JSON string of canonical decimal digits with an optional fraction, never a JSON number and never a float.",
+    "timestamp": "RFC 3339 UTC with a literal Z suffix and no offset: YYYY-MM-DDTHH:MM:SS[.fraction]Z.",
+    "base64url": "Unpadded base64url over A-Z a-z 0-9 - _ , at least 16 characters.",
+    "digest": "sha256:<64 lowercase hex characters>.",
+    "jwk": "A public JWK: kty in EC, RSA, OKP. Private members d, p, q, dp, dq, qi, oth are refused.",
+    "money": "An object with amount (decimal), unit (string), and an optional remaining (decimal). A value without a unit is refused.",
+    "enum": "A JSON string from the declared list."
+  },
+  "envelope": [
+    {
+      "name": "schema_version",
+      "type": "string"
+    },
+    {
+      "name": "tenant_ref",
+      "type": "string"
+    },
+    {
+      "name": "trust_domain_ref",
+      "type": "string"
+    },
+    {
+      "name": "issued_at",
+      "type": "timestamp"
+    },
+    {
+      "name": "issuer_ref",
+      "type": "string"
+    }
+  ],
+  "records": {
+    "Credential": {
+      "signed": true,
+      "identity": "An agent execution's short-lived credential, issued by the local issuer. It carries no human authority and no human is ever issued one.",
+      "nullability": "delegation_ref is required and may be null only for a local P0/P1 execution; it is non-null for governed execution. attempt_ref may be null for a credential that outlives one attempt.",
+      "fields": [
+        {
+          "name": "iss",
+          "type": "string"
+        },
+        {
+          "name": "sub",
+          "type": "string"
+        },
+        {
+          "name": "aud",
+          "type": "string"
+        },
+        {
+          "name": "jti",
+          "type": "string"
+        },
+        {
+          "name": "iat",
+          "type": "uint64"
+        },
+        {
+          "name": "nbf",
+          "type": "uint64"
+        },
+        {
+          "name": "exp",
+          "type": "uint64"
+        },
+        {
+          "name": "execution_ref",
+          "type": "string"
+        },
+        {
+          "name": "attempt_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "holder_jwk",
+          "type": "jwk"
+        },
+        {
+          "name": "delegation_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "authority_epoch",
+          "type": "uint64"
+        },
+        {
+          "name": "issuer_generation",
+          "type": "uint64"
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "OperationDescriptor": {
+      "signed": true,
+      "identity": "What a caller asks to do, with the caller's identity taken from the authenticated session rather than from the request's own words.",
+      "nullability": "execution_ref and delegation_ref are required for agent_execution except that a local P0/P1 execution may have a null delegation; a registered_agent names no execution, because the registered key proves a principal and not a logical execution, and names no delegation head either, because it holds no grant; both are null for human_session, local_console, code_holder and device_credential. caller_ref is the session, execution, agent principal, console principal, device principal or code holder, never the target execution.",
+      "fields": [
+        {
+          "name": "operation_id",
+          "type": "string"
+        },
+        {
+          "name": "caller_kind",
+          "type": "string",
+          "enum": [
+            "human_session",
+            "registered_agent",
+            "agent_execution",
+            "local_console",
+            "code_holder",
+            "device_credential"
+          ]
+        },
+        {
+          "name": "caller_ref",
+          "type": "string"
+        },
+        {
+          "name": "parameters",
+          "type": "object"
+        },
+        {
+          "name": "params_schema_ref",
+          "type": "string"
+        },
+        {
+          "name": "nonce",
+          "type": "base64url"
+        },
+        {
+          "name": "issued_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "resource_refs",
+          "type": "string_array"
+        },
+        {
+          "name": "expected_revision",
+          "type": "uint64",
+          "nullable": true
+        },
+        {
+          "name": "world_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "case_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "frame_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "execution_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "delegation_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "policy_digest",
+          "type": "digest"
+        },
+        {
+          "name": "idempotency_key",
+          "type": "string"
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "DelegationGrant": {
+      "signed": true,
+      "identity": "A bounded grant from a person (root) or from a live parent grant (child). It never expands authority and is never issued for a human session.",
+      "nullability": "parent_ref and execution_ref are null for a root grant; a child grant requires a live parent and may bind an execution.",
+      "fields": [
+        {
+          "name": "grant_ref",
+          "type": "string"
+        },
+        {
+          "name": "parent_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "delegator_ref",
+          "type": "string"
+        },
+        {
+          "name": "agent_ref",
+          "type": "string"
+        },
+        {
+          "name": "execution_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "audience",
+          "type": "string"
+        },
+        {
+          "name": "operations",
+          "type": "string_array"
+        },
+        {
+          "name": "resource_selectors",
+          "type": "string_array"
+        },
+        {
+          "name": "data_labels",
+          "type": "string_array"
+        },
+        {
+          "name": "budget",
+          "type": "money"
+        },
+        {
+          "name": "not_before",
+          "type": "timestamp"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "depth_remaining",
+          "type": "uint64"
+        },
+        {
+          "name": "redelegate",
+          "type": "boolean"
+        },
+        {
+          "name": "offline",
+          "type": "boolean"
+        },
+        {
+          "name": "human_evidence",
+          "type": "string"
+        },
+        {
+          "name": "authority_epoch",
+          "type": "uint64"
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "AuthorityDecision": {
+      "signed": true,
+      "identity": "The authority writer's answer for one operation digest, one set of resources, and one amount.",
+      "nullability": "grant_ref is null only for a root grant.create or for an entitlement-backed human P2/P3, in which case entitlement_ref is non-null and current. approver_ref is null only for an autonomous policy decision; a human-reserved decision requires it. An entitlement_ref names a record of the `sea_forge.human_entitlement` interface, which SEA-Forge owns; see `contracts/identity/v1/external-interfaces.json`. The entitlement is an external record whose interface is specified but not yet published, so the entitlement-backed path is unavailable until its owner publishes it.",
+      "fields": [
+        {
+          "name": "decision_ref",
+          "type": "string"
+        },
+        {
+          "name": "grant_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "entitlement_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "operation_digest",
+          "type": "digest"
+        },
+        {
+          "name": "resource_refs",
+          "type": "string_array"
+        },
+        {
+          "name": "amount",
+          "type": "money",
+          "nullable": true
+        },
+        {
+          "name": "decision",
+          "type": "string",
+          "enum": [
+            "permitted",
+            "refused"
+          ]
+        },
+        {
+          "name": "policy_digest",
+          "type": "digest"
+        },
+        {
+          "name": "authority_epoch",
+          "type": "uint64"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "approver_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "reservation_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "Approval": {
+      "signed": true,
+      "identity": "A human-reserved decision bound to one operation digest and one single-use nonce.",
+      "nullability": "approver_ref must differ from requester_ref and executor_ref. executor_ref is null for a human-only decision. The nonce is single use.",
+      "fields": [
+        {
+          "name": "approval_ref",
+          "type": "string"
+        },
+        {
+          "name": "operation_digest",
+          "type": "digest"
+        },
+        {
+          "name": "requester_ref",
+          "type": "string"
+        },
+        {
+          "name": "executor_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "approver_ref",
+          "type": "string"
+        },
+        {
+          "name": "tenant_ref",
+          "type": "string"
+        },
+        {
+          "name": "policy_digest",
+          "type": "digest"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "nonce",
+          "type": "base64url"
+        },
+        {
+          "name": "state",
+          "type": "string",
+          "enum": [
+            "pending",
+            "consumed",
+            "rejected",
+            "expired"
+          ]
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "EffectFence": {
+      "signed": true,
+      "identity": "The immutable right to dispatch one effect once. It is the last record checked before an effect is written.",
+      "nullability": "grant_ref is null for an entitlement-backed human P2/P3, in which case entitlement_ref is required. Exactly one of the two is present. execution_ref and attempt_ref are null for a human or console caller. supersedes_ref is null only for the first attempt. An entitlement_ref names a record of the `sea_forge.human_entitlement` interface, which SEA-Forge owns; see `contracts/identity/v1/external-interfaces.json`. The entitlement is an external record whose interface is specified but not yet published, so the entitlement-backed path is unavailable until its owner publishes it.",
+      "fields": [
+        {
+          "name": "fence_ref",
+          "type": "string"
+        },
+        {
+          "name": "caller_ref",
+          "type": "string"
+        },
+        {
+          "name": "decision_ref",
+          "type": "string"
+        },
+        {
+          "name": "grant_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "entitlement_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "execution_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "attempt_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "resource_refs",
+          "type": "string_array"
+        },
+        {
+          "name": "amount",
+          "type": "money"
+        },
+        {
+          "name": "operation_digest",
+          "type": "digest"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "authority_epoch",
+          "type": "uint64"
+        },
+        {
+          "name": "dispatch_epoch",
+          "type": "uint64"
+        },
+        {
+          "name": "supersedes_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "A3Receipt": {
+      "signed": true,
+      "identity": "What the verifier reports about one human authentication. It holds no raw assertion: the assertion is never stored, only its digest.",
+      "nullability": "uv must be true for A3-UV. A3-T records protected terminal presence in its own protected_terminal_presence claim and never as a user verification, and it is confined to Stage 0B local containment.",
+      "fields": [
+        {
+          "name": "verifier_ref",
+          "type": "string"
+        },
+        {
+          "name": "key_id",
+          "type": "string"
+        },
+        {
+          "name": "device_ref",
+          "type": "string"
+        },
+        {
+          "name": "principal_ref",
+          "type": "string"
+        },
+        {
+          "name": "tenant_ref",
+          "type": "string"
+        },
+        {
+          "name": "trust_domain_ref",
+          "type": "string"
+        },
+        {
+          "name": "operation_digest",
+          "type": "digest"
+        },
+        {
+          "name": "challenge_digest",
+          "type": "digest"
+        },
+        {
+          "name": "policy_digest",
+          "type": "digest"
+        },
+        {
+          "name": "up",
+          "type": "boolean"
+        },
+        {
+          "name": "uv",
+          "type": "boolean"
+        },
+        {
+          "name": "protected_terminal_presence",
+          "type": "boolean",
+          "note": "The claim that the presence came from a protected terminal outside the agent's control. It is a claim, not an assurance predicate: only A3-UV and A3-T are predicates."
+        },
+        {
+          "name": "sign_count",
+          "type": "uint64"
+        },
+        {
+          "name": "assurance_predicate",
+          "type": "string",
+          "enum": [
+            "A3-UV",
+            "A3-T"
+          ]
+        },
+        {
+          "name": "verified_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "EvidenceRecord": {
+      "signed": true,
+      "identity": "One producer's observation about one operation digest, and what that observation says about the effect. It carries no credential and no private content.",
+      "nullability": "supersedes_ref is null for a first record and names the record this one replaces otherwise. observation_outcome says what the producer observed; effect_outcome says what the effect became. The two are separate facts and a record carries both: an observation can succeed while the effect it observed is still uncertain, and an effect can fail without the observation itself having failed.",
+      "fields": [
+        {
+          "name": "producer",
+          "type": "string"
+        },
+        {
+          "name": "producer_record_id",
+          "type": "string"
+        },
+        {
+          "name": "trace_id",
+          "type": "string"
+        },
+        {
+          "name": "operation_digest",
+          "type": "digest"
+        },
+        {
+          "name": "refs",
+          "type": "string_array"
+        },
+        {
+          "name": "assurance_predicate",
+          "type": "string"
+        },
+        {
+          "name": "authority_epoch",
+          "type": "uint64"
+        },
+        {
+          "name": "issuer_generation",
+          "type": "uint64"
+        },
+        {
+          "name": "observation_outcome",
+          "type": "string",
+          "enum": [
+            "observed",
+            "failed",
+            "refused"
+          ],
+          "meaning": "What the producer's observation was: it observed the thing, the observation failed, or the observation was refused."
+        },
+        {
+          "name": "effect_outcome",
+          "type": "string",
+          "enum": [
+            "none",
+            "uncertain",
+            "committed"
+          ],
+          "meaning": "What the observed effect became: no effect took hold, the effect's commitment is uncertain, or the effect committed."
+        },
+        {
+          "name": "content_hash",
+          "type": "digest"
+        },
+        {
+          "name": "supersedes_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "Refusal": {
+      "signed": false,
+      "identity": "What a boundary reports when it will not perform an operation. It is an outcome, not an authority record, so it is not signed; it is also the only record a caller may receive without one.",
+      "nullability": "effect reports whether anything happened (none, uncertain, committed). missing_or_expired names what was absent. repair may be null only when no lawful repair exists.",
+      "fields": [
+        {
+          "name": "code",
+          "type": "string"
+        },
+        {
+          "name": "boundary",
+          "type": "string"
+        },
+        {
+          "name": "operation_id",
+          "type": "string"
+        },
+        {
+          "name": "effect",
+          "type": "string",
+          "enum": [
+            "none",
+            "uncertain",
+            "committed"
+          ]
+        },
+        {
+          "name": "missing_or_expired",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "repair",
+          "type": "string",
+          "nullable": true
+        }
+      ]
+    },
+    "PendingOperation": {
+      "signed": true,
+      "identity": "The immutable descriptor for one governed operation: what was asked, by whom, under which authority, and the window in which it may be confirmed. It is written once, before the effect, and never rewritten. It carries no state: the state lives in appended PendingTransition records, so a confirmation is never erased by a later expiry and the signed descriptor stays true for as long as it exists.",
+      "nullability": "created_at is the descriptor's creation time and expires_at its expiry. The descriptor's confirmer_ref, presence_evidence and local_receipt are always null: the confirmation is a PendingTransition from pending to confirmed, and that record carries them. case_authority is local or governed and is immutable for this record; a replacement record must carry the same one. execution_ref and delegation_ref are null for a human or console caller. The confirmation_code is single use and binds the confirming actor.",
+      "fields": [
+        {
+          "name": "pending_id",
+          "type": "string"
+        },
+        {
+          "name": "operation_id",
+          "type": "string"
+        },
+        {
+          "name": "caller_kind",
+          "type": "string",
+          "enum": [
+            "human_session",
+            "registered_agent",
+            "agent_execution",
+            "local_console",
+            "code_holder",
+            "device_credential"
+          ]
+        },
+        {
+          "name": "requester_ref",
+          "type": "string"
+        },
+        {
+          "name": "params_schema_ref",
+          "type": "string"
+        },
+        {
+          "name": "parameters",
+          "type": "object"
+        },
+        {
+          "name": "nonce",
+          "type": "base64url"
+        },
+        {
+          "name": "operation_digest",
+          "type": "digest"
+        },
+        {
+          "name": "resource_refs",
+          "type": "string_array"
+        },
+        {
+          "name": "expected_revision",
+          "type": "uint64",
+          "nullable": true
+        },
+        {
+          "name": "world_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "case_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "frame_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "case_authority",
+          "type": "string",
+          "enum": [
+            "local",
+            "governed"
+          ]
+        },
+        {
+          "name": "policy_digest",
+          "type": "digest"
+        },
+        {
+          "name": "execution_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "delegation_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "session_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "confirmer_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "presence_evidence",
+          "type": "object",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "confirmation_code",
+          "type": "base64url"
+        },
+        {
+          "name": "launch_generation",
+          "type": "string"
+        },
+        {
+          "name": "effect_class",
+          "type": "string",
+          "enum": [
+            "db_local",
+            "external"
+          ]
+        },
+        {
+          "name": "effect_idempotency_key",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "supersedes_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "local_receipt",
+          "type": "object",
+          "nullable": true
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "PendingTransition": {
+      "signed": true,
+      "identity": "One appended state transition of a pending operation. It is the only place a pending operation's state, its confirmation, or its expiry is recorded: the descriptor is immutable, so a transition that changes the state is a new signed record rather than a rewrite of the old one. The chain of transitions for one pending_id is the record of what happened to it.",
+      "nullability": "confirmer_ref, presence_evidence and local_receipt are null on every transition except the one from pending to confirmed, which carries all three: the confirmation step writes them, never the caller. reason names why the transition happened. launch_generation is the launch the transition happened in; a transition that ends a prior launch's operation is an expiry, never a confirmation.",
+      "fields": [
+        {
+          "name": "transition_id",
+          "type": "string"
+        },
+        {
+          "name": "pending_id",
+          "type": "string"
+        },
+        {
+          "name": "from_state",
+          "type": "string",
+          "enum": [
+            "pending",
+            "confirmed",
+            "dispatching"
+          ]
+        },
+        {
+          "name": "to_state",
+          "type": "string",
+          "enum": [
+            "confirmed",
+            "dispatching",
+            "applied",
+            "uncertain",
+            "expired"
+          ]
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "enum": [
+            "human_confirmation",
+            "window_closed",
+            "launch_ended",
+            "redemption_claim",
+            "effect_applied",
+            "effect_uncertain"
+          ]
+        },
+        {
+          "name": "confirmer_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "presence_evidence",
+          "type": "object",
+          "nullable": true
+        },
+        {
+          "name": "local_receipt",
+          "type": "object",
+          "nullable": true
+        },
+        {
+          "name": "at",
+          "type": "timestamp"
+        },
+        {
+          "name": "launch_generation",
+          "type": "string"
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    }
+  },
+  "constraints": {
+    "human_has_no_grant": {
+      "applies_to": [
+        "OperationDescriptor",
+        "PendingOperation"
+      ],
+      "rule": "A human_session caller has no grant and no delegation head. delegation_ref is null, and no parameter that names a delegation as the caller's own authority may be present. The register of delegation reference parameters says which parameter is which, per schema and caller kind: a delegation named as the operation's target \u2014 the grant a revocation revokes, the parent a redelegation narrows \u2014 is not a delegation the caller holds, so a human session may name it. No grant is fabricated, defaulted, or synthesized to satisfy a shared schema. The entitlement-backed P2/P3 case is covered by fence_authority_exactly_one."
+    },
+    "human_has_no_credential": {
+      "applies_to": [
+        "OperationDescriptor",
+        "PendingOperation"
+      ],
+      "rule": "A human_session caller has no credential, so execution_ref is null. The descriptor carries no attempt reference of its own; the attempt belongs to the credential and to the fence."
+    },
+    "agent_needs_execution": {
+      "applies_to": [
+        "OperationDescriptor",
+        "PendingOperation"
+      ],
+      "rule": "An agent_execution caller names the execution it runs as."
+    },
+    "console_has_no_execution": {
+      "applies_to": [
+        "OperationDescriptor",
+        "PendingOperation"
+      ],
+      "rule": "A local_console caller has no execution and no delegation."
+    },
+    "caller_is_not_target": {
+      "applies_to": [
+        "EffectFence"
+      ],
+      "rule": "The fence's caller_ref is the session, execution, or console principal that asked; execution_ref is the execution that will perform the effect. A fence whose caller_ref equals its execution_ref is a caller claiming to be the execution it targets, and is refused. On a descriptor the caller_ref may legitimately be the executing principal, so substitution there is caught by the caller_kind rules instead."
+    },
+    "governed_agent_needs_delegation": {
+      "applies_to": [
+        "OperationDescriptor",
+        "PendingOperation"
+      ],
+      "rule": "A governed (P2/P3) agent execution is authorized by a live delegation, so delegation_ref is non-null. A local P0/P1 agent execution may omit it."
+    },
+    "params_schema_mismatch": {
+      "applies_to": [
+        "OperationDescriptor",
+        "PendingOperation"
+      ],
+      "rule": "The descriptor's params_schema_ref is the schema the catalog row names for that operation. Naming a weaker schema is a classification downgrade through the parameters, and is refused."
+    },
+    "alias_fixes_action": {
+      "applies_to": [
+        "OperationDescriptor",
+        "PendingOperation"
+      ],
+      "rule": "Where the operation ID fixes an action or resolution, a parameter that disagrees with it is refused. The operation ID, not the payload, decides what is performed."
+    },
+    "dispatcher_target_listed": {
+      "applies_to": [
+        "OperationDescriptor",
+        "PendingOperation"
+      ],
+      "rule": "A dispatch carries no authority of its own: every target it names (target_operation, or each entry of resolved_operations for a plan) must be a listed catalog row, and a dispatch naming no target at all is Px. An unlisted or unresolvable target makes the whole descriptor Px."
+    },
+    "separation_of_duty": {
+      "applies_to": [
+        "Approval"
+      ],
+      "rule": "The approver is distinct from the requester and from the executor. A P3 grant may authorize an execution but never authorizes that execution to approve its own commitment."
+    },
+    "child_subset_of_parent": {
+      "applies_to": [
+        "DelegationGrant"
+      ],
+      "rule": "A child grant is a strict subset of its live parent: operations, resources, budget, expiry, depth, audience, and the redelegate and offline permissions may only narrow. An absent child field grants nothing; it is not inherited."
+    },
+    "fence_authority_exactly_one": {
+      "applies_to": [
+        "EffectFence",
+        "AuthorityDecision"
+      ],
+      "rule": "An effect is fenced either by a grant or by a current human entitlement, never by both and never by neither. An authority decision names exactly one of the two; a decision naming neither was not made by an authority."
+    },
+    "a3_uv_requires_uv": {
+      "applies_to": [
+        "A3Receipt"
+      ],
+      "rule": "An A3-UV receipt reports user verification. A receipt that claims A3-UV with uv false is refused."
+    },
+    "nonce_not_reused": {
+      "applies_to": [
+        "Approval",
+        "OperationDescriptor",
+        "PendingOperation"
+      ],
+      "rule": "A nonce is single use. A record whose nonce already appears among the supplied previous nonces is refused. A pending record's nonce is the replay guard for the confirmation: the same nonce may not open a second pending record for the same operation."
+    },
+    "supersedes_chain": {
+      "applies_to": [
+        "EffectFence",
+        "EvidenceRecord",
+        "PendingOperation"
+      ],
+      "rule": "supersedes_ref is null only for a first attempt or a first record. When the supplied context names a previous reference, the new record must supersede exactly that one. A pending record that replaces an expired one names the expired record it replaces, and the replacement carries the same operation and the same case authority."
+    },
+    "pending_confirmation_not_caller_supplied": {
+      "applies_to": [
+        "PendingOperation",
+        "PendingTransition"
+      ],
+      "rule": "A pending descriptor carries no confirmation: its confirmer_ref, presence_evidence and local_receipt are always null, and the confirmation lives in the PendingTransition that moves the operation from pending to confirmed. The confirmation is written by the confirmation step, never by the caller: a transition that names a confirmer, presence evidence or a receipt on any other transition, or that moves into confirmed without all three, is refused."
+    },
+    "pending_case_authority_immutable": {
+      "applies_to": [
+        "PendingOperation"
+      ],
+      "rule": "case_authority is immutable for a pending record. A replacement record, named by supersedes_ref, carries the same case_authority and the same operation_id as the record it replaces; a replacement that widens the authority of the original is refused."
+    },
+    "pending_governed_needs_governed_authority": {
+      "applies_to": [
+        "PendingOperation"
+      ],
+      "rule": "A row whose authority comes from outside the local continuation \u2014 every P3 row, and any row whose authority writer is SEA-Forge or the issuer root \u2014 acts on a governed case and requires case_authority governed. A local pending record may not stand in for a governed decision, and an interim local receipt may not enable the row."
+    },
+    "pending_case_authority_matches_case": {
+      "applies_to": [
+        "PendingOperation"
+      ],
+      "rule": "A row whose authority writer is case_record.authority takes its authority from the case the operation acts on: local means the Cognate continuation, governed means SEA-Forge. The pending record states that authority in case_authority, and it must equal the case record's authority; a pending record that claims a different one is refused."
+    },
+    "a3_t_requires_protected_terminal_presence": {
+      "applies_to": [
+        "A3Receipt"
+      ],
+      "rule": "An A3-T receipt claims protected-terminal presence. A receipt that claims A3-T with protected_terminal_presence false is refused: the terminal claim is what the predicate rests on, and without it the receipt claims an assurance it cannot show."
+    },
+    "a3_uv_is_not_terminal_presence": {
+      "applies_to": [
+        "A3Receipt"
+      ],
+      "rule": "Terminal presence and user verification are separate claims and neither stands in for the other. An A3-UV receipt that also claims protected_terminal_presence is refused, so a terminal-presence check can never accept a user-verification receipt."
+    },
+    "parameters_match_schema": {
+      "applies_to": [
+        "OperationDescriptor",
+        "PendingOperation"
+      ],
+      "rule": "The record's parameters conform to the schema named by params_schema_ref: every required field is present with the declared type and enum, a nullable field may be null, an optional field may be absent, and no field outside the schema is present. A record naming a schema the parameter contract does not declare is refused. The check is on the values, not on the name: a record that names the right schema and carries the wrong fields is the defect this rule exists for."
+    },
+    "entitlement_is_external": {
+      "applies_to": [
+        "AuthorityDecision",
+        "EffectFence"
+      ],
+      "rule": "An entitlement_ref names a record of the `sea_forge.human_entitlement` interface, which SEA-Forge owns and mints. It never names a Horizon record, and Horizon never mints one. While that interface is unpublished the entitlement-backed path is unavailable: a record that names an entitlement is refused, because nothing can authenticate an artifact nobody has published. When the interface is published, the external entitlement is supplied with the record as the facts that interface declares \u2014 including the issuer, the issuer's key identifier and the owner's signature over the artifact \u2014 and it binds the same subject, the same operation digest, a resource scope and an amount that cover the record's, the same authority epoch, and an expiry no earlier than the record's. An entitlement that names a different subject or operation, covers a narrower scope or a smaller amount, carries a different epoch, expires before the record it authorizes, is not active, or is not signed by the issuer the interface names, is refused. Publication and currentness are properties of the authority that owns the entitlement, so they are named in `not_enforceable_from_one_record`; the path never falls back to a grant, a session, or a policy decision."
+    },
+    "caller_channel_exclusive": {
+      "applies_to": [
+        "PendingOperation"
+      ],
+      "rule": "A pending record names exactly one caller channel, and the channel is the one its caller kind implies. A human_session names its session and no execution and no delegation. An agent_execution names its execution, never a session, and names its delegation when the operation is governed. A registered_agent names the agent principal and no session and no execution, because the registered key proves a principal and not a logical execution; it holds no delegation head of its own. A local_console, a code_holder and a device_credential name none of the three, and that is exactly what makes them valid: they hold no session, no execution and no delegation. A record that names two channels, or names a channel its caller kind does not have, is refused: a record that could be read as two callers is not one caller's record."
+    },
+    "pending_expired_carries_no_confirmation": {
+      "applies_to": [
+        "PendingTransition"
+      ],
+      "rule": "An expiry is the absence of a new confirmation, and never an erasure of one: the transition into expired carries no confirmer, presence evidence or local receipt, and a confirmation that happened earlier stays in its own transition record. An expired pending operation is never redeemable."
+    },
+    "delegation_reference_kind": {
+      "applies_to": [
+        "OperationDescriptor",
+        "PendingOperation"
+      ],
+      "rule": "A parameter that names a delegation is the caller's authority, the operation's target, or forbidden to that caller, and the register of delegation reference parameters says which, per schema, field and caller kind. When the field is the caller's authority, the record's delegation_ref must be that same reference, so a caller cannot name one delegation and act under another; a caller kind that holds no delegation at all can never be the authority for one. When the field is the operation's target, naming it claims nothing. When it is forbidden, the parameter must be absent. A caller kind the register does not list is treated as forbidden, because a parameter whose meaning is not stated is a parameter whose authority is not stated."
+    },
+    "pending_transition_chain": {
+      "applies_to": [
+        "PendingTransition"
+      ],
+      "rule": "A pending operation's state changes only through appended PendingTransition records, and only along the complete transition table: pending to confirmed (reason human_confirmation); pending to expired (reason window_closed or launch_ended); confirmed to dispatching (reason redemption_claim); confirmed to expired (reason launch_ended); dispatching to applied (reason effect_applied); dispatching to uncertain (reason effect_uncertain or launch_ended). applied, uncertain and expired are terminal: no transition leaves them. confirmed is never reopened to pending. A transition's from_state is the state the operation's prior transitions leave it in, and pending when it is the first. A transition whose from_state disagrees with the chain, whose to_state is not an allowed successor, whose reason does not match the transition it claims, or which leaves a terminal state, is refused."
+    },
+    "caller_kind_permitted": {
+      "applies_to": [
+        "OperationDescriptor",
+        "PendingOperation"
+      ],
+      "rule": "A record's caller_kind is one the operation permits. The catalog states the caller kinds each operation permits, and the record's kind must be one of them: a device credential's record may not claim a human session, a human session's record may not claim a device, and a record for an operation no caller kind reaches is refused. The set is the operation's own, not the validator's: a row that is performed by one kind and asked for by another names both, because the initiator of a request is not the executor of the effect."
+    },
+    "non_principal_caller_has_no_credential": {
+      "applies_to": [
+        "OperationDescriptor",
+        "PendingOperation"
+      ],
+      "rule": "A device credential and a code holder name no session, no execution and no delegation. They hold none of the three caller channels: a device proves which enrolled device is at the route, and a code holder proves possession of a one-time code, and neither is a session, an execution or a delegation head. A record that gives one of them any of the three is refused."
+    }
+  },
+  "not_enforceable_from_one_record": {
+    "grant_liveness": "Whether a named grant or entitlement is live at dispatch needs the authority store; Stage 3 states the check and Stage 5 measures it.",
+    "epoch_monotonicity": "Whether authority_epoch has been superseded needs the epoch history; Stage 3 states the check and Stage 5 measures it, so a single record cannot prove it is current.",
+    "revocation_latency": "Admission after revocation is a measured property (U4.B); Stage 3 states the check and Stage 5 measures it, so it is not a record field.",
+    "pending_expiry": "Whether a pending operation is still inside its window needs the clock and the store; the window is checked when the confirmation is written and again when it is redeemed, so one record cannot prove it is current. The transition into expired records that the window closed; Stage 3 states the check for the production path and Stage 5 measures it.",
+    "pending_code_single_use": "Whether a confirmation code was already spent needs the store's history; the transition chain and the single-use code bind the operation to one confirmation. Stage 3 states the transition rule and Stage 5 measures the at-most-once property.",
+    "entitlement_currentness": "Whether an entitlement is still current needs the authority that owns it; the entitlement's expiry and revocation state are checked when the decision is made and again when the fence is dispatched, so one record cannot prove it is current. Stage 3 states the check for the production path and Stage 5 measures it."
+  },
+  "delegation_reference_parameters": {
+    "rule": "A parameter that names a delegation is one of three things, and this register says which, for every caller kind. `authority` means the delegation the caller acts under: the record's own `delegation_ref` must be that same reference, so a caller cannot name one delegation and act under another. `target` means the delegation the operation acts on: naming it claims nothing, so a human session may name it. `forbidden` means the caller may not name it at all in this operation. The record's own `delegation_ref` is the field that says a delegation is held. A field is named by the name the parameter carries on the wire. The register's `delegation_reference_fields` names the parameter names that name a delegation: a parameter with one of those names is a delegation reference whether or not its schema declares it, so a request cannot smuggle a delegation under a schema that forgot to register it. A schema and field the register does not list is `forbidden` for every caller kind, because a parameter whose meaning is not stated is a parameter whose authority is not stated. The register lists every parameter the frozen schemas declare with one of those names, and the build check fails if a schema adds one without an entry.",
+    "entries": [
+      {
+        "schema": "params.grant_revoke",
+        "field": "grant_ref",
+        "meaning": "The grant the revocation revokes. It is the operation's target.",
+        "per_caller_kind": {
+          "human_session": "target",
+          "agent_execution": "target",
+          "local_console": "target"
+        }
+      },
+      {
+        "schema": "params.grant_redelegate",
+        "field": "parent_ref",
+        "meaning": "The parent delegation the redelegation narrows. For an agent caller it is that execution's own delegation head; for a human caller it is the live parent the principal's entitlement covers, and the entitlement is the authority.",
+        "per_caller_kind": {
+          "human_session": "target",
+          "agent_execution": "authority",
+          "local_console": "target"
+        }
+      },
+      {
+        "schema": "params.run_start",
+        "field": "grant_ref",
+        "meaning": "The live delegation the run spends. It is the agent execution's own head.",
+        "per_caller_kind": {
+          "human_session": "forbidden",
+          "agent_execution": "authority",
+          "local_console": "forbidden"
+        }
+      }
+    ],
+    "delegation_reference_fields": [
+      "grant_ref",
+      "parent_ref"
+    ],
+    "notes": {
+      "sponsor_ref": "Not a delegation reference. `params.grant_create` declares the person the grant is for, and the authenticated human session is checked against it; it is a declaration, never a source of identity and never a delegation the caller holds.",
+      "grant_ref": "A delegation reference. `params.grant_revoke` names the grant the revocation revokes (the operation's target). `params.run_start` names the delegation the run spends (the caller's own head, for an agent execution).",
+      "parent_ref": "A delegation reference. `params.grant_redelegate` names the parent the redelegation narrows: the operation's target for a human session, the caller's own head for an agent execution."
+    }
+  }
+}

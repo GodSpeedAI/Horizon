@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { Access } from "../src/adapters/workshop.ts";
 import { START } from "../src/ui/desk/attention.ts";
 import { Desk } from "../src/ui/desk/Desk.tsx";
-import type { ConversationRow } from "../src/ui/desk/conversation-model.ts";
+import type { ConversationRow, RowStage } from "../src/ui/desk/conversation-model.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { deskState } from "./support/desk-fixture.ts";
 import { quietIo } from "./support/desk-io.ts";
@@ -53,26 +53,56 @@ afterAll(async () => {
   keeper.stop();
 });
 
-async function handOff(text: string, assign: boolean): Promise<ConversationRow> {
+async function refusedSend(text: string, assign: boolean): Promise<{ status: number; body: Record<string, any> }> {
   plan = [];
   replies.clear();
   const { draftId } = await app.get("/desk/draft");
   const p = (await (await app.post("/desk/handoff/preview", { draft_id: draftId, text })).json()) as any;
   const sent = await app.post("/desk/handoff", { draft_id: draftId, text, plan_precondition: p.preview.plan_precondition, assign });
-  expect(sent.status).toBe(200);
-  const rows = ((await app.get("/desk/conversation")).rows as ConversationRow[]).filter((r) => r.kind === "handoff" && r.words === text);
-  expect(rows).toHaveLength(1);
-  return rows[0]!;
+  return { status: sent.status, body: (await sent.json()) as Record<string, any> };
 }
+/**
+ * A row as the desk writes one. The send path that produced these rows is refused at this freeze
+ * (R5-01), so the stages are built here from the row model the desk's conversation keeps; the
+ * component below is what these tests are about.
+ */
+const rowOf = (name: string, stages: readonly RowStage[], status: "done" | "partial"): ConversationRow => ({
+  row_id: `row-${name}`,
+  at: "2026-11-06T10:00:00.000Z",
+  source: "you",
+  kind: "handoff",
+  words: name,
+  outcome: "",
+  status,
+  refs: {},
+  stages,
+});
 const stage = (row: ConversationRow, name: string) => row.stages!.find((g) => g.name === name)!;
 const draw = (rows: ConversationRow[]): string => renderToStaticMarkup(<Desk ui={{ ...START, data: deskState(), view: "conversation", rows }} dispatch={() => undefined} io={quietIo()} />);
 const words = (html: string): string => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
 describe("hand off stages", () => {
-  test("everything worked: Sent, Started and Given to an agent are done, and Result seen is not seen yet", async () => {
+  test("a refused send leaves one hand off row, refused, with no stage claimed", async () => {
     advanceFails = false; assignFails = false; finished = false;
-    const row = await handOff("Fix the totals", true);
-    expect(row.status).toBe("done");
+    const { status, body } = await refusedSend("Fix the totals", true);
+    expect(status).toBe(403);
+    expect(body.outcome).toBe("refused");
+    // Nothing reached the case keeper, so no stage is shown as done.
+    expect(plan).toEqual([]);
+    const rows = ((await app.get("/desk/conversation")).rows as ConversationRow[]).filter((r) => r.kind === "handoff" && r.words === "Fix the totals");
+    const refused = rows.filter((r) => r.status === "refused");
+    expect(refused.length).toBeGreaterThanOrEqual(1);
+    expect(refused[0]!.stages).toBeUndefined();
+    expect(refused[0]!.outcome).toContain("refused at this release");
+  });
+
+  test("everything worked: Sent, Started and Given to an agent are done, and Result seen is not seen yet", () => {
+    const row = rowOf("Fix the totals", [
+      { name: "Sent", status: "done", words: "The step was added to the case." },
+      { name: "Started", status: "done", words: "The step is under way." },
+      { name: "Given to an agent", status: "done", words: "An agent has the step." },
+      { name: "Result seen", status: "unseen", words: "Not seen yet." },
+    ], "done");
     expect(row.stages!.map((g) => [g.name, g.status])).toEqual([["Sent", "done"], ["Started", "done"], ["Given to an agent", "done"], ["Result seen", "unseen"]]);
     const html = words(draw([row]));
     expect(html).toContain("Sent: Yes");
@@ -80,15 +110,21 @@ describe("hand off stages", () => {
     expect(html).not.toContain("Completed");
   });
 
-  test("a stage that was not asked for is not shown", async () => {
-    advanceFails = false; assignFails = false; finished = false;
-    const row = await handOff("Fix the labels", false);
+  test("a stage that was not asked for is not shown", () => {
+    const row = rowOf("Fix the labels", [
+      { name: "Sent", status: "done", words: "The step was added to the case." },
+      { name: "Started", status: "done", words: "The step is under way." },
+      { name: "Result seen", status: "unseen", words: "Not seen yet." },
+    ], "done");
     expect(row.stages!.map((g) => g.name)).toEqual(["Sent", "Started", "Result seen"]);
   });
 
-  test("starting failed: Sent stays a success, Started says why and offers Try again, and the row is partly done", async () => {
-    advanceFails = true; assignFails = false; finished = false;
-    const row = await handOff("Fix the footer", false);
+  test("starting failed: Sent stays a success, Started says why and offers Try again, and the row is partly done", () => {
+    const row = rowOf("Fix the footer", [
+      { name: "Sent", status: "done", words: "The step was added to the case." },
+      { name: "Started", status: "refused", words: "It did not start: the case keeper could not start it", recovery: "Try again" },
+      { name: "Result seen", status: "unseen", words: "Not seen yet." },
+    ], "partial");
     expect(row.status).toBe("partial");
     expect(stage(row, "Sent").status).toBe("done");
     expect(stage(row, "Started")).toMatchObject({ status: "refused", recovery: "Try again" });
@@ -100,23 +136,32 @@ describe("hand off stages", () => {
     expect(words(html)).not.toContain("Completed");
   });
 
-  test("giving it to an agent failed: that stage says so and offers Open the step", async () => {
-    advanceFails = false; assignFails = true; finished = false;
-    const row = await handOff("Fix the header", true);
+  test("giving it to an agent failed: that stage says so and offers Open the step", () => {
+    const row = rowOf("Fix the header", [
+      { name: "Sent", status: "done", words: "The step was added to the case." },
+      { name: "Started", status: "done", words: "The step is under way." },
+      { name: "Given to an agent", status: "refused", words: "No agent has it: the agent service is down", recovery: "Open the step" },
+      { name: "Result seen", status: "unseen", words: "Not seen yet." },
+    ], "partial");
     expect(row.status).toBe("partial");
     expect(stage(row, "Started").status).toBe("done");
     expect(stage(row, "Given to an agent")).toMatchObject({ status: "refused", recovery: "Open the step" });
     expect(draw([row])).toContain('data-recover="open-step"');
   });
 
-  test("Result seen turns to done only when the case keeper shows the step finished", async () => {
-    advanceFails = false; assignFails = false; finished = false;
-    const row = await handOff("Fix the menu", false);
-    expect(stage(row, "Result seen").status).toBe("unseen");
-    finished = true;
-    const later = ((await app.get("/desk/conversation")).rows as ConversationRow[]).find((r) => r.row_id === row.row_id)!;
-    expect(stage(later, "Result seen")).toMatchObject({ status: "done", words: "The step finished." });
-    expect(stage(later, "Sent").status).toBe("done");
-    finished = false;
+  test("Result seen is not seen until the case keeper shows the step finished", () => {
+    const unseen = rowOf("Fix the menu", [
+      { name: "Sent", status: "done", words: "The step was added to the case." },
+      { name: "Started", status: "done", words: "The step is under way." },
+      { name: "Result seen", status: "unseen", words: "Not seen yet." },
+    ], "done");
+    const seen = rowOf("Fix the menu", [
+      { name: "Sent", status: "done", words: "The step was added to the case." },
+      { name: "Started", status: "done", words: "The step is under way." },
+      { name: "Result seen", status: "done", words: "The step finished." },
+    ], "done");
+    expect(stage(unseen, "Result seen").status).toBe("unseen");
+    expect(stage(seen, "Result seen")).toMatchObject({ status: "done", words: "The step finished." });
+    expect(stage(seen, "Sent").status).toBe("done");
   });
 });

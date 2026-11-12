@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { withRequestId } from "./support/request-body.ts";
+import { agentInProcess } from "./support/agent-door.ts";
 
 /**
  * Every agent has its own key. The registry (`agents.json`, beside agent.key) holds a hash of each key, never the key. The
@@ -88,8 +89,13 @@ describe("agent B cannot read or route agent A's question, even when it sends A'
   });
 
   test("A routes its own answer under its own key", async () => {
-    const routed = await as(alpha, "Alpha agent", "/agent/panels", { tool: "answer.route", panel_id: "a_panel", ask_id: "a_q", routed_as: "step handoff_0a49 in Seed" });
+    // The door refuses `answer.route` at this freeze (R5-01): the machinery behind it, which is
+    // what this test is about, is called where the door calls it.
+    const routed = await agentInProcess(app.application, "ag_alpha0001", "Alpha agent", { tool: "answer.route", panel_id: "a_panel", ask_id: "a_q", routed_as: "step handoff_0a49 in Seed" });
     expect(routed.status).toBe(200);
+    // And the live route refuses it, whoever asks.
+    const live = await as(alpha, "Alpha agent", "/agent/panels", { tool: "answer.route", panel_id: "a_panel", ask_id: "a_q", routed_as: "step handoff_0a49 in Seed" });
+    expect(live.status).toBe(403);
   });
 
   test("a display name cannot move a question to another key", async () => {

@@ -16,7 +16,13 @@ export interface OpenCase {
   readonly case_ref: string;
   readonly purpose: string;
   readonly opened_at: string;
+  /** Who opened the case: the caller that asked, which may be an enrolled device rather than a person. */
   readonly operator: string;
+  /**
+   * The durable operator a device enrolment is associated with, when the caller was a device.
+   * Attribution only: it says who is answerable for the device, never who asked.
+   */
+  readonly attributed_operator?: string;
   readonly tenant: string;
 }
 
@@ -32,13 +38,14 @@ export function checkPurpose(raw: unknown): PurposeCheck {
 
 export async function openCase(
   store: DurableStore,
-  options: { readonly tenant: string; readonly operator: string; readonly purpose: string; readonly now: Date },
+  options: { readonly tenant: string; readonly operator: string; readonly attributed_operator?: string; readonly purpose: string; readonly now: Date },
 ): Promise<OpenCase> {
   const value: OpenCase = {
     case_ref: `case:${randomUUID()}`,
     purpose: options.purpose,
     opened_at: options.now.toISOString(),
     operator: options.operator,
+    ...(options.attributed_operator === undefined ? {} : { attributed_operator: options.attributed_operator }),
     tenant: options.tenant,
   };
   await store.commit({

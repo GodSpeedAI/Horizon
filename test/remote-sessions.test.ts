@@ -19,6 +19,7 @@ import { approvalAuthority } from "../src/adapters/sea-forge-config.ts";
 import { delegatingAuthority } from "../src/adapters/delegating-authority.ts";
 import { loadWorld } from "../src/adapters/semantic.ts";
 import { readIntentAttempts, readIntentRecords } from "../src/capabilities/navigation-intent.ts";
+import { CASE_COLLECTION, latestCase } from "../src/capabilities/workspace-records.ts";
 import { identityStoreOf } from "../src/remote/identity-store.ts";
 import { OperatorActors, OperatorMappingError, resolveOperatorsConfig, validateOperatorActors } from "../src/remote/operators.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
@@ -215,7 +216,7 @@ describe("an unpaired phone, forged actors, and the mapped actor", () => {
     expect(devices[0]!.operatorId).toBe("operator");
   });
 
-  test("a forged actor in the body is refused, a forged header is ignored, and the mapped actor is the one SEA-Forge hears", async () => {
+  test("a forged actor in the body is refused, a forged header is ignored, and a device is never turned into the operator", async () => {
     for (const field of ["actor", "actor_id", "on_behalf_of", "operator", "role"]) {
       const response = await phone.commit({ [field]: "mallory" });
       expect(response.status).toBe(400);
@@ -224,21 +225,33 @@ describe("an unpaired phone, forged actors, and the mapped actor", () => {
     expect(await intents(r.app)).toBe(0);
     expect(commitDecisions(r.wire).length).toBe(0);
 
-    const accepted = await phone.commit({}, { "x-actor": "mallory", "x-on-behalf-of": "mallory", "x-operator": "mallory", "x-forwarded-user": "mallory" });
-    expect(accepted.status).toBe(200);
-    expect(await intents(r.app)).toBe(1);
-    const delegated = r.wire.seen.filter((entry) => entry.onBehalfOf !== null);
-    expect(delegated.length).toBeGreaterThan(0);
-    for (const entry of delegated) {
-      expect(entry.onBehalfOf).toEqual({ actor_id: MAPPED, role: "operator" });
-      expect(entry.actor).toEqual({ actor_id: SERVICE, role: "service" });
-    }
-    expect(commitDecisions(r.wire).every((entry) => (entry.onBehalfOf as { actor_id: string } | null)?.actor_id === MAPPED)).toBe(true);
+    // A header cannot name the person either. The commit itself is refused at this freeze: a
+    // device credential proves which device is at the route, never which person is holding it,
+    // and there is no device-attributed delegation from the operator, so the commit is not run
+    // under a borrowed identity (R5-03). SEA-Forge hears nothing, and no intent is recorded.
+    const refused = await phone.commit({}, { "x-actor": "mallory", "x-on-behalf-of": "mallory", "x-operator": "mallory", "x-forwarded-user": "mallory" });
+    expect(refused.status).toBe(403);
+    const outcome = (await refused.json()) as { accepted: boolean; outcome: { state: string; code: string; message: string } };
+    expect(outcome.accepted).toBe(false);
+    expect(outcome.outcome).toMatchObject({ state: "refused", code: "refused" });
+    expect(outcome.outcome.message).toContain("refused at this release");
+    expect(outcome.outcome.message).toContain("delegation");
+    expect(await intents(r.app)).toBe(0);
+    expect(commitDecisions(r.wire).length).toBe(0);
     expect(JSON.stringify(r.wire.seen)).not.toContain("mallory");
-    // The Caller of the commit is the durable operator, not the server operator.
-    const attempt = (await readIntentAttempts(r.app.runtime.runtime.store)).at(-1);
-    expect(attempt?.caller_ref).toBe("operator");
-    expect(attempt?.caller_ref).not.toBe(r.app.caller.actor.id);
+
+    // What the device *can* do is its own row: opening a case records the device as the caller
+    // and the operator its enrolment belongs to beside it, as attribution rather than a
+    // substitution. The two are separate fields, and neither is the server operator.
+    const identityTenant = (await identityStoreOf(r.app.runtime.runtime.store).listRecords(OPERATORS, {}))[0]!.value.tenant as string;
+    const devices = await r.app.identity.listDevices(identityTenant, "operator");
+    const deviceId = devices[0]!.id;
+    const opened = await phone.post("/m/api/command", { command_id: randomUUID(), kind: "open_case", purpose: "From the phone, as the phone" });
+    expect(opened.status).toBe(200);
+    const openedCase = await latestCase(r.app.runtime.runtime.store, r.app.caller.tenant);
+    expect(openedCase?.purpose).toBe("From the phone, as the phone");
+    expect(openedCase?.operator).toBe(`device:${deviceId}`);
+    expect(openedCase?.attributed_operator).toBe("operator");
   });
 
   test("a revoked session cannot read or commit", async () => {
@@ -312,25 +325,26 @@ describe("double submission and concurrent commits write one commit", () => {
   }, 60_000);
   afterAll(async () => void (await r?.close()));
 
-  test("the same command id submitted twice at once is one commit and one answer", async () => {
-    const state = (await (await phone.request("/m/api/state")).json()) as { frame: { frame_id: string; revision: number }; actions: { action_id: string }[] };
+  test("the same command id submitted twice at once is one command and one answer", async () => {
+    // The case command is the device row that runs at this freeze; the same command id answered
+    // twice is one command, not two cases.
+    const countCases = async (): Promise<number> => (await r.app.runtime.runtime.store.listRecords(CASE_COLLECTION, { tenant: r.app.caller.tenant })).length;
+    const before = await countCases();
     const id = randomUUID();
-    const [first, second] = await Promise.all([phone.commitWith(state, {}, {}, id), phone.commitWith(state, {}, {}, id)]);
+    const body = { command_id: id, kind: "open_case", purpose: "Sent twice at once" };
+    const [first, second] = await Promise.all([phone.post("/m/api/command", body), phone.post("/m/api/command", body)]);
     expect(first.status).toBe(200);
     expect(await second.text()).toBe(await first.text());
-    expect(await intents(r.app)).toBe(1);
-    expect(commitDecisions(r.wire).length).toBe(1);
+    expect(await countCases()).toBe(before + 1);
   });
 
-  test("two different commands on one frame, sent together, commit once: the second finds the surface moved", async () => {
+  test("two different commits on one frame are both refused, and neither commits", async () => {
     const before = await intents(r.app);
     const state = (await (await phone.request("/m/api/state")).json()) as { frame: { frame_id: string; revision: number }; actions: { action_id: string }[] };
     const [one, two] = await Promise.all([phone.commitWith(state), phone.commitWith(state)]);
-    const statuses = [one.status, two.status].sort();
-    expect(statuses).toEqual([200, 409]);
-    const refused = (await (one.status === 409 ? one : two).json()) as { outcome: { code: string } };
-    expect(refused.outcome.code).toBe("stale_surface");
-    expect(await intents(r.app)).toBe(before + 1);
+    expect([one.status, two.status]).toEqual([403, 403]);
+    expect(await intents(r.app)).toBe(before);
+    expect(commitDecisions(r.wire).length).toBe(0);
   });
 });
 
@@ -344,20 +358,29 @@ describe("an operator's own escalation", () => {
   }, 60_000);
   afterAll(async () => void (await r?.close()));
 
-  test("the requester cannot approve their own escalation: refused before SEA-Forge is asked, and nothing commits", async () => {
+  test("the phone cannot answer an escalation: refused before SEA-Forge is asked, and nothing commits", async () => {
+    // The phone cannot even raise the escalation at this freeze: its commit is refused before any
+    // intent exists, so the approval it would answer never appears. The approval commands are
+    // refused for their own reason, before SEA-Forge is asked on either side (R3-01, R5-03).
     r.wire.escalateCommits(true);
     const waiting = await phone.commit();
-    expect(waiting.status).toBe(200);
-    const body = (await waiting.json()) as { outcome: { state: string; intent_id: string } };
-    expect(body.outcome.state).toBe("waiting");
-    const state = (await (await phone.request("/m/api/state")).json()) as { decisions: { approval_id: string }[] };
-    const approvalId = state.decisions[0]?.approval_id;
-    expect(approvalId).toMatch(/^apr-/);
+    expect(waiting.status).toBe(403);
     expect(await intents(r.app)).toBe(0);
+    const approvalId = "apr-unreachable";
+    // Containment (R3-01): the remote path has no operation-bound pending record and no
+    // protected confirmation, so the phone's approval command is refused outright rather than
+    // downgraded to something its own session can do.
     const approve = await phone.post("/m/api/command", { command_id: randomUUID(), kind: "approve", approval_id: approvalId });
-    expect(approve.status).toBe(409);
+    expect(approve.status).toBe(403);
     const refusal = (await approve.json()) as { outcome: { code: string; message: string } };
-    expect(refusal.outcome.code).toBe("own_escalation");
+    expect(refusal.outcome.code).toBe("no_protected_confirmation_path");
+    expect(refusal.outcome.message).toContain("desktop");
+    expect(await intents(r.app)).toBe(0);
+    expect(r.wire.seen.some((entry) => entry.verb === "authority_approval")).toBe(false);
+    // A rejection is refused the same way: the phone never reaches the authority on either side.
+    const reject = await phone.post("/m/api/command", { command_id: randomUUID(), kind: "reject", approval_id: approvalId });
+    expect(reject.status).toBe(403);
+    expect(((await reject.json()) as { outcome: { code: string } }).outcome.code).toBe("no_protected_confirmation_path");
     expect(await intents(r.app)).toBe(0);
     expect(r.wire.seen.some((entry) => entry.verb === "authority_approval")).toBe(false);
   });

@@ -29,6 +29,8 @@ export interface RowRefs {
   readonly panel_id?: string;
   readonly ask_id?: string;
   readonly draft_id?: string;
+  /** The key of the agent whose authenticated call made this row's claim (DEF-ASK-ROUTE-EXECUTOR). */
+  readonly executor_key?: string;
 }
 
 export interface ConversationRow {
@@ -49,7 +51,7 @@ export type ConversationAction =
   | { readonly type: "append"; readonly row: ConversationRow }
   | { readonly type: "update"; readonly row_id: string; readonly status?: RowStatus; readonly outcome?: string; readonly stages?: readonly RowStage[] };
 
-const REF_KEYS = ["case_id", "step_id", "intent_id", "panel_id", "ask_id", "draft_id"] as const;
+const REF_KEYS = ["case_id", "step_id", "intent_id", "panel_id", "ask_id", "draft_id", "executor_key"] as const;
 const clean = (text: string, max: number): string => text.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 
 /** A name an agent gives itself: plain text, no markup or control characters, at most 60 characters. */

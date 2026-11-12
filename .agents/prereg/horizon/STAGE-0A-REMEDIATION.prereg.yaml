@@ -1,0 +1,190 @@
+preregistration:
+  id: HORIZON-PREREG-STAGE-0A-REMEDIATION
+  task: STAGE-0A-REMEDIATION
+  title: "Close the second independent review's sixteen findings, and pin the design the third review reads"
+  recorded_at: "2026-11-10"
+  recorded_before_artifacts: false
+  claim: >-
+    The contract set and the normative design now say one thing. The assurance vocabulary is
+    exactly two predicates with the terminal-presence claim beside them; the pending record
+    carries the descriptor's own anti-substitution rules; the live intent boundary classifies
+    every operation reference before anything runs; every live-bound P0/P1 row names the
+    parameter schema its handler actually reads; the design's parameter table is generated from
+    the frozen contract rather than restated beside it; the record contract registers nine
+    signed records and one unsigned refusal; the human entitlement is a frozen external
+    interface with named facts rather than a name in a record; and this file pins the SHA-256 of
+    the design the third independent review will read, so that the verdict binds a known set of
+    bytes.
+  upstream_pins:
+    spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+    plan: { id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23" }
+    design: { file: design_draft.md, sha256: "7ca6416af57fb42a9df4ab8479d470890aff55f20edc4e4fb6d2a990eee37dd6", lines: 789, sections: "2, 7, 9.1, 11, 12, Appendix A, Review Record" }
+    task_preregistration: { file: .agents/prereg/horizon/T23.prereg.yaml, id: HORIZON-PREREG-T23-0A, relationship: "the task-level preregistration that registers the Stage 0A expectations; this unit is one of its Stage 0A units" }
+    unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-1, relationship: "the first Stage 0A unit" }
+    defect_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-DEFECTS.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-DEFECTS, relationship: "the unit that closed the two recorded identity defects" }
+    prior_review: { file: .agents/evidence/2026-11-09-stage-0a-defects/independent-review-round-2.md, verdict: "REJECT", findings: 16, disposition: .agents/evidence/2026-11-09-stage-0a-defects/review-round-2-disposition.md }
+  # This unit settles no specification requirement. It closes the second independent review's
+  # findings against the Stage 0A contract set. No status entry may claim REQ-SEC-006 as settled
+  # because this file exists; the third independent review, not this unit, is what can settle
+  # Stage 0A.
+  settles: []
+  positive_expectations:
+    - id: PE-17
+      expectation: >-
+        The assurance vocabulary is exactly two human predicates and one explicit disjunction.
+        `A3-UV` and `A3-T` are the only receipt predicates; terminal presence is a separate
+        boolean claim beside the predicate on the receipt and is never spelled as a predicate; and
+        the A0-or-A1 disjunction is an explicit `any_of` over the two predicates rather than a
+        list that reads as a conjunction.
+    - id: PE-18
+      expectation: >-
+        The pending record carries the descriptor's own anti-substitution rules. A pending record
+        for a human session carries no grant and no credential, an agent's carries its execution
+        and its delegation, and a console's carries neither; the rules are listed in the record
+        contract's own `applies_to`, so a consumer following the frozen contract applies them to
+        the pending record and not only to the descriptor.
+    - id: PE-19
+      expectation: >-
+        The live intent boundary classifies every operation reference before anything runs. A
+        catalogued operation keeps its own class and a governed class is refused on the intent
+        path; an unknown operation must be a deployment-bound operation; anything else is Px and
+        is refused before any capability is invoked and before any record is appended. A failure
+        to load the catalog fails closed rather than degrading to "unknown but permitted".
+    - id: PE-20
+      expectation: >-
+        Every live-bound P0/P1 row names the parameter schema its own handler reads, and the
+        build check compares all thirty-seven verified rows against the source that reads them.
+        The design's parameter table is generated from the frozen parameter contract and compared
+        with it byte for byte, so the design cannot restate the schemas and drift from them.
+    - id: PE-21
+      expectation: >-
+        Every catalog row's human evidence resolves against the assurance requirements the A3
+        mechanism declares. The approval aliases fix `resolution` as data rather than in prose;
+        the export row declares separation of duty; the exceptional P2 ceremonies name their own
+        evidence and do not inherit the terminal predicate; and the pairing row's caller path is
+        the code holder proving possession of a one-time pairing code, not the local console.
+    - id: PE-22
+      expectation: >-
+        The record contract registers nine signed record kinds and one unsigned refusal, the
+        design's record table names all ten, and this preregistration pins the SHA-256 of the
+        design as it is frozen for the third independent review, so the reviewer's verdict binds
+        a known set of bytes rather than a moving file.
+    - id: PE-23
+      expectation: >-
+        The human entitlement is a frozen external interface, not a name in a record. The contract
+        declares the interface's owner, version, and the facts an entitlement must carry — its
+        reference, the subject it was issued to, its issuer, the operation it permits, the resource
+        scope and spend ceiling it covers, the authority epoch, its expiry, and its revocation
+        state — and the record contract binds an entitlement-backed decision or fence to those
+        facts. Horizon mints no entitlement and defines no external payload. While the owner has
+        published no such artifact, the path fails closed rather than falling back to a grant, a
+        session, or a policy decision, and the design's section 9.1 table is generated from the
+        contract so the two cannot drift.
+  negative_expectations:
+    - id: NE-16
+      expectation: >-
+        An operation the identity catalog does not know must never run at the intent boundary. A
+        reference that is neither catalogued nor deployment-bound is refused as Px before any
+        capability invocation and before any record is appended, and a catalog that cannot be
+        loaded refuses everything rather than admitting what it could not read.
+    - id: NE-17
+      expectation: >-
+        The parameter schema must never become a description of an operation other than the one
+        that runs. A wire name that drifts from the handler, a field the handler reads that the
+        schema does not name, a field the schema names that the handler does not read, a
+        live-bound row with no binding in the check, and a design table that drifts from the
+        generated one each fail the build rather than passing quietly.
+    - id: NE-18
+      expectation: >-
+        The agent door's reserved-action refusal must be checked against the field the route
+        actually uses. A reserved operation named in the frozen action field is refused with the
+        reserved prefix, and a reserved operation named in any other field is refused as a
+        forbidden field rather than ignored.
+    - id: NE-19
+      expectation: >-
+        The Stage 0B tables must never claim an operation Stage 0B cannot authorise. The routing
+        row is not a Stage 0B operation, because its authority needs a live bounded grant that
+        Stage 0B does not have; it stays refused there and its closure belongs to the stage that
+        supplies both the grant and the evidence.
+    - id: NE-20
+      expectation: >-
+        The assurance vocabulary must never grow a third predicate, and terminal presence must
+        never satisfy the user-verification predicate. A receipt whose predicate is the
+        terminal-presence claim, or a receipt that claims the user-verification predicate without
+        the user-verification claim, is refused.
+    - id: NE-21
+      expectation: >-
+        An entitlement reference must never be authority on its own. A record that names an
+        entitlement and supplies none, names a different subject or operation, covers a narrower
+        scope or a smaller ceiling, carries another epoch, expires before the record it
+        authorizes, or is not active is refused — in both language implementations, over the same
+        fixture, so a divergence between them fails a test rather than passing quietly.
+  falsifier: >-
+    Any of the negative expectations reproducing on the committed files falsifies this claim: an
+    unknown operation reaching a capability at the intent boundary, a parameter schema or a design
+    table that drifts from its handler or its contract, a reserved operation honoured because it
+    was named in an unchecked field, a Stage 0B success that needs an authority Stage 0B lacks,
+    or a third assurance predicate. So does a record contract that registers eight signed
+    records, a design whose hash no preregistration pins, or an entitlement-backed record that
+    names an entitlement nobody supplied or that the owner's artifact does not cover.
+  known_confounds:
+    - >-
+      This unit was authorized in session by the owner and its implementation was written under
+      that instruction, so this file is a record of the acceptance criteria, not a claim of
+      prospective registration. Its expectations are the second independent review's findings
+      restated as testable claims.
+    - >-
+      The intent boundary's classification gate reads the operation catalog at runtime, so the
+      catalog's absence is now a refusal rather than a pass. That is a real runtime dependency the
+      Stage 0A contract introduces; the catalog is a frozen file in this repository.
+    - >-
+      The design's parameter table is generated. A generated table proves the design and the
+      contract agree about fields and types; it does not prove the contract's types are the
+      right types for the domain, which the review's own semantic checks still have to read.
+    - >-
+      The nine signed records are registered by kind and by field in the record contract. Whether
+      a signed record's issuer is entitled to sign it is Stage 1 and Stage 2 work.
+    - >-
+      SEA-Forge has published no entitlement artifact, so the interface is specified rather than
+      pinned: the fact names are Horizon's requirement on the owner's payload, not a schema the
+      owner has agreed to, and the adapter that maps one to the other is Stage 3 work. Until the
+      owner publishes it, the entitlement-backed human path is unavailable by design, and the
+      contract says so instead of pretending the artifact exists.
+  evidence_plan:
+    command: "just gate-t23"
+    typecheck: "./node_modules/.bin/tsc --noEmit"
+    artifacts:
+      - contracts/identity/v1/a3-mechanism.yaml
+      - contracts/identity/v1/external-interfaces.json
+      - contracts/identity/v1/operations.yaml
+      - contracts/identity/v1/params.yaml
+      - contracts/identity/v1/records.json
+      - contracts/identity/v1/fixtures/record-cases.json
+      - src/contracts/identity/manifest.ts
+      - src/contracts/identity/params.ts
+      - src/contracts/identity/records.ts
+      - src/app.ts
+      - design_draft.md
+      - test/identity-remediation.test.ts
+      - scripts/check-design-contract-consistency.ts
+      - scripts/check-param-schema-binding.ts
+      - scripts/gen-design-external-interface-table.ts
+      - scripts/check-stage0a-remediation-prereg-coverage.ts
+      - .agents/evidence/2026-11-09-stage-0a-defects/
+  redesign_trigger: >-
+    If closing a finding needs a caller kind, a predicate or a record kind the runtime cannot
+    produce, stop and revise the identity contract rather than weakening the refusal, widening
+    the vocabulary or adding a label that names an actor.
+  confirmation_condition: >-
+    A fresh critic reads a frozen, hash-pinned copy of the whole contract set, verifies the
+    manifest before reading any content, and confirms each finding's correction against the
+    contract bytes rather than against this file's account of them. Self-attestation is not
+    confirmation, and neither is a passing check whose assertions were not read.
+  notes: >-
+    Recorded after the implementation, on purpose: the owner authorized the unit in session. The
+    expectation ids continue the earlier series so the files never claim the same id. The earlier
+    preregistrations are left as recorded — including the one that says eight signed records
+    where the contract now registers nine — because a recorded preregistration is not rewritten;
+    this file carries the corrected count and the design pin the earlier files lack. The third
+    independent review reads a frozen copy of this file with the contract set, and its verdict is
+    the confirmation this unit's condition asks for.

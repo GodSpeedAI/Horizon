@@ -196,14 +196,16 @@ describe("acceptance through the application", () => {
     await app.application.applyAgentOp({ tool: "read_responses" });
     expect((await app.application.applyAgentOp({ tool: "annotate", panel: "release", text: "Thanks, noted." })).ok).toBe(true);
     expect((await cardNow()).blocked).not.toBeNull();
+    // Routing is what clears the block, and it is the machinery, not the door (which refuses it).
     expect((await app.application.applyAgentOp({ tool: "answer.route", panel_id: "release", ask_id: "q1", routed_as: "no" } as never)).ok).toBe(false);
     expect((await cardNow()).blocked).not.toBeNull();
     expect((await app.application.applyAgentOp({ tool: "answer.route", panel_id: "release", ask_id: "q1", routed_as: "step signoff_release: release approved" } as never)).ok).toBe(true);
     expect((await cardNow()).blocked).toBeNull();
     expect((await app.state()).panels.waiting).toEqual([]);
+    // The accept is still refused: the row is refused at this freeze whatever the card shows.
     const ok = await accept();
-    expect(ok.status).toBe(200);
-    expect(completed).toHaveLength(1);
+    expect(ok.status).toBe(403);
+    expect(completed).toHaveLength(0);
   });
 
   test("the person can stop waiting for an agent that will not reply", async () => {

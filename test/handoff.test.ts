@@ -125,165 +125,94 @@ describe("Hand off", () => {
     expect(keeper.received.filter((r) => r.verb === "case_add_item").every((r) => r.dry_run === true)).toBe(true);
   });
 
-  test("the same Hand off request sent three times gives one step and one assignment", async () => {
+  test("a send is refused before the case keeper is called, and the refusal is kept", async () => {
     reset();
     const { draftId } = await draft();
     const p = await preview(draftId, "Fix the checkout total");
     const request = { draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition, assign: true };
-    const results = [await send(request), await send(request), await send(request)];
-    for (const r of results) expect(r.status).toBe(200);
-    expect(plan).toHaveLength(1);
-    expect(adds).toHaveLength(1);
-    expect(assignments.size).toBe(1);
-    expect([...assignments.keys()][0]).toBe(`assign:${CASE}:${plan[0]}`);
-    const sentIds = keeper.received.filter((r) => r.verb === "case_add_item" && r.dry_run === false).map((r) => r.request_id);
-    expect(new Set(sentIds)).toEqual(new Set([`handoff:${draftId}`]));
-    expect(results[0]!.body.assigned).toEqual({ done: true, words: "Given to an agent." });
+    // The catalog's row is refused at this freeze: no pending record, no protected confirmation,
+    // no authority. The route answers 403 in the catalog's own words and adds nothing (R5-01).
+    const sent = await send(request);
+    expect(sent.status).toBe(403);
+    expect(sent.body.outcome).toBe("refused");
+    expect(sent.body.message).toContain("refused at this release");
+    expect(plan).toHaveLength(0);
+    expect(adds).toHaveLength(0);
+    expect(advances).toHaveLength(0);
+    expect(assignCalls).toBe(0);
+    // Where the refusal is recorded: one audit per attempt, naming the row and the route.
+    const audits = (await app.refusals()).filter((r) => r.operation === "handoff.send");
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({ route: "POST /desk/handoff", code_op: null });
+    expect(audits[0]!.reason).toContain("refused before any target effect");
+    // Trying again refuses again and still changes nothing.
+    expect((await send(request)).status).toBe(403);
+    expect((await app.refusals()).filter((r) => r.operation === "handoff.send")).toHaveLength(2);
+    expect(adds).toHaveLength(0);
+    // The draft is untouched, so the person keeps their words.
+    expect((await draft()).draftId).toBe(draftId);
   });
 
-  test("a new draft makes a new step", async () => {
-    reset();
-    const first = await draft();
-    const p1 = await preview(first.draftId, "First job");
-    const done = await send({ draft_id: first.draftId, text: "First job", plan_precondition: p1.body.preview.plan_precondition });
-    expect(done.status).toBe(200);
-    const second = await draft();
-    expect(second.draftId).not.toBe(first.draftId);
-    expect(done.body.draft_id).toBe(second.draftId);
-    const p2 = await preview(second.draftId, "Second job");
-    await send({ draft_id: second.draftId, text: "Second job", plan_precondition: p2.body.preview.plan_precondition });
-    expect(plan).toHaveLength(2);
-    expect(new Set(plan).size).toBe(2);
-    expect(adds.map((a) => a.request_id)).toEqual([`handoff:${first.draftId}`, `handoff:${second.draftId}`]);
-  });
-
-  test("a stale hand off preview sends nothing", async () => {
+  test("a refused send leaves the preview's own checks in place", async () => {
     reset();
     const { draftId } = await draft();
     const p = await preview(draftId, "Fix the checkout total");
-    plan = ["someone_elses_step"]; // the case's plan changed after the preview
-    const result = await send({ draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition, assign: true });
-    expect(result.status).toBe(409);
-    expect(result.body.outcome).toBe("preview_out_of_date");
-    expect(result.body.message).toContain("Preview out of date");
+    // Input the person could not have meant is still refused as input, before the effect gate:
+    // a missing plan precondition and a missing draft id never reach the catalog's refusal.
+    expect((await send({ draft_id: draftId, text: "Fix the checkout total" })).status).toBe(400);
+    expect((await send({ draft_id: "not-a-uuid", text: "x", plan_precondition: p.body.preview.plan_precondition })).status).toBe(400);
+    expect((await send({ draft_id: draftId, text: "   ", plan_precondition: p.body.preview.plan_precondition })).body.outcome).toBe("empty");
+    // The staleness check the preview carries still runs, and still sends nothing.
+    plan = ["someone_elses_step"];
+    const stale = await send({ draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition, also_starts: ["a_different_set"] });
+    expect(stale.status).toBe(409);
+    expect(stale.body.outcome).toBe("preview_out_of_date");
     expect(adds).toHaveLength(0);
     expect(plan).toEqual(["someone_elses_step"]);
-    expect(assignCalls).toBe(0);
-    // The draft is kept, so a fresh preview and confirm still work.
-    expect((await draft()).draftId).toBe(draftId);
-    const again = await preview(draftId, "Fix the checkout total");
-    expect((await send({ draft_id: draftId, text: "Fix the checkout total", plan_precondition: again.body.preview.plan_precondition })).status).toBe(200);
   });
 
-  test("a hand off retried after a stale preview succeeds with the next attempt id", async () => {
-    reset();
-    const { draftId } = await draft();
-    const p = await preview(draftId, "Fix the checkout total");
-    plan = ["someone_elses_step"];
-    const stale = await send({ draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition });
-    expect(stale.body.outcome).toBe("preview_out_of_date");
-    const p2 = await preview(draftId, "Fix the checkout total");
-    const ok = await send({ draft_id: draftId, text: "Fix the checkout total", plan_precondition: p2.body.preview.plan_precondition });
-    expect(ok.status).toBe(200);
-    const ids = keeper.received.filter((r) => r.verb === "case_add_item" && r.dry_run === false).slice(-2).map((r) => r.request_id);
-    expect(ids).toEqual([`handoff:${draftId}`, `handoff:${draftId}:a1`]);
-    expect(plan).toHaveLength(2);
-    expect(adds).toHaveLength(1);
-  });
-
-  test("a timeout keeps the same request id", async () => {
+  test("a refusal names the catalog's reason and writes no step, no start and no assignment", async () => {
     reset();
     const { draftId } = await draft();
     const p = await preview(draftId, "Fix the checkout total");
     const body = { draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition };
-    hangNextAdd = true;
-    const lost = await send(body);
-    expect(lost.status).toBe(502);
-    const again = await send(body);
-    expect(again.status).toBe(200);
-    const ids = keeper.received.filter((r) => r.verb === "case_add_item" && r.dry_run === false).slice(-2).map((r) => r.request_id);
-    expect(ids).toEqual([`handoff:${draftId}`, `handoff:${draftId}`]);
-    expect(adds).toHaveLength(1);
+    const before = (await app.refusals()).filter((r) => r.operation === "handoff.send").length;
+    const [a, b, c] = await Promise.all([send(body), send(body), send(body)]);
+    expect([a.status, b.status, c.status]).toEqual([403, 403, 403]);
+    // Three attempts, three audits, and the case keeper was never asked to add anything.
+    expect((await app.refusals()).filter((r) => r.operation === "handoff.send")).toHaveLength(before + 3);
+    expect(keeper.received.filter((r) => r.verb === "case_add_item" && r.dry_run === false)).toHaveLength(0);
+    expect(plan).toHaveLength(0);
+    expect(advances).toHaveLength(0);
   });
 
-  test("an agent's proposal keeps its own draft: your draft and preview are untouched, and each confirm sends its own words", async () => {
+  test("the person's started step under Work shows nothing added, because nothing was sent", async () => {
     reset();
-    const mine = (await draft()).draftId;
-    const p1 = await preview(mine, "My own words");
-    await app.post("/desk/draft", { draft_id: mine, text: "My own words", mode: "handoff" });
-    // The agent proposes under a fresh draft id.
-    const theirs = crypto.randomUUID();
-    const proposed = await fetch(`${app.base}/desk/handoff/preview`, { method: "POST", headers: { "content-type": "application/json", "x-horizon-source": "page-agent", "x-horizon-agent-name": "Helper" }, body: JSON.stringify({ draft_id: theirs, text: "The agent's words" }) });
-    expect(proposed.status).toBe(200);
-    const p2 = (await proposed.json()) as Record<string, any>;
-    // Your draft is still yours, with your words.
-    expect(await draft()).toMatchObject({ draftId: mine, text: "My own words" });
-    // Confirm your own: your words go out, not the agent's.
-    const first = await send({ draft_id: mine, text: "My own words", plan_precondition: p1.body.preview.plan_precondition });
-    expect(first.status).toBe(200);
-    expect(adds.map((a) => (a.item as { name: string }).name)).toEqual(["My own words"]);
-    // The plan changed, so the agent's older preview is out of date; looking again gives the same proposal a fresh preview.
-    const stale = await send({ draft_id: theirs, text: "The agent's words", plan_precondition: p2.preview.plan_precondition });
-    expect(stale.status).toBe(409);
-    const again = await fetch(`${app.base}/desk/handoff/preview`, { method: "POST", headers: { "content-type": "application/json", "x-horizon-source": "page-agent" }, body: JSON.stringify({ draft_id: theirs, text: "The agent's words" }) });
-    const p3 = (await again.json()) as Record<string, any>;
-    const second = await send({ draft_id: theirs, text: "The agent's words", plan_precondition: p3.preview.plan_precondition });
-    expect(second.status).toBe(200);
-    expect(adds.map((a) => (a.item as { name: string }).name)).toEqual(["My own words", "The agent's words"]);
-    expect(new Set(adds.map((a) => a.request_id)).size).toBe(2);
-  });
-
-  test("two confirms of one draft still make one step", async () => {
-    reset();
-    const { draftId } = await draft();
-    const p = await preview(draftId, "Fix the checkout total");
-    const body = { draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition };
-    const [a, b] = await Promise.all([send(body), send(body)]);
-    expect([a.status, b.status]).toEqual([200, 200]);
-    expect(plan).toHaveLength(1);
-    expect(adds).toHaveLength(1);
-  });
-
-  test("a handed-off step is started after it is added", async () => {
-    reset();
-    const { draftId } = await draft();
-    const p = await preview(draftId, "Fix the checkout total");
-    const body = { draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition };
-    const done = await send(body);
-    expect(done.body.started).toMatchObject({ ok: true });
-    expect(done.body.message).toContain("It has started.");
-    expect(advances).toHaveLength(1);
-    expect(advances[0]).toMatchObject({ verb: "case_advance", case_id: CASE, request_id: `advance:handoff:${draftId}` });
-    // Under Work the step shows as waiting to start until it is started.
-    const work = await app.get("/desk/work.json");
-    expect(work.cases.items[0].waiting.map((w: any) => w.plan_item_id)).toEqual(plan);
-    // Sending again replays: still one step, and the same advance request.
-    await send(body);
-    expect(adds).toHaveLength(1);
-    expect(new Set(advances.map((a) => a.request_id))).toEqual(new Set([`advance:handoff:${draftId}`]));
-  });
-
-  test("if starting fails the step is still added, said in words, and Start it tries again with a new id", async () => {
-    reset();
-    advanceFails = true;
     const { draftId } = await draft();
     const p = await preview(draftId, "Fix the checkout total");
     const done = await send({ draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition });
-    expect(done.status).toBe(200);
-    expect(plan).toHaveLength(1);
-    expect(done.body.started.ok).toBe(false);
-    expect(done.body.message).toContain("It has not started yet:");
-    expect(done.body.message).toContain("Start it");
-    advanceFails = false;
-    // Start it starts the steps the person was shown as waiting: the set is sent back with the start.
-    const start = await app.post("/desk/start", { case_id: CASE, also_starts: [...plan] });
-    expect(start.status).toBe(200);
-    expect(advances.length).toBe(2);
-    expect(advances[1]!.request_id).not.toBe(advances[0]!.request_id);
-    expect((await app.post("/desk/start", { case_id: "nope", also_starts: [] })).status).toBe(409);
+    expect(done.status).toBe(403);
+    const work = await app.get("/desk/work.json");
+    expect(work.cases.items[0].waiting.map((w: any) => w.plan_item_id)).toEqual(plan);
+    expect(plan).toEqual([]);
   });
 
-  test("when agent work is not connected the desk says so and refuses to hand a step to an agent", async () => {
+  test("a refused send never asks the case keeper to start the case", async () => {
+    reset();
+    const { draftId } = await draft();
+    const p = await preview(draftId, "Fix the checkout total");
+    const done = await send({ draft_id: draftId, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition });
+    expect(done.status).toBe(403);
+    expect(advances).toHaveLength(0);
+    // Start it is refused too: the dispatcher's targets are not resolved at this freeze (R5-02).
+    const start = await app.post("/desk/start", { case_id: CASE, also_starts: [...plan] });
+    expect(start.status).toBe(403);
+    expect(((await start.json()) as Record<string, any>).message).toContain("refused at this release");
+    expect(advances).toHaveLength(0);
+    expect((await app.refusals()).some((r) => r.operation === "run.start")).toBe(true);
+  });
+
+  test("a refusal does not depend on agent work being connected", async () => {
     reset();
     connected = false;
     const { draftId, agent } = await draft();
@@ -291,12 +220,15 @@ describe("Hand off", () => {
     const p = await preview(draftId, "Fix it");
     expect(p.body.preview.agent.offered).toBe(false);
     expect(p.body.preview.agent.words).toContain("Not connected");
+    // Asking for an agent is refused first, because there is no agent to give it to; either way
+    // nothing is added, and the plain send is refused by the catalog's own row.
     const refused = await send({ draft_id: draftId, text: "Fix it", plan_precondition: p.body.preview.plan_precondition, assign: true });
     expect(refused.status).toBe(409);
+    expect(refused.body.outcome).toBe("not_connected");
     expect(adds).toHaveLength(0);
-    // Without asking for an agent, the step is still handed off.
-    expect((await send({ draft_id: draftId, text: "Fix it", plan_precondition: p.body.preview.plan_precondition })).status).toBe(200);
     expect(assignCalls).toBe(0);
+    expect((await send({ draft_id: draftId, text: "Fix it", plan_precondition: p.body.preview.plan_precondition })).status).toBe(403);
+    expect(adds).toHaveLength(0);
   });
 
   test("bad input is refused in words before anything is sent", async () => {

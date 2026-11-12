@@ -106,11 +106,26 @@ def matching_close(text, start):
 
 
 def sea_invariant_by_requirement():
-    """REQ id -> (invariant_id, statement) for `.sea` InteractionInvariant instances."""
+    """REQ id -> list of (invariant_id, statement) for `.sea` InteractionInvariant instances.
+
+    A requirement MAY name more than one invariant, and the canonical model does exactly that:
+    REQ-DEV-001 is witnessed by INV-07 (observed evidence, operational settlement and
+    developmental capability assessment remain distinct) and by INV-12 (settlement advances
+    unobserved -> observed -> ruled, never skipping a stage). Both relationships are valid:
+    `scripts/check-idm-integrity.py` enforces unique invariant ids and live requirement refs,
+    and deliberately does not enforce one invariant per requirement, so a many-to-one binding is
+    the canonical model's shape rather than an ambiguity to be resolved by dropping one.
+
+    The ledger therefore names EVERY binding. `invariant`/`invariant_source` keep the single
+    primary witness (the lowest invariant id, so the choice is deterministic and not a
+    judgement about which relationship matters), and `additional_invariants` carries the rest.
+    Nothing is discarded: an invariant present in the `.sea` model and absent from the ledger
+    is a generator defect, and `scripts/check-ledger-invariants.py` fails the build on it.
+    """
     text = "\n".join(
         open(os.path.join(REPO, rel), encoding="utf-8").read() for rel in SEA_FILES
     )
-    bindings = {}
+    found = {}
     for m in re.finditer(r'instance\s+\w+\s+of\s+"InteractionInvariant"\s*\{', text):
         body = text[m.end():]
         body = body[: matching_close("{" + body, 0)]
@@ -119,12 +134,18 @@ def sea_invariant_by_requirement():
         req = re.search(r'requirement_ref:\s*"([^"]+)"', body)
         if not (iid and stmt and req):
             raise SystemExit(f"malformed InteractionInvariant instance near {m.group(0)!r}")
-        if req.group(1) in bindings:
-            raise SystemExit(
-                f"{req.group(1)} is bound to two invariants: "
-                f"{bindings[req.group(1)][0]} and {iid.group(1)}"
+        found.setdefault(req.group(1), []).append((iid.group(1), stmt.group(1)))
+    bindings = {}
+    for requirement, entries in found.items():
+        entries.sort()
+        bindings[requirement] = entries
+        if len(entries) > 1:
+            print(
+                f"note: {requirement} names {len(entries)} invariants "
+                f"({', '.join(invariant for invariant, _ in entries)}); "
+                f"the ledger records all of them",
+                file=sys.stderr,
             )
-        bindings[req.group(1)] = (iid.group(1), stmt.group(1))
     return bindings
 
 
@@ -421,9 +442,16 @@ def main():
                 prefix, f"the requirement {rid} holds for {entity}"
             )
             invariant_source = "family"
+            additional_invariants = []
         else:
-            invariant_id, invariant = bound
+            # `bound` is every invariant the canonical model binds to this requirement. The
+            # first is the primary witness; the rest are recorded, never discarded.
+            invariant_id, invariant = bound[0]
             invariant_source = f"sea:{invariant_id}"
+            additional_invariants = [
+                {"invariant": statement, "invariant_source": f"sea:{other_id}"}
+                for other_id, statement in bound[1:]
+            ]
         check_entity(entity, entities, rid)
 
         gate = task_gates(tasks)
@@ -444,6 +472,9 @@ def main():
                 "entity_source": entities[entity],
                 "invariant": invariant,
                 "invariant_source": invariant_source,
+                # Every further `.sea` invariant that witnesses this requirement. Empty for a
+                # family-bound or single-invariant requirement; never a silent drop.
+                "additional_invariants": additional_invariants,
             },
             "acceptance": [ac],
             "proof": gate,

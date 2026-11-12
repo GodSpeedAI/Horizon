@@ -17,6 +17,7 @@ import { CONVERSATION_COLLECTION } from "../src/capabilities/conversation.ts";
 import { questionFingerprint } from "../src/capabilities/question-rules.ts";
 import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { withRequestId } from "./support/request-body.ts";
+import { agentInProcess } from "./support/agent-door.ts";
 import { answerIdOf } from "../src/capabilities/panel-answers.ts";
 import { guardIdOf } from "../src/capabilities/panel-answers.ts";
 import { deskScopeOf } from "../src/capabilities/panel-records.ts";
@@ -50,8 +51,7 @@ afterAll(async () => {
 });
 
 const question = (id: string, text = "Which plan?", extra: Record<string, unknown> = {}) => ({ id, question: text, why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }], ...extra });
-const agent = (app: DeskApp, key: string, name: string, body: unknown) =>
-  fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": name }, body: JSON.stringify(withRequestId(body)) });
+const agent = (app: DeskApp, key: string, name: string, body: unknown) => agentInProcess(app.application, Object.entries(keys).find(([, value]) => value === key)?.[0] ?? key, name, body);
 const putAs = (app: DeskApp, panel: string, ask: Record<string, unknown>, key = keys.ag_alice, step?: string) => agent(app, key, "Alice", { tool: "ask_human", panel, ask, ...(step === undefined ? {} : { step }) });
 const person = async (app: DeskApp, body: unknown) => app.post("/desk/panels/op", await withRevision(app, body));
 const answer = (app: DeskApp, panel: string, ask: string, outcome: "answered" | "deferred" = "answered") => person(app, { op: "human.answer", panel, ask, outcome, value: outcome === "answered" ? "a" : undefined });

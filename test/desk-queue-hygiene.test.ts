@@ -135,7 +135,9 @@ describe("step acceptance looks up its card outside the queue", () => {
     expect(put).toMatchObject({ ok: true });
     expect(Date.now() - started).toBeLessThan(1_000);
     const response = await accepted;
-    expect(response.status).toBe(200);
+    // The decision itself is refused at this freeze (R5-01); what this test proves is that the
+    // slow card lookup happened outside the queue, so the panel command above ran meanwhile.
+    expect(response.status).toBe(403);
   });
 
   test("a lookup that saw a wait, then the wait was stopped before the decision ran, is refused as stale", async () => {
@@ -255,8 +257,10 @@ describe("a route claim's step lookup does not hold the queue (R3-10)", () => {
     const routed = await within(routing, 6_000);
     holdCases = false;
     expect(routed).not.toBe("timeout");
-    const routedBody = await (routed as Response).json();
-    expect(routedBody).toMatchObject({ ok: true });
-    expect((routed as Response).status).toBe(200);
+    // The route is refused before it reaches the case keeper, so a keeper that never answers
+    // cannot hold the door: the refusal is answered from the catalog alone (R5-01).
+    const routedBody = (await (routed as Response).json()) as { ok?: boolean; outcome?: string };
+    expect(routedBody).toMatchObject({ ok: false, outcome: "refused" });
+    expect((routed as Response).status).toBe(403);
   }, 15_000);
 });

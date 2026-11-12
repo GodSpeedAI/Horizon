@@ -57,6 +57,12 @@ export interface PanelAnswer {
   /** Why the answer finished, once it has: the agent named where it went ("reported"), or the person stopped waiting ("stopped"). */
   readonly finished_by?: FinishedBy | null;
   /**
+   * The key of the agent whose authenticated call finished this answer. It is the key the door
+   * authenticated, never a label from the request (DEF-ASK-ROUTE-EXECUTOR). Null when the person
+   * stopped waiting, and null on records written before the executor was recorded.
+   */
+  readonly executed_by_key?: string | null;
+  /**
    * Every change of owner, in order (`planReassign`). The authorship fields (`asked_by`, `asked_by_key`) are never changed by a
    * reassignment; this list says who held the question and when.
    */
@@ -187,9 +193,9 @@ export function answerState(a: PanelAnswer): QuestionState {
  * overwritten by the stale words.
  */
 type Write = { readonly collection: string; readonly id: string; readonly expectedVersion: number; readonly value: { readonly [key: string]: Json } };
-function planFinish(read: ReadAnswer, by: FinishedBy, routedAs: string | null, note: string | null): Write {
+function planFinish(read: ReadAnswer, by: FinishedBy, routedAs: string | null, note: string | null, executedByKey: string | null = null): Write {
   const a = read.answer;
-  return { collection: PANEL_ANSWERS_COLLECTION, id: answerIdOf(a.tenant, a.panel_id, a.n), expectedVersion: read.version, value: storedOf({ ...a, state: "finished", finished_by: by, routed_as: routedAs, note: a.note ?? note }) };
+  return { collection: PANEL_ANSWERS_COLLECTION, id: answerIdOf(a.tenant, a.panel_id, a.n), expectedVersion: read.version, value: storedOf({ ...a, state: "finished", finished_by: by, routed_as: routedAs, executed_by_key: executedByKey, note: a.note ?? note }) };
 }
 
 /**
@@ -216,7 +222,9 @@ export async function planRoute(store: DurableStore, tenant: string, panelId: st
     if (!own.ok) return { ok: false, message: own.message };
   }
   const words = typeof routedAs === "string" ? routedAs.trim() : "";
-  const records: CommitRecord[] = rows.filter((r) => waitsForAgent(r.answer)).map((r) => planFinish(r, "reported", words, null));
+  // The executor is the key the door authenticated, never a label from the request: the record says
+  // which agent made the claim (DEF-ASK-ROUTE-EXECUTOR).
+  const records: CommitRecord[] = rows.filter((r) => waitsForAgent(r.answer)).map((r) => planFinish(r, "reported", words, null, callerKey));
   return records.length === 0 ? { ok: false, message: NO_ANSWER_WAITING } : { ok: true, records, closed: records.length };
 }
 

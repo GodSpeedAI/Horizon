@@ -40,6 +40,17 @@ import type { DurableStore, Json } from "@godspeedai/cognate-events";
 import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
 import type { RunView } from "@godspeedai/cognate-runtime-api";
 import { buildStructuralFrame, type NavigationFrameV1, type NavigationIntentRecord } from "./domain/frame.ts";
+import {
+  actionFieldFor,
+  classifyReference,
+  loadOperationManifest,
+  refusedPrefixesFor,
+  resolveDispatchedOperation,
+  type LoadedManifest,
+} from "./contracts/identity/manifest.ts";
+import { RESERVED_ACTOR_FIELDS, reservedActorField, schemaFieldNames, unknownField } from "./contracts/identity/reserved-fields.ts";
+import { frozenRefusal, refusalWords, type FrozenRefusal } from "./contracts/identity/enforcement.ts";
+import { loadParamSchemas, wireName, type ParamSchemaSpec } from "./contracts/identity/params.ts";
 import { buildCommitIntent, IntentError, type CommitIntentInput, type CommitIntentOutput } from "./domain/intent.ts";
 import type { NavigationFrame as NavigationFrameV2 } from "./domain/navigation.ts";
 import type { SemanticRef } from "./domain/operational.ts";
@@ -106,6 +117,7 @@ import { buildDecide, waitingCount, type CaseApprovals, type HumanStepInput } fr
 import { conflictLogLines } from "./ui/desk/conflict-model.ts";
 import { addItem, advance as caseAdvance, detailsOf, entryOptions, approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
 import { activeHolds, checkReason, putHold, recordDecision } from "./capabilities/decisions.ts";
+import { recordRefusal } from "./capabilities/refusals.ts";
 import { caseItems, costSource, orderWork, sessionItems, type AcceptedKnowledge, type WorkData } from "./ui/desk/work-build.ts";
 import { readLedgerDay } from "./adapters/ledger-day.ts";
 import { recordReader, type RecordReader } from "./adapters/realitytrace-economics.ts";
@@ -120,7 +132,7 @@ import { existsSync as fileExists, mkdirSync as makeDir, readFileSync as readFil
 import { dirname as dirOf, join as joinPath } from "node:path";
 import { tmpdir as tmpDir } from "node:os";
 import type { Server } from "bun";
-import { RemoteController, type RemoteStatus } from "./remote/server.ts";
+import { DEVICE_ACTOR_PREFIX, RemoteController, type RemoteStatus } from "./remote/server.ts";
 import { remoteSettings } from "./remote/settings.ts";
 import { qrSvg, remotePanelPage } from "./remote/panel.ts";
 import { itemOf, questionOf } from "./ui/surface2/panel-blocks.ts";
@@ -180,9 +192,25 @@ export interface FrameView {
   readonly frame: NavigationFrameV1;
 }
 
+/**
+ * Request fields that would name the caller. The caller is never taken from a request: the actor
+ * comes from the authenticated session or the agent key, and the role comes from the same place.
+ * A request that carries one of these is refused outright rather than quietly ignored, so no
+ * caller can ask to be read as somebody else.
+ *
+ * The list itself lives with the contract, in `contracts/identity/reserved-fields.ts`, because
+ * every write boundary answers the same question with the same names. The phone used to keep a
+ * shorter list of its own, and a field the desktop refused was an ordinary unknown field on the
+ * phone (R4-07).
+ */
+export const ACTOR_NAMING_FIELDS = RESERVED_ACTOR_FIELDS;
+
 export interface SurfaceIntentRequestBody {
   readonly transport: "gui" | "cli" | "mcp";
-  readonly role?: unknown;
+  /**
+   * The role is deliberately absent. It selects which projection the surface is reduced for, and
+   * it comes from the authenticated caller, never from the body (DEF-ROLE-FROM-REQUEST).
+   */
   /** GUI: the action the operator activated. */
   readonly node_id?: unknown;
   /** CLI/MCP: the operation the caller named. */
@@ -303,7 +331,12 @@ export interface HorizonApplication {
   surface(role?: SurfaceRole): ReturnType<typeof projectForRole>;
   /** The published `horizon.surface/2` vocabulary, for discovery (PE-01). */
   surfaceSchema(): ReturnType<typeof publishSurfaceSchema>;
-  commitSurfaceIntent(submission: SurfaceIntentRequestBody): Promise<
+  /**
+   * Commit one surface intent for the role the caller's context gives it. The role is never read
+   * from the submission: at an HTTP boundary it comes from the signed-in session, and in process
+   * it comes from the local console (DEF-ROLE-FROM-REQUEST).
+   */
+  commitSurfaceIntent(submission: SurfaceIntentRequestBody, role: SurfaceRole): Promise<
     | { readonly ok: true; readonly result: IntentCommit; readonly bound: EquivalenceResult }
     | { readonly ok: false; readonly code: string; readonly message: string }
   >;
@@ -313,6 +346,103 @@ export interface HorizonApplication {
   /** Resolves when the saved records are migrated. Until then every change is refused with words saying so (design v3, step 4). */
   readonly migrated: Promise<void>;
   close(): Promise<void>;
+}
+
+/**
+ * The identity catalog, read once and kept.
+ *
+ * A catalog that cannot be loaded is a refusal, never a default. The gate below would otherwise
+ * see every reference as unknown, and an unknown reference that the deployment happens to bind
+ * would be allowed — the opposite of failing closed.
+ */
+let identityCatalog: LoadedManifest | null = null;
+function identityCatalogOf(): LoadedManifest {
+  if (identityCatalog !== null) return identityCatalog;
+  identityCatalog = loadOperationManifest();
+  return identityCatalog;
+}
+
+/**
+ * What the catalog says the runtime does with the operation a request is about to perform.
+ *
+ * The answer comes from the catalog's own live-enforcement table, so the contract and the runtime
+ * cannot drift: a contract that says a row is refused is a row the route refuses, and a contract
+ * that says a row runs is a row the route runs. A catalog that cannot be loaded is a refusal, not
+ * a default: the route answers 503 and changes nothing (R5-01).
+ */
+type RefusalCheck = { readonly ok: true; readonly refusal: FrozenRefusal | null } | { readonly ok: false; readonly message: string };
+function checkFrozenRefusal(
+  operationId: string,
+  selector: { readonly route?: string; readonly codeOp?: string },
+): RefusalCheck {
+  try {
+    return { ok: true, refusal: frozenRefusal(identityCatalogOf(), operationId, selector) };
+  } catch (error) {
+    return {
+      ok: false,
+      message: `The identity catalog could not be loaded, so nothing was changed (${error instanceof Error ? error.message : String(error)}).`,
+    };
+  }
+}
+
+/**
+ * Whether the catalog lets a route perform the operation it is about to perform.
+ *
+ * `run` means the catalog has no refusal for the row, so the route's own checks decide.
+ * `refused` means the row is refused at this freeze: the refusal audit is written now, before the
+ * route returns, and the caller answers with the catalog's own words. `unavailable` means the
+ * catalog could not be read, which is a refusal too — never a default (R5-01).
+ */
+type FrozenGate = { readonly state: "run" } | { readonly state: "refused"; readonly refusal: FrozenRefusal } | { readonly state: "unavailable"; readonly message: string };
+async function frozenGate(
+  store: DurableStore,
+  tenant: string,
+  operationId: string,
+  selector: { readonly route?: string; readonly codeOp?: string },
+  caller: string | null,
+): Promise<FrozenGate> {
+  const check = checkFrozenRefusal(operationId, selector);
+  if (!check.ok) return { state: "unavailable", message: check.message };
+  if (check.refusal === null) return { state: "run" };
+  try {
+    await recordRefusal(store, {
+      tenant,
+      operation: check.refusal.operationId,
+      code_op: check.refusal.codeOp,
+      route: selector.route ?? null,
+      caller,
+      reason: check.refusal.reason,
+      now: new Date(),
+    });
+  } catch {
+    // The refusal stands whether or not its audit could be kept: nothing was changed either way.
+  }
+  return { state: "refused", refusal: check.refusal };
+}
+
+/**
+ * The qualifier the identity catalog dispatches a desk decision on.
+ *
+ * The card kind is never read from the request: the person names a card, and the server looks
+ * that card up. The settlement card is one kind with two halves, so its phase is read from the
+ * card's own id — the same id the settlement handler parses. A kind the catalog does not know
+ * resolves to nothing, and the pair is then refused rather than guessed (R3-02).
+ */
+function deskCardKind(card: { readonly kind: string; readonly id: string }): string | null {
+  switch (card.kind) {
+    case "escalation":
+    case "lesson":
+    case "case_task":
+    case "human_step":
+      return card.kind;
+    case "acceptance": {
+      const cut = card.id.lastIndexOf(":");
+      const phase = card.id.slice(cut + 1);
+      return phase === "observe" || phase === "rule" ? `acceptance_${phase}` : null;
+    }
+    default:
+      return null;
+  }
 }
 
 /**
@@ -456,6 +586,8 @@ export async function createApplication(
   }
   // HORIZON-001 1.1.0: bound operations, capacity and the obligation flow (SPEC-CR-002).
   const bindingFor = (operationRef: string) => loaded.config.operations.find((binding) => binding.operation_ref === operationRef);
+  /** The operations this deployment binds. A reference outside the catalog and outside this set is Px. */
+  const deploymentBoundRefs = new Set(loaded.config.operations.map((binding) => binding.operation_ref));
   // The rulebook is Horizon's DomainForge model; RealityTrace snapshots it so records carry its edition.
   const obligationRt = realityTrace ? new RealityTraceObligation({ bin: realityTrace.bin, dataHome: realityTrace.dataHome, stateHome: realityTrace.stateHome, repoDir: `${realityTrace.repoDir}-obligations`, rulebookEntry: resolve("domain", "interaction-model.sea") }) : null;
   if (!options.readOnly) void obligationRt?.snapshot();
@@ -800,6 +932,30 @@ export async function createApplication(
 
   /** Submit an already-built intent: refused intents are audited and write no record. */
   async function submitIntent(intent: CommitIntentInput): Promise<IntentCommit> {
+    // The gate is here as well as at the request boundary: this is the last place before a
+    // capability runs and a record is appended, so an unclassified reference cannot reach it by
+    // any other route into the application (R2-03).
+    try {
+      const classification = classifyReference(identityCatalogOf(), intent.operation_ref, deploymentBoundRefs);
+      if (!classification.allowed) {
+        const governed = classification.reason === "governed_operation_needs_confirmation";
+        const bound = classification.reason === "deployment_bound_operation_needs_its_own_path";
+        throw new IntentError(
+          governed || bound ? "failed_precondition" : "invalid_argument",
+          governed
+            ? `${intent.operation_ref} is a ${classification.class} row: it needs its pending record, its confirmation and its authority writer, not a plain intent`
+            : bound
+              ? `${intent.operation_ref} is bound by this deployment: its authority, its evidence and its expiry are its binding contract's, and a plain intent carries none of them`
+              : `${intent.operation_ref} is not a classified operation: it is neither in the identity catalog nor bound by this deployment`,
+        );
+      }
+    } catch (error) {
+      if (error instanceof IntentError) {
+        await audit(intent, "refused", error.message);
+        throw error;
+      }
+      throw new IntentError("failed_precondition", `the identity catalog could not be loaded, so nothing was committed (${error instanceof Error ? error.message : String(error)})`);
+    }
     if (governance.mode === "sea-forge") return governedSubmit(intent);
     let result: CommitIntentOutput;
     try {
@@ -839,6 +995,27 @@ export async function createApplication(
 
   /** Source → frame → typed intent → commit. The route never supplies an observer. */
   async function commitNavigationIntent(request: { readonly operationRef: string; readonly intentId?: string; readonly expectation?: unknown }): Promise<IntentCommit> {
+    // The operation reference is classified before anything runs. An operation the identity
+    // catalog does not know is not a local write by default: it is Px unless the deployment binds
+    // it, and a governed row never travels the plain intent path (R2-03).
+    let classification;
+    try {
+      classification = classifyReference(identityCatalogOf(), request.operationRef, deploymentBoundRefs);
+    } catch (error) {
+      throw new IntentError("failed_precondition", `the identity catalog could not be loaded, so nothing was committed (${error instanceof Error ? error.message : String(error)})`);
+    }
+    if (!classification.allowed) {
+      const governed = classification.reason === "governed_operation_needs_confirmation";
+      const bound = classification.reason === "deployment_bound_operation_needs_its_own_path";
+      throw new IntentError(
+        governed || bound ? "failed_precondition" : "invalid_argument",
+        governed
+          ? `${request.operationRef} is a ${classification.class} row: it needs its pending record, its confirmation and its authority writer, not a plain intent`
+          : bound
+            ? `${request.operationRef} is bound by this deployment: its authority, its evidence and its expiry are its binding contract's, and a plain intent carries none of them`
+            : `${request.operationRef} is not a classified operation: it is neither in the identity catalog nor bound by this deployment`,
+      );
+    }
     const binding = bindingFor(request.operationRef);
     if (binding) await refreshBoundChoices();
     const { frame } = issueFrame();
@@ -1004,9 +1181,15 @@ export async function createApplication(
    * Commit an intent a transport expressed in its own vocabulary, after checking that the
    * canonical intent is the one the surface offered. A divergent submission (another
    * operation, frame or actor) is refused rather than "closest-matched" (PE-04/NE-09).
+   *
+   * The role is an argument, not a field of the request: it selects the projection the surface
+   * is reduced for, and every caller passes the role its authenticated context gives it. The
+   * role never establishes identity or authority — the intent's actor is the frame's observer
+   * (DEF-ROLE-FROM-REQUEST).
    */
   async function commitSurfaceIntent(
     submission: SurfaceIntentRequestBody,
+    role: SurfaceRole,
   ): Promise<
     | { readonly ok: true; readonly result: IntentCommit; readonly bound: EquivalenceResult }
     | { readonly ok: false; readonly code: string; readonly message: string }
@@ -1016,7 +1199,6 @@ export async function createApplication(
     if (typeof submission.frame_id === "string" && submission.frame_id !== frame.frame_id) {
       return { ok: false, code: "stale_surface", message: `SURFACE: frame ${submission.frame_id} is not the current frame` };
     }
-    const role: SurfaceRole = submission.role === "agent" || submission.role === "system" ? submission.role : "human";
     const offered = projectForRole(composeSurface(frame), role, frame, bindingContextOf(routeContext()));
     if (!offered.ok) return { ok: false, code: offered.code, message: JSON.stringify(offered.issues) };
     const view: GuiView = offered.view;
@@ -1373,12 +1555,22 @@ export async function createApplication(
   /** The cockpit's commit of one offered action, run as a session's Caller; refused when that Caller is not a mapped operator session. */
   async function commitForSession(actionId: string, intentId: string, who: Caller): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }> {
     const refusal = sessionRefusal(who);
-    if (refusal !== null) return { ok: false, code: "no_actor_mapping", message: refusal };
+    if (refusal !== null) {
+      // A device credential is never turned into the operator. The phone's move would have to run
+      // under the device's own principal, and the commit path is the person's: the two are not
+      // interchangeable, so the commit is refused rather than run under a borrowed identity
+      // (R5-03). The row the phone's command resolves is refused by the catalog before this
+      // branch; this is the backstop that keeps a drifted catalog from succeeding here.
+      if (who.actor.id.startsWith(DEVICE_ACTOR_PREFIX)) {
+        return { ok: false, code: "no_device_delegation", message: "A phone cannot make this move as the person: there is no delegation from the device to the operator at this release. Make the move on the desktop." };
+      }
+      return { ok: false, code: "no_actor_mapping", message: refusal };
+    }
     // The same commit the desktop's /workspace/intent makes, run as the session's Caller.
     let outcome: Awaited<ReturnType<typeof commitSurfaceIntent>> | null = null;
     let failure: unknown = null;
     try {
-      outcome = await acting.run(who, () => commitSurfaceIntent({ transport: "gui", role: "human", node_id: actionId, intent_id: intentId }));
+      outcome = await acting.run(who, () => commitSurfaceIntent({ transport: "gui", node_id: actionId, intent_id: intentId }, "human"));
     } catch (error) {
       failure = error;
     }
@@ -1713,7 +1905,18 @@ export async function createApplication(
     } catch {
       return Response.json({ ok: false, message: "That lesson could not be read. Nothing was recorded." }, { status: 400, headers });
     }
-    const proposed = await proposeLesson(runtime.runtime.store, { tenant: caller.tenant, text: typeof body.text === "string" ? body.text : "", source: typeof body.source === "string" && body.source !== "" ? body.source.slice(0, 200) : null, proposed_by: typeof body.proposed_by === "string" && body.proposed_by.trim() !== "" ? body.proposed_by.trim().slice(0, 100) : "a review", now: clock() });
+    // The proposer is the caller, never a string in the request. A body that names one is
+    // refused rather than believed: a lesson displayed as "Proposed by ..." is a claim about who
+    // said it, and the only source for that claim is the session that asked (R4-07).
+    const named = reservedActorField(body);
+    if (named !== null) {
+      return Response.json({ ok: false, message: `This request does not take an actor from the body (${named}). The signed-in session is who you are. Nothing was recorded.` }, { status: 400, headers });
+    }
+    const extra = unknownField(body, schemaFieldNames("params.horizon_lesson_propose"));
+    if (extra !== null) {
+      return Response.json({ ok: false, message: `This request does not take ${extra}. Nothing was recorded.` }, { status: 400, headers });
+    }
+    const proposed = await proposeLesson(runtime.runtime.store, { tenant: caller.tenant, text: typeof body.text === "string" ? body.text : "", source: typeof body.source === "string" && body.source !== "" ? body.source.slice(0, 200) : null, proposed_by: caller.actor.id, now: clock() });
     if (!proposed.ok) return Response.json({ ok: false, message: proposed.message }, { status: 400, headers });
     return Response.json({ ok: true, message: "Lesson proposed. It waits in Decide until you accept it.", lesson_id: proposed.lesson.lesson_id, status: proposed.lesson.status }, { headers });
   }
@@ -1775,7 +1978,19 @@ export async function createApplication(
     const state = looked ?? (await decideState(await recentMoves()));
     const card = state.cards.find((candidate) => candidate.id === cardId);
     if (card === undefined) return fail(404, "gone", "That decision is no longer waiting. It may have been answered somewhere else. Nothing was done.");
+    // The route is a dispatcher: the server resolves what kind of card this is, and the catalog
+    // says which operation that kind together with the chosen action performs. A pair the catalog
+    // does not list is Px and is refused before any effect runs, so no card is ever downgraded to
+    // a weaker row by taking another path to it (R3-02).
+    let operation: string | null;
+    try {
+      operation = resolveDispatchedOperation(identityCatalogOf(), "POST /desk/decide", choice, deskCardKind(card));
+    } catch (error) {
+      return fail(503, "unavailable", `The identity catalog could not be loaded, so nothing was decided (${error instanceof Error ? error.message : String(error)}).`);
+    }
+    if (operation === null) return fail(400, "px", "That decision is not one Horizon knows. Nothing was done.");
     if (choice === "release") {
+      if (operation !== "decision.release") return fail(400, "px", "That decision is not one Horizon knows. Nothing was done.");
       if (card.held === null) return fail(409, "not_held", "That card is not on hold.");
       await putHold(store, { tenant: caller.tenant, card_id: card.id, reason: card.held.reason, released: true, now });
       return Response.json({ ok: true, message: "Released. The card is back under Needs you." }, { headers: { "cache-control": "no-store" } });
@@ -1797,14 +2012,25 @@ export async function createApplication(
         // The decision itself is already recorded where it counts; a missing audit row is not hidden by failing the answer.
       }
     };
+    // What the catalog says the runtime does with this operation, checked before anything is
+    // changed. A row the catalog refuses performs no target effect here: the approval, the case
+    // decision and the settlement halves are all refused at this freeze, and the refusal is
+    // recorded (R5-01).
+    const refusalCheck = checkFrozenRefusal(operation, { route: "POST /desk/decide" });
+    if (!refusalCheck.ok) return fail(503, "unavailable", refusalCheck.message);
+    if (refusalCheck.refusal !== null) {
+      await audit("refused");
+      return fail(403, "refused", refusalWords(refusalCheck.refusal));
+    }
     if (choice === "hold") {
+      if (operation !== "decision.hold") return fail(400, "px", "That decision is not one Horizon knows. Nothing was done.");
       await putHold(store, { tenant: caller.tenant, card_id: card.id, reason: reason as string, released: false, now });
       await audit("held");
       return Response.json({ ok: true, message: "On hold. Nothing changed; the step keeps waiting. Release the hold to bring it back." }, { headers: { "cache-control": "no-store" } });
     }
     if (card.blocked !== null) return fail(409, "blocked", card.blocked);
 
-    if (card.kind === "escalation") {
+    if (operation === "approval.approve" || operation === "approval.reject") {
       const approvalId = card.id.slice("approval:".length);
       let failure: unknown = null;
       try {
@@ -1829,7 +2055,7 @@ export async function createApplication(
       return Response.json({ ok: confirmed.ok, ...(confirmed.ok ? {} : { outcome: "unconfirmed" }), message: confirmed.message, receipt: intentId }, { headers: { "cache-control": "no-store" } });
     }
 
-    if (card.kind === "lesson") {
+    if (operation === "lesson.decide") {
       const decided = await decideLesson(store, { lesson_id: card.id, choice: choice === "accept" ? "accept" : "reject", person: caller.actor.id, now });
       if (!decided.ok) {
         await audit("refused");
@@ -1839,7 +2065,7 @@ export async function createApplication(
       return Response.json({ ok: true, message: choice === "accept" ? "Lesson accepted. It is now active, recorded with your name and the time." : "Lesson rejected. It will not become active." }, { headers: { "cache-control": "no-store" } });
     }
 
-    if (card.kind === "case_task") {
+    if (operation === "case.task.decide") {
       if (caseKeeper === null) return fail(503, "unreachable", "The case keeper is not set up, so this cannot be decided.");
       const approvalId = card.id.slice("case-task:".length);
       const listed = await approvalList(caseKeeper);
@@ -1867,7 +2093,7 @@ export async function createApplication(
       return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words, detailsOf(result));
     }
 
-    if (card.kind === "human_step") {
+    if (operation === "case.task.complete") {
       if (caseKeeper === null) return fail(503, "unreachable", "The case keeper is not set up, so this cannot be done.");
       const [, caseId, itemId] = /^human:([^:]+):(.+)$/.exec(card.id) ?? [];
       if (caseId === undefined || itemId === undefined) return fail(400, "unreadable", "That step is not one Horizon knows. Nothing was done.");
@@ -1891,11 +2117,17 @@ export async function createApplication(
       return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words, detailsOf(result));
     }
 
-    // acceptance: the observe and rule steps of a committed move
+    // The settlement halves: the observation and the ruling of a committed move. The card's own
+    // phase and the operation the catalog resolved must agree, so a card that names one half
+    // cannot run the other.
+    if (operation !== "horizon.settlement.observe" && operation !== "horizon.settlement.rule") {
+      return fail(400, "px", "That decision is not one Horizon knows. Nothing was done.");
+    }
     const cut = card.id.lastIndexOf(":");
     const phase = card.id.slice(cut + 1);
     const intentId = card.id.slice("settle:".length, cut);
-    if (phase !== "observe" && phase !== "rule") return fail(400, "unreadable", "That check is not one Horizon knows. Nothing was done.");
+    const expectedPhase = operation === "horizon.settlement.observe" ? "observe" : "rule";
+    if (phase !== expectedPhase) return fail(400, "px", "That decision is not one Horizon knows. Nothing was done.");
     try {
       await settleNavigationIntent(intentId, phase);
     } catch (error) {
@@ -2206,8 +2438,10 @@ export async function createApplication(
       const found = lookup !== null && lookup.resolves === resolves ? lookup.found : null;
       const where = found === null ? `The agent says it took it to: ${said}. Not checked: Horizon found no step with that name.` : `The agent says it took it to: ${said}. Step found: the step "${found.name}" is in the case "${found.case_title}".`;
       // One entry per answer: the one made when you answered is finished in place. The route, the row and the panel's row are one commit.
+      // The row keeps the person's words, so it stays the person's row; the agent that made the claim is named by its
+      // authenticated key in the row's references, never by a label the request chose (DEF-ASK-ROUTE-EXECUTOR).
       const mine = await answerRowOf(store, deskWho, op.panel_id, op.ask_id);
-      const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: "claimed", refs: { panel_id: op.panel_id, ask_id: op.ask_id, ...(found === null ? {} : { step_id: found.step_id, case_id: found.case_id }) } }, clock());
+      const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: "claimed", refs: { panel_id: op.panel_id, ask_id: op.ask_id, executor_key: keyId, ...(found === null ? {} : { step_id: found.step_id, case_id: found.case_id }) } }, clock());
       const panelRow = await panelRowWrite(state, op.panel_id, "You answered. The agent says it has taken it on.", op.ask_id);
       try {
         await store.commit({ appends: [], records: [...routePlan.records, row.record, ...(panelRow === null ? [] : [panelRow]), ...agentKeep(result)] });
@@ -2221,7 +2455,7 @@ export async function createApplication(
       // The withdrawal, its question state, the conversation row and the panel's row are one commit.
       const why = `The agent withdrew this question: ${op.reason.trim()}`;
       const mine = await answerRowOf(store, deskWho, op.panel_id, op.ask_id);
-      const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: mine?.words ?? (question ? `The agent's question: ${question}` : "The agent's question"), outcome: why, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id } }, clock());
+      const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: mine?.words ?? (question ? `The agent's question: ${question}` : "The agent's question"), outcome: why, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id, executor_key: keyId } }, clock());
       const panelRow = await panelRowWrite(state, op.panel_id, why);
       try {
         await commitBoard(panelBoard, state, [row.record, ...(panelRow === null ? [] : [panelRow]), ...agentKeep(result)]);
@@ -2330,8 +2564,44 @@ export async function createApplication(
     }
     const op = body as Record<string, unknown> | null;
     if (op === null || typeof op !== "object" || Array.isArray(op)) return refuse(400, "Send one object with a \"tool\" field. Nothing was changed.");
-    if (typeof op.op === "string" && op.op.startsWith("human.")) return refuse(403, "Only the person can do that. An agent cannot answer, pin, close or open a panel for them.");
+    // The door takes no identity from the body: the key in the Authorization header is the caller.
+    // A body that names an executor, a role or an actor is refused, not quietly ignored
+    // (DEF-ASK-ROUTE-EXECUTOR: the executor is the authenticated key, never a label in the request).
+    for (const field of ACTOR_NAMING_FIELDS) {
+      if (field in op) return refuse(400, `This door does not take an actor from the body (${field}). The agent key in the Authorization header is who you are. Nothing was changed.`);
+    }
+    // The refused prefixes are the route's own: the catalog says which field carries the semantic
+    // action, and the refusal is checked against that field. A refusal read from another field
+    // would let a reserved operation through under a different name (R2-10).
+    const agentDoorRoute = "POST /agent/panels";
+    let actionField: string;
+    let refusedPrefixes: readonly string[];
+    try {
+      const catalog = identityCatalogOf();
+      actionField = actionFieldFor(catalog, agentDoorRoute) ?? "tool";
+      refusedPrefixes = refusedPrefixesFor(catalog, agentDoorRoute);
+    } catch {
+      return refuse(503, "The identity catalog could not be loaded, so nothing was changed.");
+    }
+    const action = op[actionField];
+    if (typeof action === "string" && refusedPrefixes.some((prefix) => action.startsWith(prefix))) return refuse(403, "Only the person can do that. An agent cannot answer, pin, close or open a panel for them.");
     if (typeof op.tool !== "string" || !(AGENT_TOOLS as readonly string[]).includes(op.tool)) return refuse(400, `Say which tool: ${AGENT_TOOLS.join(", ")}. Nothing was changed.`);
+    // The catalog says which operation the named action performs, and whether the runtime refuses
+    // it at this freeze. The answer comes from the catalog, not from a list kept beside it, so a
+    // row the catalog refuses is a row this door refuses (R5-01, R5-02): asking a person to route
+    // an answer, and withdrawing one that was asked, both need a grant and a pending record the
+    // agent key alone does not carry.
+    let dispatched: string | null;
+    try {
+      dispatched = resolveDispatchedOperation(identityCatalogOf(), agentDoorRoute, typeof action === "string" ? action : op.tool);
+    } catch {
+      return refuse(503, "The identity catalog could not be loaded, so nothing was changed.");
+    }
+    if (dispatched !== null) {
+      const gate = await frozenGate(runtime.runtime.store, caller.tenant, dispatched, { route: agentDoorRoute }, owner.key_id);
+      if (gate.state === "unavailable") return refuse(503, gate.message);
+      if (gate.state === "refused") return Response.json({ ok: false, outcome: "refused", code: "refused", message: refusalWords(gate.refusal) }, { status: 403, headers });
+    }
     // Every change an agent makes carries its id (R2-11). Reading the answers changes nothing and needs none. The id's checks, its stored
     // receipt and the change itself are one path, agentCommandNow, which the desk's own callers use too.
     const requestId = op.request_id;
@@ -2432,6 +2702,21 @@ export async function createApplication(
     // Shared with the agent's writes: a person's change is refused while the records are migrating or after a failed migration.
     const paused = migrationBlock();
     if (paused !== null) return fail(503, paused);
+    // What the catalog says the runtime does with the operation this command names. Every person
+    // operation on this route runs at this freeze; the gate is here so that a row the catalog
+    // starts refusing is refused here too, rather than settling nothing and answering as if it had
+    // (R5-01). A route that cannot read the catalog answers 503, never a default.
+    let panelOperation: string | null;
+    try {
+      panelOperation = resolveDispatchedOperation(identityCatalogOf(), "POST /desk/panels/op", body.op);
+    } catch (error) {
+      return fail(503, `The identity catalog could not be loaded, so nothing was changed (${error instanceof Error ? error.message : String(error)}).`);
+    }
+    if (panelOperation !== null) {
+      const gate = await frozenGate(store, caller.tenant, panelOperation, { route: "POST /desk/panels/op" }, caller.actor.id);
+      if (gate.state === "unavailable") return fail(503, gate.message);
+      if (gate.state === "refused") return fail(403, refusalWords(gate.refusal));
+    }
     // Design v3, section 2: every person operation takes a request id. The same id with the same body returns the response it got and
     // writes nothing, so a retry never repeats a change (a retry after a new wait exists does not close it). The same id with other
     // contents is refused. The id's record joins the operation's commit, so the change and its record are stored together or not at all.
@@ -2617,6 +2902,12 @@ export async function createApplication(
 
   async function deskStart(request: Request): Promise<Response> {
     const headers = { "cache-control": "no-store" };
+    // The catalog refuses this row at this freeze: the dispatcher's targets are not resolved, so
+    // the route cannot know the class or the authority of what it starts. Nothing is started and
+    // the refusal is recorded (R5-02).
+    const gate = await frozenGate(runtime.runtime.store, caller.tenant, "run.start", { route: "POST /desk/start" }, caller.actor.id);
+    if (gate.state === "unavailable") return Response.json({ ok: false, message: gate.message }, { status: 503, headers });
+    if (gate.state === "refused") return Response.json({ ok: false, outcome: "refused", code: "refused", message: refusalWords(gate.refusal) }, { status: 403, headers });
     // The start is bound to what the person previewed: the steps listed as waiting, sent back as `also_starts`. A different set is refused.
     const body = (await request.json().catch(() => null)) as { case_id?: unknown; also_starts?: unknown } | null;
     if (caseKeeper === null) return Response.json({ ok: false, message: "Cases are not connected, so nothing can be started." }, { status: 503, headers });
@@ -2798,6 +3089,15 @@ export async function createApplication(
     }
     const wantsAgent = body.assign === true;
     if (wantsAgent && !agent.offered) return fail(409, "not_connected", `${agent.words} Nothing was sent.`);
+    // The catalog refuses this row at this freeze: sending a hand off adds a step to a case and
+    // starts it, and the row has no pending record, no protected confirmation and no authority for
+    // either. The checks above refuse what a person could not have meant; this gate refuses the
+    // effect itself, after them and before anything is added, and records the refusal (R5-01).
+    {
+      const gate = await frozenGate(store, caller.tenant, "handoff.send", { route: "POST /desk/handoff" }, caller.actor.id);
+      if (gate.state === "unavailable") return fail(503, "unavailable", gate.message);
+      if (gate.state === "refused") return fail(403, "refused", refusalWords(gate.refusal));
+    }
     const sentId = await requestIdFor(store, caller.tenant, handoffRequestId(draftId));
     const sent = await addItem(caseKeeper, {
       case_id: target.case_id,
@@ -2889,16 +3189,31 @@ export async function createApplication(
     workspace: () => workspace(),
     chrome: (receipt) => cockpitChrome({ receipt: receipt ?? null }),
     position: () => lastPosition(runtime),
-    approvalIntent: (approvalId) => intentIdForApproval(approvalId),
-    resolveApproval: async (approvalId, resolution, who) => {
-      await resolveNavigationApproval({ approvalId, resolution }, who);
+    // The phone's credential is a device credential: it proves which enrolled device is at the
+    // route and never which person is holding it. The catalog's dispatch table resolves the
+    // kind to a device-credential row, and the row's class comes back with it so the remote can
+    // refuse a governed row rather than downgrading it (R3-01, R4-02).
+    resolveCommand: (kind, phase) => {
+      const catalog = identityCatalogOf();
+      const operation = resolveDispatchedOperation(catalog, "POST /m/api/command", kind, phase);
+      if (operation === null) return null;
+      const row = catalog.byId.get(operation);
+      // The phone's body is closed: the dispatch envelope plus the fields the resolved row's own
+      // schema names. The schema is the contract's, so the phone cannot carry a field the
+      // operation does not have (R4-07).
+      const fields = row?.paramsSchema === null || row?.paramsSchema === undefined
+        ? []
+        : schemaFieldNames(row.paramsSchema);
+      // The catalog's own refusal, not a second list kept here: the row the contract refuses is
+      // the row the phone's command refuses (R5-01).
+      const refusal = frozenRefusal(catalog, operation, { route: "POST /m/api/command", codeOp: kind });
+      return { operation, class: row?.class ?? "PX", fields, refusal };
     },
     commitAction: (actionId, intentId, who) => commitForSession(actionId, intentId, who),
-    settle: async (intentId, phase) => {
-      await settleNavigationIntent(intentId, phase);
-    },
-    openCase: async (purpose, who) => {
-      await openCase(runtime.runtime.store, { tenant: caller.tenant, operator: who.actor.id, purpose, now: new Date() });
+    // The device acts; the operator its enrolment belongs to is recorded beside it as
+    // attribution. The two are never collapsed into one field (R5-03).
+    openCase: async (purpose, who, attribution) => {
+      await openCase(runtime.runtime.store, { tenant: caller.tenant, operator: who.actor.id, attributed_operator: attribution.operator, purpose, now: new Date() });
     },
   });
 
@@ -2957,16 +3272,21 @@ export async function createApplication(
             pairing.end(request.headers.get("cookie"));
             return Response.json({ ok: true, paired: false }, { headers: { "cache-control": "no-store", "set-cookie": clearedSessionCookie() } });
           }
-          if (url.pathname === "/health") {
-            // An unpaired caller (scripts/setup-health.ts) learns only whether the world answers: no identity, counts or versions.
-            if (!paired) {
-              try {
-                await runtime.runtime.service.invoke(caller, { capability: "horizon.semantics.world", input: {} });
-                return Response.json({ ok: true }, { headers: { "cache-control": "no-store" } });
-              } catch {
-                return Response.json({ ok: false }, { status: 503, headers: { "cache-control": "no-store" } });
-              }
+          if (url.pathname === "/health" && request.method === "GET") {
+            // The liveness probe is public and says one thing: the process is up. It answers the
+            // same to a paired caller as to an unpaired one, so it never becomes a second way in
+            // to the deployment profile, the operator reference, the semantic world, the research
+            // state or the transports (R3-10).
+            try {
+              await runtime.runtime.service.invoke(caller, { capability: "horizon.semantics.world", input: {} });
+              return Response.json({ ok: true }, { headers: { "cache-control": "no-store" } });
+            } catch {
+              return Response.json({ ok: false }, { status: 503, headers: { "cache-control": "no-store" } });
             }
+          }
+          if (url.pathname === "/diagnostics" && request.method === "GET") {
+            // The diagnostics read is a separate operation from the probe: it is paired, it writes
+            // nothing, and it is the only route that reports the deployment in detail.
             const semantic = await runtime.runtime.service.invoke(caller, {
               capability: "horizon.semantics.world",
               input: {},
@@ -2980,7 +3300,7 @@ export async function createApplication(
               transports: loaded.config.transports,
             });
           }
-          if (url.pathname === "/frame") {
+          if (url.pathname === "/frame" && request.method === "GET") {
             return Response.json({ ...issueFrame(), research });
           }
           if (url.pathname === "/intent" && request.method === "POST") {
@@ -2997,12 +3317,17 @@ export async function createApplication(
             try {
               return Response.json(await commitNavigationIntent({ operationRef: record.operation_ref, ...(record.expected_outcome === undefined ? {} : { expectation: record.expected_outcome }) }));
             } catch (error) {
-              if (!(error instanceof AwaitingAuthorityError)) throw error;
+              if (!(error instanceof AwaitingAuthorityError)) {
+                if (error instanceof IntentError) {
+                  return Response.json({ code: error.code, message: error.message }, { status: error.code === "already_exists" ? 409 : error.code === "failed_precondition" ? 412 : 400 });
+                }
+                throw error;
+              }
               // Accepted for a decision, not committed: the operator answers it at SEA-Forge.
               return Response.json({ code: error.code, intent_id: error.intent.intent_id, approval_id: error.approvalId, run_id: error.runId }, { status: 202 });
             }
           }
-          if (url.pathname === "/surface") {
+          if (url.pathname === "/surface" && request.method === "GET") {
             const role = url.searchParams.get("role");
             if (role !== null && role !== "human" && role !== "agent" && role !== "system") {
               return Response.json({ code: "invalid_argument", message: `SURFACE: unknown role '${role}'` }, { status: 400 });
@@ -3022,7 +3347,7 @@ export async function createApplication(
             }
             return Response.json({ schema: SURFACE_SCHEMA, frame: frames.current()?.frame_id, view: projection.view });
           }
-          if (url.pathname === "/surface/schema") {
+          if (url.pathname === "/surface/schema" && request.method === "GET") {
             return Response.json(publishSurfaceSchema());
           }
           if (url.pathname === "/surface/intent" && request.method === "POST") {
@@ -3033,14 +3358,26 @@ export async function createApplication(
               return Response.json({ code: "invalid_argument", message: "SURFACE: body is not JSON" }, { status: 400 });
             }
             const record = (body ?? {}) as Record<string, unknown>;
+            // The role comes from the signed-in session, never from the body. A request that names
+            // its own actor is refused outright rather than quietly ignored (DEF-ROLE-FROM-REQUEST).
+            for (const field of ACTOR_NAMING_FIELDS) {
+              if (field in record) {
+                return Response.json({ code: "forbidden_field", message: `SURFACE: a request cannot name its own role (${field}); the role comes from the signed-in session` }, { status: 400 });
+              }
+            }
+            // The body has a closed vocabulary: a field the operation's schema does not name is
+            // refused rather than ignored, so no caller believes an unnamed field was read.
+            const extra = unknownField(record, schemaFieldNames("params.horizon_surface_intent_commit"));
+            if (extra !== null) {
+              return Response.json({ code: "unknown_field", message: `SURFACE: this request does not take ${extra}` }, { status: 400 });
+            }
             const transport = record.transport === "gui" || record.transport === "cli" || record.transport === "mcp" ? record.transport : "mcp";
             const outcome = await commitSurfaceIntent({
               transport,
-              role: record.role,
               operation: record.operation,
               node_id: record.node_id,
               frame_id: record.frame_id,
-            });
+            }, "human");
             return outcome.ok
               ? Response.json({ ok: true, intent: outcome.bound, committed: outcome.result })
               : Response.json({ ok: false, code: outcome.code, message: outcome.message }, { status: 409 });
@@ -3069,9 +3406,14 @@ export async function createApplication(
             if (body === null || typeof body !== "object" || Array.isArray(body)) return Response.json({ ok: false, message: "That find could not be read." }, { status: 400, headers: noStore });
             const params = new URLSearchParams();
             for (const key of ["q", "day", "tag"]) if (typeof body[key] === "string") params.set(key, body[key] as string);
-            const found = await deskSearch(params, page !== null);
             const asked = (params.get("q") ?? "").trim();
-            if (asked !== "" && (body.record === "1" || body.record === true)) {
+            // The closed catalog names two actions for this route and nothing else: a read that
+            // records nothing, and a recorded find. Any other `record` value is Px, and it is
+            // refused before the search runs, so an unlisted action can never execute a read.
+            const action = deskSearchAction(body.record, asked);
+            if (action === null) return Response.json({ ok: false, code: "unknown_action", message: "That find asked for something this desk does not do. Nothing was searched and nothing was recorded." }, { status: 400, headers: noStore });
+            const found = await deskSearch(params, page !== null);
+            if (action === "true_with_non_empty_q") {
               await logRow({ source: "you", kind: "find", words: `Find: ${asked}`, outcome: `${found.notes.length} notes, ${found.cases.length} cases, ${found.days.length} days, ${found.tags.length} tags.`, status: "done" });
             }
             return Response.json(found, { headers: noStore });
@@ -3198,6 +3540,13 @@ export async function createApplication(
             return Response.redirect(`/workspace/compare?${safeReturn(form.get("return"))}`, 303);
           }
           if (url.pathname === "/workspace/export" && request.method === "POST") {
+            // The catalog refuses the export at this freeze: writing a labelled copy of the record
+            // is a P3 effect, and the row has no pending record, no A3-UV confirmation, no
+            // authority decision and no separation-of-duty check. Nothing is written and the
+            // refusal is recorded (R5-01).
+            const gate = await frozenGate(runtime.runtime.store, caller.tenant, "workspace.export", { route: "POST /workspace/export" }, caller.actor.id);
+            if (gate.state === "unavailable") return Response.json({ code: "unavailable", message: gate.message }, { status: 503 });
+            if (gate.state === "refused") return Response.json({ code: "refused", message: refusalWords(gate.refusal) }, { status: 403 });
             // The export writes a file, so it is a POST from a form the person pressed, with the session. A GET is never served.
             const form = await request.formData().catch(() => null);
             if (form === null) return Response.json({ code: "invalid_argument", message: "EXPORT: body is not a form" }, { status: 400 });
@@ -3278,7 +3627,7 @@ export async function createApplication(
             let outcome: Awaited<ReturnType<typeof commitSurfaceIntent>> | null = null;
             let failure: unknown = null;
             try {
-              outcome = await commitSurfaceIntent({ transport: "gui", role: "human", node_id: actionId, intent_id: intentId });
+              outcome = await commitSurfaceIntent({ transport: "gui", node_id: actionId, intent_id: intentId }, "human");
             } catch (error) {
               failure = error;
             }
@@ -3362,7 +3711,7 @@ export async function createApplication(
             await remote.stop();
             return Response.redirect("/workspace/remote", 303);
           }
-          if (url.pathname === "/") {
+          if (url.pathname === "/" && request.method === "GET") {
             return Response.redirect("/workspace", 303);
           }
           return new Response("not found\n", { status: 404 });
@@ -3461,6 +3810,20 @@ export function notPairedRead(): Response {
 
 /** The owner of a call that carries no agent key. No question is ever owned by it, so such a call reads and routes nothing. */
 export const UNKEYED_AGENT = "unkeyed";
+/**
+ * Which closed-catalog action a `POST /desk/search` body performs. The catalog's dispatch table
+ * for that route names exactly two actions — `false_or_absent` (the read, which records nothing)
+ * and `true_with_non_empty_q` (the recorded find) — and every other `record` value is Px.
+ *
+ * Null means "refuse": the caller asked for an action the closed catalog does not list, so the
+ * desk searches nothing and writes nothing. A `record` of true with an empty question is refused
+ * for the same reason: there is no find to bind the record to.
+ */
+export function deskSearchAction(record: unknown, query: string): "false_or_absent" | "true_with_non_empty_q" | null {
+  if (record === undefined || record === false || record === "0") return "false_or_absent";
+  if (record === true || record === "1") return query.trim() === "" ? null : "true_with_non_empty_q";
+  return null;
+}
 
 export const AGENT_NOTE_WORDS = "An agent can suggest a note; you save it.";
 export const AGENT_REFUSAL_WORDS = "Only you can confirm this. The agent's suggestion is waiting in the conversation.";

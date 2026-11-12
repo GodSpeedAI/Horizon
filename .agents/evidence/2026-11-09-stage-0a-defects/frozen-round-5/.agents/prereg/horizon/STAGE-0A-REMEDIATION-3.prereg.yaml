@@ -1,0 +1,255 @@
+preregistration:
+  id: HORIZON-PREREG-STAGE-0A-REMEDIATION-3
+  task: STAGE-0A-REMEDIATION-3
+  title: "Close the fourth independent review's nine findings, and pin the design the fifth review reads"
+  recorded_at: "2026-11-11"
+  recorded_before_artifacts: false
+  claim: >-
+    The contract set, the live handlers and the normative design now say one thing about the
+    paths the fourth review found unsafe. The external-interface contract names the artifacts
+    the owner actually publishes: one committed decision envelope at a pinned commit with the
+    facts that envelope really carries, and two interfaces that are specified rather than
+    pinned because the owner publishes neither, so both fail closed. The phone's effects have
+    their own device-credential rows with their own parameters, the phone can no longer settle
+    or approve, and the observation half of settlement is classed by the external commitment it
+    makes. The pending operation's state is an append-only transition chain, so a descriptor
+    carries no state and never carries a confirmation. A caller kind the schema never described
+    is refused by name rather than fitted to the closest variant. The actor is derived from the
+    caller and never read from a request, and a field the schema does not name is refused at
+    every boundary. The route census is exact in both directions. And the frozen fixture set
+    exercises every negative tooth the earlier preregistrations promised. This file pins the
+    SHA-256 of the design the fifth independent review will read, so that the verdict binds a
+    known set of bytes.
+  upstream_pins:
+    spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+    plan: { id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23" }
+    design: { file: design_draft.md, sha256: "5536acfaa046cb2491fc41c378334a41fa328f78f73fef69b1c0e173e0dccfe8", lines: 956, sections: "2, 6, 7, 9.1, 11, 12, Appendix A, Review Record" }
+    task_preregistration: { file: .agents/prereg/horizon/T23.prereg.yaml, id: HORIZON-PREREG-T23-0A, relationship: "the task-level preregistration that registers the Stage 0A expectations; this unit is one of its Stage 0A units" }
+    unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-1, relationship: "the first Stage 0A unit" }
+    defect_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-DEFECTS.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-DEFECTS, relationship: "the unit that closed the two recorded identity defects" }
+    remediation_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-REMEDIATION.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-REMEDIATION, relationship: "the unit that closed the second independent review's findings" }
+    remediation_2_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-REMEDIATION-2.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-REMEDIATION-2, relationship: "the unit that closed the third independent review's findings" }
+    prior_review: { file: .agents/evidence/2026-11-09-stage-0a-defects/independent-review-round-4.md, verdict: "REJECT", findings: 9, disposition: .agents/evidence/2026-11-09-stage-0a-defects/review-round-4-disposition.md }
+  # This unit settles no specification requirement. It closes the fourth independent review's
+  # findings against the Stage 0A contract set. No status entry may claim a Stage 0A
+  # requirement as settled because this file exists; the fifth independent review, not this
+  # unit, is what can settle Stage 0A.
+  settles: []
+  positive_expectations:
+    - id: PE-34
+      expectation: >-
+        The external-interface contract names the artifacts the owner actually publishes. The one
+        published interface, the authority decision, is pinned to the owner's commit and to the
+        file that carries the envelope, and its required facts are exactly the fields that
+        envelope really has: its envelope identity and kind, its decision and request, its
+        ledger entry and ordinal, its policy, action and identity hashes, its scope, authority
+        and constraints, its compensating controls, its approval and expiry, the hash chain
+        that links it to the previous entry, its writer identity and subject references, and its
+        canonicalization, hash, checkpoint and Merkle-root facts, with the signing algorithm,
+        key identifier and signature that make it verifiable. The two interfaces the owner has
+        not published — the delegated action grant and the human entitlement — name no commit
+        and no artifact, because there is nothing to point at, and they are marked
+        specified-not-published so that a path needing either fails closed instead of degrading
+        to a local policy, a session or a grant.
+    - id: PE-35
+      expectation: >-
+        Every effect the phone can perform has its own device-credential row with its own
+        parameter schema. The phone's case open, its surface-intent commit, its settlement
+        observation, its settlement ruling, its approval and its rejection are six rows, each
+        with the device credential as its executor, the passkey assertion as its authentication,
+        and a schema that describes the phone's own wire rather than borrowing a human row's.
+        The phone's command route resolves only to device rows, so no human row is ever
+        selected by it. The four rows the phone may not perform keep their class: a refusal is
+        a containment, not a downgrade.
+    - id: PE-36
+      expectation: >-
+        The phone can neither settle nor approve, and the refusal precedes every effect. The
+        containment stands in the live phone server ahead of the phone's own branches, so a
+        governed command is refused by its class before any capability is invoked. The four
+        refused rows are catalogued as performing nothing, so the catalog states the same
+        containment the code carries rather than leaving it implied by their class.
+    - id: PE-37
+      expectation: >-
+        The observation half of settlement is classed by the effect it makes. It observes through
+        RealityTrace, builds an evidence packet and submits it to SEA-Forge, so the effect
+        leaves this application and it is P2 rather than P1. It still decides nothing — the
+        ruling is a separate operation — so it is P2 rather than P3. The catalog's live
+        enforcement row says what is still missing on that path: the durable principal binding,
+        the pending record and the person's A3-UV evidence, and names the stage that must close
+        them.
+    - id: PE-38
+      expectation: >-
+        The device enrollment's evidence is local presence, never the person's A3-UV. The
+        enrollment is held by whoever presents the one-time pairing code, because possession of
+        the code proves no identity and the device is enrolled by the ceremony rather than
+        claimed by it. The catalog's enforcement row for that path names the missing enrollment
+        presence receipt and does not name A3-UV evidence at all.
+    - id: PE-39
+      expectation: >-
+        A pending operation's state is an append-only transition chain. The descriptor is
+        immutable and carries no state field; the state lives in signed transitions, each of
+        which names the pending operation it moves, the state it came from, the state it enters,
+        the reason, the time and the launch generation. The transition table is complete and
+        closed, and the contract says which transitions are legal — pending to confirmed,
+        pending to expired, confirmed to dispatching, confirmed to expired, dispatching to
+        applied, and dispatching to uncertain. A descriptor that carries a confirmation is
+        refused, and a transition that leaves a terminal state is refused.
+    - id: PE-40
+      expectation: >-
+        A caller kind the schema never described is refused by name. The parameter validator
+        reads the record's discriminator, finds no variant for it, and reports
+        `params:unknown_variant:<discriminator>:<value>` rather than falling back to the
+        closest variant, because a caller kind the schema never described is not a record whose
+        parameters happen to resemble one it did. A caller kind the schema does declare is
+        checked against that variant's own fields, so a field the variant does not name is
+        still refused.
+    - id: PE-41
+      expectation: >-
+        The actor is never read from a request, and a field the schema does not name is refused
+        at every boundary. One central list of reserved actor fields serves the desktop's doors
+        and the phone's command route, and neither server keeps a list of its own. The lesson's
+        proposer is derived from the caller's own identity, so the lesson's parameter schema has
+        no proposer field at all. The lesson route, the surface-intent route and the phone
+        command route each refuse a body carrying an unknown field, and the phone's strict check
+        runs after its containment refusal, so a governed command is refused for the governance
+        reason rather than for a stray field.
+    - id: PE-42
+      expectation: >-
+        The route census is exact in both directions. Every route either server answers is named
+        exactly once in the catalog: by an operation row's routes, by a dispatch entry, by a
+        route alias, by an acknowledged catalog gap, or by the non-operation list. A route that
+        reads the world, the store or the transport is an operation route even when it only
+        projects, because the read is the operation; the projection reads are therefore live
+        rows with their own parameter schemas rather than fudged as non-operation routes. The
+        phone's trailing-slash page is named, because the phone serves it. Every non-operation
+        route says why it performs no operation. And the list is exact in the other direction
+        too: a listed route that no longer exists is a stale entry, and a live-bound row that
+        claims a route the source does not answer is a row whose binding cannot be confirmed.
+    - id: PE-43
+      expectation: >-
+        The frozen fixture set exercises every negative tooth the earlier preregistrations
+        promised. The pending nonce replay and the wrong supersession chain are refused cases.
+        The caller-channel combinations — a human without a session, an agent with one, a console
+        with one, and a console naming a delegation — are refused cases. The evidence record's
+        old single outcome is a refused case. The transition chain's own teeth — reopening a
+        confirmed pending, a chain that does not match, reopening a terminal state, a reason that
+        does not match, and a restart that would expire a confirmed pending — are cases. And
+        every record kind in the contract has at least one case in the shared set.
+  negative_expectations:
+    - id: NE-31
+      expectation: >-
+        The phone must never settle and must never approve. The containment is the only thing
+        between the phone and a P3 ruling, so its absence is visible: the phone server refuses
+        by class, and the rows it would reach are governed, so the refusal is load-bearing rather
+        than decorative.
+    - id: NE-32
+      expectation: >-
+        The external-interface contract must never claim a fact the owner does not publish. The
+        published interface names exactly the fields the pinned source carries — one fact more or
+        one fact fewer is a false claim about another project's artifact — and an interface whose
+        owner has published nothing names no artifact and no commit.
+    - id: NE-33
+      expectation: >-
+        A pending descriptor must never carry a state or a confirmation, and a terminal state
+        must never open. The descriptor's own field list has no state field, a descriptor that
+        carries a confirmation is refused, and a transition that would leave a terminal state is
+        refused against the chain.
+    - id: NE-34
+      expectation: >-
+        An unknown caller discriminator must never be fitted to the closest variant. The refusal
+        names the discriminator and the value it carried, so a caller can tell the contract does
+        not describe its kind apart from a caller whose parameters did not match.
+    - id: NE-35
+      expectation: >-
+        A request must never be able to name its own actor. The reserved-field list is the
+        contract's and both boundaries use it, so a body that claims an actor, a caller, an
+        executor or an authority is refused at the boundary. The phone's strict check runs after
+        its containment refusal, so a governed command is refused for the governance reason
+        rather than for a stray field.
+    - id: NE-36
+      expectation: >-
+        An answered route must never be absent from the catalog. A read branch answers the
+        method the catalog binds and no other, so a method the contract never bound cannot reach
+        the handler behind it.
+    - id: NE-37
+      expectation: >-
+        The frozen fixture set must never lose a preregistered negative case. Every negative case
+        named by the earlier preregistrations is present in the shared set and still expects to
+        be invalid, so a case cannot be quietly dropped to make a suite green.
+  falsifier: >-
+    Any of the negative expectations reproducing on the committed files falsifies this claim: a
+    phone that can settle or approve, a contract that names a fact the owner does not publish, a
+    pending descriptor that carries a state or a confirmation, a terminal state that opens, an
+    unknown caller discriminator that is fitted to the closest variant, a request that names its
+    own actor, an answered route the catalog does not name, or a frozen fixture set that has lost
+    a preregistered negative case. So does a design whose hash this file does not pin.
+  known_confounds:
+    - >-
+      This unit was authorized in session by the owner and its implementation was written under
+      that instruction, so this file is a record of the acceptance criteria, not a claim of
+      prospective registration. Its expectations are the fourth independent review's findings
+      restated as testable claims.
+    - >-
+      The contract's claim about the owner's published artifact was checked against a local
+      checkout of the pinned commit, not against a published release. The pinned commit is
+      stated, the artifact path is stated, and the facts are the ones that commit's source
+      carries; a later publication by the owner would supersede this file rather than
+      contradict it, and the two unpublished interfaces stay unpublished until the owner
+      publishes them.
+    - >-
+      The phone's settlement and approval paths are closed by refusal, not by the protected
+      confirmation the desk's own escalation path still lacks. The desk keeps its current
+      escalation authority checks, and the gap between them and the contract's pending and
+      A3-UV requirement is declared in the catalog's live-enforcement table as Stage 0B work
+      rather than claimed as settled.
+    - >-
+      The parameter contract's types are checked against the live handlers, not against the
+      domain. A check proves the contract and the handler agree about what crosses the boundary;
+      whether the type is the right type for the domain is the reviewer's semantic reading.
+    - >-
+      The route census reads the live source's route branches by pattern. A route expressed in a
+      shape the pattern does not recognise would not be counted, so the census is a floor on
+      the reviewer's own reading of the servers rather than a substitute for it.
+  evidence_plan:
+    command: "just gate-t23"
+    typecheck: "./node_modules/.bin/tsc --noEmit"
+    artifacts:
+      - contracts/identity/v1/external-interfaces.json
+      - contracts/identity/v1/operations.yaml
+      - contracts/identity/v1/params.yaml
+      - contracts/identity/v1/records.json
+      - contracts/identity/v1/fixtures/record-cases.json
+      - src/contracts/identity/manifest.ts
+      - src/contracts/identity/params.ts
+      - src/contracts/identity/records.ts
+      - src/contracts/identity/reserved-fields.ts
+      - src/app.ts
+      - src/remote/server.ts
+      - design_draft.md
+      - test/identity-remediation-3.test.ts
+      - scripts/check-route-census.ts
+      - scripts/check-external-interface-facts.ts
+      - scripts/check-param-schema-binding.ts
+      - scripts/check-design-contract-consistency.ts
+      - scripts/check-stage0a-remediation-3-prereg-coverage.ts
+      - .agents/evidence/2026-11-09-stage-0a-defects/
+  redesign_trigger: >-
+    If closing a finding needs a caller kind, a predicate or a record kind the runtime cannot
+    produce, stop and revise the identity contract rather than weakening the refusal, widening
+    the vocabulary or adding a label that names an actor. If the owner's published artifacts
+    cannot carry the facts the authority path needs, the path stays unavailable and the
+    contract says so; it is not closed by inventing a payload.
+  confirmation_condition: >-
+    A fresh critic reads a frozen, hash-pinned copy of the whole contract set, verifies the
+    manifest before reading any content, and confirms each finding's correction against the
+    contract bytes rather than against this file's account of them. Self-attestation is not
+    confirmation, and neither is a passing check whose assertions were not read.
+  notes: >-
+    Recorded after the implementation, on purpose: the owner authorized the unit in session. The
+    expectation ids continue the earlier series so the files never claim the same id; PE-34 to
+    PE-43 and NE-31 to NE-37 were free when this unit was recorded. The earlier preregistrations
+    are left as recorded — including the ones that pin a design hash the working tree has since
+    moved past — because a recorded preregistration is not rewritten; this file carries the
+    current pin and the findings the fourth review raised. The design pin in this file is checked
+    against the frozen copy the fifth review reads, not against the moving working tree: a
+    verdict binds the bytes it read, and the bytes it read are kept.

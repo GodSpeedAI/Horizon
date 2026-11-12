@@ -52,23 +52,26 @@ describe("the confirmation says what will start", () => {
     expect(p.preview.also_starts.map((s: any) => s.name)).toEqual(["Step old_a", "Step old_b"]);
   });
 
-  test("a step that began waiting after the preview makes the send refuse, and nothing is added or started", async () => {
+  test("a step that began waiting after the preview is still nothing: the changed set is refused, and nothing is added or started", async () => {
     plan = ["old_a"];
     advances = 0;
     const { draftId, p } = await preview();
     plan = ["old_a", "old_late"];
     const sent = await app.post("/desk/handoff", { draft_id: draftId, text, plan_precondition: { ...p.preview.plan_precondition, expected_digest: digestOf(plan) }, also_starts: p.preview.also_starts.map((s: any) => s.step_id) });
+    // The preview's own binding refuses the changed set first; the effect never runs either way.
     expect(sent.status).toBe(409);
     expect(((await sent.json()) as any).outcome).toBe("preview_out_of_date");
     expect(plan).toEqual(["old_a", "old_late"]);
     expect(advances).toBe(0);
   });
 
-  test("the same set sent back is accepted", async () => {
+  test("the same set sent back is refused too: the row is refused at this freeze, not the preview", async () => {
     plan = ["old_a"];
     const { draftId, p } = await preview();
     const sent = await app.post("/desk/handoff", { draft_id: draftId, text, plan_precondition: p.preview.plan_precondition, also_starts: p.preview.also_starts.map((s: any) => s.step_id) });
-    expect(sent.status).toBe(200);
+    expect(sent.status).toBe(403);
+    expect(plan).toEqual(["old_a"]);
+    expect(advances).toBe(0);
   });
 
   const pv: HandoffPreview = { draft_id: "d", case_id: "c1", case_title: "Seed: triage inbox", step_name: "Fix the footer", step_id: "s", check: "ok", plan_precondition: { ref: "plan:c1", expected_digest: "x" }, agent: { offered: false, words: "" }, also_starts: [{ step_id: "a", name: "Call the supplier" }, { step_id: "b", name: "Write the rollback note" }] };
@@ -87,16 +90,21 @@ describe("the confirmation says what will start", () => {
   });
 });
 
-describe("starting a case is bound to the steps the person previewed", () => {
-  const CHANGED = "The case changed after you looked. Look again, then start.";
+describe("starting a case is refused while its targets are unresolved", () => {
   const start = (body: unknown) => app.post("/desk/start", body);
 
-  test("the start sends the case and the steps it previewed, and starts the case when they are still the waiting set", async () => {
+  test("a start of the steps the person previewed is refused, and nothing is started", async () => {
     plan = ["old_a", "old_b"];
     advances = 0;
     const sent = await start({ case_id: CASE, also_starts: ["old_a", "old_b"] });
-    expect(sent.status).toBe(200);
-    expect(advances).toBe(1);
+    // The catalog names this row as a dispatcher with no resolved targets, and the route refuses
+    // it rather than starting an unclassified plan (R5-02).
+    expect(sent.status).toBe(403);
+    const body = (await sent.json()) as any;
+    expect(body.outcome).toBe("refused");
+    expect(body.message).toContain("refused at this release");
+    expect(advances).toBe(0);
+    expect((await app.refusals()).some((r) => r.operation === "run.start" && r.route === "POST /desk/start")).toBe(true);
   });
 
   test("a step added after the preview refuses the start, and nothing is started", async () => {
@@ -105,8 +113,7 @@ describe("starting a case is bound to the steps the person previewed", () => {
     // The person previewed ["old_a"]; then a step began waiting.
     plan = ["old_a", "old_late"];
     const refused = await start({ case_id: CASE, also_starts: ["old_a"] });
-    expect(refused.status).toBe(409);
-    expect(((await refused.json()) as any).message).toBe(CHANGED);
+    expect(refused.status).toBe(403);
     expect(advances).toBe(0);
   });
 
@@ -114,7 +121,7 @@ describe("starting a case is bound to the steps the person previewed", () => {
     plan = ["old_a"];
     advances = 0;
     const bare = await start({ case_id: CASE });
-    expect(bare.status).toBe(400);
+    expect(bare.status).toBe(403);
     expect(advances).toBe(0);
   });
 });

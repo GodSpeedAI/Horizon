@@ -10,6 +10,7 @@ import { CONFLICTED_WORDS, listAnswers, PANEL_ANSWERS_COLLECTION } from "../src/
 import { MIGRATION_COLLECTION } from "../src/capabilities/desk-migrations.ts";
 import { deskScopeFor, startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { answerIdOf } from "../src/capabilities/panel-answers.ts";
+import { agentInProcess } from "./support/agent-door.ts";
 
 const keys = { ag_a: randomBytes(32).toString("hex"), ag_b: randomBytes(32).toString("hex") };
 const sha = (k: string) => createHash("sha256").update(k).digest("hex");
@@ -52,7 +53,9 @@ async function migrateAgain(app: DeskApp): Promise<DeskApp> {
 }
 /** A route through the agents' door, as the named agent. */
 const route = async (app: DeskApp, who: "ag_a" | "ag_b"): Promise<{ status: number; body: { ok?: boolean; message?: string } }> => {
-  const response = await fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${keys[who]}`, "content-type": "application/json" }, body: JSON.stringify({ tool: "answer.route", panel_id: "p1", ask_id: "q1", routed_as: ROUTED, request_id: crypto.randomUUID() }) });
+  // The door refuses `answer.route` at this freeze (R5-01); the conflict rule this test is about
+  // lives in the machinery the door calls, so it is called there.
+  const response = await agentInProcess(app.application, who, undefined, { tool: "answer.route", panel_id: "p1", ask_id: "q1", routed_as: ROUTED, request_id: crypto.randomUUID() });
   return { status: response.status, body: (await response.json()) as { ok?: boolean; message?: string } };
 };
 const waitingCount = async (app: DeskApp): Promise<number> => (await listAnswers(app.application.runtime.runtime.store, tenantOf(app), "p1")).filter((a) => a.state === "waiting_for_agent").length;

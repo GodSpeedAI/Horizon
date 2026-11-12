@@ -72,15 +72,20 @@ describe("no GET changes state", () => {
     expect(await rowsOf()).toBe(before + 1);
   });
 
-  test("the export is a POST that needs the session; a GET is not served", async () => {
+  test("the export is a POST that needs the session, and the export itself is refused at this freeze", async () => {
     const app = await start();
     const cookie = await pairTestClient(app.base);
     const get = await fetch(`${app.base}/workspace/export?kind=labels&standins=1`, { headers: { cookie: cookie! } });
     expect(get.status).not.toBe(200);
     const unpaired = await fetch(`${app.base}/workspace/export`, { method: "POST", body: new URLSearchParams({ kind: "labels", standins: "1" }), headers: { "x-test-no-session": "1" } });
     expect(unpaired.status).toBe(403);
+    expect(((await unpaired.json()) as { outcome?: string }).outcome).toBe("not_paired");
+    // A paired person still gets no export: writing a labelled copy of the record is a P3 effect
+    // with no pending record, no protected confirmation and no authority at this freeze, so the
+    // refusal comes before the body is built and before any file is written (R5-01).
     const paired = await fetch(`${app.base}/workspace/export`, { method: "POST", body: new URLSearchParams({ kind: "labels", standins: "1" }), headers: { cookie: cookie! } });
-    expect(paired.status).toBe(200);
-    expect(paired.headers.get("content-disposition")).toContain("attachment");
+    expect(paired.status).toBe(403);
+    expect(((await paired.json()) as { code?: string }).code).toBe("refused");
+    expect(paired.headers.get("content-disposition")).toBeNull();
   });
 });

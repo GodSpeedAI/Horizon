@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
 import type { RecordReader } from "../src/adapters/realitytrace-economics.ts";
 import { applyStandIns, standIn, standInMap } from "../src/ui/workspace/presenting.ts";
+import { buildExport, chooseStandIns } from "../src/exports/export.ts";
+import type { RunLabel } from "../src/capabilities/labels.ts";
 import { horizonDocument, writeConfig } from "./support/config.ts";
 import { observation, questionDeclared } from "./support/economics-fixture.ts";
 
@@ -101,28 +103,43 @@ describe("presenting on the comparison page and exports", () => {
     expect(hidden).toContain('data-presenting="on"');
   });
 
-  test("export with Presenting on uses stand-ins", async () => {
+  test("an export is refused at this freeze, and no file is written", async () => {
     await post("/workspace/label", { session: "sess-A", event: "x1", verdict: "fail", first_failure: `${SECRET_NAME} did not build`, return: "" });
     await presenting(true);
     const res = await exportOf("kind=labels");
-    expect(res.status).toBe(200);
-    const text = await res.text();
-    expect(text).not.toContain(SECRET_NAME);
-    expect(text).toMatch(/Project [A-Z2-7]{4}/);
-    const cmp = await (await exportOf("kind=comparison&source=personal&repo=R1&day=2026-10-30&session=sess-A&standins=0")).text();
-    expect(cmp).not.toContain(SECRET_NAME);
-    const files = readdirSync(join(deskRoot, "exports"));
-    expect(files.length).toBeGreaterThan(0);
-    for (const file of files) expect(readFileSync(join(deskRoot, "exports", file), "utf8")).not.toContain(SECRET_NAME);
+    // Writing a labelled copy of the record is a P3 effect: the row has no pending record, no
+    // protected confirmation, no authority decision and no separation-of-duty check at this
+    // freeze, so the refusal comes before anything is built and before any file is written (R5-01).
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code?: string }).code).toBe("refused");
+    expect(existsSync(join(deskRoot, "exports"))).toBe(false);
   });
 
-  test("export with Presenting off needs an explicit choice and defaults to stand-ins", async () => {
+  test("the export body hides project names while Presenting is on, and keeps them when it is off", () => {
+    // The export body itself, built by the same function the refused route would call.
+    const labels: RunLabel[] = [
+      { tenant: "local", session_id: "sess-A", event_id: "x1", record_seq: null, verdict: "fail", first_failure: `${SECRET_NAME} did not build`, operator: "operator", created_at: "2026-10-30T15:00:00Z" },
+    ];
+    const base = { kind: "labels" as const, labels, comparison: null, key: KEY, names: [SECRET_NAME], now: new Date("2026-10-30T20:00:00Z") };
+    const shown = buildExport({ ...base, standins: true });
+    expect(shown.body).not.toContain(SECRET_NAME);
+    expect(shown.body).toMatch(/Project [A-Z2-7]{4}/);
+    expect(shown.name).toContain("-standins");
+    const plain = buildExport({ ...base, standins: false });
+    expect(plain.body).toContain(SECRET_NAME);
+    expect(plain.name).not.toContain("-standins");
+  });
+
+  test("with Presenting off an export needs an explicit choice, and the page offers stand-ins", async () => {
+    // The choice rule the refused route applies before it builds anything: Presenting on always
+    // stands in; off needs the person to say which, and the form offers 1 (hide the names).
+    expect(chooseStandIns(true, null)).toEqual({ ok: true, standins: true });
+    expect(chooseStandIns(true, "0")).toEqual({ ok: true, standins: true });
+    expect(chooseStandIns(false, null)).toMatchObject({ ok: false, status: 400 });
+    expect(chooseStandIns(false, "1")).toEqual({ ok: true, standins: true });
+    expect(chooseStandIns(false, "0")).toEqual({ ok: true, standins: false });
     await presenting(false);
-    expect((await exportOf("kind=labels")).status).toBe(400);
-    const one = await (await exportOf("kind=labels&standins=1")).text();
-    expect(one).not.toContain(SECRET_NAME);
-    const zero = await (await exportOf("kind=labels&standins=0")).text();
-    expect(zero).toContain(SECRET_NAME);
+    expect((await exportOf("kind=labels")).status).toBe(403);
     // The page offers the export as a POST form with standins=1 as the default, and no GET link to the export.
     const page = await (await fetch(`${base}${COMPARE}`)).text();
     expect(page).toContain('action="/workspace/export"');

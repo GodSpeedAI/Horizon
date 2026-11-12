@@ -129,21 +129,22 @@ describe("rows from each desk operation", () => {
     await post("/desk/handoff/preview", { draft_id: id, text: "Fix the checkout total" });
     expect((await rows()).length).toBe(now.length);
     const sent = await post("/desk/handoff", { draft_id: id, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition });
-    expect(sent.status).toBe(200);
+    // The send is refused at this freeze (R5-01), and the row the desk keeps says so.
+    expect(sent.status).toBe(403);
     now = await rows();
     expect(now.length).toBe(before + 3);
-    expect(now.at(-1)).toMatchObject({ kind: "handoff", status: "done", source: "you" });
-    expect(now.at(-1)!.outcome).toContain("Handed off");
+    expect(now.at(-1)).toMatchObject({ kind: "handoff", status: "refused", source: "you" });
+    expect(now.at(-1)!.outcome).toContain("refused at this release");
     expect(JSON.stringify(now)).not.toContain("Error");
   });
 
   test("a refused hand off turns its row refused with plain words", async () => {
     const id = await draftId();
     await post("/desk/handoff/preview", { draft_id: id, text: "Another step" });
-    const stale = await post("/desk/handoff", { draft_id: id, text: "Another step", plan_precondition: { ref: "plan:x", expected_digest: "sha256:old" } });
-    expect(stale.status).toBe(409);
+    const refused = await post("/desk/handoff", { draft_id: id, text: "Another step", plan_precondition: { ref: "plan:x", expected_digest: "sha256:old" } });
+    expect(refused.status).toBe(403);
     expect((await rows()).at(-1)).toMatchObject({ status: "refused", kind: "handoff" });
-    expect((await rows()).at(-1)!.outcome).toContain("Preview out of date");
+    expect((await rows()).at(-1)!.outcome).toContain("refused at this release");
   });
 
   test("a refused note appends a refused row", async () => {
@@ -222,9 +223,10 @@ describe("the agent caller", () => {
     const p = await post("/desk/handoff/preview", { draft_id: id, text: "Agent suggested step" });
     expect((await rows()).filter((r) => r.kind === "handoff-proposal" || (r.refs.draft_id === id && r.status === "waiting"))).toHaveLength(1); // the person's own preview of the same draft settles the same row
     const sent = await post("/desk/handoff", { draft_id: id, text: "Agent suggested step", plan_precondition: p.body.preview.plan_precondition });
-    expect(sent.status).toBe(200);
-    const done = (await rows()).find((r) => r.row_id === proposal.row_id)!;
-    expect(done).toMatchObject({ status: "done", source: "page-agent", kind: "handoff-proposal" });
+    // The send is refused, so the proposal keeps waiting instead of turning done (R5-01).
+    expect(sent.status).toBe(403);
+    const still = (await rows()).find((r) => r.row_id === proposal.row_id)!;
+    expect(still).toMatchObject({ status: "refused", source: "page-agent", kind: "handoff-proposal" });
 
     const next = await asAgent("/desk/handoff/preview", { draft_id: await draftId(), text: "Second suggestion" });
     expect(next.status).toBe(200);

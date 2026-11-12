@@ -12,6 +12,7 @@ import { PANEL_ANSWERS_COLLECTION } from "../src/capabilities/panel-answers.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { fakeCaseKeeper, type FakeKeeper } from "./support/fake-case-keeper.ts";
 import { withRequestId } from "./support/request-body.ts";
+import { agentInProcess } from "./support/agent-door.ts";
 
 const keys = { ag_alice: randomBytes(32).toString("hex"), ag_alice2: randomBytes(32).toString("hex") };
 const sha = (k: string) => createHash("sha256").update(k).digest("hex");
@@ -29,6 +30,8 @@ const agent = (app: DeskApp, key: string, name: string, body: unknown) =>
 const person = async (app: DeskApp, body: unknown) => app.post("/desk/panels/op", await withRevision(app, body));
 const answer = (panel: string, ask: string) => ({ op: "human.answer", panel, ask, outcome: "answered", value: "a" });
 const routeBody = (panel: string, ask: string) => ({ tool: "answer.route", panel_id: panel, ask_id: ask, routed_as: "step handoff_0a49 in Seed" });
+/** The route machinery, at the entry point the door calls: the door itself refuses this row at this freeze (R5-01). */
+const routeAs = (app: DeskApp, keyId: string, name: string, body: unknown) => agentInProcess(app.application, keyId, name, body);
 
 /** Lets the concurrent commands reach the server (or the queue) before the held write is released. */
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 200));
@@ -82,7 +85,7 @@ describe("one queue for panel commands", () => {
     try {
       const moved = person(app, { op: "human.reassign_owner", panel: "rq1", ask: "rq1_q", from_key_id: "ag_alice", to_key_id: "ag_alice2", confirmed: true });
       await gate.reached;
-      const routed = agent(app, keys.ag_alice, "Alice", routeBody("rq1", "rq1_q"));
+      const routed = routeAs(app, "ag_alice", "Alice", routeBody("rq1", "rq1_q"));
       await settle();
       gate.release();
       const [moveResponse, routeResponse] = await Promise.all([moved, routed]);
@@ -92,7 +95,7 @@ describe("one queue for panel commands", () => {
       gate.restore();
     }
     // The owner has moved: the new key is the one that can say where the answer went.
-    expect((await agent(app, keys.ag_alice2, "Alice 2", routeBody("rq1", "rq1_q"))).status).toBe(200);
+    expect((await routeAs(app, "ag_alice2", "Alice 2", routeBody("rq1", "rq1_q"))).status).toBe(200);
   });
 
   test("an answer paused in its store write keeps a panel update made meanwhile", async () => {

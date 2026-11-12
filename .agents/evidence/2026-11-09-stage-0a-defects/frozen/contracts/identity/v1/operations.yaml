@@ -1,0 +1,515 @@
+manifest_version: "horizon.identity.operations/2"
+contract_id: "horizon.identity.operations"
+contract_version: "2.0.0"
+frozen_at: "2026-11-09"
+authority:
+  design: "design_draft.md sections 11 and Appendix A"
+  spec: { id: "HORIZON-001", version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+  owner_decision: "2026-11-09 — owner authorized reconciling the catalog against implemented behaviour, classifying the agent door per semantic action, treating session logout as session lifecycle, aliasing the third intent route, and classifying search by effect."
+  note: >-
+    This file is the implementation binding of a closed catalog. An operation ID that is not
+    listed below, or a write route that maps to no row, is Px and fails closed. A route name,
+    HTTP method, client label, or caller role can never move an operation to a weaker class.
+    A route that carries several semantic actions is dispatched by the handler from the action
+    the handler actually performs (see `dispatch`), never from a blanket route class.
+
+classes: [P0, P1, P2, P3, PX]
+
+authority_writers:
+  local_read_policy: "Local read policy only. Cannot write, create a grant, or create a pending approval."
+  cognate_local_policy: "Cognate local policy. No grant creation."
+  cognate_local_continuation: "Cognate continuation for a local decision."
+  sea_forge: "SEA-Forge decision, epoch, and bounded grant."
+  issuer_root: "Cognate/issuer root, local console only."
+  case_record.authority: "Selected per record: local → Cognate continuation; governed → SEA-Forge."
+
+budget_units: [currency, tokens, calls, bytes]
+
+class_defaults:
+  P0:
+    executor: human_session
+    authority_writer: local_read_policy
+    human_evidence: A0
+    pending_expiry: null
+    params_schema: params.read
+    offline_allowed: true
+    writable: false
+    ownership: none_required
+  P1:
+    executor: human_session
+    authority_writer: cognate_local_policy
+    human_evidence: A0_A1
+    pending_expiry: null
+    params_schema: params.local_write
+    offline_allowed: true
+    writable: true
+    ownership: none_required
+  P2:
+    executor: human_session
+    authority_writer: cognate_local_continuation
+    human_evidence: A3_UV
+    stage0b_evidence: A3_T
+    pending_expiry: 10m
+    offline_allowed: false
+    writable: true
+    ownership: none_required
+  P3:
+    executor: human_session
+    authority_writer: sea_forge
+    human_evidence: A3_UV
+    pending_expiry: null
+    offline_allowed: false
+    writable: true
+    ownership: none_required
+  PX:
+    executor: null
+    authority_writer: null
+    human_evidence: null
+    pending_expiry: null
+    offline_allowed: false
+    writable: false
+    ownership: none_required
+
+# Each class is a group; a row may restate a field to override its class default.
+# binding: verified  — a route or code op in this repository was read and maps to this row
+#          candidate — the row is frozen by the catalog but no route binding was confirmed
+#          reserved  — no route exists yet; the row is the target of a later stage
+# ownership: none_required | caller_owns_panel | caller_owns_question | caller_own_session |
+#            person_owns_board | caller_scoped_own_rows
+operations:
+  P0:
+    - { id: horizon.health, binding: verified, routes: ["GET /health"] }
+    - { id: horizon.research.health, binding: candidate }
+    - { id: horizon.workspace.read, binding: candidate, routes: ["GET /workspace.json", "GET /desk/state.json"] }
+    - { id: horizon.case.read, binding: candidate }
+    - { id: horizon.evidence.read, binding: candidate }
+    - { id: horizon.economics.read, binding: verified, routes: ["GET /workspace/economics"] }
+    - { id: horizon.inspect.focus, binding: candidate, routes: ["GET /workspace/inspect"] }
+    - { id: horizon.inspect.neighborhood, binding: candidate, routes: ["GET /workspace/inspect"] }
+    - { id: horizon.navigation.inspect, binding: candidate, routes: ["GET /frame"] }
+    - { id: horizon.context.query_reference, binding: candidate }
+    - { id: horizon.remote.status, binding: verified, routes: ["GET /workspace/remote/status"] }
+    - { id: horizon.settlement.observe, binding: candidate }
+    - { id: workbench.view.read, binding: candidate }
+    - { id: gauntlet.run.read, binding: candidate }
+    - { id: realitytrace.observation.read, binding: candidate }
+    - id: horizon.search.read
+      binding: verified
+      routes: ["GET /desk/search", "POST /desk/search"]
+      params_schema: params.horizon_search_read
+      note: >-
+        Classified by effect, not by HTTP method: the POST form is the Find action and reads
+        only. The same route also performs horizon.search.record when, and only when, the body
+        asks the find to be recorded; that write is a separate operation with its own class.
+    - id: agent.response.read
+      binding: verified
+      routes: ["POST /agent/panels", "GET /agent/panels/answers"]
+      code_ops: ["read_responses"]
+      params_schema: params.agent_response_read
+      executor: agent_execution
+      caller_authentication: registered_agent_key
+      ownership: caller_owns_question
+      note: >-
+        An agent reads only the answers to questions its own key put up. Read-only: no panel,
+        conversation row, or receipt is written.
+
+  P1:
+    - { id: horizon.navigation.defer, binding: candidate, code_ops: ["navigation.defer"] }
+    - { id: horizon.navigation.reframe, binding: candidate, code_ops: ["navigation.reframe"] }
+    - { id: horizon.navigation.disagree, binding: candidate, code_ops: ["navigation.disagree"] }
+    - { id: horizon.navigation.intent.commit, binding: verified, routes: ["POST /intent"] }
+    - { id: horizon.surface.intent.commit, binding: verified, routes: ["POST /surface/intent", "POST /workspace/intent"] }
+    - { id: horizon.note.save, binding: verified, routes: ["POST /desk/note"] }
+    - { id: horizon.note.remove, binding: candidate, code_ops: ["note.remove"] }
+    - { id: horizon.draft.save, binding: verified, routes: ["POST /desk/draft"] }
+    - { id: horizon.conversation.discard, binding: verified, routes: ["POST /desk/conversation/discard"] }
+    - { id: horizon.case.open, binding: verified, routes: ["POST /workspace/case"] }
+    - { id: horizon.lesson.propose, binding: verified, routes: ["POST /desk/lesson"] }
+    - { id: horizon.onboarding.skip, binding: verified, routes: ["POST /workspace/onboarding/skip"] }
+    - { id: horizon.onboarding.resume, binding: verified, routes: ["POST /workspace/onboarding/resume"] }
+    - { id: horizon.workspace.presenting, binding: verified, routes: ["POST /workspace/presenting"] }
+    - { id: workbench.draft.save, binding: candidate }
+    - { id: workbench.conversation.discard, binding: candidate }
+    - { id: workbench.expert.launch, binding: candidate }
+    - id: cognate.execution.start
+      binding: verified
+      routes: ["POST /desk/start"]
+      note: "The desk start route begins a run; the governed equivalent is the run.start dispatcher."
+    - id: horizon.search.record
+      binding: verified
+      routes: ["POST /desk/search"]
+      params_schema: params.horizon_search_record
+      ownership: caller_scoped_own_rows
+      note: >-
+        The write half of the Find action: one conversation row in the caller's own scope, and
+        only when the body sets `record` and the query is not empty. The class rises with the
+        effect; the read half stays P0.
+    - id: session.logout
+      binding: verified
+      routes: ["POST /desk/pair/logout"]
+      params_schema: params.session_logout
+      ownership: caller_own_session
+      note: >-
+        Session lifecycle, not device removal: the handler deletes only the session named by the
+        caller's own cookie. Ending another session or removing a paired device is governed
+        (see device.remove).
+    - id: agent.surface.publish
+      binding: verified
+      routes: ["POST /agent/panels"]
+      code_ops: ["show_surface"]
+      params_schema: params.agent_surface_publish
+      executor: agent_execution
+      caller_authentication: registered_agent_key
+      ownership: caller_owns_panel
+      note: >-
+        P1 because the implemented path creates or updates an agent-owned shared surface: the
+        panel is admitted to the shared board and a conversation row is committed with it. An
+        update is refused when another key owns the panel. A P0 private, ephemeral presentation
+        with no shared write is a distinct semantic action; no such path exists in this handler,
+        so it has no row and cannot be claimed here.
+    - id: agent.surface.arrange
+      binding: verified
+      routes: ["POST /agent/panels"]
+      code_ops: ["arrange"]
+      params_schema: params.agent_surface_arrange
+      executor: agent_execution
+      caller_authentication: registered_agent_key
+      ownership: caller_owns_panel
+      note: >-
+        `surface.remove` writes: it removes an agent-owned panel only when every question on it
+        belongs to the same key, and refuses a pinned panel. Every other arrange sub-action is
+        observed to write nothing (focus and placement are the person's). The row stays P1 for
+        all sub-actions because the handler cannot be classified from a request-supplied label;
+        a sub-action that later gains an ownership-transferring effect is a P2 row, not a P1
+        variant.
+    - id: agent.surface.annotate
+      binding: verified
+      routes: ["POST /agent/panels"]
+      code_ops: ["annotate"]
+      params_schema: params.agent_surface_annotate
+      executor: agent_execution
+      caller_authentication: registered_agent_key
+      ownership: caller_owns_panel
+      note: "A note is added only to a panel the caller's key owns; a panel with no recorded owner has no agent that may annotate it."
+    - id: agent.question.ask
+      binding: verified
+      routes: ["POST /agent/panels"]
+      code_ops: ["ask_human"]
+      params_schema: params.agent_question_ask
+      executor: agent_execution
+      caller_authentication: registered_agent_key
+      ownership: caller_owns_panel
+      note: >-
+        Proposing an ordinary question is P1. It grants nothing: the person's `human.answer`
+        stays P2 with its own confirmation, and moving a question to another agent (ask.reassign)
+        and a required decision remain governed.
+    - id: human.panel.open
+      binding: verified
+      routes: ["POST /desk/panels/op"]
+      code_ops: ["human.open"]
+      params_schema: params.human_panel_open
+      ownership: person_owns_board
+      note: "Opens a person-owned panel from a closed template; no agent key may perform it and it creates no pending decision."
+    - id: human.panel.close
+      binding: verified
+      routes: ["POST /desk/panels/op"]
+      code_ops: ["human.close"]
+      params_schema: params.human_panel_close
+      ownership: person_owns_board
+      note: >-
+        The person closes a panel. It is P1 because it is the person's own board and it settles
+        nothing; a question left unanswered on a closed panel is still unanswered, and closing a
+        panel is never an answer (the answer rows and their rules are untouched).
+
+  P2:
+    - id: human.answer
+      binding: verified
+      routes: ["POST /desk/panels/op"]
+      code_ops: ["human.answer"]
+      params_schema: params.human_answer
+      ownership: none_required
+      note: "The agent door refuses every human.* op with 403; only the person's paired panel route performs it."
+    - id: ask.route
+      binding: verified
+      routes: ["POST /agent/panels"]
+      code_ops: ["answer.route"]
+      params_schema: params.ask_route
+      executor: agent_execution
+      caller_authentication: registered_agent_key
+      authority_writer: case_record.authority
+      ownership: caller_owns_question
+      note: >-
+        The agent records where an answer went. It is a claim, not delivery: the row stays
+        claimed and nothing marks a step done without independent evidence. The executor is the
+        agent execution, authenticated by its registered key, because that is who acts: the design
+        defines the executor as the agent or service acting, and the only credential that reaches
+        this handler is the agent key. The P2 human evidence is unchanged (A3-UV, and A3-T under
+        Stage 0B), so the agent proposes the route and the human authorises the effect. The
+        design's P2/P3 table cell that named a human session for this row is corrected here and in
+        the defect record; the class, the authority writer and the evidence are not changed.
+    - id: ask.reassign
+      binding: verified
+      routes: ["POST /desk/panels/op"]
+      code_ops: ["human.reassign_owner"]
+      params_schema: params.ask_reassign
+      authority_writer: case_record.authority
+      ownership: person_owns_board
+      note: "Moving a waiting question to another registered agent is a person-reserved ownership change; an agent cannot perform it."
+    - id: ask.withdraw
+      binding: verified
+      routes: ["POST /desk/panels/op", "POST /agent/panels"]
+      code_ops: ["human.stop_waiting", "ask.withdraw"]
+      params_schema: params.ask_withdraw
+      executor: agent_execution_or_human_session
+      caller_authentication: registered_agent_key_or_human_session
+      authority_writer: case_record.authority
+      ownership: none_required
+      note: "`human.stop_waiting` stops waiting on a step; the agent's `ask.withdraw` withdraws its own unanswered question and is refused once the question is answered, agreed, or required. The row has two callers: the person on the desk route and a registered agent key on the agent door, so the executor and the credential are named per caller. The class and the human evidence are unchanged."
+    - id: owner.pin
+      binding: verified
+      routes: ["POST /desk/panels/op"]
+      code_ops: ["human.pin"]
+      params_schema: params.owner_pin
+      ownership: person_owns_board
+    - id: workspace.label
+      binding: verified
+      routes: ["POST /workspace/label"]
+      params_schema: params.workspace_label
+    - id: handoff.send
+      binding: verified
+      routes: ["POST /desk/handoff"]
+      params_schema: params.handoff_send
+      authority_writer: sea_forge
+      note: "POST /desk/handoff/preview is a read and is not a send."
+    - id: lesson.decide
+      binding: verified
+      routes: ["POST /desk/decide"]
+      params_schema: params.lesson_decide
+    - id: remote.start
+      binding: verified
+      routes: ["POST /workspace/remote/start"]
+      params_schema: params.remote_control
+    - id: remote.refresh
+      binding: verified
+      routes: ["POST /workspace/remote/refresh"]
+      params_schema: params.remote_control
+    - id: remote.stop
+      binding: verified
+      routes: ["POST /workspace/remote/stop"]
+      params_schema: params.remote_control
+    - id: device.pair
+      binding: verified
+      routes: ["POST /desk/pair"]
+      executor: local_console
+      human_evidence: local_enrollment_presence
+      stage0b_evidence: local_enrollment_presence
+      pending_expiry: 5m
+      params_schema: params.device_pair
+    - id: device.remove
+      binding: candidate
+      params_schema: params.device_remove
+      note: "Removing a paired device, including a session that is not the caller's own, stays governed. It is not session.logout."
+    - id: device.recover
+      binding: reserved
+      executor: local_console
+      human_evidence: recovery_code_local_presence_fresh_passkey
+      pending_expiry: 5m
+      params_schema: params.device_recover
+    - { id: expert.install, binding: candidate, params_schema: params.expert_install }
+    - { id: expert.configure, binding: candidate, params_schema: params.expert_configure }
+    - { id: expert.answer, binding: candidate, params_schema: params.expert_answer }
+    - { id: expert.remove, binding: candidate, params_schema: params.expert_remove }
+    - { id: grant.create, binding: reserved, params_schema: params.grant_create, authority_writer: sea_forge }
+    - { id: grant.revoke, binding: reserved, params_schema: params.grant_revoke, authority_writer: sea_forge }
+    - { id: gauntlet.run.cancel, binding: reserved, params_schema: params.run_cancel, authority_writer: sea_forge }
+    - id: trust.rotate
+      binding: reserved
+      executor: local_console
+      human_evidence: admin_presence_independent_admin
+      pending_expiry: 30m
+      params_schema: params.trust_rotate
+      authority_writer: issuer_root
+    - id: grant.redelegate
+      binding: reserved
+      executor: agent_execution_or_human_session
+      params_schema: params.grant_redelegate
+      authority_writer: sea_forge
+      human_evidence: none_for_agent_execution_A3_UV_for_human_session
+      pending_expiry: parent_grant_expiry_or_10m
+      note: >-
+        Narrowing only. An agent caller is gated by the parent's redelegate permission, remaining
+        depth, and ancestor budget; a human caller needs A3-UV and a current SEA-Forge entitlement
+        to redelegate the named live parent, since a human session has no delegation head.
+
+  P3:
+    - id: approval.approve
+      binding: reserved
+      params_schema: params.approval
+      authority_writer: sea_forge
+      separation_of_duty: true
+      note: "The approver is distinct from the initiating human, the requesting execution, and the executor."
+    - id: approval.reject
+      binding: reserved
+      params_schema: params.approval
+      authority_writer: sea_forge
+      separation_of_duty: true
+    - id: external.commit
+      binding: reserved
+      executor: agent_execution
+      params_schema: params.external_commit
+      authority_writer: sea_forge
+      human_evidence: per_target_row
+      pending_expiry: grant_expiry
+    - id: workspace.export
+      binding: verified
+      routes: ["POST /workspace/export"]
+      params_schema: params.workspace_export
+      pending_expiry: 15m
+      authority_writer: sea_forge
+    - id: isolation.request
+      binding: reserved
+      executor: agent_execution
+      params_schema: params.isolation_request
+      authority_writer: sea_forge
+      human_evidence: none
+      pending_expiry: grant_expiry
+      note: "The capability gate fails closed with isolation_unavailable where the host prerequisites are not met."
+
+  PX:
+    - id: capability.invoke
+      binding: reserved
+      dispatcher: true
+      params_schema: params.capability_invoke
+      inherits: [class, executor, authority_writer, human_evidence, pending_expiry]
+      note: "A family. The target operation ID, resource, amount, and effect are part of the descriptor and the resolved row. An unresolvable target is Px."
+    - id: run.start
+      binding: reserved
+      dispatcher: true
+      params_schema: params.run_start
+      inherits: [class, executor, authority_writer, human_evidence, pending_expiry]
+      note: "Resolves every target from the pinned plan. A plan whose targets are all local P0/P1 resolves in Cognate with no grant and no SEA-Forge call; any governed target binds the whole run at the highest class present."
+
+# Routes that carry more than one semantic action. The applied operation is chosen by the
+# handler from the action it actually performs. An action not listed here is Px, whatever the
+# route is called and whatever class the request claims for itself.
+dispatch:
+  - route: "POST /agent/panels"
+    action_field: tool
+    actions:
+      show_surface: agent.surface.publish
+      ask_human: agent.question.ask
+      arrange: agent.surface.arrange
+      annotate: agent.surface.annotate
+      read_responses: agent.response.read
+      ask.withdraw: ask.withdraw
+      answer.route: ask.route
+    unknown_action: PX
+    refused_prefixes: ["human."]
+    note: >-
+      The door refuses any human.* operation outright; a person's reserved operations are not
+      reachable from an agent key at a stronger class.
+  - route: "POST /desk/panels/op"
+    action_field: op
+    actions:
+      human.answer: human.answer
+      human.reassign_owner: ask.reassign
+      human.stop_waiting: ask.withdraw
+      human.pin: owner.pin
+      human.open: human.panel.open
+      human.close: human.panel.close
+    unknown_action: PX
+  - route: "POST /desk/search"
+    action_field: record
+    actions:
+      "false_or_absent": horizon.search.read
+      "true_with_non_empty_q": horizon.search.record
+    unknown_action: PX
+    note: >-
+      Effect-based dispatch on one POST route: the read is P0 even though the method is POST,
+      and the recorded find is the P1 write. The write path also performs the read, so a
+      recorded find is governed by horizon.search.record alone.
+
+# A route that is a transport alias of a listed operation. The alias adds no class and no
+# authority; it may only narrow.
+route_aliases:
+  - route: "POST /workspace/intent"
+    operation: horizon.surface.intent.commit
+    basis: "Both handlers call commitSurfaceIntent; the effect is one committed surface intent."
+    narrowing: >-
+      /workspace/intent is strictly narrower: it hard-codes transport `gui` and role `human`, and
+      it additionally requires the action to be offered and available in the current frame with a
+      matching frame revision.
+    added_requirements: [transport_fixed_gui, role_fixed_human, offered_action_required, frame_revision_match]
+
+# Bindings that were read and do not yet meet the design's contract. A defect is recorded here,
+# not waived: the row above is the reviewable statement of what the route must become.
+binding_defects:
+  - id: DEF-ROLE-FROM-REQUEST
+    route: "POST /surface/intent"
+    operation: horizon.surface.intent.commit
+    observed: "commitSurfaceIntent reads `role` from the request body and falls back to human."
+    required: "The caller kind and role come from the authenticated session; a request-supplied role is refused, not honoured."
+    consequence: "A caller able to reach the route can ask to be reduced to the agent projection, or claim the human one."
+    status: fixed
+    stage: "Stage 3 (operation descriptor) — the descriptor carries caller_kind from the session."
+    resolution: >-
+      Closed at Stage 0A. `SurfaceIntentRequestBody` no longer has a role field, `commitSurfaceIntent`
+      takes the role as an argument its caller supplies from the authenticated context, and the route
+      refuses a body that names an actor (`ACTOR_NAMING_FIELDS`, 400 forbidden_field) instead of
+      honouring or ignoring it. The route is a human-session route, so the role is the session's
+      "human"; the agent door is the only agent-authenticated route and it never reads a role.
+    evidence: "test/identity-defects.test.ts (a body role is refused and nothing is written; the recorded intent names the session's actor) and test/identity-contract.test.ts (the source no longer reads a role from a submission)."
+    residual: >-
+      The operation descriptor still does not carry caller_kind; Stage 3 adds it. The residual is an
+      extension of the descriptor, not an open path for a request-supplied role.
+  - id: DEF-ASK-ROUTE-EXECUTOR
+    route: "POST /agent/panels"
+    operation: ask.route
+    observed: "The handler is on the agent door and is performed by an agent key."
+    required: "The design's P2 row names a human_session executor for ask.route."
+    consequence: "The class is not in doubt (both are governed), but the executor evidence is."
+    status: fixed
+    stage: "Stage 0B — the owner decides whether the agent's route claim is P2-with-agent-executor or a separate operation."
+    resolution: >-
+      Closed at Stage 0A by the owner's rule that the row may be corrected when the executor evidence
+      is missing. The row now names `executor: agent_execution` and
+      `caller_authentication: registered_agent_key`, matching the design's own definition of the
+      executor (the agent or service acting) and the sibling agent-door rows. The class (P2), the
+      authority writer (`case_record.authority`), the human evidence (A3-UV, A3-T under Stage 0B)
+      and the pending expiry (10m) are unchanged, so the agent proposes and the human authorises.
+      The runtime record changed too: the answer record carries `executed_by_key` and the
+      conversation row carries `refs.executor_key`, both taken from the authenticated key, and the
+      agent door refuses a body that names an actor.
+    evidence: "test/identity-defects.test.ts (the recorded executor is the authenticated key; a body that names an executor is refused; another key cannot route this question) and test/identity-contract.test.ts (the row's executor and caller authentication)."
+    residual: >-
+      The design draft's P2/P3 table still says "human session" for `ask.route`; the catalog carries
+      the correction and this record names the divergence, so the design table should be amended in
+      the same change. Stage 0B adds the pending record and the A3-T confirmation for the effect.
+
+# Write routes and code operations the catalog does not yet contain. Empty: the reconciliation
+# closed every gap that reading the router found. A new entry here is a defect, not a waiver.
+catalog_gaps: []
+
+non_operation_routes:
+  - { route: "GET /desk/app.js", reason: "Static asset." }
+  - { route: "GET /desk/app.css", reason: "Static asset." }
+  - { route: "GET /agent/panels/catalogue", reason: "Read of the closed surface vocabulary." }
+  - { route: "GET /desk/panels/catalogue", reason: "Read of the closed surface vocabulary." }
+  - { route: "POST /desk/handoff/preview", reason: "Renders a review without sending; handoff.send is the write." }
+
+# Refusal is a first-class outcome: every blocked action reports why and what would repair it.
+refusal_codes:
+  unlisted_operation: "The operation is not in the closed catalog. Nothing was written."
+  unmapped_route: "The route maps to no catalog row. Nothing was written."
+  unknown_action: "The route is listed but the semantic action is not. Nothing was written."
+  insufficient_evidence: "The required human evidence is absent or weaker than the row demands."
+  grant_required: "A governed target needs a live grant or a current entitlement."
+  grant_not_allowed: "A human caller has no grant; supplying one is refused rather than ignored."
+  stale_revision: "The resource moved since the operation was described."
+  authority_unavailable: "The authority writer could not decide. No effect was dispatched."
+  isolation_unavailable: "This host does not meet the isolation prerequisites."
+  separation_of_duty: "The approver must differ from the requester and the executor."
+  budget_required: "A P3 grant without an explicit numeric budget is refused."
+  not_owner: "The caller's key does not own the panel or question the action names."
+  caller_substituted: "The caller kind, role, or reference disagrees with the authenticated session."
+  alias_action_mismatch: "The request's action or resolution disagrees with the operation ID that fixes it."

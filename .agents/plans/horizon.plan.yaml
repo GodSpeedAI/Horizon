@@ -5,11 +5,11 @@ metadata:
   id: "HORIZON-PLAN-001"
   title: "Horizon end-to-end semantic navigation, deterministic Clack + Atomic GUI and governed evidence"
   status: "ready"
-  version: "1.0.0"
+  version: "1.1.0"
   created: "2026-10-19"
   purpose: "Project Horizon's normative specification into a dependency-correct settlement graph, beginning with the owner's canonical Project Topology Architect skill and a Cognate-native, Product Actualizer-informed application, with independent evidence for consequential claims."
-  revised: "2026-10-19"
-  revision_note: "Rebound to spec 0.2.0 after source-grounded adversarial review (.agents/reports/horizon-spec-adversarial-review.md). Fixed workspace paths, added T20 product connectors, T21 GodSpeed research subsystem, T22 operator home and navigation UX, regenerated traceability. 1.0.0 rebinds to the approved, frozen spec 1.0.0 (Apache-2.0 Product Actualizer, REQ-STACK-014 one-way dependency)."
+  revised: "2026-11-09"
+  revision_note: "Rebound to spec 0.2.0 after source-grounded adversarial review (.agents/reports/horizon-spec-adversarial-review.md). Fixed workspace paths, added T20 product connectors, T21 GodSpeed research subsystem, T22 operator home and navigation UX, regenerated traceability. 1.0.0 rebinds to the approved, frozen spec 1.0.0 (Apache-2.0 Product Actualizer, REQ-STACK-014 one-way dependency). 1.1.0 adds T23 unified human and agent identity, delegation and authority (the owner's 2026-11-08 design): a tracked task with its own stages, evidence and acceptance gates, depending on T04 and required before T19 final conformance. The frozen spec (1.2.0) is unchanged; only the settlement graph gains a task, so REQ-SEC-006 gains T23 as a settling task."
 source:
   spec:
     intended_repository_path: ".agents/specs/horizon.agent.spec.yaml"
@@ -154,6 +154,8 @@ dependency_graph:
       - "T11"
     - - "T04"
       - "T11"
+    - - "T04"
+      - "T23"
     - - "T11"
       - "T12"
     - - "T11"
@@ -211,6 +213,8 @@ dependency_graph:
     - - "T21"
       - "T19"
     - - "T22"
+      - "T19"
+    - - "T23"
       - "T19"
     - - "T06"
       - "T20"
@@ -283,6 +287,10 @@ dependency_graph:
         - "T20"
         - "T21"
         - "T22"
+    - name: "Unified human and agent identity, delegation and authority"
+      after: "T04"
+      tasks:
+        - "T23"
   settlement_sequence:
     - "P0 topology skill inventory and source/spec freeze gate"
     - "P1 semantic IDM; P1B Behavioral IR/Clack proof; P1C Atomic UI IR"
@@ -363,6 +371,7 @@ initial_state:
       - "T20"
       - "T21"
       - "T22"
+      - "T23"
     T20:
       - "T06"
       - "T07"
@@ -378,6 +387,8 @@ initial_state:
       - "T09"
       - "T11"
       - "T13"
+    T23:
+      - "T04"
 tasks:
   T00:
     title: "Start with Project Topology Architect: inspect, bind ruler, freeze formation constraints"
@@ -1683,6 +1694,71 @@ tasks:
         - "Mocks and fixture-only results are not live settlement evidence."
         - "Pinned external API and skill versions may differ from prose documentation."
       confirmation_condition: "Builder demonstrates preregistered positive and negative checks with stable evidence and documents plausible alternate failures."
+  T23:
+    title: "Unified human and agent identity, delegation and authority"
+    initial_status: "blocked"
+    depends_on:
+      - "T04"
+    proof_level: "P3"
+    confirmation: "fresh_independent_adversarial"
+    settles:
+      - "REQ-SEC-006"
+    changes: "One identity, delegation and authority contract across Horizon, Cognate, SEA-Forge, Gauntlet and RealityTrace: a closed operation catalog bound by semantic effect, frozen record schemas for credentials, descriptors, grants, decisions, approvals, fences, receipts and evidence, an interim local containment for reserved Horizon operations, and one minimum end-to-end vertical slice with no mocked boundary."
+    proves: "A human session is never mistaken for an agent, a reserved human decision cannot be impersonated or laundered, an operation's class cannot be lowered by a route, an alias or a parameter, and a consequential effect is dispatched only under a live bounded grant or an operation-bound confirmation with independent evidence."
+    does_not_prove: "Does not prove S2 protection, workload isolation, or remote multi-user identity; those are Stage 6 platform qualification and a different deployment profile."
+    hot_context:
+      - "design_draft.md"
+      - "contracts/identity/v1/operations.yaml"
+      - "contracts/identity/v1/records.json"
+      - "src/contracts/identity/manifest.ts"
+      - "src/contracts/identity/records.ts"
+      - ".agents/reports/2026-11-08-unified-human-agent-identity-authority.md"
+      - "~/projects/cognate/.agents/skills/building-with-cognate/SKILL.md"
+      - "~/projects/sea-rs"
+      - "~/projects/gauntlet"
+      - "~/projects/sxr"
+    steps:
+      - "Stage 0A: freeze the closed operation catalog, policy constants, parameter schemas, record schemas, issuer profile, A3 mechanism, evidence schema and platform-claim matrix; reconcile the catalog against implemented behaviour by semantic effect, with an unrecognized action failing closed as Px."
+      - "Stage 0A: keep the catalog, the parameter schemas and the record schemas readable by an independent implementation, and prove the three owner proofs in two languages: no fabricated grant for a human session, no substitutable caller type, and no class downgrade through an alias or a parameter."
+      - "Stage 0A: close the two recorded binding defects with remediation and negative tests before any containment is considered releasable. DEF-ROLE-FROM-REQUEST: the surface-intent role comes from the authenticated session, the request body carries no role, and a body that names an actor is refused with a typed refusal and no write. DEF-ASK-ROUTE-EXECUTOR: the executor of an agent's route claim is the key the agent door authenticated, recorded in the answer record and the conversation row; the catalog row names that executor and its credential, the agent door refuses a body that names an actor, and the design draft's ask-row cells are corrected in the same change. Neither closure relies on the catalog to compensate for an untrusted caller identity."
+      - "Stage 0A: publish one hash-pinned frozen copy of the complete Stage 0A contract set — the design draft, the operation catalog, policy, parameter schemas, platform claims, record schemas, the issuer profile, the A3 mechanism, the cross-language fixtures and both preregistrations — and have a fresh independent reviewer re-derive the catalog census, the caller restrictions, the ownership and authority splits, the parameter and alias downgrade resistance, the human-session and agent-grant paths, and the fail-closed behaviour of an unknown operation. Record the verdict; a schema-valid catalog that is semantically wrong fails this step."
+      - "Stage 0B: contain Horizon's reserved operations with an immutable pending descriptor and a local terminal confirmation (A3-T), so every reserved operation without an exact local confirmation refuses with no write, low-risk collaboration stays available, and governed and P3 operations stay refused."
+      - "Stage 1: establish the Cognate identity foundation (issuer client/service, enrollment, execution and attempt credentials, propagation, supersession, restart), marking all pre-cutover work legacy/unbound."
+      - "Stage 2: establish the SEA-Forge authority bridge (issuer proof verification, grants, decisions, approvals, epochs, ancestor budgets, fences) with a gateway restricted to a distinct non-agent principal."
+      - "Stage 3: establish A3-UV phone challenge and the Horizon and Workbench consumers (canonical review, attribution, refusal UX, local/governed split)."
+      - "Stage 4: run the minimum end-to-end vertical slice (one issuer execution, Cognate propagation, one SEA grant, one Horizon operation, a real effect, revocation, evidence) with no mock or simulated boundary."
+      - "Stage 5: bind Gauntlet and RealityTrace to the attempt record, verifier receipt and observation references, and reject altered or substituted evidence."
+      - "Stage 6: qualify the platform (S1/S2 lanes, unsupported modes, custody probes, A3 independence) and disable every unsupported claim."
+      - "Stage 7: drain legacy paths (Workbench, Horizon, remaining protocols) so no unbound continuation, outbox or approval can create a new effect, and refuse mixed-version fallback."
+    gate:
+      - "just gate-t23"
+      - "just verify"
+    teeth:
+      - attack: "Supply an operation ID that is not in the closed catalog, or a route action the catalog does not list"
+        expected: "The operation resolves to Px with no writer, no expiry and no write; the unrecognized action fails closed."
+      - attack: "Lower a governed operation to P1 by adding an alias, renaming the route, switching the HTTP method, or naming a weaker parameter schema"
+        expected: "The class stays governed and the request is refused as a classification downgrade."
+      - attack: "Attach a grant, a delegation head or an execution to a human-session operation"
+        expected: "The record is refused; no grant is fabricated, defaulted or ignored."
+      - attack: "Present a session as an agent, or claim to be the execution a record targets"
+        expected: "The caller kind cannot be substituted and the operation refuses with no write."
+    redesign_trigger: "The catalog cannot express a real operation without changing its class taxonomy, or a reserved decision cannot be bound to an operation without inventing evidence a single host cannot produce."
+    evidence: ".agents/evidence/horizon/T23/"
+    done_when:
+      - "Every declared narrow gate ran and passed with retained exact output."
+      - "Every deliberate negative/teeth case behaved as claimed."
+      - "The task evidence includes touched refs, commands, results, and remaining unknowns."
+      - "Applicable global gates remain green; no required test is skipped."
+    preregistration:
+      required: true
+      artifact: ".agents/prereg/horizon/T23.prereg.yaml"
+      claim: "One closed operation catalog and one frozen record schema set make caller identity, operation class and authority decidable before any effect, and no path lowers a governed operation or gives a human session a fabricated grant."
+      falsifier: "An unlisted operation, a lowered class, a substituted caller, or a human-session grant reaches an effect."
+      known_confounds:
+        - "Stage 0A fixtures are contract-level: they prove the schemas and the classification rules, not a live issuer, grant or external effect."
+        - "The reconciled catalog is a binding of the routes and code operations read in this repository; a route registered through a table or another server file would need its own inventory."
+        - "Pinned external API and skill versions may differ from prose documentation."
+      confirmation_condition: "Builder demonstrates preregistered positive and negative checks with stable evidence, and an independent reviewer re-derives the same catalog census, the same violation sets and the same refusals without seeing the builder's reasoning."
 final_acceptance:
   canonical_world_and_navigation:
     - "One pin to DomainForge world_ref plus distinct operational checkpoint is preserved across all journeys."
@@ -1870,6 +1946,7 @@ traceability:
     "REQ-SEC-006":
       - "T04"
       - "T19"
+      - "T23"
     "REQ-STACK-001":
       - "T01"
       - "T14"

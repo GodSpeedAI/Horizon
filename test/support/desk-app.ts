@@ -7,6 +7,7 @@ import type { ApprovalAuthority } from "../../src/adapters/sea-forge-config.ts";
 import type { Access } from "../../src/adapters/workshop.ts";
 import { horizonDocument, writeConfig } from "./config.ts";
 import { deskScopeOf } from "../../src/capabilities/panel-records.ts";
+import { refusalsFor, type RefusalAudit } from "../../src/capabilities/refusals.ts";
 
 export interface DeskApp {
   readonly application: HorizonApplication;
@@ -15,6 +16,8 @@ export interface DeskApp {
   readonly post: (path: string, body: unknown) => Promise<Response>;
   readonly state: (query?: string) => Promise<any>;
   readonly get: (path: string) => Promise<any>;
+  /** The refusals the catalog's frozen rows left behind: one audit per refused attempt, and no target effect. */
+  readonly refusals: () => Promise<readonly RefusalAudit[]>;
   /** The directory this desk keeps its store, config and agent key in. Start again with `root` to restart on the same records. */
   readonly root: string;
 }
@@ -71,6 +74,7 @@ export async function startDeskApp(options: { readonly repoPath?: string; readon
     // need not name one; a test that retries passes its own id.
     post: (path, body) => fetch(`${base}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: typeof body === "string" ? body : JSON.stringify(withRequestId(path, body)) }),
     get: async (path) => (await fetch(`${base}${path}`)).json(),
+    refusals: () => refusalsFor(application.runtime.runtime.store, application.caller.tenant),
     state: async (query = "") => (await fetch(`${base}/desk/state.json?${query}`)).json(),
   };
 }

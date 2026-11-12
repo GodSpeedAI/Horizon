@@ -8,14 +8,18 @@ import { StatusBar } from "../src/ui/desk/StatusBar.tsx";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { deskState } from "./support/desk-fixture.ts";
 import { withRequestId } from "./support/request-body.ts";
+import { agentInProcess } from "./support/agent-door.ts";
 
 const apps: DeskApp[] = [];
 afterEach(async () => {
   while (apps.length > 0) await apps.pop()!.stop();
 });
 
-const agent = (app: DeskApp, body: unknown) =>
-  fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${app.application.loaded.agentKey}`, "content-type": "application/json", "x-horizon-agent-name": "Helper" }, body: JSON.stringify(withRequestId(body)) });
+const agent = (app: DeskApp, body: unknown) => {
+  // The door refuses `answer.route` at this freeze (R5-01); the machinery it calls is called directly.
+  if ((body as { readonly tool?: unknown }).tool === "answer.route") return agentInProcess(app.application, "default", "Helper", body);
+  return fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${app.application.loaded.agentKey}`, "content-type": "application/json", "x-horizon-agent-name": "Helper" }, body: JSON.stringify(withRequestId(body)) });
+};
 
 describe("a recording failure reaches the person", () => {
   // Design v3, step 3: a route and its conversation row are one commit. A row that cannot be written refuses the route as a whole,

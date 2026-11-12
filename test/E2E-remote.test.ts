@@ -120,15 +120,19 @@ suite("phone remote control, end to end in Chromium", () => {
     await (page.getByText("Desktop changes the case")).waitFor({ state: "visible", timeout: 20_000 });
   }, 90_000);
 
-  test("the phone commits an offered move through the same commit, and the desktop workspace shows its receipt", async () => {
+  test("the phone's commit is refused in the catalog's words, and the desktop records no new move", async () => {
+    // R5-03: a device credential never proves which person holds the phone, so the phone's commit
+    // is refused before any target effect. The phone says so; the desktop gets no intent or receipt.
     const { page } = phone;
+    await desktopPage.goto(`${cockpitBase}/workspace`);
+    const before = await desktopPage.locator("[data-intent]").count();
     await page.getByRole("button", { name: "Commit", exact: true }).first().click();
     await page.getByRole("button", { name: "Confirm commit" }).click();
-    await (page.locator("#moves details").first()).waitFor({ state: "visible", timeout: 20_000 });
+    const notice = page.locator("#notice[data-kind='error']");
+    await notice.waitFor({ state: "visible", timeout: 20_000 });
+    expect(await notice.textContent()).toContain("delegation");
     await desktopPage.goto(`${cockpitBase}/workspace`);
-    // The desk draws Recent moves after its first poll.
-    await desktopPage.locator("[data-intent]").first().waitFor({ state: "attached", timeout: 15_000 });
-    expect(await desktopPage.locator("[data-intent]").count()).toBeGreaterThan(0);
+    expect(await desktopPage.locator("[data-intent]").count()).toBe(before);
   }, 90_000);
 
   test("the phone reloads, signs out on the phone, and signs back in with its passkey", async () => {

@@ -45,6 +45,7 @@ test:
 
 ledger:
     python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
+    python3 scripts/check-ledger-invariants.py
     ./scripts/check-ledger-freeze.sh
 
 wayfinder:
@@ -245,6 +246,47 @@ gate-t21:
 gate-t22:
     @echo "gate-t22: not implemented; fails closed until T22 settles"
     @exit 1
+
+# T23: the unified human and agent identity, delegation and authority contract. The narrow target
+# proves the closed operation catalog, the frozen record schemas and the cross-language fixtures:
+# an unlisted operation, a lowered class, a substituted caller or a human-session grant fails
+# them. The prereg linkage is checked so a Stage 0A expectation cannot drift out of a named test,
+# and the mutation teeth attack the catalog and the record rules one property at a time.
+# The defect-remediation unit and the issuer profile are Stage 0A units of the same task, so they
+# are gated here too: a unit whose expectations are unlinked, or whose negative tests would pass
+# against the undone fix, blocks the task.
+check-t23:
+    bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/T23.prereg.yaml
+    bun run scripts/check-t23-prereg-coverage.ts
+    bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/STAGE-0A-DEFECTS.prereg.yaml
+    bun run scripts/check-stage0a-defects-prereg-coverage.ts
+    bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/STAGE-0A-REMEDIATION.prereg.yaml
+    bun run scripts/check-stage0a-remediation-prereg-coverage.ts
+    bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/STAGE-0A-REMEDIATION-2.prereg.yaml
+    bun run scripts/check-stage0a-remediation-2-prereg-coverage.ts
+    bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/STAGE-0A-REMEDIATION-3.prereg.yaml
+    bun run scripts/check-stage0a-remediation-3-prereg-coverage.ts
+    bun run scripts/check-param-schema-binding.ts
+    bun run scripts/check-design-contract-consistency.ts
+    bun run scripts/check-delegation-register.ts
+    bun run scripts/check-dispatch-coverage.ts
+    bun run scripts/check-route-census.ts
+    bun run scripts/check-external-interface-facts.ts
+    bun test test/identity-contract.test.ts test/identity-records.test.ts
+    bun test test/identity-defects.test.ts
+    bun test test/identity-issuer.test.ts
+    bun test test/identity-remediation.test.ts
+    bun test test/identity-remediation-2.test.ts
+    bun test test/identity-remediation-3.test.ts
+    uv run --project research pytest research/tests/test_identity_fixtures.py -q
+
+teeth-t23-mutation:
+    bun run scripts/teeth-t23-mutation.ts
+
+teeth-t23: teeth-t23-mutation
+
+gate-t23: check-t23 teeth-t23 test check boundaries idm-integrity acceptance-claims witness-claims contract-modals ledger wayfinder teeth
+    @echo "gate-t23: ok — closed operation catalog, frozen record schemas and cross-language identity fixtures"
 
 # SEA-Forge gateway and Horizon runtime, two service accounts (Linux/WSL). Nothing here runs privileged
 # commands on its own; the only privileged step is the sudo command gateway-install prints.

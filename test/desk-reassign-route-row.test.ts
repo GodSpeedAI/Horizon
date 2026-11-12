@@ -10,6 +10,7 @@ import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { withRequestId } from "./support/request-body.ts";
+import { agentInProcess } from "./support/agent-door.ts";
 
 const keys = { ag_alice: randomBytes(32).toString("hex"), ag_alice2: randomBytes(32).toString("hex") };
 const sha = (k: string) => createHash("sha256").update(k).digest("hex");
@@ -21,8 +22,19 @@ const writeRegistry = (app: DeskApp) => {
   writeFileSync(join(dirname(app.application.loaded.agentKeyPath), "agents.json"), JSON.stringify({ schema: "horizon.agents/1", agents: entries }));
 };
 const q = (id: string) => ({ id, question: `Which plan for ${id}?`, why_needed: "x", options: [{ option_id: "a", label: "Plan A" }, { option_id: "b", label: "Plan B" }] });
-const agent = (app: DeskApp, key: string, name: string, body: unknown) =>
-  fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": name }, body: JSON.stringify(withRequestId(body)) });
+/**
+ * A call at the agent door. The door refuses `answer.route` and `ask.withdraw` at this freeze
+ * (R5-01), so those two go to the same function the door calls after its checks; everything else
+ * still goes over the door's own HTTP route.
+ */
+const agent = (app: DeskApp, key: string, name: string, body: unknown) => {
+  const tool = (body as { readonly tool?: unknown }).tool;
+  if (tool === "answer.route" || tool === "ask.withdraw") {
+    const keyId = Object.entries(keys).find(([, value]) => value === key)?.[0] ?? key;
+    return agentInProcess(app.application, keyId, name, body);
+  }
+  return fetch(`${app.base}/agent/panels`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-horizon-agent-name": name }, body: JSON.stringify(withRequestId(body)) });
+};
 const person = (app: DeskApp, body: unknown) => fetch(`${app.base}/desk/panels/op`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(withRequestId(body)) });
 const rowsOf = async (app: DeskApp): Promise<any[]> => (await (await fetch(`${app.base}/desk/conversation`)).json()).rows;
 

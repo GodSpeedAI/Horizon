@@ -132,7 +132,11 @@ async function isolatedTree(): Promise<string> {
   copyFileSync("tsconfig.json", join(root, "tsconfig.json"));
   // The test preload (bunfig.toml) pairs the test clients; without it the isolated control makes unpaired reads and fails.
   copyFileSync("bunfig.toml", join(root, "bunfig.toml"));
-  for (const dir of ["src", "test"]) cpSync(dir, join(root, dir), { recursive: true });
+  // The identity contract set is a pinned runtime input: the intent boundary classifies every
+  // operation reference against `contracts/identity/v1/operations.yaml` before anything runs, so a
+  // copy of the application without it cannot start, and a control that fails for that reason
+  // would make the attack below meaningless.
+  for (const dir of ["src", "test", "contracts"]) cpSync(dir, join(root, dir), { recursive: true });
   for (const link of ["domain", "config", "research", "cognate.config.ts"]) {
     // Follow the link: `domain/` is an absolute symlink, so copying it verbatim would point
     // back at this repository's tree instead of the isolated copy's.

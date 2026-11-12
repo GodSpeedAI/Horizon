@@ -52,6 +52,11 @@ async function runSequentialTui(
   });
 }
 
+/**
+ * Which projection the local console reduces the surface for. This is a projection selector, not
+ * an identity: the intent's actor is always the frame's observer, and the CLI is the operator's
+ * own process (DEF-ROLE-FROM-REQUEST).
+ */
 function roleFlag(): SurfaceRole {
   const role = flag("role");
   if (role === "human" || role === "agent" || role === "system") return role;
@@ -109,11 +114,10 @@ if (command === "frame") {
   const frameId = flag("frame");
   const outcome = await application.commitSurfaceIntent({
     transport: "cli",
-    role: roleFlag(),
     ...(operation === undefined ? {} : { operation }),
     ...(nodeId === undefined ? {} : { node_id: nodeId }),
     ...(frameId === undefined ? {} : { frame_id: frameId }),
-  });
+  }, roleFlag());
   process.stdout.write(`${JSON.stringify(outcome, null, 2)}\n`);
   await application.close();
   if (!outcome.ok) process.exit(1);

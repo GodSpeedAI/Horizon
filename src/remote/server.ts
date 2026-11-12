@@ -24,15 +24,32 @@ import { auditRemote, addDevice, listDevices, updateDevice, type RemoteDevice } 
 import { checkPurpose } from "../capabilities/workspace-records.ts";
 import type { WorkspaceChrome, WorkspaceMove, WorkspaceReceipt } from "../ui/workspace/model.ts";
 import { identityStoreOf } from "./identity-store.ts";
+import { reservedActorField, unknownField } from "../contracts/identity/reserved-fields.ts";
+import { refusalWords, type FrozenRefusal } from "../contracts/identity/enforcement.ts";
 import { Pairing } from "./pairing.ts";
 import { clearedCookie, cookieOf, sessionCookie } from "./sessions.ts";
 import { phonePage, pairPage } from "./phone.ts";
 import type { RemoteSettings } from "./settings.ts";
 
 export const REMOTE_SCHEMA = "horizon.remote/1";
+/** The actor id an enrolled device is called by. It is not a person, and its prefix says so in every record it writes. */
+export const DEVICE_ACTOR_PREFIX = "device:";
+/**
+ * The durable operator an enrolled device is associated with. It is attribution — who the device
+ * belongs to and who is answerable for it — never the caller of a device-authenticated request.
+ */
+export interface DeviceAttribution {
+  readonly operator: string;
+}
 const BODY_LIMIT = 16 * 1024;
-/** Request fields that would name an actor. The actor is never taken from the request. */
-const FORBIDDEN_FIELDS = ["actor", "actor_id", "actor_ref", "on_behalf_of", "operator", "operator_id", "caller", "role"] as const;
+/**
+ * Request fields that would name an actor. The actor is never taken from the request.
+ *
+ * The list is the contract's one list (`contracts/identity/reserved-fields.ts`), not a copy of
+ * it: the phone once kept a shorter set of its own, so a field the desktop refused outright —
+ * `caller_ref`, `principal`, `executor`, `authority` — was an ordinary unknown field here
+ * (R4-07).
+ */
 const COMMAND_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** What the listener needs from the application: reads, and the same write paths the cockpit uses. */
@@ -56,13 +73,36 @@ export interface RemoteDeps {
   }>;
   readonly chrome: (receipt?: string | null) => Promise<WorkspaceChrome>;
   readonly position: () => Promise<number>;
-  readonly approvalIntent: (approvalId: string) => Promise<string | null>;
-  /** Throws when SEA-Forge refuses; a rejected commit is audited and throws by design. */
-  readonly resolveApproval: (approvalId: string, resolution: "approved" | "rejected", who: Caller) => Promise<void>;
-  /** The cockpit's commit of one offered action, run with the session's Caller (never the server operator's). */
-  readonly commitAction: (actionId: string, intentId: string, who: Caller) => Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }>;
-  readonly settle: (intentId: string, phase: "observe" | "rule", who: Caller) => Promise<void>;
-  readonly openCase: (purpose: string, who: Caller) => Promise<void>;
+  /**
+   * The cockpit's commit of one offered action, run with the session's Caller (never the server
+   * operator's) and the operator the enrolled device is associated with, as attribution only.
+   */
+  readonly commitAction: (
+    actionId: string,
+    intentId: string,
+    who: Caller,
+    attribution: DeviceAttribution,
+  ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }>;
+  readonly openCase: (purpose: string, who: Caller, attribution: DeviceAttribution) => Promise<void>;
+  /**
+   * The operation the phone's command performs, resolved from the identity catalog's dispatch
+   * table for `POST /m/api/command`, and the class that operation carries.
+   *
+   * The phone names a kind, never an operation. The catalog says which row a kind selects, and
+   * the settlement command's phase selects between the two settlement rows. A kind or a pair
+   * the catalog does not list resolves to nothing, and the command is refused before any effect
+   * runs (R3-01, R3-02).
+   *
+   * The class comes back with the operation because the phone's credential is a device
+   * credential: it proves which enrolled device is at the route and never which person is
+   * holding it. A governed row therefore needs a protected operation-bound confirmation the
+   * remote path does not have, and the command is refused rather than downgraded (R4-02).
+   *
+   * The catalog's own refusal comes back with the operation (R5-01): the row the catalog refuses
+   * is the row the command refuses, with the catalog's own words and its refusal audit, so the
+   * contract and this route cannot drift.
+   */
+  readonly resolveCommand: (kind: string, phase: string | null) => { readonly operation: string; readonly class: string; readonly fields: readonly string[]; readonly refusal: FrozenRefusal | null } | null;
 }
 
 export interface RemoteStatus {
@@ -205,9 +245,23 @@ export class RemoteController {
     return session !== undefined && session.status === "active" && Date.parse(session.expiresAt) > now;
   }
 
-  /** The Caller for a resolved session: the durable operator's actor, in the runtime tenant. Never the server operator. */
+  /**
+   * The Caller for a resolved session: the enrolled device, in the runtime tenant.
+   *
+   * A device credential proves which device is at the route, never which person is holding it
+   * (design §7), so the durable operator behind the enrolment is not substituted for the caller:
+   * the device acts, and the operator is recorded beside it as attribution. The operator's own
+   * actor still reaches the cockpit's own paths; it is simply not the caller of a
+   * device-authenticated request (R5-03). `Principal.kind` has no device kind, so the device is
+   * carried as a service principal whose id says it is one.
+   */
   private callerOf(session: ResolvedSession): Caller {
-    return { tenant: this.deps.tenant, actor: session.caller.actor };
+    return { tenant: this.deps.tenant, actor: { id: `${DEVICE_ACTOR_PREFIX}${session.session.deviceId ?? session.session.sid}`, kind: "service" } };
+  }
+
+  /** The operator the enrolled device is associated with, as attribution beside the device caller. */
+  private attributionOf(session: ResolvedSession): DeviceAttribution {
+    return { operator: session.caller.actor.id };
   }
 
   /** Bind the loopback listener and open a pairing link. Old devices stay revoked from any earlier stop. */
@@ -515,9 +569,8 @@ export class RemoteController {
     if (!COMMAND_ID.test(commandId)) return refusal(400, "invalid_argument", "REMOTE: command_id must be a UUID");
     // The actor is the session's, from the durable operator record and the configured mapping. A request that
     // names one is refused outright rather than quietly ignored.
-    for (const field of FORBIDDEN_FIELDS) {
-      if (body !== null && field in body) return refusal(400, "forbidden_field", `REMOTE: a request cannot name its own actor (${field}); the actor comes from the signed-in session`);
-    }
+    const named = reservedActorField(body);
+    if (body !== null && named !== null) return refusal(400, "forbidden_field", `REMOTE: a request cannot name its own actor (${named}); the actor comes from the signed-in session`);
     const perSession = this.commands.get(sid) ?? new Map<string, Promise<{ readonly status: number; readonly body: unknown }>>();
     this.commands.set(sid, perSession);
     const seen = perSession.get(commandId);
@@ -544,14 +597,65 @@ export class RemoteController {
   private async execute(body: Record<string, unknown> | null, session: ResolvedSession, now: number, reply: (status: number, accepted: boolean, outcome: Outcome) => Promise<Response>): Promise<Response> {
     const who = this.callerOf(session);
     const kind = body?.kind;
-    if (kind === "open_case") {
+    const namedKind = typeof kind === "string" ? kind : "";
+    // The command route is a dispatcher: the phone names a kind, and the catalog says which
+    // operation that kind performs. A kind or a pair the catalog does not list is Px and is
+    // refused before any effect runs (R3-01, R3-02).
+    const phase = typeof body?.phase === "string" ? body.phase : null;
+    let resolved: { readonly operation: string; readonly class: string; readonly fields: readonly string[]; readonly refusal: FrozenRefusal | null } | null;
+    try {
+      resolved = this.deps.resolveCommand(namedKind, phase);
+    } catch (error) {
+      return reply(503, false, { state: "refused", code: "unavailable", message: `REMOTE: the identity catalog could not be loaded, so nothing was done (${error instanceof Error ? error.message : String(error)}).` });
+    }
+    if (resolved === null) {
+      const message = namedKind === "settle" ? "REMOTE: that settlement is not one Horizon knows. Nothing was done." : "REMOTE: that command is not one Horizon knows. Nothing was done.";
+      return reply(400, false, { state: "refused", code: "px", message });
+    }
+    const operation = resolved.operation;
+    // Containment: a device credential may not reach a governed row. A governed row needs the
+    // operation-bound pending record, the protected confirmation and its own A3-UV evidence, and
+    // the remote path has none of them: the phone's credential proves which enrolled device is
+    // at the route, never which person is holding it. The command is refused rather than
+    // downgraded to something the device's session can do on its own (R3-01, R4-02).
+    //
+    // The refusal the catalog states is the refusal the command answers with (R5-01). The class
+    // check below stays as a backstop for a catalog that stopped refusing a governed row: a row
+    // this route cannot support is refused, never run.
+    if (resolved.refusal !== null) {
+      // A governed row is refused because the protected confirmation cannot exist on the phone. A
+      // P0/P1 row is refused for its own stated reason — the commit row's is the missing
+      // device-attributed delegation — and answers in the catalog's own words (R5-03).
+      const governed = resolved.class === "P2" || resolved.class === "P3";
+      await this.audit(session, namedKind, governed ? "refused:no_protected_confirmation_path" : `refused:catalog:${resolved.operation}`, now);
+      return reply(
+        403,
+        false,
+        governed
+          ? { state: "refused", code: "no_protected_confirmation_path", message: "REMOTE: that action can only be taken on the desktop, where the confirmation is protected. Nothing was done." }
+          : { state: "refused", code: "refused", message: refusalWords(resolved.refusal) },
+      );
+    }
+    if (resolved.class === "P2" || resolved.class === "P3") {
+      await this.audit(session, namedKind, "refused:no_protected_confirmation_path", now);
+      return reply(403, false, { state: "refused", code: "no_protected_confirmation_path", message: "REMOTE: that action can only be taken on the desktop, where the confirmation is protected. Nothing was done." });
+    }
+    // The body has a closed vocabulary: the dispatch envelope plus the fields the resolved
+    // operation's schema names. A field nothing names is refused rather than ignored, so a
+    // caller never believes an unnamed field was read (R4-07).
+    const extra = unknownField(body, ["command_id", "kind", "phase", ...resolved.fields]);
+    if (extra !== null) {
+      await this.audit(session, namedKind, `refused:unknown_field:${extra}`, now);
+      return reply(400, false, { state: "refused", code: "unknown_field", message: `REMOTE: that command does not take ${extra}. Nothing was done.` });
+    }
+    if (operation === "device.case.open") {
       const check = checkPurpose(body?.purpose);
       if (!check.ok) return reply(400, false, { state: "refused", code: check.code, message: check.code === "empty" ? "Write the purpose in one line." : "The purpose is longer than 200 characters." });
-      await this.deps.openCase(check.purpose, who);
+      await this.deps.openCase(check.purpose, who, this.attributionOf(session));
       await this.audit(session, "open_case", "accepted", now);
       return reply(200, true, { state: "done", receipt: null });
     }
-    if (kind === "commit") {
+    if (operation === "device.surface.intent.commit") {
       return this.serial(async () => {
         const data = await this.deps.workspace();
         if (body?.frame_id !== data.frame.frame_id || String(body?.frame_revision) !== String(data.frame.revision)) {
@@ -562,7 +666,7 @@ export class RemoteController {
           return reply(409, false, { state: "refused", code: "not_available", message: "That move is no longer available." });
         }
         const intentId = randomUUID();
-        const result = await this.deps.commitAction(action.action_id, intentId, who);
+        const result = await this.deps.commitAction(action.action_id, intentId, who, this.attributionOf(session));
         if (!result.ok && result.code !== "awaiting_authority") {
           await this.audit(session, "commit", `refused:${result.code}`, now);
           return reply(409, false, { state: "refused", code: result.code, message: result.message });
@@ -572,40 +676,14 @@ export class RemoteController {
         return reply(200, true, { state: result.ok ? "done" : "waiting", intent_id: intentId, receipt });
       });
     }
-    if (kind === "approve" || kind === "reject") {
-      return this.serial(async () => {
-        const approvalId = typeof body?.approval_id === "string" ? body.approval_id : "";
-        const intentId = approvalId === "" ? null : await this.deps.approvalIntent(approvalId);
-        if (intentId === null) return reply(404, false, { state: "refused", code: "not_found", message: "No escalated commit waits on this approval." });
-        try {
-          await this.deps.resolveApproval(approvalId, kind === "approve" ? "approved" : "rejected", who);
-        } catch (error) {
-          // A rejected commit fails by design and is audited; its receipt says so. Anything else is refused.
-          if (!(error instanceof Error && error.message.startsWith("INTENT: governed commit refused"))) {
-            const own = error instanceof Error && error.message.startsWith("APPROVAL: the requester");
-            await this.audit(session, kind, own ? "refused:own_escalation" : "refused", now);
-            return reply(409, false, { state: "refused", code: own ? "own_escalation" : "approval_refused", message: own ? "You started this move, so someone else must decide it." : "SEA-Forge did not accept this decision. Check the desktop." });
-          }
-        }
-        await this.audit(session, kind, "decided", now);
-        return reply(200, true, { state: "done", intent_id: intentId, receipt: (await this.deps.chrome(intentId)).receipt });
-      });
+    if (operation === "device.settlement.observe" || operation === "device.settlement.rule" || operation === "horizon.settlement.observe" || operation === "horizon.settlement.rule") {
+      // Unreachable while the catalog holds: the settlement rows the phone's command selects are
+      // device-credential rows, and a device credential may not reach a governed row. The branch
+      // is kept as a backstop so a catalog that drifted back to the shared rows still refuses the
+      // settlement rather than calling SEA-Forge's final settlement from a device session.
+      return reply(403, false, { state: "refused", code: "no_protected_confirmation_path", message: "REMOTE: that action can only be taken on the desktop, where the confirmation is protected. Nothing was done." });
     }
-    if (kind === "settle") {
-      const intentId = typeof body?.intent_id === "string" ? body.intent_id : "";
-      if (intentId === "") return reply(400, false, { state: "refused", code: "invalid_argument", message: "intent_id is required" });
-      // Observation and the SEA-Forge ruling are separate requests, as on the desktop: a combined settle is not offered.
-      const phase = body?.phase;
-      if (phase !== "observe" && phase !== "rule") return reply(400, false, { state: "refused", code: "invalid_argument", message: "phase must be observe or rule" });
-      try {
-        await this.deps.settle(intentId, phase, who);
-      } catch {
-        return reply(409, false, { state: "refused", code: "settlement_refused", message: "Settlement was refused. The receipt on the desktop says why." });
-      }
-      await this.audit(session, "settle", "requested", now);
-      return reply(200, true, { state: "done", intent_id: intentId, receipt: (await this.deps.chrome(intentId)).receipt });
-    }
-    return reply(400, false, { state: "refused", code: "invalid_argument", message: "REMOTE: kind must be open_case, commit, approve, reject or settle" });
+    return reply(400, false, { state: "refused", code: "px", message: "REMOTE: that command is not one Horizon knows. Nothing was done." });
   }
 
   private async audit(session: ResolvedSession, action: string, outcome: string, now: number): Promise<void> {
