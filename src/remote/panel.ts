@@ -106,7 +106,7 @@ export function remotePanelPage(input: PanelInput): string {
     const label = device === null ? "Unknown phone" : esc(device.label);
     const heading = status.state === "connected" ? "Phone connected." : "Restoring connection…";
     const body = status.state === "connected"
-      ? "Replacing the phone signs out the current one at once and needs a new passkey on the new phone."
+      ? "Replacing the phone opens a new link. The current phone stays signed in until the new phone is authorized with its passkey on this phone; then the current one is signed out."
       : "The phone is paired but has no live session. It re-authenticates with its passkey when it reopens the page.";
     section = `<section class="card" aria-labelledby="panel-title">
 <h2>${heading}</h2>
@@ -116,8 +116,12 @@ export function remotePanelPage(input: PanelInput): string {
 <dt>Last seen</dt><dd>${clock(device?.last_seen ?? null)}</dd>
 </dl>
 <p class="muted">${body}</p>
+${link === null ? "" : `<h3>Replacement link</h3>
+<div class="qr">${qrSvg(link)}</div>
+<p class="row"><code id="pair-link">${esc(link)}</code></p>
+<p class="muted">The new phone opens this link once. This desk then asks the current phone to authorize it.</p>`}
 <div class="row">
-<form method="post" action="/workspace/remote/refresh"><button type="submit">Replace phone</button></form>
+<form method="post" action="/workspace/remote/start"><button type="submit">Replace phone</button></form>
 <form method="post" action="/workspace/remote/stop"><button type="submit">Stop</button></form>
 </div>
 </section>`;

@@ -24,6 +24,7 @@ import { auditRemote, addDevice, listDevices, updateDevice, type RemoteDevice } 
 import { checkPurpose } from "../capabilities/workspace-records.ts";
 import type { WorkspaceChrome, WorkspaceMove, WorkspaceReceipt } from "../ui/workspace/model.ts";
 import { identityStoreOf } from "./identity-store.ts";
+import { verifyAssertion } from "./webauthn.ts";
 import { reservedActorField, unknownField } from "../contracts/identity/reserved-fields.ts";
 import { refusalWords, type FrozenRefusal } from "../contracts/identity/enforcement.ts";
 import { Pairing } from "./pairing.ts";
@@ -68,8 +69,8 @@ export interface RemoteDeps {
    */
   readonly operator: string;
   /**
-   * The operator's authorization of a new controller. A verified passkey is held here until the operator
-   * types the code the desk shows on its terminal; nothing is enrolled before that.
+   * The operator's authorization of a new controller. A verified passkey is held here until the active
+   * controller signs the enrolment with its own user-verified passkey; nothing is enrolled before that.
    */
   readonly enrollment: EnrollmentAuthority;
   /** The cockpit's default read: frame, closed surface view and its actions. */
@@ -240,13 +241,12 @@ export class RemoteController {
     const committed = await this.deps.enrollment.commit({
       pendingId,
       tenant: this.deps.tenant,
-      operator: this.deps.operator,
       generation: this.pairing.generation,
       currentControllers: await this.activeDeviceIds(),
       now: new Date(now),
     });
     if (!committed.ok) {
-      if (committed.code === "not_authorized") return json(202, { status: "awaiting_operator_authorization" });
+      if (committed.code === "not_authorized") return json(202, { status: "awaiting_phone_authorization" });
       if (committed.code === "stale") return refusal(409, "controller_changed", "The desktop's controller changed while this phone waited. Refresh the QR on your desktop and scan again.");
       if (committed.code === "expired") return refusal(410, "authorization_expired", "The desktop did not authorize this phone in time. Refresh the QR on your desktop and scan again.");
       return refusal(410, "authorization_used", "This authorization was already used or is not valid. Refresh the QR on your desktop and scan again.");
@@ -330,7 +330,11 @@ export class RemoteController {
 
   /** Bind the loopback listener and open a pairing link. Old devices stay revoked from any earlier stop. */
   async start(): Promise<void> {
-    if (this.server !== null) return;
+    if (this.server !== null) {
+      // Already listening: a new invitation for another phone. It grants no authority and revokes no controller.
+      this.pairing.invite(this.clock());
+      return;
+    }
     // The cockpit's own session approves pairing for one durable operator that must already exist and be active.
     const operator = await this.deps.identity.getOperator(this.deps.identityTenant, this.deps.operator);
     if (operator === undefined || operator.status !== "active") throw new Error(`REMOTE: operator ${this.deps.operator} is not an active durable operator; a pairing link never creates one`);
@@ -348,7 +352,7 @@ export class RemoteController {
   private async refreshNow(): Promise<void> {
     if (this.server === null) return;
     const at = new Date(this.clock()).toISOString();
-    await this.deps.enrollment.abandonWaiting("pairing refreshed");
+    await this.deps.enrollment.endWaiting(this.deps.tenant, "pairing refreshed");
     await this.revokeDevices(at, "pairing refreshed");
     this.pairing.refresh(this.clock());
   }
@@ -361,7 +365,7 @@ export class RemoteController {
   private async stopNow(): Promise<void> {
     const at = new Date(this.clock()).toISOString();
     this.pairing.stop();
-    await this.deps.enrollment.abandonWaiting("remote control stopped");
+    await this.deps.enrollment.endWaiting(this.deps.tenant, "remote control stopped");
     await this.revokeDevices(at, "remote control stopped");
     this.server?.stop(true);
     this.server = null;
@@ -475,27 +479,29 @@ export class RemoteController {
       if (challenge === null) return refusal(410, "challenge_expired", "The passkey request expired. Scan the QR on your desktop again.");
       try {
         const verified = verifyRegistration(body?.credential as Parameters<typeof verifyRegistration>[0], { challenge, origin: this.origin, rpId: this.rpId });
-        // A verified passkey proves the phone holds a new credential. It authorizes nothing. The enrolment is held
-        // until the operator types the code the desk shows on its own terminal, which names this phone and the
-        // controllers it would replace. Nothing is enrolled, and no session is granted, until then.
-        // Read the generation and the controllers, and record the request, inside the serial chain, so a stop or
-        // refresh cannot land between the read and the record and leave a waiting enrolment behind it.
-        const requested = await this.serial(async () =>
-          this.pairing.isEnabled
-            ? this.deps.enrollment.request({
-                tenant: this.deps.tenant,
-                operator: this.deps.operator,
-                generation: this.pairing.generation,
-                label: labelOf(request.headers.get("user-agent")),
-                registration: verified,
-                replaces: await this.activeDeviceIds(),
-                requested_at: new Date(now).toISOString(),
-              })
-            : null,
-        );
-        if (requested === null) return refusal(409, "remote_off", "Remote control is off on the desktop.");
-        if (!requested.ok) return refusal(409, "no_operator_terminal", requested.message);
-        return json(202, { status: "awaiting_operator_authorization", pending_id: requested.pendingId, expires_at: requested.expiresAt });
+        // A verified passkey proves the phone holds a new credential. It authorizes nothing: the enrolment is held
+        // until the active controller authorizes it with its own user-verified passkey. With no active controller
+        // there is no authorizer, and the request is refused. The request is recorded inside the serial chain, so a
+        // stop or refresh cannot land between reading the controllers and recording the request.
+        const requested = await this.serial(async () => {
+          if (!this.pairing.isEnabled) return "remote_off" as const;
+          const controllers = await this.activeDeviceIds();
+          if (controllers.length === 0) return "no_controller" as const;
+          return this.deps.enrollment.request({
+            tenant: this.deps.tenant,
+            operator: this.deps.operator,
+            generation: this.pairing.generation,
+            label: labelOf(request.headers.get("user-agent")),
+            registration: verified,
+            replaces: controllers,
+            requested_at: new Date(now).toISOString(),
+          });
+        });
+        if (requested === "remote_off") return refusal(409, "remote_off", "Remote control is off on the desktop.");
+        if (requested === "no_controller") {
+          return refusal(409, "no_controller", "No phone is an active controller, so no phone can authorize this one. A first controller needs the desk's own passkey, which this build does not yet provide.");
+        }
+        return json(202, { status: "awaiting_phone_authorization", pending_id: requested.pendingId, expires_at: requested.expiresAt });
       } catch (error) {
         const message = error instanceof WebAuthnError ? error.message : error instanceof IdentityError ? `Pairing refused: ${error.message}` : "The passkey could not be registered.";
         return refusal(400, "passkey_refused", message);
@@ -563,8 +569,71 @@ export class RemoteController {
     if (session === null) return refusal(401, "not_signed_in", "Use your passkey to continue.");
     if (request.method === "GET" && path === "/m/api/state") return json(200, await this.snapshot(session));
     if (request.method === "GET" && path === "/m/api/events") return this.events(request, session);
+    if (request.method === "GET" && path === "/m/api/pair/pending") return this.pendingEnrolment(now);
+    if (request.method === "POST" && path === "/m/api/pair/authorize") return this.authorizeEnrolment(request, now);
     if (request.method === "POST" && path === "/m/api/command") return this.command(request, session, now);
     return refusal(404, "not_found", "REMOTE: no such route");
+  }
+
+  /** The enrolment waiting for this controller's authorization, and the challenge its passkey must sign. */
+  private async pendingEnrolment(now: number): Promise<Response> {
+    const controller = await this.liveDevice();
+    if (controller === null) return refusal(409, "no_controller", "No phone is an active controller.");
+    const waiting = await this.deps.enrollment.waiting(this.deps.tenant, now);
+    if (waiting === null) return json(200, { pending: null });
+    const options = assertionOptions({ challenge: waiting.challenge, rpId: this.rpId, credentialIds: [controller.credential_id] });
+    return json(200, {
+      pending: { pending_id: waiting.pendingId, label: waiting.label, replaces: waiting.replaces, expires_at: waiting.expiresAt },
+      options,
+    });
+  }
+
+  /**
+   * The authorization. The active controller's own user-verified passkey signs the enrolment's operation digest,
+   * which covers the new credential, its key, its label and the controllers it replaces. Verification uses the
+   * identity service's stored key and sign count and issues no session. Only a verified proof confirms the
+   * enrolment, and it confirms it once.
+   */
+  private async authorizeEnrolment(request: Request, now: number): Promise<Response> {
+    if (!this.limiter.allow("authorize", 10, 60_000, now)) return refusal(429, "rate_limited", "REMOTE: too many attempts, wait a minute");
+    const body = await bodyOf(request);
+    const pendingId = typeof body?.pending_id === "string" ? body.pending_id : "";
+    const credential = body?.credential as Parameters<typeof verifyAssertion>[0] | undefined;
+    const controller = await this.liveDevice();
+    if (controller === null || credential === undefined || (credential as { id?: unknown }).id !== controller.credential_id) {
+      return refusal(401, "passkey_refused", "The passkey was not recognised as this desktop's controller.");
+    }
+    const identityDevice = (await this.deps.identity.listDevices(this.deps.identityTenant, this.deps.operator)).find(
+      (device) => device.credentialId === controller.credential_id && device.revokedAt === null,
+    );
+    if (identityDevice === undefined) return refusal(401, "passkey_refused", "The controller's passkey is not enrolled with the identity service.");
+    return this.serial(async () => {
+      const outcome = await this.deps.enrollment.authorize({
+        tenant: this.deps.tenant,
+        pendingId,
+        now: new Date(now),
+        generation: this.pairing.generation,
+        currentControllers: await this.activeDeviceIds(),
+        verify: async (challenge) => {
+          const verified = await verifyAssertion(credential, {
+            challenge,
+            origin: this.origin,
+            rpId: this.rpId,
+            publicKey: identityDevice.publicKey,
+            signCount: Math.max(identityDevice.signCount, controller.sign_count),
+          });
+          return verified.signCount;
+        },
+      });
+      if (!outcome.ok) {
+        if (outcome.code === "unverified") return refusal(401, "passkey_refused", outcome.message);
+        if (outcome.code === "stale") return refusal(409, "controller_changed", outcome.message);
+        return refusal(410, `authorization_${outcome.code}`, outcome.message);
+      }
+      await updateDevice(this.deps.store, controller.device_id, { sign_count: outcome.signCount, last_seen: new Date(now).toISOString() });
+      await auditRemote(this.deps.store, { tenant: this.deps.tenant, operator: this.deps.operator, device_id: controller.device_id, action: "pair", outcome: `authorized_by_controller ${pendingId}`, at: new Date(now).toISOString() });
+      return json(200, { status: "authorized" });
+    });
   }
 
   /** The phone's home: the same canonical reads the cockpit makes, shaped for a narrow screen. */

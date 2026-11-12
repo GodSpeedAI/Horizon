@@ -156,19 +156,16 @@ describe("the round-4 review's corrections", () => {
     expect(entry.required_stage).toBe("Stage 0B");
   });
 
-  test("the device enrollment's evidence is local presence, never A3-UV (PE-38)", () => {
+  test("the device enrollment's commit is issued by the credential issuer, under the active controller's A3-UV proof (PE-38)", () => {
     const pair = manifest.byId.get("device.pair")!;
-    // The enrollment is held by whoever presents the one-time code: possession of the code
-    // proves no identity, and the device is enrolled by the ceremony rather than claimed by it.
-    // The row therefore states that no assurance predicate applies (R5-07); the presence claim
-    // the ceremony asks for is its own receipt, not an A3 predicate.
-    expect(pair.executor).toBe("code_holder");
-    expect(pair.callerAuthentication).toBe("one_time_pairing_code");
-    expect(pair.humanEvidence).toBeNull();
+    // The commit creates the credential. Its authority is the confirmed pending record that a verified proof of the
+    // active controller's user-verified passkey moved to confirmed. The commit is not a code holder's act.
+    expect(pair.executor).toBe("credential_issuer");
+    expect(pair.callerAuthentication).toBe("authorized_pending_record");
+    expect(pair.humanEvidence).toBe("A3-UV");
     const entry = (manifest.manifest.live_enforcement?.rows ?? []).find((row) => row.id === "device.pair")!;
-    expect((entry as { caller_path?: string }).caller_path).toBe("code_holder");
-    expect(entry.missing).toContain("enrollment_presence_receipt");
-    expect(entry.missing).not.toContain("evidence_A3_UV");
+    expect((entry as { caller_path?: string }).caller_path).toBe("authorized_pending_record");
+    expect(entry.missing).toContain("authority_sea_forge");
     expect(entry.enforced_today).toBe(false);
   });
 

@@ -176,7 +176,7 @@ describe("the phone and the executors", () => {
   });
 
   test("PE-51: the record caller kinds are exactly the set the catalog names", () => {
-    const expected: string[] = ["agent_execution", "code_holder", "device_credential", "local_console", "human_session", "registered_agent"];
+    const expected: string[] = ["agent_execution", "code_holder", "device_credential", "local_console", "human_session", "registered_agent", "credential_issuer"];
     const actual: string[] = [...RECORD_CALLER_KINDS];
     expect(actual.sort()).toEqual(expected.sort());
     const approval = classify(manifest, "approval.approve") as Operation;
@@ -184,10 +184,12 @@ describe("the phone and the executors", () => {
   });
 
   test("PE-52: anonymous and code-holder rows state no human evidence, and separation of duty is set per row", () => {
-    for (const id of ["horizon.health", "remote.health", "session.pair", "remote.pair.redeem", "remote.session.challenge", "device.pair"]) {
+    for (const id of ["horizon.health", "remote.health", "session.pair", "remote.pair.redeem", "remote.session.challenge"]) {
       const row = classify(manifest, id) as Operation;
       expect(row.humanEvidence, id).toBeNull();
     }
+    // The commit records the proof it applies: device.pair is evidenced by the controller's user-verified passkey (A3-UV).
+    expect((classify(manifest, "device.pair") as Operation).humanEvidence).toBe("A3-UV");
     const approval = classify(manifest, "approval.approve") as Operation;
     // Separation of duty is stated by role: the approver is a different principal from the requester and the executor.
     expect(approval.separationOfDuty).toEqual({ requester: "initiating_human", approver: "approving_human", executor: "human_session" });

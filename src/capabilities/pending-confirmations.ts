@@ -314,3 +314,76 @@ export async function stateOf(store: DurableStore, pendingId: string): Promise<P
 export async function describe(store: DurableStore, pendingId: string): Promise<PendingDescriptor | null> {
   return descriptorOf(store, pendingId);
 }
+
+/** The confirmation digest of a descriptor whose confirmation is a verified proof, never a typed code. */
+export const PROOF_CONFIRMATION = "by_verified_proof";
+
+/**
+ * Opens a waiting operation whose confirmation is a verified proof over its operation digest, not a code.
+ * Writes the descriptor and its head; the operation itself has not run.
+ */
+export async function openAwaitingProof(
+  store: DurableStore,
+  input: { readonly tenant: string; readonly operator: string; readonly operationId: string; readonly params: Readonly<Record<string, unknown>>; readonly now: Date; readonly ttlMs?: number },
+): Promise<{ readonly pending_id: string; readonly expires_at: string; readonly operation_digest: string }> {
+  const pendingId = `pending_${randomUUID()}`;
+  const expires = new Date(input.now.getTime() + (input.ttlMs ?? CONFIRM_TTL_MS));
+  const digest = operationDigest(input.operationId, input.params);
+  const descriptor: PendingDescriptor = {
+    pending_id: pendingId,
+    tenant: input.tenant,
+    operator: input.operator,
+    operation_id: input.operationId,
+    operation_digest: digest,
+    confirmation_digest: PROOF_CONFIRMATION,
+    created_at: input.now.toISOString(),
+    expires_at: expires.toISOString(),
+  };
+  await store.commit({
+    appends: [],
+    records: [
+      { collection: PENDING_COLLECTION, id: pendingId, expectedVersion: 0, value: descriptor as unknown as { readonly [key: string]: Json } },
+      { collection: PENDING_HEAD_COLLECTION, id: pendingId, expectedVersion: 0, value: { state: "pending", seq: 0 } as unknown as { readonly [key: string]: Json } },
+      {
+        collection: PENDING_TRANSITION_COLLECTION,
+        id: `${pendingId}#0`,
+        expectedVersion: 0,
+        value: { pending_id: pendingId, seq: 0, from_state: null, to_state: "pending", reason: "opened", at: input.now.toISOString() } as unknown as { readonly [key: string]: Json },
+      },
+    ],
+  });
+  return { pending_id: pendingId, expires_at: expires.toISOString(), operation_digest: digest };
+}
+
+export type ProofResult =
+  | { readonly ok: true; readonly descriptor: PendingDescriptor }
+  | { readonly ok: false; readonly code: "unknown" | "not_pending" | "expired" | "unverified" | "raced"; readonly message: string };
+
+/**
+ * Confirms a waiting proof-confirmed operation when `verify` accepts its descriptor. `verify` throws to
+ * refuse. The transition is one compare-and-swap from pending, so a second proof for the same descriptor,
+ * or an abandon that lands first, moves nothing.
+ */
+export async function confirmWithProof(
+  store: DurableStore,
+  input: { readonly tenant: string; readonly pendingId: string; readonly now: Date; readonly reason: string },
+  verify: (descriptor: PendingDescriptor) => Promise<void>,
+): Promise<ProofResult> {
+  const descriptor = await descriptorOf(store, input.pendingId);
+  if (descriptor === null || descriptor.tenant !== input.tenant) return { ok: false, code: "unknown", message: "No waiting operation has that id." };
+  if (descriptor.confirmation_digest !== PROOF_CONFIRMATION) return { ok: false, code: "unknown", message: "That operation does not take a proof." };
+  const head = await headOf(store, input.pendingId);
+  if (head === null || head.state !== "pending") return { ok: false, code: "not_pending", message: "That operation is no longer waiting for authorization." };
+  if (input.now.getTime() > Date.parse(descriptor.expires_at)) {
+    await transition(store, input.pendingId, head, "expired", "pending", "expired before authorization", input.now);
+    return { ok: false, code: "expired", message: "That authorization window has closed." };
+  }
+  try {
+    await verify(descriptor);
+  } catch {
+    return { ok: false, code: "unverified", message: "The authorization did not verify. Nothing was confirmed." };
+  }
+  const moved = await transition(store, input.pendingId, head, "confirmed", "pending", input.reason, input.now);
+  if (!moved) return { ok: false, code: "raced", message: "That operation changed while it was being authorized. Nothing was confirmed." };
+  return { ok: true, descriptor };
+}

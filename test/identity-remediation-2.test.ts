@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createApplication, OPEN_READS, type HorizonApplication } from "../src/app.ts";
-import { TestOperatorChannel } from "./support/operator-channel.ts";
+import { seedController } from "./support/controller.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { readIntentAttempts } from "../src/capabilities/navigation-intent.ts";
 import { AUDIT_COLLECTION } from "../src/capabilities/remote-records.ts";
@@ -106,7 +106,9 @@ describe("the round-3 review's corrections", () => {
       "rule:settle",
     ]);
     // The device enrollment is the pairing-finish row, not a catalogued gap.
-    expect(manifest.byId.get("device.pair")?.routes).toEqual(["POST /m/api/pair/finish", "POST /m/api/pair/await"]);
+    expect(manifest.byId.get("device.pair")?.routes).toEqual(["POST /m/api/pair/await"]);
+    expect(manifest.byId.get("device.pair.request")?.routes).toEqual(["POST /m/api/pair/finish"]);
+    expect(manifest.byId.get("device.pair.authorize")?.routes).toEqual(["GET /m/api/pair/pending", "POST /m/api/pair/authorize"]);
     expect(manifest.manifest.catalog_gaps).toEqual([]);
     // The phone's server holds no approval resolver at all: the path is absent, not gated.
     const source = readFileSync(join(ROOT, "src/remote/server.ts"), "utf8");
@@ -623,7 +625,6 @@ describe("the round-3 review's refusals", () => {
 });
 
 /** The desk terminal for the phone enrolment: the test operator types the code the desk shows. */
-const operatorChannel = new TestOperatorChannel();
 
 describe("the phone's approval path", () => {
   let application: HorizonApplication;
@@ -657,7 +658,7 @@ describe("the phone's approval path", () => {
       join(root, "horizon.toml"),
       horizonDocument({ storePath: join(root, "remote.sqlite"), secretPath: join(root, "launch.secret") }),
     );
-    application = await createApplication({ configPath, operatorChannel });
+    application = await createApplication({ configPath });
     await seedOperationalFixture(application.runtime.runtime.store, undefined, application.caller.tenant);
     cockpit = application.startServer(0);
     cockpitBase = `http://127.0.0.1:${cockpit.port}`;
@@ -673,12 +674,23 @@ describe("the phone's approval path", () => {
       options: { challenge: string; rp: { id: string } };
     };
     const authenticator = await new SoftwareAuthenticator().generate();
+    // The first controller is seeded (no production path yet); it signs in and authorizes the new phone with its passkey.
+    const controllerAuth = await new SoftwareAuthenticator().generate();
+    await seedController(application, controllerAuth, "controller phone");
+    const controllerOptions = await phonePost("/m/api/auth/options", {});
+    const signing = (await controllerOptions.json()) as { ticket: string; options: { challenge: string; rpId: string } };
+    const signed = await phonePost("/m/api/auth/finish", { ticket: signing.ticket, credential: await controllerAuth.assert({ challenge: signing.options.challenge, origin: phoneBase, rpId: signing.options.rpId }) });
+    const controllerCookie = /__Host-hz_remote=[^;]+/.exec(signed.headers.get("set-cookie") ?? "")?.[0] ?? "";
+    if (controllerCookie === "") throw new Error("the controller could not sign in");
     const credential = await authenticator.register({ challenge: options.challenge, origin: phoneBase, rpId: options.rp.id });
     const finished = await phonePost("/m/api/pair/finish", { ticket, credential }, { "user-agent": IPHONE_UA });
-    if (finished.status !== 202) throw new Error(`the device enrollment was not held for the operator: ${finished.status}`);
-    // The operator types the code the desk showed on its terminal; only then does the phone's retry enrol it.
+    if (finished.status !== 202) throw new Error(`the device enrollment was not held for the controller: ${finished.status}`);
     const { pending_id: pendingId } = (await finished.json()) as { pending_id: string };
-    await operatorChannel.type(operatorChannel.codeFor(pendingId));
+    const waiting = await fetch(`${phoneBase}/m/api/pair/pending`, { headers: { origin: phoneBase, cookie: controllerCookie } });
+    const { options: proofOptions } = (await waiting.json()) as { options: { challenge: string; rpId: string } };
+    const proof = await controllerAuth.assert({ challenge: proofOptions.challenge, origin: phoneBase, rpId: proofOptions.rpId });
+    const authorized = await fetch(`${phoneBase}/m/api/pair/authorize`, { method: "POST", headers: { origin: phoneBase, cookie: controllerCookie, "content-type": "application/json" }, body: JSON.stringify({ pending_id: pendingId, credential: proof }) });
+    if (authorized.status !== 200) throw new Error(`the controller did not authorize the device: ${authorized.status}`);
     const committed = await phonePost("/m/api/pair/await", { pending_id: pendingId });
     if (committed.status !== 200) throw new Error(`the device enrollment was refused: ${committed.status}`);
     const match = /__Host-hz_remote=[^;]+/.exec(committed.headers.get("set-cookie") ?? "");

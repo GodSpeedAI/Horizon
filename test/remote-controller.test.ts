@@ -15,12 +15,13 @@ import { readIntentRecords } from "../src/capabilities/navigation-intent.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
-import { TestOperatorChannel } from "./support/operator-channel.ts";
+import { seedController } from "./support/controller.ts";
 import { b64url } from "../src/remote/webauthn.ts";
 
 let application: HorizonApplication;
 /** The desk's terminal for the test: the operator authorizes each enrolment by typing the code it shows. */
-const operatorChannel = new TestOperatorChannel();
+/** The active controller that authorizes each new phone, and its session cookie. Null when no controller is left. */
+let controller: { auth: SoftwareAuthenticator; cookie: string } | null = null;
 let cockpit: ReturnType<HorizonApplication["startServer"]>;
 let cockpitBase: string;
 let savedPort: string | undefined;
@@ -40,7 +41,7 @@ beforeAll(async () => {
     join(root, "horizon.toml"),
     horizonDocument({ storePath: join(root, "remote.sqlite"), secretPath: join(root, "launch.secret") }),
   );
-  application = await createApplication({ configPath, operatorChannel });
+  application = await createApplication({ configPath });
   await seedOperationalFixture(application.runtime.runtime.store, undefined, application.caller.tenant);
   cockpit = application.startServer(0);
   cockpitBase = `http://127.0.0.1:${cockpit.port}`;
@@ -89,17 +90,35 @@ async function startFromCockpit(): Promise<string> {
   return link;
 }
 
+/** Seeds the first controller, signed in, when none exists. Production has no first-controller path yet (see the report). */
+async function ensureController(): Promise<void> {
+  if (controller !== null) return;
+  const auth = await new SoftwareAuthenticator().generate();
+  await seedController(application, auth, "controller phone");
+  const response = await signIn(auth);
+  expect(response.status).toBe(200);
+  controller = { auth, cookie: sessionCookieOf(response) };
+}
+
+/** Redeems the link, registers the device, and has the active controller authorize it with its own passkey. */
 async function pairWith(link: string, device: SoftwareAuthenticator): Promise<Response> {
   const redeemed = await postJson("/m/api/pair/redeem", { secret: secretOf(link) });
   expect(redeemed.status).toBe(200);
   const { ticket, options } = (await redeemed.json()) as { ticket: string; options: { challenge: string; rp: { id: string } } };
   const credential = await device.register({ challenge: options.challenge, origin: phoneBase(), rpId: options.rp.id });
   const finished = await postJson("/m/api/pair/finish", { ticket, credential }, { "user-agent": IPHONE_UA });
-  expect(finished.status).toBe(202);
+  if (finished.status !== 202) return finished;
   const { pending_id: pendingId } = (await finished.json()) as { pending_id: string };
-  // The operator types the code the desk showed on its terminal; only then does the phone's retry enrol it.
-  await operatorChannel.type(operatorChannel.codeFor(pendingId));
-  return postJson("/m/api/pair/await", { pending_id: pendingId });
+  if (controller === null) throw new Error("no controller is signed in to authorize the phone");
+  const current = controller;
+  const waiting = await fetch(`${phoneBase()}/m/api/pair/pending`, { headers: { origin: phoneBase(), cookie: current.cookie } });
+  const { options: signing } = (await waiting.json()) as { options: { challenge: string; rpId: string } };
+  const proof = await current.auth.assert({ challenge: signing.challenge, origin: phoneBase(), rpId: signing.rpId });
+  const authorized = await postJson("/m/api/pair/authorize", { pending_id: pendingId, credential: proof }, { cookie: current.cookie });
+  expect(authorized.status).toBe(200);
+  const committed = await postJson("/m/api/pair/await", { pending_id: pendingId });
+  if (committed.status === 200) controller = { auth: device, cookie: sessionCookieOf(committed) };
+  return committed;
 }
 
 async function signIn(device: SoftwareAuthenticator): Promise<Response> {
@@ -190,6 +209,7 @@ describe("pairing: the link authorizes one passkey registration and nothing else
   });
 
   test("a valid link registers the passkey, signs the phone in, and the cookie is host-bound and strict", async () => {
+    await ensureController();
     const response = await pairWith(phoneLink, authenticator);
     expect(response.status).toBe(200);
     const header = response.headers.get("set-cookie") ?? "";
@@ -346,20 +366,22 @@ describe("revocation: refresh and replacement", () => {
     expect((await postJson("/m/api/pair/redeem", { secret: secretOf(oldLink) })).status).toBe(401);
     const devices = await listDevices(application.runtime.runtime.store, application.caller.tenant);
     expect(devices.every((device) => device.revoked_at !== null)).toBe(true);
+    controller = null;
   });
 
-  test("a second phone pairs and replaces the first, which is revoked for good", async () => {
+  test("after a refresh no controller is left, so a new phone is refused and nothing is held", async () => {
     const link = application.remote.pairingLink();
     if (link === null) throw new Error("refresh should have opened a new link");
     const second = await new SoftwareAuthenticator().generate();
-    const response = await pairWith(link, second);
-    expect(response.status).toBe(200);
-    cookie = sessionCookieOf(response);
+    const redeemed = await postJson("/m/api/pair/redeem", { secret: secretOf(link) });
+    expect(redeemed.status).toBe(200);
+    const { ticket, options } = (await redeemed.json()) as { ticket: string; options: { challenge: string; rp: { id: string } } };
+    const credential = await second.register({ challenge: options.challenge, origin: phoneBase(), rpId: options.rp.id });
+    const finished = await postJson("/m/api/pair/finish", { ticket, credential }, { "user-agent": IPHONE_UA });
+    expect(finished.status).toBe(409);
+    expect(((await finished.json()) as { code: string }).code).toBe("no_controller");
     const active = (await listDevices(application.runtime.runtime.store, application.caller.tenant)).filter((device) => device.revoked_at === null);
-    expect(active.length).toBe(1);
-    expect(active[0]?.credential_id).toBe(b64url(second.credentialId));
-    const status = (await (await fetch(`${cockpitBase}/workspace/remote/status`)).json()) as { state: string };
-    expect(status.state).toBe("connected");
+    expect(active).toHaveLength(0);
   });
 
   test("the audit trail records the remote commands with their outcomes and no secret", async () => {

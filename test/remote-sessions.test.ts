@@ -25,7 +25,7 @@ import { OperatorActors, OperatorMappingError, resolveOperatorsConfig, validateO
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { horizonDocument, PINNED_WORLD_REF, writeConfig } from "./support/config.ts";
 import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
-import { TestOperatorChannel } from "./support/operator-channel.ts";
+import { seedController } from "./support/controller.ts";
 
 const MAPPED = "sea-actor-alice";
 const SERVICE = "cognate-service";
@@ -100,7 +100,8 @@ interface Rig {
   readonly app: HorizonApplication;
   readonly wire: ReturnType<typeof scriptedWire>;
   readonly base: () => string;
-  readonly channel: TestOperatorChannel;
+  /** The active controller that authorizes new phones, signed in. Null until the first one is seeded. */
+  controller: { auth: SoftwareAuthenticator; cookie: string } | null;
   readonly close: () => Promise<void>;
 }
 
@@ -112,7 +113,6 @@ async function rig(name: string): Promise<Rig> {
   const root = mkdtempSync(join(tmpdir(), `${name}-`));
   const world = loadWorld(PINNED_WORLD_REF).cognateWorldRef;
   const wire = scriptedWire(world);
-  const channel = new TestOperatorChannel();
   const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "s.sqlite"), secretPath: join(root, "launch.secret") }));
   const app = await createApplication({
     configPath,
@@ -122,7 +122,6 @@ async function rig(name: string): Promise<Rig> {
     operators: { desktop_operator: "operator", delegable_actors: [MAPPED, "operator"], actors: { operator: MAPPED } },
     delegationClient: wire.client,
     unpublishedAuthorityForTests: true,
-    operatorChannel: channel,
   });
   await seedOperationalFixture(app.runtime.runtime.store, undefined, app.caller.tenant);
   await app.remote.start();
@@ -130,7 +129,7 @@ async function rig(name: string): Promise<Rig> {
     app,
     wire,
     base: () => app.remote.origin,
-    channel,
+    controller: null,
     close: async () => {
       await app.remote.stop().catch(() => undefined);
       await app.close();
@@ -138,6 +137,16 @@ async function rig(name: string): Promise<Rig> {
       else process.env.HORIZON_REMOTE_PORT = savedPort;
     },
   };
+}
+
+/** Signs a controller in with its own passkey and returns its session cookie. */
+async function controllerCookie(r: Rig, auth: SoftwareAuthenticator): Promise<string> {
+  const headers = { origin: r.base(), "content-type": "application/json" };
+  const first = await fetch(`${r.base()}/m/api/auth/options`, { method: "POST", headers, body: "{}" });
+  const { ticket, options } = (await first.json()) as { ticket: string; options: { challenge: string; rpId: string } };
+  const credential = await auth.assert({ challenge: options.challenge, origin: r.base(), rpId: options.rpId });
+  const finish = await fetch(`${r.base()}/m/api/auth/finish`, { method: "POST", headers, body: JSON.stringify({ ticket, credential }) });
+  return /__Host-hz_remote=[^;]+/.exec(finish.headers.get("set-cookie") ?? "")?.[0] ?? "";
 }
 
 class Phone {
@@ -152,6 +161,7 @@ class Phone {
     return this.request(path, { method: "POST", body: JSON.stringify(body) }, { "content-type": "application/json", ...headers });
   }
   async pair(device: SoftwareAuthenticator): Promise<Response> {
+    if (this.r.controller === null) await this.seedFirstController();
     const link = this.r.app.remote.pairingLink();
     if (link === null) throw new Error("no pairing link");
     const secret = new URLSearchParams(link.split("#")[1] ?? "").get("p");
@@ -160,18 +170,45 @@ class Phone {
     const { ticket, options } = (await redeemed.json()) as { ticket: string; options: { challenge: string; rp: { id: string } } };
     const credential = await device.register({ challenge: options.challenge, origin: this.r.base(), rpId: options.rp.id });
     const finished = await this.post("/m/api/pair/finish", { ticket, credential }, { "user-agent": IPHONE_UA });
-    // The enrolment waits for the operator: type the code the desk showed on its terminal, then retry.
-    const response = finished.status === 202 ? await this.authorize(finished) : finished;
+    // The enrolment waits for the active controller: it signs the request with its own passkey, then the phone retries.
+    const response = finished.status === 202 ? await this.authorize(finished, device) : finished;
     const cookie = /__Host-hz_remote=[^;]+/.exec(response.headers.get("set-cookie") ?? "")?.[0];
     if (cookie !== undefined) this.cookie = cookie;
     return response;
   }
-  async authorize(waiting: Response): Promise<Response> {
+  /** Seeds the first controller, signed in, the way the test support does. Production has no first-controller path yet. */
+  async seedFirstController(): Promise<void> {
+    const auth = await new SoftwareAuthenticator().generate();
+    await seedController(this.r.app, auth, "controller phone");
+    const response = await this.signInWith(auth);
+    expect(response.status).toBe(200);
+    this.r.controller = { auth, cookie: /__Host-hz_remote=[^;]+/.exec(response.headers.get("set-cookie") ?? "")?.[0] ?? "" };
+  }
+  /** The controller's passkey signs the enrolment's challenge, and the phone then commits. A new controller replaces the old one. */
+  async authorize(waiting: Response, device: SoftwareAuthenticator): Promise<Response> {
     const { pending_id: pendingId } = (await waiting.json()) as { pending_id: string };
-    await this.r.channel.type(this.r.channel.codeFor(pendingId));
-    return this.post("/m/api/pair/await", { pending_id: pendingId });
+    const held = this.r.controller;
+    if (held === null) throw new Error("no controller to authorize the phone");
+    // Signing in rotates a device's session, so the controller signs in again for this step rather than reuse a cookie.
+    const current = { auth: held.auth, cookie: await controllerCookie(this.r, held.auth) };
+    const pending = await fetch(`${this.r.base()}/m/api/pair/pending`, { headers: { origin: this.r.base(), cookie: current.cookie } });
+    const { options } = (await pending.json()) as { options: { challenge: string; rpId: string } };
+    const proof = await current.auth.assert({ challenge: options.challenge, origin: this.r.base(), rpId: options.rpId });
+    const authorized = await fetch(`${this.r.base()}/m/api/pair/authorize`, {
+      method: "POST",
+      headers: { origin: this.r.base(), cookie: current.cookie, "content-type": "application/json" },
+      body: JSON.stringify({ pending_id: pendingId, credential: proof }),
+    });
+    expect(authorized.status).toBe(200);
+    const committed = await this.post("/m/api/pair/await", { pending_id: pendingId });
+    const cookie = /__Host-hz_remote=[^;]+/.exec(committed.headers.get("set-cookie") ?? "")?.[0];
+    if (committed.status === 200 && cookie !== undefined) this.r.controller = { auth: device, cookie };
+    return committed;
   }
   async signIn(device: SoftwareAuthenticator): Promise<Response> {
+    return this.signInWith(device);
+  }
+  private async signInWith(device: SoftwareAuthenticator): Promise<Response> {
     const first = await this.post("/m/api/auth/options", {});
     if (first.status !== 200) return first;
     const { ticket, options } = (await first.json()) as { ticket: string; options: { challenge: string; rpId: string } };
@@ -225,8 +262,10 @@ describe("an unpaired phone, forged actors, and the mapped actor", () => {
     const operators = (await identityStoreOf(r.app.runtime.runtime.store).listRecords(OPERATORS, {})).map((row) => (row.value as { operatorId: string }).operatorId);
     expect(operators).toEqual(["operator"]);
     const devices = await r.app.identity.listDevices((await identityStoreOf(r.app.runtime.runtime.store).listRecords(OPERATORS, {}))[0]!.value.tenant as string, "operator");
-    expect(devices.length).toBe(1);
-    expect(devices[0]!.operatorId).toBe("operator");
+    // The seeded first controller and the phone are both enrolled; the phone is the one active device.
+    const active = devices.filter((device) => device.revokedAt === null);
+    expect(active.length).toBe(1);
+    expect(active[0]!.operatorId).toBe("operator");
   });
 
   test("a forged actor in the body is refused, a forged header is ignored, and a device is never turned into the operator", async () => {
@@ -258,7 +297,7 @@ describe("an unpaired phone, forged actors, and the mapped actor", () => {
     // substitution. The two are separate fields, and neither is the server operator.
     const identityTenant = (await identityStoreOf(r.app.runtime.runtime.store).listRecords(OPERATORS, {}))[0]!.value.tenant as string;
     const devices = await r.app.identity.listDevices(identityTenant, "operator");
-    const deviceId = devices[0]!.id;
+    const deviceId = devices.find((device) => device.revokedAt === null)!.id;
     const opened = await phone.post("/m/api/command", { command_id: randomUUID(), kind: "open_case", purpose: "From the phone, as the phone" });
     expect(opened.status).toBe(200);
     const openedCase = await latestCase(r.app.runtime.runtime.store, r.app.caller.tenant);
@@ -297,20 +336,24 @@ describe("an unpaired phone, forged actors, and the mapped actor", () => {
   });
 
   test("replacing the device revokes the old one and its session; the old passkey is refused", async () => {
-    await r.app.remote.refresh();
+    // The lost phone above is already revoked, so a live controller is seeded to authorize the replacement. A new
+    // invitation, not a refresh, opens the link: the controller stays signed in until the new phone is authorized.
+    await r.app.remote.start();
+    r.controller = null;
+    await phone.seedFirstController();
+    const replaced = r.controller!;
+    const oldCookie = await controllerCookie(r, replaced.auth);
     const second = await new SoftwareAuthenticator().generate();
-    const oldCookie = phone.cookie;
     expect((await phone.pair(second)).status).toBe(200);
     const replacement = phone.cookie;
     expect(replacement).not.toBe(oldCookie);
     const tenant = (await identityStoreOf(r.app.runtime.runtime.store).listRecords(OPERATORS, {}))[0]!.value.tenant as string;
     const devices = await r.app.identity.listDevices(tenant, "operator");
     expect(devices.filter((candidate) => candidate.revokedAt === null).length).toBe(1);
-    expect(devices.length).toBeGreaterThanOrEqual(2);
     phone.cookie = oldCookie;
     expect((await phone.request("/m/api/state")).status).toBe(401);
     phone.cookie = "";
-    expect((await phone.signIn(device)).status).toBe(401);
+    expect((await phone.signIn(replaced.auth)).status).toBe(401);
     phone.cookie = replacement;
     expect((await phone.request("/m/api/state")).status).toBe(200);
   });

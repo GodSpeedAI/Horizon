@@ -245,11 +245,11 @@ describe("the round-2 review's corrections", () => {
     expect(manifest.byId.get("workspace.export")?.class).toBe("P3");
     const exportRow = manifest.manifest.operations.P3?.find((row) => row.id === "workspace.export");
     expect(exportRow?.separation_of_duty).toEqual({ requester: "human_session", approver: "independent_human", executor: "human_session" });
-    // The pairing row's caller path is the code holder: a one-time code proves possession of the
-    // code and nothing about a person, so the row states that no assurance predicate applies
-    // rather than inheriting the class's terminal one (R5-07).
-    expect(manifest.byId.get("device.pair")?.executor).toBe("code_holder");
-    expect(manifest.byId.get("device.pair")?.humanEvidence).toBeNull();
+    // The enrolment commit is issued by the credential issuer, under the active controller's proof. The request step
+    // stays a code holder's act: a one-time code proves possession of the invitation, nothing about a person (R5-07).
+    expect(manifest.byId.get("device.pair")?.executor).toBe("credential_issuer");
+    expect(manifest.byId.get("device.pair.request")?.executor).toBe("code_holder");
+    expect(manifest.byId.get("device.pair")?.humanEvidence).toBe("A3-UV");
     expect(manifest.byId.get("device.recover")?.humanEvidence).toBe("RECOVERY_CODE_PRESENCE_FRESH_PASSKEY");
     expect(manifest.byId.get("trust.rotate")?.humanEvidence).toBe("ADMIN_PRESENCE_INDEPENDENT_ADMIN");
     for (const id of ["device.pair", "device.recover", "trust.rotate"]) {

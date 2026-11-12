@@ -10,7 +10,8 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright-core";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
-import { presentOperator, TestOperatorChannel } from "./support/operator-channel.ts";
+import { seedController } from "./support/controller.ts";
+import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 import { testCodeFor } from "./support/write-token.ts";
@@ -45,8 +46,34 @@ suite("phone remote control, end to end in Chromium", () => {
   let secondPhone: typeof phone;
   let link = "";
   let savedPort: string | undefined;
-  const operatorTerminal = new TestOperatorChannel();
-  let stopOperator: () => void = () => undefined;
+  let deskController: SoftwareAuthenticator | null = null;
+
+  /** The desk's active controller authorizes the phone that is waiting: its passkey signs the enrolment's digest over HTTP. */
+  async function authorizeWaitingPhone(): Promise<void> {
+    if (deskController === null || application === undefined) throw new Error("no desk controller");
+    const origin = application.remote.origin;
+    const rpId = new URL(origin).hostname;
+    const headers = { origin, "content-type": "application/json" };
+    const first = await fetch(`${origin}/m/api/auth/options`, { method: "POST", headers, body: "{}" });
+    const signed = (await first.json()) as { ticket: string; options: { challenge: string; rpId: string } };
+    if (first.status !== 200) throw new Error(`auth options refused: ${first.status} ${JSON.stringify(signed)}`);
+    const credential = await deskController.assert({ challenge: signed.options.challenge, origin, rpId: signed.options.rpId });
+    const finish = await fetch(`${origin}/m/api/auth/finish`, { method: "POST", headers, body: JSON.stringify({ ticket: signed.ticket, credential }) });
+    const cookie = /__Host-hz_remote=[^;]+/.exec(finish.headers.get("set-cookie") ?? "")?.[0] ?? "";
+    const deadline = Date.now() + 20_000;
+    let pending: { pending_id: string } | null = null;
+    let options: { challenge: string; rpId: string } | null = null;
+    while (Date.now() < deadline && (pending === null || options === null)) {
+      const response = await fetch(`${origin}/m/api/pair/pending`, { headers: { origin, cookie } });
+      const body = (await response.json()) as { pending: { pending_id: string } | null; options?: { challenge: string; rpId: string } };
+      if (body.pending !== null && body.options !== undefined) { pending = body.pending; options = body.options; break; }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    if (pending === null || options === null) throw new Error("no enrolment waited for authorization");
+    const proof = await deskController.assert({ challenge: options.challenge, origin, rpId: options.rpId });
+    const authorized = await fetch(`${origin}/m/api/pair/authorize`, { method: "POST", headers: { ...headers, cookie }, body: JSON.stringify({ pending_id: pending.pending_id, credential: proof }) });
+    if (authorized.status !== 200) throw new Error(`authorize refused: ${authorized.status}`);
+  }
 
   async function openPhone(): Promise<typeof phone> {
     const context = await chrome.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: IPHONE_UA, deviceScaleFactor: 2 });
@@ -67,12 +94,12 @@ suite("phone remote control, end to end in Chromium", () => {
     process.env.HORIZON_REMOTE_PORT = "0";
     const root = mkdtempSync(join(tmpdir(), "e2e-remote-"));
     const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "e2e.sqlite"), secretPath: join(root, "launch.secret") }));
-    // The operator is at the desk terminal: each enrolment the phone asks for is authorized by the code the desk shows.
-    application = await createApplication({ configPath, operatorChannel: operatorTerminal });
-    stopOperator = presentOperator(operatorTerminal);
+    application = await createApplication({ configPath });
     await seedOperationalFixture(application.runtime.runtime.store, undefined, application.caller.tenant);
     cockpit = application.startServer(0);
     cockpitBase = `http://127.0.0.1:${cockpit.port}`;
+    // No production path makes the first controller yet, so the test seeds one once remote control is on. Every later phone is authorized by a controller's passkey.
+    deskController = await new SoftwareAuthenticator().generate();
     chrome = await chromium.launch({ executablePath: browser.path ?? undefined, headless: true });
     desktop = await chrome.newContext({ viewport: { width: 1280, height: 860 } });
     // The desktop browser pairs with the code the cockpit printed at start. The session cookie then lives in this context.
@@ -81,7 +108,6 @@ suite("phone remote control, end to end in Chromium", () => {
   }, 120_000);
 
   afterAll(async () => {
-    stopOperator();
     await chrome?.close().catch(() => undefined);
     await application?.remote.stop().catch(() => undefined);
     await cockpit?.stop(true);
@@ -102,7 +128,10 @@ suite("phone remote control, end to end in Chromium", () => {
 
   test("the phone opens the link, registers a passkey on a virtual authenticator, and lands on Home with no secret in the address bar", async () => {
     phone = await openPhone();
+    await seedController(application, deskController as SoftwareAuthenticator, "desk controller");
     await phone.page.goto(link);
+    // The phone waits for the desk controller: its passkey authorizes the enrolment, then the phone completes.
+    await authorizeWaitingPhone();
     await phone.page.waitForURL((url) => url.pathname === "/m", { timeout: 30_000 });
     await (phone.page.locator("#home")).waitFor({ state: "visible", timeout: 30_000 });
     expect(phone.page.url()).not.toContain("#");
@@ -160,16 +189,15 @@ suite("phone remote control, end to end in Chromium", () => {
     await page.setViewportSize({ width: 390, height: 844 });
   }, 30_000);
 
-  test("Refresh QR on the desktop revokes the phone: its next call fails and it shows the turned-off state", async () => {
+  test("Replace phone keeps the first phone signed in until a new phone is authorized", async () => {
     await desktopPage.goto(`${cockpitBase}/workspace/remote`);
     await desktopPage.getByRole("button", { name: "Replace phone" }).click();
     await desktopPage.locator("#pair-link").waitFor({ state: "visible", timeout: 20_000 });
     const status = await phone.page.evaluate(async () => (await fetch("/m/api/state", { credentials: "same-origin" })).status);
-    expect(status).toBe(401);
-    await (phone.page.getByText("Remote control was turned off, or this phone was replaced")).waitFor({ state: "visible", timeout: 20_000 });
+    expect(status).toBe(200);
   }, 90_000);
 
-  test("a second phone pairs with the new link and replaces the first; a refused passkey prompt is retried without a new scan", async () => {
+  test("a second phone pairs with the new link; the first phone authorizes it with its passkey and is then replaced; a refused passkey prompt is retried without a new scan", async () => {
     await desktopPage.goto(`${cockpitBase}/workspace/remote`);
     const second = await desktopPage.locator("#pair-link").innerText();
     secondPhone = await openPhone();
@@ -180,12 +208,14 @@ suite("phone remote control, end to end in Chromium", () => {
     await retry.waitFor({ state: "visible", timeout: 30_000 });
     await secondPhone.cdp.send("WebAuthn.setUserVerified", { authenticatorId: secondPhone.authenticator, isUserVerified: true });
     await retry.click();
+    // The second phone now waits. The first phone, the active controller, authorizes it with its own user-verified passkey.
+    await phone.page.getByRole("button", { name: "Authorize the new phone" }).click({ timeout: 30_000 });
     await (secondPhone.page.locator("#home")).waitFor({ state: "visible", timeout: 30_000 });
     const firstStatus = await phone.page.evaluate(async () => (await fetch("/m/api/state", { credentials: "same-origin" })).status);
     expect(firstStatus).toBe(401);
     const panel = await desktopPage.goto(`${cockpitBase}/workspace/remote`).then(() => desktopPage.locator("#state").innerText());
     expect(panel).toBe("Phone connected");
-  }, 90_000);
+  }, 120_000);
 
   test("Stop on the desktop closes the listener: the phone can no longer reach it", async () => {
     await desktopPage.goto(`${cockpitBase}/workspace/remote`);

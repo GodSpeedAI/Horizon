@@ -58,6 +58,9 @@ operation_specific:
   remote.health: params.remote_health
   remote.state.read: params.remote_state_read
   remote.events.read: params.remote_events_read
+  device.pair.request: params.device_pair
+  device.pair.authorize: params.device_pair_authorize
+  device.pair: params.device_pair_await
   remote.pair.redeem: params.remote_pair_redeem
   remote.session.challenge: params.remote_session_challenge
   remote.session.authenticate: params.remote_session_authenticate
@@ -325,6 +328,22 @@ schemas:
       The device enrollment the phone completes: the ticket the redeemed pairing code issued, and
       the WebAuthn registration the phone's authenticator produced. The route verifies the
       registration against the ticket's challenge before it enrols anything.
+
+  params.device_pair_authorize:
+    fields:
+      - { name: pending_id, type: string }
+      - { name: credential, type: json }
+    rule: >-
+      The controller's authorization of one waiting enrolment: the pending id and the passkey assertion the
+      active controller produced over the enrolment's operation digest. The route verifies the assertion
+      with user verification before it confirms anything.
+
+  params.device_pair_await:
+    fields:
+      - { name: pending_id, type: string }
+    rule: >-
+      The phone's commit of one authorized enrolment: the pending id it was given. The route creates a
+      credential only for a confirmed record and nothing else.
 
   params.device_remove:
     fields:

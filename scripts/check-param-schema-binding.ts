@@ -201,7 +201,9 @@ const BINDINGS: readonly Binding[] = [
   { operation: "remote.session.challenge", reads: [{ file: REMOTE, kind: "block_after", marker: 'path === "/m/api/auth/options"' }] },
   { operation: "remote.session.authenticate", reads: [{ file: REMOTE, kind: "block_after", marker: 'path === "/m/api/auth/finish"', variables: ["body"] }] },
   { operation: "remote.session.logout", reads: [{ file: REMOTE, kind: "statement", marker: 'path === "/m/api/signout"' }] },
-  { operation: "device.pair", reads: [{ file: REMOTE, kind: "block_after", marker: 'path === "/m/api/pair/finish"', variables: ["body"] }] },
+  { operation: "device.pair.request", reads: [{ file: REMOTE, kind: "block_after", marker: 'path === "/m/api/pair/finish"', variables: ["body"] }] },
+  { operation: "device.pair.authorize", reads: [{ file: REMOTE, kind: "function", marker: "private async authorizeEnrolment", variables: ["body"] }] },
+  { operation: "device.pair", reads: [{ file: REMOTE, kind: "block_after", marker: 'path === "/m/api/pair/await"', variables: ["body"] }] },
   // The session rows: pairing proves possession of a code, and logging out names no other
   { operation: "session.logout", reads: [{ file: APP, kind: "block_after", marker: 'url.pathname === "/desk/pair/logout" && request.method === "POST"' }] },
   // session — the cookie the caller presents is the session that ends.

@@ -68,6 +68,7 @@ export const EXECUTORS = [
   "anonymous_connection",
   "unauthenticated_caller",
   "device_credential",
+  "credential_issuer",
 ] as const;
 export type Executor = (typeof EXECUTORS)[number];
 
@@ -81,6 +82,7 @@ export const CALLER_AUTHENTICATIONS = [
   "none_public_liveness",
   "none_unauthenticated",
   "device_passkey_assertion",
+  "authorized_pending_record",
 ] as const;
 export type CallerAuthentication = (typeof CALLER_AUTHENTICATIONS)[number];
 
@@ -101,6 +103,7 @@ export const EXECUTOR_CALLER_AUTHENTICATION: Readonly<Record<Executor, CallerAut
   anonymous_connection: "none_public_liveness",
   unauthenticated_caller: "none_unauthenticated",
   device_credential: "device_passkey_assertion",
+  credential_issuer: "authorized_pending_record",
 };
 
 /**
@@ -116,6 +119,7 @@ export const EXECUTOR_CALLER_PATHS: Readonly<Record<Executor, readonly string[]>
   anonymous_connection: ["none"],
   unauthenticated_caller: ["none_unauthenticated"],
   device_credential: ["device_credential"],
+  credential_issuer: ["authorized_pending_record"],
 };
 
 /**
@@ -133,6 +137,7 @@ export const RECORD_CALLER_KINDS = [
   "local_console",
   "code_holder",
   "device_credential",
+  "credential_issuer",
 ] as const;
 export type RecordCallerKind = (typeof RECORD_CALLER_KINDS)[number];
 
@@ -155,6 +160,7 @@ export const EXECUTOR_CALLER_KINDS: Readonly<Record<Executor, readonly string[]>
   anonymous_connection: [],
   unauthenticated_caller: [],
   device_credential: ["device_credential"],
+  credential_issuer: ["credential_issuer"],
 };
 
 /**
@@ -523,7 +529,9 @@ function resolveRow(raw: RawOperationRow, groupClass: IdentityClass, defaults: R
     scopeRule: raw.scope_rule ?? base.scope_rule ?? "",
     separationOfDuty: raw.separation_of_duty ?? base.separation_of_duty ?? null,
     permittedCallerKinds:
-      executor === null ? [...RECORD_CALLER_KINDS] : [...(EXECUTOR_CALLER_KINDS[executor as Executor] ?? [])],
+      // A row with no executor permits the caller kinds a person or a device may name. The credential issuer is the
+      // commit's own kind, produced only by the authorized pending record, so no unexecuted row permits it.
+      executor === null ? RECORD_CALLER_KINDS.filter((kind) => kind !== "credential_issuer") : [...(EXECUTOR_CALLER_KINDS[executor as Executor] ?? [])],
     callerAuthentication: derivedAuthentication,
     binding: raw.binding,
     routes: raw.routes ?? [],

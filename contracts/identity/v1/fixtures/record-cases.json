@@ -2860,8 +2860,8 @@
       ],
       "proof": "caller_not_substitutable",
       "catalog": {
-        "operation_id": "device.pair",
-        "class": "P3",
+        "operation_id": "device.pair.request",
+        "class": "P2",
         "params_schema": "params.device_pair",
         "params_schema_spec": {
           "fields": [
@@ -2881,7 +2881,7 @@
         ]
       },
       "record": {
-        "operation_id": "device.pair",
+        "operation_id": "device.pair.request",
         "caller_kind": "local_console",
         "caller_ref": "console:local",
         "parameters": {
@@ -7435,8 +7435,8 @@
       "violations": [],
       "proof": "caller_not_substitutable",
       "catalog": {
-        "operation_id": "device.pair",
-        "class": "P3",
+        "operation_id": "device.pair.request",
+        "class": "P2",
         "params_schema": "params.device_pair",
         "params_schema_spec": {
           "fields": [
@@ -7456,7 +7456,7 @@
         ]
       },
       "record": {
-        "operation_id": "device.pair",
+        "operation_id": "device.pair.request",
         "caller_kind": "code_holder",
         "caller_ref": "pairing-ticket:0001",
         "parameters": {
@@ -7503,8 +7503,8 @@
       ],
       "proof": "caller_not_substitutable",
       "catalog": {
-        "operation_id": "device.pair",
-        "class": "P3",
+        "operation_id": "device.pair.request",
+        "class": "P2",
         "params_schema": "params.device_pair",
         "params_schema_spec": {
           "fields": [
@@ -7524,7 +7524,7 @@
         ]
       },
       "record": {
-        "operation_id": "device.pair",
+        "operation_id": "device.pair.request",
         "caller_kind": "code_holder",
         "caller_ref": "pairing-ticket:0001",
         "parameters": {

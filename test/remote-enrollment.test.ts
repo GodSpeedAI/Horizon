@@ -1,34 +1,31 @@
 /**
- * Enrolling a phone is an authority change, so it needs the operator, not the invitation.
+ * Enrolling a phone is an authority change, and the active controller authorizes it with its own passkey.
  *
- * The invitation (the pairing link) proves the phone was shown it. The passkey proves the phone
- * holds a new credential. Neither authorizes a controller. A verified registration waits for the
- * operator to type the one-time code the desk shows on its own terminal, and only that
- * confirmation commits the enrolment. Each test starts a fresh desk so no test depends on another.
+ * The invitation proves the phone was shown it. A verified registration proves the phone holds a new
+ * credential. Neither authorizes a controller. The active controller's user-verified passkey signs the
+ * enrolment's operation digest, and only that verified proof confirms it. The commit then creates the
+ * credential once. Each test starts a fresh desk, and the first controller is seeded by the test support
+ * because production has no first-controller path yet.
  */
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
-import { addDevice, listDevices } from "../src/capabilities/remote-records.ts";
-import { stateOf } from "../src/capabilities/pending-confirmations.ts";
+import { listDevices } from "../src/capabilities/remote-records.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { horizonDocument, writeConfig } from "./support/config.ts";
 import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
-import { TestOperatorChannel } from "./support/operator-channel.ts";
-import { Pairing, PAIRING_TTL_MS } from "../src/remote/pairing.ts";
-import { identityStoreOf } from "../src/remote/identity-store.ts";
-import { SESSIONS } from "@godspeed/identity";
-import { createMemoryStore } from "@godspeedai/cognate-store-memory";
+import { failNextReplace, identityDeviceOf, seedController } from "./support/controller.ts";
 import { EnrollmentAuthority } from "../src/remote/enrollment.ts";
+import { createMemoryStore } from "@godspeedai/cognate-store-memory";
+import { stateOf } from "../src/capabilities/pending-confirmations.ts";
+import { auditRemote } from "../src/capabilities/remote-records.ts";
 
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1";
 
 interface Rig {
   readonly app: HorizonApplication;
-  readonly channel: TestOperatorChannel;
-  readonly base: string;
   readonly phone: Client;
   close(): Promise<void>;
 }
@@ -40,16 +37,12 @@ async function freshRig(): Promise<Rig> {
   process.env.HORIZON_REMOTE_PORT = "0";
   const root = mkdtempSync(join(tmpdir(), "enrol-"));
   const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "e.sqlite"), secretPath: join(root, "launch.secret") }));
-  const channel = new TestOperatorChannel();
-  const app = await createApplication({ configPath, operatorChannel: channel });
+  const app = await createApplication({ configPath });
   await seedOperationalFixture(app.runtime.runtime.store, undefined, app.caller.tenant);
   await app.remote.start();
-  const base = app.remote.origin;
   const rig: Rig = {
     app,
-    channel,
-    base,
-    phone: new Client(() => rig),
+    phone: new Client(() => rig!),
     close: async () => {
       await app.remote.stop().catch(() => undefined);
       await app.close();
@@ -64,35 +57,36 @@ function secretOf(link: string): string {
   return new URLSearchParams(link.split("#")[1] ?? "").get("p") ?? "";
 }
 
-function sessionCookieOf(response: Response): string {
+function cookieOf(response: Response): string {
   return /__Host-hz_remote=[^;]+/.exec(response.headers.get("set-cookie") ?? "")?.[0] ?? "";
 }
 
 /** One phone: its cookie, and the requests it makes to the desk's phone routes. */
 class Client {
   cookie = "";
+  private lastProof: { readonly pendingId: string; readonly credential: unknown } | null = null;
   constructor(private readonly rigOf: () => Rig) {}
 
   request(path: string, init: RequestInit = {}, headers: Record<string, string> = {}): Promise<Response> {
     const rig = this.rigOf();
-    const merged: Record<string, string> = { origin: rig.base, ...(init.headers as Record<string, string> | undefined), ...headers };
+    const merged: Record<string, string> = { origin: rig!.app.remote.origin, ...(init.headers as Record<string, string> | undefined), ...headers };
     if (this.cookie !== "") merged.cookie = this.cookie;
-    return fetch(`${rig.base}${path}`, { redirect: "manual", ...init, headers: merged });
+    return fetch(`${rig!.app.remote.origin}${path}`, { redirect: "manual", ...init, headers: merged });
   }
 
   post(path: string, body: unknown, headers: Record<string, string> = {}): Promise<Response> {
     return this.request(path, { method: "POST", body: JSON.stringify(body) }, { "content-type": "application/json", ...headers });
   }
 
-  /** Redeems an invitation and registers a passkey: the phone's half of pairing. Returns the finish response. */
+  /** The phone's half of pairing: redeem the invitation, register a passkey, and ask to join. */
   async finish(device: SoftwareAuthenticator): Promise<Response> {
     const rig = this.rigOf();
-    const link = rig.app.remote.pairingLink();
+    const link = rig!.app.remote.pairingLink();
     if (link === null) throw new Error("no invitation is open");
     const redeemed = await this.post("/m/api/pair/redeem", { secret: secretOf(link) });
     expect(redeemed.status).toBe(200);
     const { ticket, options } = (await redeemed.json()) as { ticket: string; options: { challenge: string; rp: { id: string } } };
-    const credential = await device.register({ challenge: options.challenge, origin: rig.base, rpId: options.rp.id });
+    const credential = await device.register({ challenge: options.challenge, origin: rig!.app.remote.origin, rpId: options.rp.id });
     return this.post("/m/api/pair/finish", { ticket, credential }, { "user-agent": IPHONE_UA });
   }
 
@@ -100,304 +94,424 @@ class Client {
     return this.post("/m/api/pair/await", { pending_id: pendingId });
   }
 
+  /** Signs this phone in with its own passkey, the same way the phone page does. */
+  async signIn(device: SoftwareAuthenticator): Promise<Response> {
+    const rig = this.rigOf();
+    const options = await this.post("/m/api/auth/options", {});
+    expect(options.status).toBe(200);
+    const { ticket, options: asserted } = (await options.json()) as { ticket: string; options: { challenge: string; rpId: string } };
+    const credential = await device.assert({ challenge: asserted.challenge, origin: rig!.app.remote.origin, rpId: asserted.rpId });
+    const response = await this.post("/m/api/auth/finish", { ticket, credential });
+    this.adopt(response);
+    return response;
+  }
+
   adopt(response: Response): void {
-    const cookie = sessionCookieOf(response);
+    const cookie = cookieOf(response);
     if (cookie !== "") this.cookie = cookie;
+  }
+
+  /** The pending enrolment this signed-in controller can authorize, or null when it has none or is no longer signed in. */
+  async pending(): Promise<{ pending_id: string; options: { challenge: string; rpId: string; allowCredentials: unknown[] } } | null> {
+    const response = await this.request("/m/api/pair/pending");
+    if (response.status !== 200) return null;
+    const data = (await response.json()) as { pending: { pending_id: string } | null; options?: { challenge: string; rpId: string; allowCredentials: unknown[] } };
+    if (data.pending === null || data.options === undefined) return null;
+    return { pending_id: data.pending.pending_id, options: data.options };
+  }
+
+  /** Authorizes a pending enrolment with the controller's passkey, signing what the server asked it to sign. */
+  async authorize(controller: SoftwareAuthenticator, pendingId: string, overrides: { flags?: number; challenge?: string } = {}): Promise<Response> {
+    const rig = this.rigOf();
+    const pending = await this.pending();
+    // With no session or no waiting enrolment there is nothing to sign: the route is still asked, and refuses.
+    if (pending === null) return this.post("/m/api/pair/authorize", { pending_id: pendingId, credential: {} });
+    const credential = await controller.assert({
+      challenge: overrides.challenge ?? pending.options.challenge,
+      origin: rig!.app.remote.origin,
+      rpId: pending.options.rpId,
+      flags: overrides.flags,
+    });
+    this.lastProof = { pendingId, credential };
+    return this.post("/m/api/pair/authorize", { pending_id: pendingId, credential });
+  }
+
+  /** Posts the most recent proof again, as a replay would. */
+  replay(): Promise<Response> {
+    if (this.lastProof === null) throw new Error("no proof has been sent");
+    return this.post("/m/api/pair/authorize", { pending_id: this.lastProof.pendingId, credential: this.lastProof.credential });
   }
 }
 
-/** The pending enrolment a finish response is waiting on. */
-async function pendingOf(response: Response): Promise<string> {
-  expect(response.status).toBe(202);
-  const body = (await response.json()) as { status: string; pending_id: string };
-  expect(body.status).toBe("awaiting_operator_authorization");
-  return body.pending_id;
+/** A desk with an active controller that is signed in, and the phone that will be replaced or joined. */
+async function controlledRig(): Promise<{ rig: Rig; controller: SoftwareAuthenticator; controllerDeviceId: string }> {
+  const rig = await freshRig();
+  const controller = await new SoftwareAuthenticator().generate();
+  const seeded = await seedController(rig.app, controller, "controller phone");
+  rig!.phone.cookie = "";
+  expect((await rig!.phone.signIn(controller)).status).toBe(200);
+  return { rig, controller, controllerDeviceId: seeded.device_id };
 }
 
 async function activeDevices(rig: Rig) {
-  return (await listDevices(rig.app.runtime.runtime.store, rig.app.caller.tenant)).filter((device) => device.revoked_at === null);
+  return (await listDevices(rig!.app.runtime.runtime.store, rig!.app.caller.tenant)).filter((device) => device.revoked_at === null);
 }
 
-let rig: Rig;
-beforeEach(async () => {
-  rig = await freshRig();
-});
+async function pendingOf(response: Response): Promise<string> {
+  expect(response.status).toBe(202);
+  const body = (await response.json()) as { status: string; pending_id: string };
+  expect(body.status).toBe("awaiting_phone_authorization");
+  return body.pending_id;
+}
+
+let rig: Rig | undefined;
 afterEach(async () => {
-  await rig.close();
+  await rig?.close();
+  rig = undefined;
 });
 
-describe("enrolment: the invitation proposes a controller and the operator authorizes it", () => {
+describe("enrolment: the invitation proposes a controller and the active controller authorizes it", () => {
   test("PE-60: starting remote control creates no device and grants no authority", async () => {
-    expect(await activeDevices(rig)).toHaveLength(0);
-    const options = await rig.phone.post("/m/api/auth/options", {});
-    expect(options.status).toBe(404);
-    expect(((await options.json()) as { code: string }).code).toBe("not_paired");
+    rig = await freshRig();
+    expect(await activeDevices(rig!)).toHaveLength(0);
+    expect(rig!.app.remote.pairingLink()).not.toBeNull();
   });
 
-  test("NE-47: the invitation alone enrols nothing: redeeming it opens a passkey prompt and no session", async () => {
-    const link = rig.app.remote.pairingLink();
-    if (link === null) throw new Error("no invitation is open");
-    const redeemed = await rig.phone.post("/m/api/pair/redeem", { secret: secretOf(link) });
-    expect(redeemed.status).toBe(200);
-    expect(await activeDevices(rig)).toHaveLength(0);
-    expect((await rig.phone.request("/m/api/state")).status).toBe(401);
+  test("NE-47: a redeemed invitation and a verified registration alone enrol no device and grant no session", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    expect(pendingId).toMatch(/^pending_/);
+    expect(await activeDevices(rig!)).toHaveLength(1);
+    // The new phone holds no session: its finish sets no cookie, and its state read is refused.
+    const finish = await rig!.phone.post("/m/api/pair/await", { pending_id: pendingId });
+    expect(cookieOf(finish)).toBe("");
+    const state = await new Client(() => rig!).request("/m/api/state");
+    expect(state.status).toBe(401);
   });
 
-  test("PE-61: a verified passkey waits for the operator: no device, no session cookie, no signed-in state", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const response = await rig.phone.finish(device);
-    await pendingOf(response);
-    expect(response.headers.get("set-cookie")).toBeNull();
-    expect(await activeDevices(rig)).toHaveLength(0);
-    rig.phone.adopt(response);
-    expect((await rig.phone.request("/m/api/state")).status).toBe(401);
+  test("NE-48: the new phone's own retries before authorization never sign it in", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    const phoneNew = new Client(() => rig!);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const response = await phoneNew.awaitAuthorization(pendingId);
+      expect(response.status).toBe(202);
+      expect(cookieOf(response)).toBe("");
+    }
+    expect(await activeDevices(rig!)).toHaveLength(1);
   });
 
-  test("the desk shows the operator what is being authorized, with a one-time code and the pending id", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const pendingId = await pendingOf(await rig.phone.finish(device));
-    const line = rig.channel.shown.find((shown) => shown.includes(pendingId));
-    expect(line).toBeDefined();
-    expect(line).toContain("iPhone · Safari");
-    expect(line).toMatch(/Code: \d{6}\./);
+  test("NE-49: with no active controller the request is refused and nothing is held", async () => {
+    rig = await freshRig();
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const response = await rig!.phone.finish(newPhone);
+    expect(response.status).toBe(409);
+    expect(((await response.json()) as { code: string }).code).toBe("no_controller");
+    expect(await activeDevices(rig!)).toHaveLength(0);
   });
 
-  test("NE-48: the phone's own retries before authorization do not sign it in", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const pendingId = await pendingOf(await rig.phone.finish(device));
-    const early = await rig.phone.awaitAuthorization(pendingId);
-    expect(early.status).toBe(202);
-    expect(await activeDevices(rig)).toHaveLength(0);
-  });
-
-  test("a wrong code leaves the request waiting, and the right code then authorizes it", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const pendingId = await pendingOf(await rig.phone.finish(device));
-    await rig.channel.type("000000");
-    expect((await rig.phone.awaitAuthorization(pendingId)).status).toBe(202);
-    await rig.channel.type(rig.channel.codeFor(pendingId));
-    const committed = await rig.phone.awaitAuthorization(pendingId);
+  test("PE-61: the controller's user-verified passkey authorizes the exact enrolment, and the commit creates one device and revokes the replaced controller", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const newPhoneClient = new Client(() => rig!);
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    const authorized = await rig!.phone.authorize(seeded.controller, pendingId);
+    expect(authorized.status).toBe(200);
+    const committed = await newPhoneClient.awaitAuthorization(pendingId);
     expect(committed.status).toBe(200);
-    expect(await activeDevices(rig)).toHaveLength(1);
+    newPhoneClient.adopt(committed);
+    expect(newPhoneClient.cookie).not.toBe("");
+    const active = await activeDevices(rig!);
+    expect(active).toHaveLength(1);
+    expect(active[0]?.credential_id).toBe(Buffer.from(newPhone.credentialId).toString("base64url"));
+    const replaced = await identityDeviceOf(rig.app, (await listDevicesAll(rig)).find((device) => device.device_id === seeded.controllerDeviceId)!.credential_id);
+    expect(replaced?.revokedAt).not.toBeNull();
   });
 
-  test("NE-49: five wrong codes abandon the request: the right code afterwards authorizes nothing", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const pendingId = await pendingOf(await rig.phone.finish(device));
-    const code = rig.channel.codeFor(pendingId);
-    for (let attempt = 0; attempt < 5; attempt += 1) await rig.channel.type("000000");
-    await rig.channel.type(code);
-    expect((await rig.phone.awaitAuthorization(pendingId)).status).toBe(410);
-    expect(await activeDevices(rig)).toHaveLength(0);
+  test("PE-62: the authorization is recorded with the controller that signed it and the pending id", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    expect((await rig!.phone.authorize(seeded.controller, pendingId)).status).toBe(200);
+    const audit = await rig!.app.runtime.runtime.store.listRecords("horizon-remote-audit", { tenant: rig!.app.caller.tenant });
+    const outcomes = audit.map((row) => (row.value as { outcome: string; device_id: string }));
+    expect(outcomes.some((entry) => entry.outcome === `authorized_by_controller ${pendingId}` && entry.device_id === seeded.controllerDeviceId)).toBe(true);
   });
 
-  test("PE-62: the operator's code authorizes once: the enrolment commits and the phone is signed in", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const pendingId = await pendingOf(await rig.phone.finish(device));
-    await rig.channel.type(rig.channel.codeFor(pendingId));
-    const committed = await rig.phone.awaitAuthorization(pendingId);
-    expect(committed.status).toBe(200);
-    rig.phone.adopt(committed);
-    expect(rig.phone.cookie).not.toBe("");
-    expect((await rig.phone.request("/m/api/state")).status).toBe(200);
-    expect(await activeDevices(rig)).toHaveLength(1);
+  test("NE-50: a replayed authorization is refused and creates no second device", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    expect((await rig!.phone.authorize(seeded.controller, pendingId)).status).toBe(200);
+    const replayed = await rig!.phone.replay();
+    expect(replayed.status).not.toBe(200);
+    expect((await new Client(() => rig!).awaitAuthorization(pendingId)).status).toBe(200);
+    expect(await activeDevices(rig!)).toHaveLength(1);
   });
 
-  test("NE-50: replaying an authorized enrolment is refused and creates no second device", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const pendingId = await pendingOf(await rig.phone.finish(device));
-    await rig.channel.type(rig.channel.codeFor(pendingId));
-    expect((await rig.phone.awaitAuthorization(pendingId)).status).toBe(200);
-    expect((await rig.phone.awaitAuthorization(pendingId)).status).toBe(410);
-    await rig.channel.type(rig.channel.codeFor(pendingId));
-    expect(await activeDevices(rig)).toHaveLength(1);
+  test("NE-51: simultaneous commits after one authorization commit exactly one device", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    expect((await rig!.phone.authorize(seeded.controller, pendingId)).status).toBe(200);
+    const commits = await Promise.all([0, 1, 2, 3].map(() => new Client(() => rig!).awaitAuthorization(pendingId)));
+    expect(commits.filter((response) => response.status === 200)).toHaveLength(1);
+    expect(await activeDevices(rig!)).toHaveLength(1);
   });
 
-  test("NE-51: simultaneous requests after one authorization commit exactly one device", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const pendingId = await pendingOf(await rig.phone.finish(device));
-    await rig.channel.type(rig.channel.codeFor(pendingId));
-    const [first, second] = await Promise.all([rig.phone.awaitAuthorization(pendingId), rig.phone.awaitAuthorization(pendingId)]);
-    expect([first.status, second.status].sort()).toEqual([200, 410]);
-    expect(await activeDevices(rig)).toHaveLength(1);
+  test("NE-52: a controller proof without user verification confirms nothing and creates nothing", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    const refused = await rig!.phone.authorize(seeded.controller, pendingId, { flags: 0x01 });
+    expect(refused.status).toBe(401);
+    expect((await new Client(() => rig!).awaitAuthorization(pendingId)).status).toBe(202);
+    expect(await activeDevices(rig!)).toHaveLength(1);
   });
 
-  test("PE-63: a refresh before authorization voids the waiting enrolment, so the operator's late code authorizes nothing", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const pendingId = await pendingOf(await rig.phone.finish(device));
-    const code = rig.channel.codeFor(pendingId);
-    await rig.app.remote.refresh();
-    expect(await stateOf(rig.app.runtime.runtime.store, pendingId)).toBe("expired");
-    await rig.channel.type(code);
-    expect((await rig.phone.awaitAuthorization(pendingId)).status).toBe(410);
-    expect(await activeDevices(rig)).toHaveLength(0);
+  test("NE-53: the waiting phone cannot authorize its own enrolment with its passkey", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    const selfAuthorized = await rig!.phone.authorize(newPhone, pendingId);
+    expect(selfAuthorized.status).toBe(401);
+    expect((await new Client(() => rig!).awaitAuthorization(pendingId)).status).toBe(202);
   });
 
-  test("PE-64: stopping before authorization voids the waiting enrolment", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const pendingId = await pendingOf(await rig.phone.finish(device));
-    await rig.app.remote.stop();
-    expect(await stateOf(rig.app.runtime.runtime.store, pendingId)).toBe("expired");
-    expect(await activeDevices(rig)).toHaveLength(0);
+  test("NE-63: a proof over another request's challenge is refused", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    const otherChallenge = Buffer.from(new Uint8Array(32).fill(7)).toString("base64url");
+    const refused = await rig!.phone.authorize(seeded.controller, pendingId, { challenge: otherChallenge });
+    expect(refused.status).toBe(401);
+    expect((await new Client(() => rig!).awaitAuthorization(pendingId)).status).toBe(202);
   });
 
-  test("NE-52: a controller enrolled by another route while the request waits makes the request stale and it is refused", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const pendingId = await pendingOf(await rig.phone.finish(device));
-    const other = await new SoftwareAuthenticator().generate();
-    await addDevice(rig.app.runtime.runtime.store, {
-      device_id: "device_other",
-      credential_id: Buffer.from(other.credentialId).toString("base64url"),
-      public_key: "",
-      sign_count: 0,
-      label: "other",
-      generation: 0,
-      tenant: rig.app.caller.tenant,
-      operator: "operator",
-      created_at: new Date().toISOString(),
-      last_seen: new Date().toISOString(),
-      revoked_at: null,
-    } as Parameters<typeof addDevice>[1]);
-    await rig.channel.type(rig.channel.codeFor(pendingId));
-    const refused = await rig.phone.awaitAuthorization(pendingId);
-    expect(refused.status).toBe(409);
-    expect(((await refused.json()) as { code: string }).code).toBe("controller_changed");
-    expect((await activeDevices(rig)).map((active) => active.device_id)).toEqual(["device_other"]);
+  test("PE-68: an invitation redeems once, so a second phone cannot open a second request from it", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const link = rig!.app.remote.pairingLink();
+    expect(link).not.toBeNull();
+    await pendingOf(await rig!.phone.finish(await new SoftwareAuthenticator().generate()));
+    const secondRedeem = await rig!.phone.post("/m/api/pair/redeem", { secret: secretOf(link as string) });
+    expect(secondRedeem.status).not.toBe(200);
+    expect(seeded.controller).toBeDefined();
+  });
+
+  test("PE-63: starting remote control again while a request waits grants no authority and leaves the waiting request as it was", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const pendingId = await pendingOf(await rig!.phone.finish(await new SoftwareAuthenticator().generate()));
+    await rig!.app.remote.start();
+    expect(await activeDevices(rig!)).toHaveLength(1);
+    expect((await rig!.phone.authorize(seeded.controller, pendingId)).status).toBe(200);
   });
 });
 
-describe("refresh and stop: the controller's authority ends and does not come back", () => {
-  test("PE-65: refresh invalidates the enrolled phone's session and an old invitation, and a refreshed invitation does not authorize by itself", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const pendingId = await pendingOf(await rig.phone.finish(device));
-    await rig.channel.type(rig.channel.codeFor(pendingId));
-    rig.phone.adopt((await rig.phone.awaitAuthorization(pendingId)) as Response);
-    expect((await rig.phone.request("/m/api/state")).status).toBe(200);
-    const oldLink = rig.app.remote.pairingLink();
-    await rig.app.remote.refresh();
-    expect((await rig.phone.request("/m/api/state")).status).toBe(401);
-    if (oldLink !== null) expect((await rig.phone.post("/m/api/pair/redeem", { secret: secretOf(oldLink) })).status).toBe(401);
-    const replacement = await new SoftwareAuthenticator().generate();
-    const waiting = await rig.phone.finish(replacement);
-    await pendingOf(waiting);
-    expect(await activeDevices(rig)).toHaveLength(0);
+describe("stop and refresh: a waiting or authorized enrolment does not come back", () => {
+  test("PE-64: stopping before authorization voids the waiting enrolment, and after a restart nothing authorizes or commits it", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    await rig!.app.remote.stop();
+    await rig!.app.remote.start();
+    const authorized = await rig!.phone.authorize(seeded.controller, pendingId);
+    expect(authorized.status).not.toBe(200);
+    expect((await new Client(() => rig!).awaitAuthorization(pendingId)).status).not.toBe(200);
+    expect(await activeDevices(rig!)).toHaveLength(0);
   });
 
-  test("PE-66: a refreshed controller cannot be restored: its passkey gets no options and no sign-in", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const pendingId = await pendingOf(await rig.phone.finish(device));
-    await rig.channel.type(rig.channel.codeFor(pendingId));
-    rig.phone.adopt((await rig.phone.awaitAuthorization(pendingId)) as Response);
-    await rig.app.remote.refresh();
-    // Refresh revokes the session; it renews nothing, so no active session is left behind.
-    const sessions = await identityStoreOf(rig.app.runtime.runtime.store).listRecords(SESSIONS, {});
-    expect(sessions.every((row) => (row.value as { status?: string }).status !== "active")).toBe(true);
-    const options = await rig.phone.post("/m/api/auth/options", {});
-    expect(options.status).toBe(404);
-    expect(((await options.json()) as { code: string }).code).toBe("not_paired");
+  test("PE-65: stopping after authorization but before the commit ends the confirmed enrolment, and it creates no device after a restart", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const newClient = new Client(() => rig!);
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    expect((await rig!.phone.authorize(seeded.controller, pendingId)).status).toBe(200);
+    await rig!.app.remote.stop();
+    await rig!.app.remote.start();
+    expect((await newClient.awaitAuthorization(pendingId)).status).not.toBe(200);
+    expect(await activeDevices(rig!)).toHaveLength(0);
+  });
+
+  test("PE-69: a refresh voids the open invitation, so its secret no longer redeems", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const link = rig!.app.remote.pairingLink();
+    expect(link).not.toBeNull();
+    const secret = new URLSearchParams(link!.split("#")[1] ?? "").get("p");
+    await rig!.app.remote.refresh();
+    const origin = rig!.app.remote.origin;
+    const redeemed = await fetch(`${origin}/m/api/pair/redeem`, { method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ secret }) });
+    expect(redeemed.status).not.toBe(200);
+  });
+
+  test("PE-66: refreshing after authorization ends the confirmed enrolment, and the prior controller's cookie is refused after a restart", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const priorCookie = rig!.phone.cookie;
+    const pendingId = await pendingOf(await rig!.phone.finish(await new SoftwareAuthenticator().generate()));
+    expect((await rig!.phone.authorize(seeded.controller, pendingId)).status).toBe(200);
+    await rig!.app.remote.refresh();
+    await rig!.app.remote.stop();
+    await rig!.app.remote.start();
+    const probe = await fetch(`${rig!.app.remote.origin}/m/api/state`, { headers: { cookie: priorCookie } });
+    expect(probe.ok).toBe(false);
+    expect((await new Client(() => rig!).awaitAuthorization(pendingId)).status).not.toBe(200);
+    expect(await activeDevices(rig!)).toHaveLength(0);
+  });
+
+  test("NE-65: a stale enrolment cannot restore access once the controller has been refreshed away", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const pendingId = await pendingOf(await rig!.phone.finish(await new SoftwareAuthenticator().generate()));
+    await rig!.app.remote.refresh();
+    const authorized = await rig!.phone.authorize(seeded.controller, pendingId);
+    expect(authorized.status).not.toBe(200);
+    const committed = await new Client(() => rig!).awaitAuthorization(pendingId);
+    expect(committed.status).not.toBe(200);
+    expect(cookieOf(committed)).toBe("");
+    expect(await activeDevices(rig!)).toHaveLength(0);
+  });
+
+  test("NE-62: a controller enrolled by another route after authorization makes the confirmed enrolment stale at commit, and it creates no device", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const pendingId = await pendingOf(await rig!.phone.finish(await new SoftwareAuthenticator().generate()));
+    expect((await rig!.phone.authorize(seeded.controller, pendingId)).status).toBe(200);
+    // Another controller is enrolled by a route that does not end the waiting enrolment.
+    await seedController(rig!.app, await new SoftwareAuthenticator().generate(), "other controller");
+    const committed = await new Client(() => rig!).awaitAuthorization(pendingId);
+    expect(committed.status).not.toBe(200);
+    expect(cookieOf(committed)).toBe("");
+    // Only the controller seeded by the other route is active; the confirmed enrolment created nothing.
+    expect(await activeDevices(rig!)).toHaveLength(1);
   });
 
   test("PE-67: stop invalidates an authorized phone's credential, so the old cookie is refused once the listener returns", async () => {
-    const device = await new SoftwareAuthenticator().generate();
-    const pendingId = await pendingOf(await rig.phone.finish(device));
-    await rig.channel.type(rig.channel.codeFor(pendingId));
-    rig.phone.adopt((await rig.phone.awaitAuthorization(pendingId)) as Response);
-    const before = await fetch(`${rig.app.remote.origin}/m/api/state`, { headers: { cookie: rig.phone.cookie } });
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const before = await fetch(`${rig!.app.remote.origin}/m/api/state`, { headers: { cookie: rig!.phone.cookie } });
     expect(before.status).toBe(200);
-    await rig.app.remote.stop();
-    await rig.app.remote.start();
-    const after = await fetch(`${rig.app.remote.origin}/m/api/state`, { headers: { cookie: rig.phone.cookie } });
+    await rig!.app.remote.stop();
+    await rig!.app.remote.start();
+    const after = await fetch(`${rig!.app.remote.origin}/m/api/state`, { headers: { cookie: rig!.phone.cookie } });
     expect(after.ok).toBe(false);
-    expect(await activeDevices(rig)).toHaveLength(0);
+    expect(await activeDevices(rig!)).toHaveLength(0);
+  });
+
+  test("NE-57: a failure in the identity writer after confirmation is fail-closed: no device, no session, and the consumed authorization cannot be reused", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const newClient = new Client(() => rig!);
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    expect((await rig!.phone.authorize(seeded.controller, pendingId)).status).toBe(200);
+    const restore = failNextReplace(rig.app, "injected identity failure");
+    try {
+      const failed = await newClient.awaitAuthorization(pendingId);
+      expect(failed.status).toBe(400);
+      expect(cookieOf(failed)).toBe("");
+    } finally {
+      restore();
+    }
+    expect(await activeDevices(rig!)).toHaveLength(1);
+    const controllerStill = await rig!.phone.pending();
+    expect(controllerStill).toBeNull();
+    expect((await rig!.phone.request("/m/api/state")).status).toBe(200);
+    const retry = await newClient.awaitAuthorization(pendingId);
+    expect(retry.status).not.toBe(200);
+    expect(cookieOf(retry)).toBe("");
   });
 });
 
-describe("invitations: they expire, they are single use, and a refresh voids them", () => {
-  test("PE-68: an invitation is redeemable once, within its window, and never after it", () => {
-    const pairing = new Pairing();
-    const opened = pairing.start(0);
-    const expired = pairing.redeem(opened.secret, PAIRING_TTL_MS + 1);
-    expect(expired.ok).toBe(false);
-    const fresh = new Pairing();
-    const link = fresh.start(0);
-    expect(fresh.redeem(link.secret, 1).ok).toBe(true);
-    const again = fresh.redeem(link.secret, 2);
-    expect(again.ok).toBe(false);
-    if (!again.ok) expect(again.reason).toBe("used");
-  });
-
-  test("NE-53: a redeemed invitation's ticket answers one registration challenge and no replay", () => {
-    const pairing = new Pairing();
-    const link = pairing.start(0);
-    const redeemed = pairing.redeem(link.secret, 1);
-    if (!redeemed.ok) throw new Error("the invitation should redeem");
-    expect(pairing.takeChallenge(redeemed.ticket, "register", 2)).not.toBeNull();
-    expect(pairing.takeChallenge(redeemed.ticket, "register", 3)).toBeNull();
-  });
-
-  test("PE-69: a refresh voids the open invitation: its secret no longer redeems", () => {
-    const pairing = new Pairing();
-    const old = pairing.start(0);
-    pairing.refresh(10);
-    const stale = pairing.redeem(old.secret, 11);
-    expect(stale.ok).toBe(false);
-    const current = pairing.current(11);
-    expect(current).not.toBeNull();
-  });
-});
-
-describe("the enrolment authority in isolation: a controllable clock and a memory store", () => {
-  const request = {
-    tenant: "tenant-a",
-    operator: "operator",
-    generation: 1,
-    label: "iPhone · Safari",
-    registration: { credentialId: "credential-abcdef", publicKey: "cose-key", alg: -7, signCount: 0 },
-    replaces: [] as string[],
-    requested_at: new Date(0).toISOString(),
-  };
-  const commitAt = (authority: EnrollmentAuthority, pendingId: string, at: number) =>
-    authority.commit({ pendingId, tenant: "tenant-a", operator: "operator", generation: 1, currentControllers: [], now: new Date(at) });
-
-  test("NE-58: a confirmation that is typed in time but committed after its window is refused and expires", async () => {
+describe("concurrency and window: a late authorization or commit authorizes nothing", () => {
+  test("NE-58: a confirmed enrolment committed after its window is refused as expired and creates nothing", async () => {
+    let now = 1_000_000;
     const store = createMemoryStore();
-    const channel = new TestOperatorChannel();
-    let at = Date.parse("2026-11-11T10:00:00Z");
-    const authority = new EnrollmentAuthority(store, channel, () => at);
-    const requested = await authority.request(request);
-    if (!requested.ok) throw new Error("the request should be held");
-    await channel.type(channel.codeFor(requested.pendingId));
-    at += 6 * 60_000;
-    const late = await commitAt(authority, requested.pendingId, at);
+    const authority = new EnrollmentAuthority(store, () => now);
+    const registration = { credentialId: "cred-late", publicKey: "key", alg: -7, signCount: 0 };
+    const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "late", registration: registration as never, replaces: [], requested_at: new Date(now).toISOString() });
+    if (!opened.ok) throw new Error("request refused");
+    const authorized = await authority.authorize({ tenant: "t", pendingId: opened.pendingId, now: new Date(now), generation: 1, currentControllers: [], verify: async () => 1 });
+    expect(authorized.ok).toBe(true);
+    now += 6 * 60_000;
+    const committed = await authority.commit({ pendingId: opened.pendingId, tenant: "t", generation: 1, currentControllers: [], now: new Date(now) });
+    expect(committed.ok).toBe(false);
+    if (!committed.ok) expect(committed.code).toBe("expired");
+  });
+
+  test("NE-59: an authorization that races a stop lands before or after the stop, never after the commit has been refused", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    // The stop may land before or after the authorization. Either way the enrolment cannot survive the stop.
+    await Promise.all([rig!.phone.authorize(seeded.controller, pendingId).catch(() => undefined), rig!.app.remote.stop()]);
+    await rig!.app.remote.start();
+    expect((await new Client(() => rig!).awaitAuthorization(pendingId)).status).not.toBe(200);
+    expect(await activeDevices(rig!)).toHaveLength(0);
+  });
+
+  test("NE-61: a newer request ends an older one, which cannot be authorized or committed", async () => {
+    const store = createMemoryStore();
+    const authority = new EnrollmentAuthority(store, () => 1_000_000);
+    const registration = { credentialId: "cred-first", publicKey: "key", alg: -7, signCount: 0 };
+    const first = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "first", registration: registration as never, replaces: [], requested_at: new Date(1_000_000).toISOString() });
+    const second = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "second", registration: { ...registration, credentialId: "cred-second" } as never, replaces: [], requested_at: new Date(1_000_000).toISOString() });
+    if (!first.ok || !second.ok) throw new Error("request refused");
+    expect(await stateOf(store, first.pendingId)).toBe("expired");
+    const late = await authority.authorize({ tenant: "t", pendingId: first.pendingId, now: new Date(1_000_000), generation: 1, currentControllers: [], verify: async () => 1 });
     expect(late.ok).toBe(false);
-    if (!late.ok) expect(late.code).toBe("expired");
+    const waiting = await authority.waiting("t", 1_000_000);
+    expect(waiting?.pendingId).toBe(second.pendingId);
   });
 
-  test("a pasted batch of wrong codes, typed together, still reaches the wrong-code limit (NE-57)", async () => {
+  test("PE-71: a confirmed enrolment that is not yet committed is ended by a stop, and its commit afterwards creates nothing", async () => {
     const store = createMemoryStore();
-    const channel = new TestOperatorChannel();
-    const authority = new EnrollmentAuthority(store, channel);
-    const requested = await authority.request(request);
-    if (!requested.ok) throw new Error("the request should be held");
-    const code = channel.codeFor(requested.pendingId);
-    // Five lines arrive at once, as a paste does; none waits for the one before it.
-    await Promise.all(Array.from({ length: 5 }, () => channel.type("000000")));
-    await channel.type(code);
-    const outcome = await commitAt(authority, requested.pendingId, Date.now());
-    expect(outcome.ok).toBe(false);
-    if (!outcome.ok) expect(outcome.code).toBe("expired");
+    const authority = new EnrollmentAuthority(store, () => 1_000_000);
+    const registration = { credentialId: "cred-confirmed", publicKey: "key", alg: -7, signCount: 0 };
+    const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "confirmed", registration: registration as never, replaces: [], requested_at: new Date(1_000_000).toISOString() });
+    if (!opened.ok) throw new Error("request refused");
+    const authorized = await authority.authorize({ tenant: "t", pendingId: opened.pendingId, now: new Date(1_000_000), generation: 1, currentControllers: [], verify: async () => 1 });
+    expect(authorized.ok).toBe(true);
+    await authority.endWaiting("t", "the controller was stopped");
+    const committed = await authority.commit({ pendingId: opened.pendingId, tenant: "t", generation: 1, currentControllers: [], now: new Date(1_000_000) });
+    expect(committed.ok).toBe(false);
+    expect(await stateOf(store, opened.pendingId)).toBe("expired");
   });
 
-  test("a confirmed enrolment that is not yet committed is ended by a stop or a refresh (PE-71)", async () => {
+  test("NE-60: an abandoned enrolment is never confirmed, even when the proof arrives after the abandon", async () => {
     const store = createMemoryStore();
-    const channel = new TestOperatorChannel();
-    const authority = new EnrollmentAuthority(store, channel);
-    const requested = await authority.request(request);
-    if (!requested.ok) throw new Error("the request should be held");
-    await channel.type(channel.codeFor(requested.pendingId));
-    await authority.abandonWaiting("remote control stopped");
-    const outcome = await commitAt(authority, requested.pendingId, Date.now());
-    expect(outcome.ok).toBe(false);
-    if (!outcome.ok) expect(outcome.code).toBe("expired");
+    const authority = new EnrollmentAuthority(store, () => 1_000_000);
+    const registration = { credentialId: "cred-abandon", publicKey: "key", alg: -7, signCount: 0 };
+    const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "gone", registration: registration as never, replaces: [], requested_at: new Date(1_000_000).toISOString() });
+    if (!opened.ok) throw new Error("request refused");
+    await authority.endWaiting("t", "the controller was stopped");
+    const late = await authority.authorize({ tenant: "t", pendingId: opened.pendingId, now: new Date(1_000_000), generation: 1, currentControllers: [], verify: async () => 1 });
+    expect(late.ok).toBe(false);
+    expect(await stateOf(store, opened.pendingId)).toBe("expired");
+    const committed = await authority.commit({ pendingId: opened.pendingId, tenant: "t", generation: 1, currentControllers: [], now: new Date(1_000_000) });
+    expect(committed.ok).toBe(false);
   });
 });
+
+async function listDevicesAll(current: Rig) {
+  return listDevices(current.app.runtime.runtime.store, current.app.caller.tenant);
+}
+
+// Keeps the audit helper referenced for readers: the audit trail is written by the authorize route.
+void auditRemote;

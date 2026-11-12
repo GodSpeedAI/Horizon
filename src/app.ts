@@ -137,7 +137,7 @@ import { existsSync as fileExists, mkdirSync as makeDir, readFileSync as readFil
 import { dirname as dirOf, join as joinPath } from "node:path";
 import { tmpdir as tmpDir } from "node:os";
 import type { Server } from "bun";
-import { EnrollmentAuthority, ttyOperatorChannel, type OperatorChannel } from "./remote/enrollment.ts";
+import { EnrollmentAuthority } from "./remote/enrollment.ts";
 import { DEVICE_ACTOR_PREFIX, RemoteController, type RemoteStatus } from "./remote/server.ts";
 import { remoteSettings } from "./remote/settings.ts";
 import { qrSvg, remotePanelPage } from "./remote/panel.ts";
@@ -521,11 +521,6 @@ export async function createApplication(
     readonly readOnly?: boolean;
     /** Test seam only: lets an in-process test drive governed mode with a scripted wire while the owner has not published the authority decision. */
     readonly unpublishedAuthorityForTests?: boolean;
-    /**
-     * The operator's terminal for authorizing a phone. Production reads the controlling terminal and has none
-     * when the desk runs without one; a test passes a channel the test types into. null means no terminal.
-     */
-    readonly operatorChannel?: OperatorChannel | null;
   } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath, { readOnly: options.readOnly === true });
@@ -3215,7 +3210,7 @@ export async function createApplication(
     identity,
     identityTenant,
     operator: mappedActors.desktopOperator,
-    enrollment: new EnrollmentAuthority(runtime.runtime.store, options.operatorChannel === undefined ? ttyOperatorChannel() : options.operatorChannel),
+    enrollment: new EnrollmentAuthority(runtime.runtime.store),
     workspace: () => workspace(),
     chrome: (receipt) => cockpitChrome({ receipt: receipt ?? null }),
     position: () => lastPosition(runtime),

@@ -164,7 +164,7 @@ describe("no downgrade path", () => {
     }
     // The rows that state it are exactly the caller paths that cannot produce it.
     const without = operations.filter((o) => o.humanEvidence === null && GOVERNED_CLASSES.includes(o.class));
-    expect(without.map((o) => o.id)).toEqual(["device.pair"]);
+    expect(without.map((o) => o.id)).toEqual(["device.pair.request"]);
   });
 
   test("a human caller is never given a grant or a credential", () => {
@@ -511,19 +511,25 @@ describe("the browser's pairing route is a session, not a device enrollment", ()
     expect(row.routes).toContain("POST /desk/pair");
     expect(row.paramsSchema).toBe("params.session_pair");
   });
-  test("device.pair is the phone's enrollment, and the browser's pairing is not it", () => {
-    const row = loaded.byId.get("device.pair")!;
-    // Enrolling a controller is a P3 authority change: the operator authorizes it at the desk's terminal.
-    expect(row.class).toBe("P3");
-    // The phone's enrollment is live-bound: it enrols a credential and revokes the previous one
-    // (R3-01). It is still not the browser's pairing route.
-    expect(row.binding).toBe("verified");
-    expect(row.routes).toContain("POST /m/api/pair/finish");
-    expect(row.executor).toBe("code_holder");
-    expect(row.callerAuthentication).toBe("one_time_pairing_code");
-    // A one-time code proves possession of the code, not the presence of a person, so the row
+  test("device.pair is the phone's enrollment, split into a request, an authorization and a commit, and the browser's pairing is not it", () => {
+    // Enrolling a controller is a P3 authority change, authorized by the active controller's user-verified
+    // passkey. It is live-bound: it enrols a credential and revokes the previous one (R3-01).
+    const request = loaded.byId.get("device.pair.request")!;
+    expect(request.class).toBe("P2");
+    expect(request.routes).toEqual(["POST /m/api/pair/finish"]);
+    expect(request.executor).toBe("code_holder");
+    // A one-time code proves possession of the invitation, not the presence of a person, so the request
     // states that no assurance predicate applies rather than borrowing one (R5-07).
-    expect(row.humanEvidence).toBeNull();
+    expect(request.humanEvidence).toBeNull();
+    const authorize = loaded.byId.get("device.pair.authorize")!;
+    expect(authorize.class).toBe("P3");
+    expect(authorize.routes).toEqual(["GET /m/api/pair/pending", "POST /m/api/pair/authorize"]);
+    expect(authorize.executor).toBe("device_credential");
+    expect(authorize.humanEvidence).toBe("A3-UV");
+    const commit = loaded.byId.get("device.pair")!;
+    expect(commit.class).toBe("P3");
+    expect(commit.routes).toEqual(["POST /m/api/pair/await"]);
+    expect(commit.executor).toBe("credential_issuer");
     expect(loaded.byId.get("session.pair")!.routes).not.toContain("POST /m/api/pair/finish");
   });
   test("the pairing schema carries the one-time code and nothing else", () => {
@@ -759,7 +765,7 @@ describe("manifest is loadable from source, not only from disk", () => {
     expect([...again.byId.keys()].sort()).toEqual([...loaded.byId.keys()].sort());
   });
 
-  test("a stale or malformed manifest fails loudly (NE-09)", () => {
+  test("a stale or malformed manifest fails loudly (STAGE-0A NE-06: .agents/prereg/horizon/STAGE-0A.prereg.yaml)", () => {
     const source = readFileSync(`${ROOT}contracts/identity/v1/operations.yaml`, "utf8");
     expect(() => parseOperationManifest(source.replace("- id: horizon.health\n", "- id: horizon.health\n      unexpected_key: 1\n"))).toThrow();
     expect(() => parseOperationManifest(source.replace("show_surface: agent.surface.publish", "show_surface: agent.not_a_row"))).toThrow();

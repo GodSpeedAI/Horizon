@@ -602,6 +602,20 @@ operations:
         lesson becomes active and applies to other people's work. The choice is fixed by the
         operation the card kind resolves to; a body that names a choice this effect does not have
         is refused.
+    - id: device.pair.request
+      binding: verified
+      routes: ["POST /m/api/pair/finish"]
+      executor: code_holder
+      human_evidence: null
+      params_schema: params.device_pair
+      ownership: caller_own_session
+      note: >-
+        P2. A phone that holds a live invitation proves the invitation with a verified passkey
+        registration and asks to join. It creates no device, credential, session or controller.
+        It holds one pending enrolment whose operation digest covers the exact credential,
+        public key, label and controllers it would replace, and it is refused when no active
+        controller exists to authorize it. The authority change is the separate row
+        device.pair.authorize, and the credential is created only by device.pair.
     - id: remote.start
       binding: verified
       routes: ["POST /workspace/remote/start"]
@@ -666,39 +680,44 @@ operations:
     - { id: expert.install, binding: candidate, params_schema: params.expert_install, separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
     - { id: expert.configure, binding: candidate, params_schema: params.expert_configure, separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
     - { id: expert.remove, binding: candidate, params_schema: params.expert_remove, separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
-    - id: device.pair
-      separation_of_duty: { requester: code_holder, approver: operator_at_desk_terminal, executor: code_holder }
+    - id: device.pair.authorize
+      separation_of_duty: { requester: prospective_device, approver: operator_with_active_controller, executor: device_credential }
       binding: verified
-      routes: ["POST /m/api/pair/finish", "POST /m/api/pair/await"]
-      executor: code_holder
-      caller_authentication: one_time_pairing_code
-      # Two steps, one authority. The phone's finish route proves possession of the invitation and a
-      # verified registration, and it authorizes nothing: it holds the enrolment as pending. The
-      # enrolment commits only on the await route, after the operator types the one-time code the
-      # desk shows on its own terminal. The operator's typed code is the authorization; no route
-      # produces it, and a browser cannot type into the desk's terminal. No A3-UV is claimed for this
-      # path, because the A3 mechanism has no evidence that a terminal presence can produce. Whether a
-      # P3 enrolment needs A3-UV is an owner decision.
+      routes: ["GET /m/api/pair/pending", "POST /m/api/pair/authorize"]
+      executor: device_credential
+      human_evidence: A3-UV
       authority_writer: cognate_local_continuation
-      human_evidence: null
-      stage0b_evidence: LOCAL_ENROLLMENT_PRESENCE
       pending_expiry: 5m
-      params_schema: params.device_pair
+      params_schema: params.device_pair_authorize
       ownership: caller_own_session
       note: >-
-        Device enrollment is a P3 authority change: it makes a new controller of this desktop and
-        revokes the controller it replaces. The invitation (the pairing link, issued by the P2
-        rows remote.start and remote.refresh) proves the phone was shown it; it does not authorize
-        a controller. A verified passkey registration proves the phone holds a new credential; it
-        does not authorize one either. The enrolment is held as pending until the operator types
-        the one-time code the desk shows on its terminal, which names the phone and the controllers
-        it replaces. Only then does the commit create the active credential, revoke the replaced
-        controller in the same commit, and expire after its pending window. A refresh or stop ends
-        a waiting enrolment. Possession of the one-time pairing code is the whole
-        authentication here: the route proves the code and the registration, never who presented
-        them. The desk's browser-session pairing is a different effect and has its own row
-        (`session.pair`): it creates a local browser session from a code typed at the local
-        console, and it enrolls no credential.
+        P3. The operator authorizes one enrolment with the active controller's own passkey, and
+        the signature requires user verification on that phone. The challenge is the enrolment's
+        operation digest, which names the new credential, its key, its label and the controllers
+        it replaces, so one proof authorizes exactly that transaction. The proof is verified
+        against the identity service's stored key and sign count, and it issues no session. A
+        verified proof moves the pending enrolment to confirmed, once, by one compare-and-swap.
+        The proof is human-authentication evidence (A3-UV). It does not commit anything: the
+        authority is the confirmed record that the writer applies in device.pair. A browser
+        cannot produce the proof, and a terminal's typed text cannot either.
+    - id: device.pair
+      separation_of_duty: { requester: prospective_device, approver: operator_with_active_controller, executor: credential_issuer }
+      binding: verified
+      routes: ["POST /m/api/pair/await"]
+      executor: credential_issuer
+      authority_writer: cognate_local_continuation
+      human_evidence: A3-UV
+      pending_expiry: 5m
+      params_schema: params.device_pair_await
+      ownership: caller_own_session
+      note: >-
+        P3. The authorized credential issuer creates the active credential only for an enrolment
+        that device.pair.authorize confirmed, inside its window, for the same generation and
+        controllers, and it applies that confirmation once. The commit replaces the controller
+        it names and revokes that controller's sessions in the same commit. A refresh or stop
+        ends every waiting or confirmed enrolment. The route authenticates the pending record
+        alone: the caller presents a pending id, and only the record's own confirmation lets it
+        create anything.
     - id: handoff.send
       separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }
       binding: verified
@@ -727,13 +746,11 @@ operations:
       fixed_parameters: { phase: observe }
       pending_expiry: 10m
       note: >-
-        The observation half of settlement, and a P3 row. It records what was done as an
-        evidence entry in SEA-Forge's ledger, an external write that a P2 local row may not
-        make. It changes no settlement state: the ruling is the separate row
-        horizon.settlement.rule. Requester, approver and executor are three distinct roles: the
-        human session requests and executes, an independent human approves. If the owner counts
-        an evidence-ledger write as a local act, this row returns to P2 (an open owner
-        decision).
+        It reads the settlement target through RealityTrace, submits an evidence packet to SEA-
+        Forge's evidence ledger, and records a local settlement state of pending with the window
+        open. The ledger entry is consequential: it is the evidence a later ruling uses, and it
+        leaves this application. The effect, not any route refusal, is why the row is P3. It
+        acknowledges no settlement and writes no ruling; the ruling is horizon.settlement.rule.
     - id: device.settlement.observe
       separation_of_duty: { requester: device_credential, approver: independent_human, executor: device_credential }
       binding: verified
@@ -744,11 +761,11 @@ operations:
       fixed_parameters: { phase: observe }
       pending_expiry: 10m
       note: >-
-        The phone's observation row. It is P3 and it is refused on the device route: the
-        observation writes an evidence entry to SEA-Forge's ledger, and a device credential
-        proves the device, not the person holding it, so it cannot supply the independent
-        approval that the separation of duty requires. The refusal is containment; no device
-        path to this write is claimed as working.
+        Same effect as horizon.settlement.observe, requested from the phone: it reads the
+        target, submits the evidence packet to SEA-Forge's ledger, and records the local window.
+        P3 because of that external ledger write. A device credential proves which device is at
+        the route, never which person holds it, so it cannot supply the approval the separation
+        of duty requires; the phone route refuses it.
     - id: approval.approve
       binding: verified
       routes: ["POST /desk/decide"]
@@ -1069,6 +1086,16 @@ live_enforcement:
       note: >-
         A phone that signed in with its passkey. It is not a human session: the device credential
         proves which enrolled device is at the route, never which person is holding it.
+    authorized_pending_record:
+      authority: >-
+        A pending enrolment that the active controller's user-verified passkey confirmed, moved by one
+        compare-and-swap, inside its window and for the same generation and controllers. The writer
+        applies it once.
+      evidence: A3-UV
+      note: >-
+        The route presents only a pending id. What it proves is the record's own state: the confirmation
+        is the controller's A3-UV proof, verified by the authorize route, and nothing the caller presents
+        at this route can create a confirmation.
   # One entry per live-bound row. `enforced_today` is a statement about this repository's running
   # code at the freeze, checked against the source. A row whose enforcement is missing says what
   # is missing and which stage must close it; it is never left implied by the class.
@@ -1500,10 +1527,9 @@ live_enforcement:
       enforced_today: false
       refused_today: true
       refusal_reason: >-
-        P3 and the observation submits an evidence packet to SEA-Forge, so the effect
-        leaves this application: the pending record and the person's evidence do not
-        exist at this freeze, so the row is refused before any target effect and the
-        refusal is audited.
+        P3: the observation submits an evidence packet to SEA-Forge's ledger, an external
+        consequential write. The pending record and the person's A3-UV evidence do not exist at
+        this freeze, so the row is refused before any target effect and the refusal is audited.
       target_effect: none
       refusal_audit: appends_refusal_audit
       enforced_by: >-
@@ -1513,19 +1539,18 @@ live_enforcement:
       required_stage: "Stage 0B"
       production_stage: "Stage 3"
       note: >-
-        The observation is P3 because the handler observes through RealityTrace, builds an
-        evidence packet and submits it to SEA-Forge, so the effect leaves this application. The
-        desk route refuses the row before the handler runs (refused_today), so no observation is
-        written; the pending record and the person's A3-UV evidence are missing.
+        The classification follows the effect described in the row's note. The desk route
+        refuses the row before the handler runs (refused_today), so no observation is written at
+        this freeze.
     - id: device.settlement.observe
       caller_path: device_credential
       enforced_today: false
       refused_today: true
       refusal_reason: >-
-        P3 and a device credential proves which enrolled device is at the route, never
-        which person is holding it: there is no pending record and no protected
-        confirmation, so the row is refused before any target effect and the refusal is
-        audited.
+        P3: the observation submits an evidence packet to SEA-Forge's ledger. A device
+        credential proves which device is at the route, never which person holds it: there is no
+        pending record and no protected confirmation, so the row is refused before any target
+        effect and the refusal is audited.
       target_effect: none
       refusal_audit: appends_refusal_audit
       enforced_by: >-
@@ -1682,26 +1707,51 @@ live_enforcement:
       missing: [durable_principal_binding, evidence_A3_UV, pending_record, separation_of_duty_check]
       required_stage: "Stage 0B"
       production_stage: "Stage 3"
-    - id: device.pair
+    - id: device.pair.request
       caller_path: code_holder
       enforced_today: false
       refused_today: false
       enforced_by: >-
-        Implemented, not claimed as enforced: the one-time pairing code and the verified WebAuthn
-        registration are checked against the ticket's challenge and the transport's origin; the
-        enrolment is then held as a pending record, and it commits only after the operator types the
-        code the desk shows on its terminal (one compare-and-swap, once, within five minutes). A
-        refresh or stop ends a waiting enrolment. The desk's terminal is the only input.
-      missing: [enrollment_presence_receipt, authority_sea_forge]
+        Implemented, not claimed as enforced: the invitation's ticket and a verified passkey registration
+        are checked, and the request is held as a pending enrolment that no controller has authorized. It
+        creates no credential and no session.
+      missing: [durable_principal_binding]
       required_stage: "Stage 0B"
       production_stage: "Stage 3"
       note: >-
-        Device enrollment is its own ceremony, not a human confirmation. Its evidence is
-        LOCAL_ENROLLMENT_PRESENCE, a presence claim the A3 mechanism says grants no A3
-        evidence and no authority beyond the enrollment itself, so this row never requires
-        A3-UV and never inherits the human confirmation's requirements. What is missing is the
-        enrollment-specific receipt and an enrollment pending record, both of which Stage 0B
-        introduces.
+        The route proves the invitation and the registration, never which person holds the phone. The
+        request is refused when no active controller exists to authorize it.
+    - id: device.pair.authorize
+      caller_path: device_credential
+      enforced_today: false
+      refused_today: false
+      enforced_by: >-
+        Implemented, not claimed as enforced: the controller's passkey assertion is verified
+        with user verification against the identity service's stored key and sign count, over
+        the enrolment's operation digest, and the confirmation is one compare-and-swap. Nothing
+        enrols until device.pair commits.
+      missing: [authority_sea_forge, enrollment_presence_receipt]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+      note: >-
+        The authorization is A3-UV evidence from the controller's own passkey. It is not the
+        authority writer: the authority is the confirmed pending record and the commit that
+        applies it. The SEA-Forge authority is not yet published, so this row is not enforced as
+        a governed decision.
+    - id: device.pair
+      caller_path: authorized_pending_record
+      enforced_today: false
+      refused_today: false
+      enforced_by: >-
+        Implemented, not claimed as enforced: the commit creates an active credential only for a
+        confirmed enrolment, inside its window, for the same generation and controllers, and
+        applies the confirmation once.
+      missing: [authority_sea_forge]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+      note: >-
+        The commit is the designated writer's act. The stop and refresh paths end waiting and
+        confirmed enrolments in the store, so a restart does not revive them.
     - id: remote.start
       caller_path: human_session
       enforced_today: false
