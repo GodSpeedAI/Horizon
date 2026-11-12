@@ -23,6 +23,7 @@ export const MISSING_LEGEND: Readonly<Record<string, string>> = {
   evidence_A3_UV: "A3-UV evidence",
   authority_cognate_local_continuation: "the Cognate local continuation authority",
   authority_sea_forge: "the SEA-Forge authority",
+  identity_service_evidence_check: "the identity service's check of the A3-UV evidence before its write (the vendored service accepts no evidence)",
   authority_sea_forge_confirmation: "the SEA-Forge authority's confirmation",
   separation_of_duty: "separation of duty",
   separation_of_duty_check: "the separation-of-duty check",

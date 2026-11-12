@@ -30,6 +30,8 @@ import { fromB64url, type VerifiedRegistration } from "./webauthn.ts";
 
 export const ENROLMENT_OPERATION = "device.pair";
 export const ENROLMENTS_COLLECTION = "horizon-remote-enrollments";
+/** The approval record: the active controller that signed the proof, written once with the confirmation. */
+export const APPROVALS_COLLECTION = "horizon-remote-enrollment-approvals";
 /** The catalog's pending window for device.pair (pending_expiry 5m). */
 export const ENROLMENT_WINDOW_MS = 5 * 60_000;
 
@@ -42,7 +44,19 @@ export interface EnrolmentRequest {
   readonly registration: VerifiedRegistration;
   /** The active controllers at request time, sorted. Authorization and commit refuse if the set has changed. */
   readonly replaces: readonly string[];
+  /** The permissions the new device would hold. The digest covers them, so the proof authorizes exactly this grant. */
+  readonly permissions: readonly string[];
   readonly requested_at: string;
+}
+
+/** The human authorization of one enrolment: which active controller signed the proof, and when. */
+export interface Approval {
+  readonly pending_id: string;
+  readonly digest: string;
+  readonly authorizer_device_id: string;
+  readonly authorizer_credential_id: string;
+  readonly sign_count: number;
+  readonly approved_at: string;
 }
 
 export interface Waiting {
@@ -61,7 +75,7 @@ export type AuthorizeOutcome =
   | { readonly ok: false; readonly code: "unknown" | "not_pending" | "expired" | "unverified" | "raced" | "stale"; readonly message: string };
 
 export type CommitOutcome =
-  | { readonly ok: true; readonly request: EnrolmentRequest }
+  | { readonly ok: true; readonly request: EnrolmentRequest; readonly approval: Approval }
   | { readonly ok: false; readonly code: "not_authorized" | "expired" | "stale" | "used" | "unknown"; readonly state: PendingState | null };
 
 export function sameIds(left: readonly string[], right: readonly string[]): boolean {
@@ -126,6 +140,7 @@ export class EnrollmentAuthority {
     readonly now: Date;
     readonly generation: number;
     readonly currentControllers: readonly string[];
+    readonly authorizer: { readonly deviceId: string; readonly credentialId: string };
     readonly verify: (challenge: Uint8Array) => Promise<number>;
   }): Promise<AuthorizeOutcome> {
     const request = await this.requestOf(input.pendingId);
@@ -143,7 +158,25 @@ export class EnrollmentAuthority {
       },
     );
     if (!result.ok) return { ok: false, code: result.code, message: result.message };
-    return { ok: true, signCount: signed.signCount ?? 0 };
+    const signCount = signed.signCount ?? 0;
+    const approval: Approval = {
+      pending_id: input.pendingId,
+      digest: result.descriptor.operation_digest,
+      authorizer_device_id: input.authorizer.deviceId,
+      authorizer_credential_id: input.authorizer.credentialId,
+      sign_count: signCount,
+      approved_at: input.now.toISOString(),
+    };
+    try {
+      await this.store.commit({
+        appends: [],
+        records: [{ collection: APPROVALS_COLLECTION, id: input.pendingId, expectedVersion: 0, value: approval as unknown as { readonly [key: string]: Json } }],
+      });
+    } catch {
+      // The confirmation is spent without its approval record, so the commit refuses it (fail closed).
+      return { ok: false, code: "raced", message: "The approval could not be recorded. Refresh the QR on your desktop and scan again." };
+    }
+    return { ok: true, signCount };
   }
 
   /**
@@ -172,9 +205,14 @@ export class EnrollmentAuthority {
       await abandon(this.store, input.pendingId, input.now, "the controller changed or the pairing was refreshed while waiting");
       return { ok: false, code: "stale", state: "expired" };
     }
+    // The authority decision the commit needs: an approval written with the confirmation, by a controller still active.
+    const approval = await this.approvalOf(input.pendingId);
+    if (approval === null || !input.currentControllers.includes(approval.authorizer_device_id)) {
+      return { ok: false, code: "not_authorized", state };
+    }
     const applied = await applyConfirmed(this.store, input.pendingId, input.now, "enrolment committed");
     if (!applied) return { ok: false, code: "used", state: await stateOf(this.store, input.pendingId) };
-    return { ok: true, request };
+    return { ok: true, request, approval };
   }
 
   /**
@@ -186,6 +224,11 @@ export class EnrollmentAuthority {
     for (const row of rows) {
       await abandon(this.store, (row.value as unknown as PendingDescriptor).pending_id, new Date(this.clock()), reason);
     }
+  }
+
+  private async approvalOf(pendingId: string): Promise<Approval | null> {
+    const row = await this.store.getRecord(APPROVALS_COLLECTION, pendingId);
+    return row === undefined || row === null ? null : (row.value as unknown as Approval);
   }
 
   private async requestOf(pendingId: string): Promise<EnrolmentRequest | null> {

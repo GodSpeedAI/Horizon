@@ -411,6 +411,8 @@ The catalog is released in Stage 0A as a checked manifest with one row per opera
 **Bootstrap exceptions.** `device.recover` and `trust.rotate` are P2 ceremonies that cannot require an already-qualified A3 device without circularity. `device.pair` is not one of them: enrolling a controller needs the active controller's own user-verified passkey, so with no active controller the enrolment is refused. The first controller therefore needs a desk-held operator passkey, which this build does not provide (see the device enrolment paragraph). Their ceremonies are distinct:
 
 - `device.pair` enrolment of a new remote controller is three rows, one per act. `device.pair.request` (P2, `code_holder`) holds a verified registration as pending and creates no authority. `device.pair.authorize` (P3, `device_credential`, A3-UV) is the active controller's own user-verified passkey signing the pending enrolment's operation digest, which names the exact credential, key, label and controllers it replaces. The proof is checked against the identity service's stored key and sign count, issues no session, and confirms the pending record once, by one compare-and-swap. `device.pair` (P3, `credential_issuer`, authority writer `cognate_local_continuation`) creates the credential only for that confirmed record, inside its window, for the same generation and controllers, and revokes the replaced controller in the same commit. A refresh or stop ends every waiting or confirmed enrolment in the store. The invitation, the registration and a terminal's typed text each authorize nothing. Separation of duty is per row: requester `prospective_device`, approver `operator_with_active_controller`, and the executor the row performs. A WebAuthn proof is human-authentication evidence, not the authority: the governing record is still the writer's confirmed transition. It is not the browser's pairing route, which is `session.pair`.
+
+**Responsibilities of device enrolment.** Three responsibilities are kept apart, and none is satisfied by another's record. *Authorization* is the P3 approver's act: the active controller's user-verified passkey approves the exact operation digest, which binds the proposed credential, its label, the permissions it would hold, the controllers it replaces and the generation it was requested under. *Identity lifecycle* is the identity service's act: it is the designated device-enrolment state writer and performs the credential enrolment and replacement. Its vendored API accepts no evidence, so Horizon checks the A3-UV proof before calling it; that check is a Stage 0B integration gap, not an identity-service guarantee. *Atomic persistence* is store compare-and-swap: it enforces the expected generation, the replacement rule and single use by moving the pending record pending to confirmed to applied, with the approval record written alongside. Store CAS enforces the transition; it approves nothing. No SEA-Forge P3 authority decision exists for enrolment in Stage 0B, and no success of the identity write or the CAS is read as one.
 - `device.recover` requires the one-time recovery code **and** the local console **and** a fresh passkey enrollment. A second already-paired device may authorize replacement through A3-UV only if it is not the device being replaced. A recovery code alone, a browser, an agent, or a remote session cannot replace a device.
 - `trust.rotate` requires the local console plus an independent human administrator confirmation; it cannot be initiated by an agent or a browser session.
 
@@ -494,7 +496,7 @@ These exceptions do not create authority to perform any other operation, and the
 | `approval.reject` | `human_session` | durable_principal_binding, evidence_A3_UV, pending_record, separation_of_duty_check | Stage 0B — Stage 3 for the production path |
 | `device.pair.request` | `code_holder` | durable_principal_binding | Stage 0B — Stage 3 for the production path |
 | `device.pair.authorize` | `device_credential` | authority_sea_forge, enrollment_presence_receipt | Stage 0B — Stage 3 for the production path |
-| `device.pair` | `authorized_pending_record` | authority_sea_forge | Stage 0B — Stage 3 for the production path |
+| `device.pair` | `authorized_pending_record` | authority_sea_forge, identity_service_evidence_check | Stage 0B — Stage 3 for the production path |
 | `remote.start` | `human_session` | durable_principal_binding, evidence_A3_UV, authority_cognate_local_continuation, pending_record | Stage 0B — Stage 3 for the production path |
 | `remote.refresh` | `human_session` | durable_principal_binding, evidence_A3_UV, authority_cognate_local_continuation, pending_record | Stage 0B — Stage 3 for the production path |
 | `remote.stop` | `human_session` | durable_principal_binding, evidence_A3_UV, authority_cognate_local_continuation, pending_record | Stage 0B — Stage 3 for the production path |
@@ -511,6 +513,7 @@ The missing-fact ids mean:
 - `enrollment_presence_receipt` — the enrollment presence receipt
 - `evidence_A3_UV` — A3-UV evidence
 - `execution_proof` — the execution proof
+- `identity_service_evidence_check` — the identity service's check of the A3-UV evidence before its write (the vendored service accepts no evidence)
 - `live_bounded_grant` — the live bounded grant
 - `pending_record` — the operation-bound pending record
 - `resolved_row_authority` — the resolved row's authority
@@ -910,8 +913,8 @@ Integer values are encoded as JSON strings, never JavaScript numbers; `uint64` a
 | `lesson.decide` | `human_session` | `cognate_local_continuation` | `A3-UV` | 10m |
 | `remote.start`, `remote.refresh`, `remote.stop` | `human_session` | `cognate_local_continuation` | `A3-UV` | 10m |
 | `device.pair.request` | `code_holder` | `cognate_local_continuation` | `NONE` | 5m |
-| `device.pair.authorize` | `device_credential` | `cognate_local_continuation` | `A3-UV` | 5m |
-| `device.pair` | `credential_issuer` | `cognate_local_continuation` | `A3-UV` | 5m |
+| `device.pair.authorize` | `device_credential` | `identity_service` | `A3-UV` | 5m |
+| `device.pair` | `credential_issuer` | `identity_service` | `A3-UV` | 5m |
 | `device.remove` | `human_session` | `cognate_local_continuation` | `A3-UV` | 10m |
 | `device.recover` | `local_console` | `cognate_local_continuation` | `RECOVERY_CODE_PRESENCE_FRESH_PASSKEY` | 5m |
 | `expert.answer` | `human_session` | `cognate_local_continuation` | `A3-UV` | 10m |

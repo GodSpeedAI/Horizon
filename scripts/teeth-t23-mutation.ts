@@ -411,13 +411,13 @@ const MUTANTS: readonly Mutant[] = [
     replace: '    if (state === "pending" && false) return { ok: false, code: "not_authorized", state };',
   },
   {
-    id: "M46 a stale enrolment commits after the controller changed",
+    id: "M46 a confirmation whose approver is no longer a controller commits",
     expectation: "ENROL-2",
     file: "src/remote/enrollment.ts",
     testFile: ENROLMENT_TEST,
-    title: "NE-62: a controller enrolled by another route after authorization makes the confirmed enrolment stale at commit, and it creates no device",
-    find: '    if (request.generation !== input.generation || !sameIds(request.replaces, input.currentControllers)) {\n      await abandon(this.store, input.pendingId, input.now, "the controller changed or the pairing was refreshed while waiting");\n      return { ok: false, code: "stale", state: "expired" };',
-    replace: '    if (false) {\n      await abandon(this.store, input.pendingId, input.now, "the controller changed or the pairing was refreshed while waiting");\n      return { ok: false, code: "stale", state: "expired" };',
+    title: "NE-69: a confirmation with no approval recorded by a current controller is refused at commit",
+    find: "    if (approval === null || !input.currentControllers.includes(approval.authorizer_device_id)) {",
+    replace: "    if (approval === null) {",
   },
   {
     // Stage 0B. A label that runs without the gate's answer is written with no confirmation.

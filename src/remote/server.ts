@@ -36,6 +36,8 @@ import type { RemoteSettings } from "./settings.ts";
 export const REMOTE_SCHEMA = "horizon.remote/1";
 /** The actor id an enrolled device is called by. It is not a person, and its prefix says so in every record it writes. */
 export const DEVICE_ACTOR_PREFIX = "device:";
+/** The one permission a phone enrolled through the remote gets: it is a controller of this desktop's remote session. */
+export const REMOTE_CONTROLLER_PERMISSION = "remote_controller";
 /**
  * The durable operator an enrolled device is associated with. It is attribution — who the device
  * belongs to and who is answerable for it — never the caller of a device-authenticated request.
@@ -252,6 +254,7 @@ export class RemoteController {
       return refusal(410, "authorization_used", "This authorization was already used or is not valid. Refresh the QR on your desktop and scan again.");
     }
     const { registration, label } = committed.request;
+    const { approval } = committed;
     let enrolledId: string | null = null;
     try {
       // One active controller, bound to one durable operator that the cockpit's session approved. The identity
@@ -278,7 +281,22 @@ export class RemoteController {
         revoked_at: null,
       };
       await addDevice(this.deps.store, device);
-      await auditRemote(this.deps.store, { tenant: this.deps.tenant, operator: this.deps.operator, device_id: device.device_id, action: "pair", outcome: "authorized", at });
+      // The committed record keeps the four roles apart: who asked, which human authorized it, the authority decision
+      // it rests on, and which component issued the credential.
+      await auditRemote(this.deps.store, {
+        tenant: this.deps.tenant,
+        operator: this.deps.operator,
+        device_id: device.device_id,
+        action: "pair",
+        outcome: "authorized",
+        at,
+        actors: {
+          requester: { credential_id: registration.credentialId, label, role: "prospective_device" },
+          authorizer: { device_id: approval.authorizer_device_id, credential_id: approval.authorizer_credential_id, role: "operator_with_active_controller" },
+          decision: { pending_id: approval.pending_id, digest: approval.digest, approved_at: approval.approved_at, role: "p3_approval" },
+          issuer: { component: "identity_service", identity_device_id: enrolled.device.id, role: "credential_issuer" },
+        },
+      });
       return json(200, { ok: true, label: device.label }, { "set-cookie": sessionCookie(enrolled.session.token) });
     } catch (error) {
       // The authorization is spent. If the identity service enrolled the phone but the ledger did not record it,
@@ -501,6 +519,7 @@ export class RemoteController {
             label: labelOf(request.headers.get("user-agent")),
             registration: verified,
             replaces: controllers,
+            permissions: [REMOTE_CONTROLLER_PERMISSION],
             requested_at: new Date(now).toISOString(),
           });
         });
@@ -621,6 +640,7 @@ export class RemoteController {
         now: new Date(now),
         generation: this.pairing.generation,
         currentControllers: await this.activeDeviceIds(),
+        authorizer: { deviceId: controller.device_id, credentialId: controller.credential_id },
         verify: async (challenge) => {
           const verified = await verifyAssertion(credential, {
             challenge,

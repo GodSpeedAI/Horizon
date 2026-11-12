@@ -40,6 +40,7 @@ const AUTHORITY_WRITERS = [
   "sea_forge",
   "issuer_root",
   "case_record.authority",
+  "identity_service",
 ] as const;
 export type AuthorityWriter = (typeof AUTHORITY_WRITERS)[number];
 

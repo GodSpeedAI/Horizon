@@ -18,7 +18,7 @@ preregistration:
   upstream_pins:
     spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
     plan: { id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23", line: 1725, reference: "contain Horizon's reserved operations with an immutable pending descriptor and a local terminal confirmation (A3-T)" }
-    design: { file: design_draft.md, sha256: "24d753ea4a159f2fdd316d536a067d0d6048c67daae5c6ebabe2e2a9de60a51c", lines: 969, sections: "12" }
+    design: { file: design_draft.md, sha256: "68f11d7832ad254703f10e3bb57d52c70979f911dcaeb992ef54508e46973365", lines: 972, sections: "12" }
     prior_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-REMEDIATION-4.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-REMEDIATION-4, relationship: "the Stage 0A unit this containment follows" }
   # This unit settles no specification requirement. It adds a local confirmation to reserved
   # human writes. The Stage 0A requirements remain open until the sixth independent review rules.
@@ -201,3 +201,18 @@ preregistration:
     - id: NE-65
       expectation: >-
         A stale enrolment cannot restore access once the controller has been refreshed away.
+    - id: NE-68
+      expectation: >-
+        Only the enrolment commit writes a device credential, and the identity service is its only writer.
+    - id: NE-69
+      expectation: >-
+        A confirmation with no approval recorded by a current controller is refused at commit.
+    - id: NE-70
+      expectation: >-
+        The digest binds the permissions, so an altered stored grant is refused at commit and creates nothing.
+    - id: NE-71
+      expectation: >-
+        A failure after the identity service enrols the phone leaves no partially authorized device.
+    - id: NE-72
+      expectation: >-
+        The commit audit names the requester, the human authorizer, the decision and the issuer as separate roles.

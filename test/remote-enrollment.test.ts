@@ -12,14 +12,15 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
-import { listDevices } from "../src/capabilities/remote-records.ts";
+import { AUDIT_COLLECTION, DEVICE_COLLECTION, listDevices } from "../src/capabilities/remote-records.ts";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { horizonDocument, writeConfig } from "./support/config.ts";
 import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
 import { failNextReplace, identityDeviceOf, seedController } from "./support/controller.ts";
-import { EnrollmentAuthority } from "../src/remote/enrollment.ts";
+import { EnrollmentAuthority, ENROLMENTS_COLLECTION } from "../src/remote/enrollment.ts";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
-import { stateOf } from "../src/capabilities/pending-confirmations.ts";
+import { confirmWithProof, stateOf } from "../src/capabilities/pending-confirmations.ts";
 import { auditRemote } from "../src/capabilities/remote-records.ts";
 
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1";
@@ -443,9 +444,9 @@ describe("concurrency and window: a late authorization or commit authorizes noth
     const store = createMemoryStore();
     const authority = new EnrollmentAuthority(store, () => now);
     const registration = { credentialId: "cred-late", publicKey: "key", alg: -7, signCount: 0 };
-    const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "late", registration: registration as never, replaces: [], requested_at: new Date(now).toISOString() });
+    const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "late", registration: registration as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(now).toISOString() });
     if (!opened.ok) throw new Error("request refused");
-    const authorized = await authority.authorize({ tenant: "t", pendingId: opened.pendingId, now: new Date(now), generation: 1, currentControllers: [], verify: async () => 1 });
+    const authorized = await authority.authorize({ tenant: "t", pendingId: opened.pendingId, now: new Date(now), generation: 1, currentControllers: [], authorizer: { deviceId: "d1", credentialId: "c1" }, verify: async () => 1 });
     expect(authorized.ok).toBe(true);
     now += 6 * 60_000;
     const committed = await authority.commit({ pendingId: opened.pendingId, tenant: "t", generation: 1, currentControllers: [], now: new Date(now) });
@@ -471,11 +472,11 @@ describe("concurrency and window: a late authorization or commit authorizes noth
     const store = createMemoryStore();
     const authority = new EnrollmentAuthority(store, () => 1_000_000);
     const registration = { credentialId: "cred-first", publicKey: "key", alg: -7, signCount: 0 };
-    const first = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "first", registration: registration as never, replaces: [], requested_at: new Date(1_000_000).toISOString() });
-    const second = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "second", registration: { ...registration, credentialId: "cred-second" } as never, replaces: [], requested_at: new Date(1_000_000).toISOString() });
+    const first = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "first", registration: registration as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() });
+    const second = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "second", registration: { ...registration, credentialId: "cred-second" } as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() });
     if (!first.ok || !second.ok) throw new Error("request refused");
     expect(await stateOf(store, first.pendingId)).toBe("expired");
-    const late = await authority.authorize({ tenant: "t", pendingId: first.pendingId, now: new Date(1_000_000), generation: 1, currentControllers: [], verify: async () => 1 });
+    const late = await authority.authorize({ tenant: "t", pendingId: first.pendingId, now: new Date(1_000_000), generation: 1, currentControllers: [], authorizer: { deviceId: "d1", credentialId: "c1" }, verify: async () => 1 });
     expect(late.ok).toBe(false);
     const waiting = await authority.waiting("t", 1_000_000);
     expect(waiting?.pendingId).toBe(second.pendingId);
@@ -485,9 +486,9 @@ describe("concurrency and window: a late authorization or commit authorizes noth
     const store = createMemoryStore();
     const authority = new EnrollmentAuthority(store, () => 1_000_000);
     const registration = { credentialId: "cred-confirmed", publicKey: "key", alg: -7, signCount: 0 };
-    const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "confirmed", registration: registration as never, replaces: [], requested_at: new Date(1_000_000).toISOString() });
+    const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "confirmed", registration: registration as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() });
     if (!opened.ok) throw new Error("request refused");
-    const authorized = await authority.authorize({ tenant: "t", pendingId: opened.pendingId, now: new Date(1_000_000), generation: 1, currentControllers: [], verify: async () => 1 });
+    const authorized = await authority.authorize({ tenant: "t", pendingId: opened.pendingId, now: new Date(1_000_000), generation: 1, currentControllers: [], authorizer: { deviceId: "d1", credentialId: "c1" }, verify: async () => 1 });
     expect(authorized.ok).toBe(true);
     await authority.endWaiting("t", "the controller was stopped");
     const committed = await authority.commit({ pendingId: opened.pendingId, tenant: "t", generation: 1, currentControllers: [], now: new Date(1_000_000) });
@@ -499,14 +500,117 @@ describe("concurrency and window: a late authorization or commit authorizes noth
     const store = createMemoryStore();
     const authority = new EnrollmentAuthority(store, () => 1_000_000);
     const registration = { credentialId: "cred-abandon", publicKey: "key", alg: -7, signCount: 0 };
-    const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "gone", registration: registration as never, replaces: [], requested_at: new Date(1_000_000).toISOString() });
+    const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "gone", registration: registration as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() });
     if (!opened.ok) throw new Error("request refused");
     await authority.endWaiting("t", "the controller was stopped");
-    const late = await authority.authorize({ tenant: "t", pendingId: opened.pendingId, now: new Date(1_000_000), generation: 1, currentControllers: [], verify: async () => 1 });
+    const late = await authority.authorize({ tenant: "t", pendingId: opened.pendingId, now: new Date(1_000_000), generation: 1, currentControllers: [], authorizer: { deviceId: "d1", credentialId: "c1" }, verify: async () => 1 });
     expect(late.ok).toBe(false);
     expect(await stateOf(store, opened.pendingId)).toBe("expired");
     const committed = await authority.commit({ pendingId: opened.pendingId, tenant: "t", generation: 1, currentControllers: [], now: new Date(1_000_000) });
     expect(committed.ok).toBe(false);
+  });
+});
+
+describe("the designated writer: no bypass, no partial device, four roles in the record", () => {
+  test("NE-68: only the enrolment commit writes a device credential, and the identity service is its only writer", () => {
+    const writers: string[] = [];
+    const walk = (dir: string): void => {
+      for (const name of readdirSync(dir)) {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) walk(path);
+        else if (path.endsWith(".ts")) {
+          readFileSync(path, "utf8").split("\n").forEach((line, index) => {
+            if (/\.replaceDevices\(|\.enrolDevice\(|\baddDevice\(/.test(line) && !/export (async )?function/.test(line)) writers.push(`${path}:${index + 1}`);
+          });
+        }
+      }
+    };
+    walk(join(import.meta.dir, "..", "src"));
+    expect(writers.map((entry) => entry.replace(/:\d+$/, "")).sort()).toEqual([
+      join(import.meta.dir, "..", "src", "remote", "server.ts"),
+      join(import.meta.dir, "..", "src", "remote", "server.ts"),
+    ]);
+  });
+
+  test("NE-69: a confirmation with no approval recorded by a current controller is refused at commit", async () => {
+    const store = createMemoryStore();
+    const authority = new EnrollmentAuthority(store, () => 1_000_000);
+    const registration = { credentialId: "cred-no-approval", publicKey: "key", alg: -7, signCount: 0 };
+    const base = { tenant: "t", operator: "o", generation: 1, label: "x", registration: registration as never, replaces: ["c1"], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() };
+    // A proof from a device that is not a current controller confirms, but its approval cannot satisfy the commit.
+    const ghost = await authority.request(base);
+    if (!ghost.ok) throw new Error("request refused");
+    const confirmed = await authority.authorize({ tenant: "t", pendingId: ghost.pendingId, now: new Date(1_000_000), generation: 1, currentControllers: ["c1"], authorizer: { deviceId: "ghost", credentialId: "g" }, verify: async () => 1 });
+    expect(confirmed.ok).toBe(true);
+    const refusedGhost = await authority.commit({ pendingId: ghost.pendingId, tenant: "t", generation: 1, currentControllers: ["c1"], now: new Date(1_000_000) });
+    expect(refusedGhost.ok).toBe(false);
+    // A confirmation with no approval record at all is refused too.
+    const bare = await authority.request({ ...base, registration: { ...registration, credentialId: "cred-bare" } as never });
+    if (!bare.ok) throw new Error("request refused");
+    await confirmWithProof(store, { tenant: "t", pendingId: bare.pendingId, now: new Date(1_000_000), reason: "confirmed without an approval" }, async () => undefined);
+    const refusedBare = await authority.commit({ pendingId: bare.pendingId, tenant: "t", generation: 1, currentControllers: ["c1"], now: new Date(1_000_000) });
+    expect(refusedBare.ok).toBe(false);
+    expect(refusedBare.ok ? "" : refusedBare.code).toBe("not_authorized");
+  });
+
+  test("NE-70: the digest binds the permissions, so an altered stored grant is refused at commit and creates nothing", async () => {
+    const store = createMemoryStore();
+    const authority = new EnrollmentAuthority(store, () => 1_000_000);
+    const registration = { credentialId: "cred-grant", publicKey: "key", alg: -7, signCount: 0 };
+    const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "grant", registration: registration as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() });
+    if (!opened.ok) throw new Error("request refused");
+    const authorized = await authority.authorize({ tenant: "t", pendingId: opened.pendingId, now: new Date(1_000_000), generation: 1, currentControllers: [], authorizer: { deviceId: "d1", credentialId: "c1" }, verify: async () => 1 });
+    expect(authorized.ok).toBe(true);
+    const stored = (await store.getRecord(ENROLMENTS_COLLECTION, opened.pendingId))!.value as unknown as Record<string, unknown>;
+    await store.commit({ appends: [], records: [{ collection: ENROLMENTS_COLLECTION, id: opened.pendingId, expectedVersion: 1, value: { ...stored, permissions: ["everything"] } as never }] });
+    const committed = await authority.commit({ pendingId: opened.pendingId, tenant: "t", generation: 1, currentControllers: [], now: new Date(1_000_000) });
+    expect(committed.ok).toBe(false);
+  });
+
+  test("NE-71: a failure after the identity service enrols the phone leaves no partially authorized device", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    expect((await rig!.phone.authorize(seeded.controller, pendingId)).status).toBe(200);
+    const store = rig!.app.runtime.runtime.store;
+    const original = store.commit.bind(store);
+    let armed = true;
+    store.commit = (async (input: Parameters<typeof original>[0]) => {
+      // Only the creation of the new device's record (addDevice, expectedVersion 0), not the revocations, fails.
+      if (armed && (input.records ?? []).some((record) => record.collection === DEVICE_COLLECTION && record.expectedVersion === 0)) {
+        armed = false;
+        throw new Error("ledger write failed");
+      }
+      return original(input);
+    }) as typeof store.commit;
+    const committed = await new Client(() => rig!).awaitAuthorization(pendingId);
+    store.commit = original;
+    expect(committed.status).toBe(400);
+    expect(cookieOf(committed)).toBe("");
+    expect(await activeDevices(rig!)).toHaveLength(0);
+    const credentialId = Buffer.from(newPhone.credentialId).toString("base64url");
+    const identity = await identityDeviceOf(rig!.app, credentialId);
+    expect(identity?.revokedAt).not.toBeNull();
+  });
+
+  test("NE-72: the commit audit names the requester, the human authorizer, the decision and the issuer as separate roles", async () => {
+    const seeded = await controlledRig();
+    rig = seeded.rig;
+    const newPhone = await new SoftwareAuthenticator().generate();
+    const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
+    expect((await rig!.phone.authorize(seeded.controller, pendingId)).status).toBe(200);
+    expect((await new Client(() => rig!).awaitAuthorization(pendingId)).status).toBe(200);
+    const audits = await rig!.app.runtime.runtime.store.listRecords(AUDIT_COLLECTION, { tenant: rig!.app.caller.tenant });
+    const commit = audits.map((row) => row.value as { action?: string; outcome?: string; actors?: Record<string, { role: string }> }).find((row) => row.outcome === "authorized");
+    expect(commit?.actors).toBeDefined();
+    const roles = Object.values(commit!.actors!).map((actor) => actor.role);
+    expect(new Set(roles).size).toBe(4);
+    expect(commit!.actors!.requester!.role).toBe("prospective_device");
+    expect(commit!.actors!.authorizer!.role).toBe("operator_with_active_controller");
+    expect(commit!.actors!.decision!.role).toBe("p3_approval");
+    expect(commit!.actors!.issuer!.role).toBe("credential_issuer");
+    expect((commit!.actors!.authorizer as { device_id?: string }).device_id).toBe(seeded.controllerDeviceId);
   });
 });
 
