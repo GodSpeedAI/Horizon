@@ -134,3 +134,17 @@ Validation at d0ca846: `tsc` clean; `bun test` 1628 pass, 0 fail (before the fin
 Design pin: `68f11d7832ad254703f10e3bb57d52c70979f911dcaeb992ef54508e46973365`, 972 lines.
 
 Preserved: the P2 remote lifecycle (`remote.start`, `device.pair.request`, `remote.refresh`, `remote.stop`) and the P3 classification of `device.pair`.
+
+## Critic round 4 (on e30bb7a): REJECT, addressed in 7565f4f
+
+Fixed: a failed step after identity enrolment is compensated as separate writes (ledger, then identity) and audited with the compensation outcome; a failed compensation is recorded, not swallowed. The commit refuses an approval whose digest differs from the descriptor's. The audit decision role is `controller_approval`, not a P3 authority. Catalog and design no longer claim the revocations happen in one commit. NE-62 asserts `controller_changed`. NE-68 scans the collection literals. NE-71 asserts the compensated audit.
+
+Not fixed, and not closable by code on this branch:
+1. No SEA-Forge P3 authority decision exists for device enrolment (`sea_forge.human_entitlement` unpublished).
+2. The vendored identity service accepts no authorization evidence.
+3. Nothing is atomic across identity, ledger and approval. Each write is sequenced and compensated, not transactional.
+4. Permissions are bound in the digest and audit only; no downstream check exists for controllers.
+5. A failure after identity enrolment can leave zero active controllers; recovery needs a live controller.
+6. The first controller cannot be created in production.
+
+Validation at 7565f4f: `tsc` clean; `bun test` 1628 pass, 0 fail; teeth 46/46; design 14/14; prereg coverage, Stage 0A coverage, param binding and prereg shape ok.
