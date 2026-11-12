@@ -396,7 +396,8 @@ describe("stop and refresh: a waiting or authorized enrolment does not come back
     // Another controller is enrolled by a route that does not end the waiting enrolment.
     await seedController(rig!.app, await new SoftwareAuthenticator().generate(), "other controller");
     const committed = await new Client(() => rig!).awaitAuthorization(pendingId);
-    expect(committed.status).not.toBe(200);
+    expect(committed.status).toBe(409);
+    expect(((await committed.json()) as { code?: string }).code).toBe("controller_changed");
     expect(cookieOf(committed)).toBe("");
     // Only the controller seeded by the other route is active; the confirmed enrolment created no device.
     expect((await activeDevices(rig!)).map((device) => device.label)).toEqual(["other controller"]);
@@ -522,7 +523,7 @@ describe("the designated writer: no bypass, no partial device, four roles in the
         if (statSync(path).isDirectory()) walk(path);
         else if (path.endsWith(".ts")) {
           const text = readFileSync(path, "utf8");
-          for (const token of ["replaceDevices(", "enrolDevice(", "addDevice(", "DEVICE_COLLECTION", "APPROVALS_COLLECTION"]) {
+          for (const token of ["replaceDevices(", "enrolDevice(", "addDevice(", "DEVICE_COLLECTION", "APPROVALS_COLLECTION", "horizon-remote-devices", "horizon-remote-enrollment-approvals"]) {
             if (text.includes(token)) hits.push({ file: path.slice(root.length + 1), token });
           }
         }
@@ -537,7 +538,9 @@ describe("the designated writer: no bypass, no partial device, four roles in the
     expect(sites("addDevice(")).toEqual(["src/capabilities/remote-records.ts", "src/remote/server.ts"]);
     // The device collection is written by the records module alone; the approval collection by the authority alone.
     expect(sites("DEVICE_COLLECTION")).toEqual(["src/capabilities/remote-records.ts"]);
+    expect(sites("horizon-remote-devices")).toEqual(["src/capabilities/remote-records.ts"]);
     expect(sites("APPROVALS_COLLECTION")).toEqual(["src/remote/enrollment.ts"]);
+    expect(sites("horizon-remote-enrollment-approvals")).toEqual(["src/remote/enrollment.ts"]);
   });
 
   test("NE-69: a confirmation with no approval recorded by a current controller is refused at commit as unapproved", async () => {
@@ -576,7 +579,7 @@ describe("the designated writer: no bypass, no partial device, four roles in the
     expect(await stateOf(store, opened.pendingId)).toBe("expired");
   });
 
-  test("NE-71: a failure after identity enrolment leaves no partially authorized device and refuses the pairing; the replaced controllers stay revoked, so recovery needs a fresh invitation from a live controller", async () => {
+  test("NE-71: a failure after identity enrolment leaves no partially authorized device: no active ledger device remains, and the identity credential is revoked", async () => {
     const seeded = await controlledRig();
     rig = seeded.rig;
     const newPhone = await new SoftwareAuthenticator().generate();
@@ -601,6 +604,9 @@ describe("the designated writer: no bypass, no partial device, four roles in the
     const credentialId = Buffer.from(newPhone.credentialId).toString("base64url");
     const identity = await identityDeviceOf(rig!.app, credentialId);
     expect(identity?.revokedAt).not.toBeNull();
+    // The refused pairing is audited, with its compensation, so the consumed authorization leaves a trail.
+    const audits = await rig!.app.runtime.runtime.store.listRecords(AUDIT_COLLECTION, { tenant: rig!.app.caller.tenant });
+    expect(audits.some((row) => String((row.value as { outcome?: unknown }).outcome).startsWith("refused after authorization: compensated"))).toBe(true);
   });
 
   test("NE-72: the commit audit names the requester, the human authorizer, the decision and the issuer as separate roles", async () => {
@@ -617,7 +623,7 @@ describe("the designated writer: no bypass, no partial device, four roles in the
     expect(new Set(roles).size).toBe(4);
     expect(commit!.actors!.requester!.role).toBe("prospective_device");
     expect(commit!.actors!.authorizer!.role).toBe("operator_with_active_controller");
-    expect(commit!.actors!.decision!.role).toBe("p3_approval");
+    expect(commit!.actors!.decision!.role).toBe("controller_approval");
     expect(commit!.actors!.issuer!.role).toBe("credential_issuer");
     expect((commit!.actors!.authorizer as { device_id?: string }).device_id).toBe(seeded.controllerDeviceId);
   });

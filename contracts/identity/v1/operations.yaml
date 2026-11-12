@@ -723,7 +723,9 @@ operations:
         P3. The authorized credential issuer creates the active credential only for an enrolment
         that device.pair.authorize confirmed, inside its window, for the same generation and
         controllers, and it applies that confirmation once. The commit replaces the controller
-        it names and revokes that controller's sessions in the same commit. A refresh or stop
+        it names. Those writes are separate and in sequence (identity enrolment, ledger revocation,
+        ledger add, audit), not one atomic commit across identity, ledger and approval; a failed step
+        is compensated and audited. A refresh or stop
         ends every waiting or confirmed enrolment. The route authenticates the pending record
         alone: the caller presents a pending id, and only the record's own confirmation lets it
         create anything.

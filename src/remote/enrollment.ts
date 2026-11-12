@@ -213,6 +213,11 @@ export class EnrollmentAuthority {
     if (approval === null || !input.currentControllers.includes(approval.authorizer_device_id)) {
       return { ok: false, code: "unapproved", state };
     }
+    // The approval must be for the digest the descriptor carries, not merely for the same pending id.
+    if (approval.digest !== descriptor.operation_digest) {
+      await abandon(this.store, input.pendingId, input.now, "the approval does not match the authorized digest");
+      return { ok: false, code: "stale", state: "expired" };
+    }
     const applied = await applyConfirmed(this.store, input.pendingId, input.now, "enrolment committed");
     if (!applied) return { ok: false, code: "used", state: await stateOf(this.store, input.pendingId) };
     return { ok: true, request, approval };

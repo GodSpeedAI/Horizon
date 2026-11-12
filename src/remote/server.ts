@@ -257,6 +257,7 @@ export class RemoteController {
     const { registration, label } = committed.request;
     const { approval } = committed;
     let enrolledId: string | null = null;
+    let ledgerAdded = false;
     try {
       // One active controller, bound to one durable operator that the cockpit's session approved. The identity
       // service revokes the previous device and its sessions in the same commit that enrols this one; it refuses
@@ -282,6 +283,7 @@ export class RemoteController {
         revoked_at: null,
       };
       await addDevice(this.deps.store, device);
+      ledgerAdded = true;
       // The committed record keeps the four roles apart: who asked, which human authorized it, the authority decision
       // it rests on, and which component issued the credential.
       await auditRemote(this.deps.store, {
@@ -294,7 +296,7 @@ export class RemoteController {
         actors: {
           requester: { credential_id: registration.credentialId, label, role: "prospective_device" },
           authorizer: { device_id: approval.authorizer_device_id, credential_id: approval.authorizer_credential_id, role: "operator_with_active_controller" },
-          decision: { pending_id: approval.pending_id, digest: approval.digest, approved_at: approval.approved_at, role: "p3_approval" },
+          decision: { pending_id: approval.pending_id, digest: approval.digest, approved_at: approval.approved_at, role: "controller_approval" },
           issuer: { component: "identity_service", identity_device_id: enrolled.device.id, role: "credential_issuer" },
         },
       });
@@ -302,7 +304,19 @@ export class RemoteController {
     } catch (error) {
       // The authorization is spent. If the identity service enrolled the phone but the ledger did not record it,
       // the new device is revoked so no identity credential exists that the ledger does not list.
-      if (enrolledId !== null) await this.deps.identity.revokeDevice(enrolledId, "enrolment did not complete").catch(() => undefined);
+      // Each compensating write is separate, because nothing here is atomic across identity, ledger and approval. A
+      // failed compensation is recorded in the audit so it is visible, not swallowed.
+      const failures: string[] = [];
+      if (ledgerAdded) await updateDevice(this.deps.store, enrolledId ?? "", { revoked_at: new Date(now).toISOString() }).catch(() => failures.push("ledger"));
+      if (enrolledId !== null) await this.deps.identity.revokeDevice(enrolledId, "enrolment did not complete").catch(() => failures.push("identity"));
+      await auditRemote(this.deps.store, {
+        tenant: this.deps.tenant,
+        operator: this.deps.operator,
+        device_id: enrolledId ?? "none",
+        action: "pair",
+        outcome: `refused after authorization: ${failures.length === 0 ? "compensated" : `compensation failed: ${failures.join(",")}`}`,
+        at: new Date(now).toISOString(),
+      }).catch(() => undefined);
       const message = error instanceof IdentityError ? `Pairing refused: ${error.message}` : "The passkey could not be registered.";
       return refusal(400, "passkey_refused", `${message} Refresh the QR on your desktop and scan again.`);
     }
