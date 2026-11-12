@@ -144,8 +144,8 @@ const MUTANTS: readonly Mutant[] = [
     file: "contracts/identity/v1/operations.yaml",
     testFile: CONTRACT_TEST,
     title: "the catalog has the reconciled shape (PE-01)",
-    find: "    - id: horizon.settlement.observe\n      binding: verified",
-    replace: '    - id: horizon.settlement.observe\n      class: "P1"\n      binding: verified',
+    find: "    - id: horizon.settlement.observe\n      separation_of_duty:",
+    replace: '    - id: horizon.settlement.observe\n      class: "P1"\n      separation_of_duty:',
   },
   {
     id: "M11 the agent door's dispatch table loses an action",

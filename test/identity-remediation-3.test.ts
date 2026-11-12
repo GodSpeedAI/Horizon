@@ -115,7 +115,7 @@ describe("the round-4 review's corrections", () => {
     ];
     for (const id of selected) expect(id, id).toStartWith("device.");
     // And the four refused rows keep their class: a refusal is a containment, not a downgrade.
-    expect(manifest.byId.get("device.settlement.observe")!.class).toBe("P2");
+    expect(manifest.byId.get("device.settlement.observe")!.class).toBe("P3");
     expect(manifest.byId.get("device.settlement.rule")!.class).toBe("P3");
     expect(manifest.byId.get("device.approval.approve")!.class).toBe("P3");
     expect(manifest.byId.get("device.approval.reject")!.class).toBe("P3");
@@ -143,9 +143,9 @@ describe("the round-4 review's corrections", () => {
     }
   });
 
-  test("the observation half of settlement is P2 because it commits evidence elsewhere (PE-37)", () => {
+  test("the observation half of settlement is P3 because it commits evidence to SEA-Forge's ledger (PE-37)", () => {
     const observe = manifest.byId.get("horizon.settlement.observe")!;
-    expect(observe.class).toBe("P2");
+    expect(observe.class).toBe("P3");
     expect(observe.writable).toBe(true);
     // The row says what is still missing: the pending record and the person's A3-UV evidence.
     // The class follows the effect, and the effect is an external commitment.

@@ -530,38 +530,6 @@ operations:
         panel is never an answer (the answer rows and their rules are untouched).
 
   P2:
-    - id: horizon.settlement.observe
-      binding: verified
-      routes: ["POST /desk/decide"]
-      params_schema: params.horizon_settlement_request
-      fixed_parameters: { phase: observe }
-      pending_expiry: 10m
-      note: >-
-        The observation half of settlement: the record keeper watches what was done and the
-        evidence goes to the case keeper. It is P2, not P1, because the effect leaves this
-        application: the handler observes through RealityTrace, builds an evidence packet and
-        submits it to SEA-Forge, which is an external commitment that a local, reversible,
-        own-scope P1 write may not make. It still decides nothing — the ruling is a separate
-        operation, horizon.settlement.rule — so it is P2 rather than P3, and it runs on the
-        desk, under a human session, with a pending record and the person's A3-UV evidence.
-        It changes no settlement state: the evidence entry SEA-Forge records is an observation of
-        what was done, and an acknowledgement of the settlement is not part of this row. If the
-        owner counts an evidence-ledger write as a commitment, this row becomes P3 (an open owner
-        decision).
-    - id: device.settlement.observe
-      binding: verified
-      routes: ["POST /m/api/command"]
-      executor: device_credential
-      caller_authentication: device_passkey_assertion
-      params_schema: params.device_settlement_request
-      fixed_parameters: { phase: observe }
-      pending_expiry: 10m
-      note: >-
-        The phone's own observation row, and it is refused. The observation submits evidence to
-        SEA-Forge, so it needs the pending record and the protected A3-UV confirmation the
-        remote path does not have; a device credential proves the device, never the person
-        holding it, so it can never be that confirmation. The refusal is a containment, not a
-        downgrade: the operation stays P2 and nothing runs.
     - id: human.answer
       binding: verified
       routes: ["POST /desk/panels/op"]
@@ -692,14 +660,14 @@ operations:
       authority_writer: issuer_root
 
   P3:
-    - { id: grant.create, binding: reserved, params_schema: params.grant_create, authority_writer: sea_forge, separation_of_duty: { requester: requesting_human, approver: independent_human, executor: sea_forge } }
-    - { id: grant.revoke, binding: reserved, params_schema: params.grant_revoke, authority_writer: sea_forge, separation_of_duty: { requester: revoking_human, approver: independent_human, executor: sea_forge }, note: "Specification only. No route exists and the SEA-Forge interface is unpublished, so this row is not runtime-accessible and the catalog makes no runtime claim for it. Compromised device authority is contained today by remote.stop and device.remove, which are local P2 rows." }
-    - { id: gauntlet.run.cancel, binding: reserved, params_schema: params.run_cancel, authority_writer: sea_forge, separation_of_duty: { requester: run_owner_human, approver: independent_human, executor: sea_forge }, note: "Specification only. No route exists and the SEA-Forge interface is unpublished, so this row is not runtime-accessible. Emergency halt of unsafe execution is not provided by any route yet; the containment path is an open owner decision." }
-    - { id: expert.install, binding: candidate, params_schema: params.expert_install, separation_of_duty: { requester: human_session, approver: independent_human, executor: cognate_local_continuation }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
-    - { id: expert.configure, binding: candidate, params_schema: params.expert_configure, separation_of_duty: { requester: human_session, approver: independent_human, executor: cognate_local_continuation }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
-    - { id: expert.remove, binding: candidate, params_schema: params.expert_remove, separation_of_duty: { requester: human_session, approver: independent_human, executor: cognate_local_continuation }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
+    - { id: grant.create, binding: reserved, params_schema: params.grant_create, authority_writer: sea_forge, separation_of_duty: { requester: requesting_human, approver: independent_human, executor: human_session } }
+    - { id: grant.revoke, binding: reserved, params_schema: params.grant_revoke, authority_writer: sea_forge, separation_of_duty: { requester: revoking_human, approver: independent_human, executor: human_session }, note: "Specification only. No route exists and the SEA-Forge interface is unpublished, so this row is not runtime-accessible and the catalog makes no runtime claim for it. Compromised device authority is contained today by remote.stop and device.remove, which are local P2 rows." }
+    - { id: gauntlet.run.cancel, binding: reserved, params_schema: params.run_cancel, authority_writer: sea_forge, separation_of_duty: { requester: run_owner_human, approver: independent_human, executor: human_session }, note: "Specification only. No route exists and the SEA-Forge interface is unpublished, so this row is not runtime-accessible. Emergency halt of unsafe execution is not provided by any route yet; the containment path is an open owner decision." }
+    - { id: expert.install, binding: candidate, params_schema: params.expert_install, separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
+    - { id: expert.configure, binding: candidate, params_schema: params.expert_configure, separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
+    - { id: expert.remove, binding: candidate, params_schema: params.expert_remove, separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
     - id: device.pair
-      separation_of_duty: { requester: code_holder, approver: operator_at_desk_terminal, executor: cognate_local_continuation }
+      separation_of_duty: { requester: code_holder, approver: operator_at_desk_terminal, executor: code_holder }
       binding: verified
       routes: ["POST /m/api/pair/finish", "POST /m/api/pair/await"]
       executor: code_holder
@@ -732,14 +700,14 @@ operations:
         (`session.pair`): it creates a local browser session from a code typed at the local
         console, and it enrolls no credential.
     - id: handoff.send
-      separation_of_duty: { requester: human_session, approver: independent_human, executor: sea_forge }
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }
       binding: verified
       routes: ["POST /desk/handoff"]
       params_schema: params.handoff_send
       authority_writer: sea_forge
       note: "POST /desk/handoff/preview is a read and is not a send."
     - id: grant.redelegate
-      separation_of_duty: { requester: registered_agent_or_human_session, approver: independent_human, executor: sea_forge }
+      separation_of_duty: { requester: registered_agent_or_human_session, approver: independent_human, executor: registered_agent_or_human_session }
       binding: reserved
       executor: registered_agent_or_human_session
       params_schema: params.grant_redelegate
@@ -750,12 +718,43 @@ operations:
         Narrowing only. An agent caller is gated by the parent's redelegate permission, remaining
         depth, and ancestor budget; a human caller needs A3-UV and a current SEA-Forge entitlement
         to redelegate the named live parent, since a human session has no delegation head.
+    - id: horizon.settlement.observe
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }
+      executor: human_session
+      binding: verified
+      routes: ["POST /desk/decide"]
+      params_schema: params.horizon_settlement_request
+      fixed_parameters: { phase: observe }
+      pending_expiry: 10m
+      note: >-
+        The observation half of settlement, and a P3 row. It records what was done as an
+        evidence entry in SEA-Forge's ledger, an external write that a P2 local row may not
+        make. It changes no settlement state: the ruling is the separate row
+        horizon.settlement.rule. Requester, approver and executor are three distinct roles: the
+        human session requests and executes, an independent human approves. If the owner counts
+        an evidence-ledger write as a local act, this row returns to P2 (an open owner
+        decision).
+    - id: device.settlement.observe
+      separation_of_duty: { requester: device_credential, approver: independent_human, executor: device_credential }
+      binding: verified
+      routes: ["POST /m/api/command"]
+      executor: device_credential
+      caller_authentication: device_passkey_assertion
+      params_schema: params.device_settlement_request
+      fixed_parameters: { phase: observe }
+      pending_expiry: 10m
+      note: >-
+        The phone's observation row. It is P3 and it is refused on the device route: the
+        observation writes an evidence entry to SEA-Forge's ledger, and a device credential
+        proves the device, not the person holding it, so it cannot supply the independent
+        approval that the separation of duty requires. The refusal is containment; no device
+        path to this write is claimed as working.
     - id: approval.approve
       binding: verified
       routes: ["POST /desk/decide"]
       params_schema: params.approval
       authority_writer: sea_forge
-      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: sea_forge }
+      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: human_session }
       fixed_parameters: { choice: accept }
       pending_expiry: 10m
       note: "The approver is distinct from the initiating human, the requesting execution, and the executor. The pending window is the policy's ten minutes (pending_approval_ttl), not the P3 default's open-ended one: an approval that is not consumed inside it is expired and the operation must be requested again. The phone has its own refused row, `device.approval.approve`."
@@ -764,7 +763,7 @@ operations:
       routes: ["POST /desk/decide"]
       params_schema: params.approval
       authority_writer: sea_forge
-      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: sea_forge }
+      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: human_session }
       fixed_parameters: { choice: reject }
       pending_expiry: 10m
       note: "A rejection expires on the same ten-minute pending window as an approval (pending_approval_ttl). The phone has its own refused row, `device.approval.reject`."
@@ -775,7 +774,7 @@ operations:
       caller_authentication: device_passkey_assertion
       params_schema: params.device_approval
       authority_writer: sea_forge
-      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: sea_forge }
+      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: device_credential }
       pending_expiry: 10m
       note: >-
         The phone's own approval row, and it is refused. An approval needs the operation-bound
@@ -790,7 +789,7 @@ operations:
       caller_authentication: device_passkey_assertion
       params_schema: params.device_approval
       authority_writer: sea_forge
-      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: sea_forge }
+      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: device_credential }
       pending_expiry: 10m
       note: >-
         The phone's own rejection row, and it is refused, for the same reason the approval row
@@ -801,7 +800,7 @@ operations:
       routes: ["POST /desk/decide"]
       params_schema: params.case_task_decide
       authority_writer: case_record.authority
-      separation_of_duty: { requester: human_session, approver: independent_human, executor: case_record.authority }
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }
       pending_expiry: 10m
       note: >-
         The case keeper's own approval, taken by the person: it approves or rejects the task the
@@ -812,7 +811,7 @@ operations:
       routes: ["POST /desk/decide"]
       params_schema: params.horizon_settlement_request
       authority_writer: sea_forge
-      separation_of_duty: { requester: human_session, approver: independent_human, executor: sea_forge }
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }
       fixed_parameters: { phase: rule }
       pending_expiry: 10m
       note: >-
@@ -826,7 +825,7 @@ operations:
       caller_authentication: device_passkey_assertion
       params_schema: params.device_settlement_request
       authority_writer: sea_forge
-      separation_of_duty: { requester: human_session, approver: independent_human, executor: sea_forge }
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: device_credential }
       fixed_parameters: { phase: rule }
       pending_expiry: 10m
       note: >-
@@ -839,7 +838,7 @@ operations:
       executor: registered_agent
       params_schema: params.external_commit
       authority_writer: sea_forge
-      separation_of_duty: { requester: human_session, approver: independent_human, executor: sea_forge }
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: registered_agent }
       human_evidence: PER_TARGET_ROW
       pending_expiry: grant_expiry
     - id: workspace.export
@@ -848,7 +847,7 @@ operations:
       params_schema: params.workspace_export
       pending_expiry: 15m
       authority_writer: sea_forge
-      separation_of_duty: { requester: human_session, approver: independent_human, executor: cognate_local_continuation }
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }
       note: >-
         The export is a P3 row: the approver is distinct from the requester and from whoever
         executes the export. The separation is declared here and is not enforced by the running
@@ -859,7 +858,7 @@ operations:
       executor: registered_agent
       params_schema: params.isolation_request
       authority_writer: sea_forge
-      separation_of_duty: { requester: registered_agent, approver: independent_human, executor: sea_forge }
+      separation_of_duty: { requester: registered_agent, approver: independent_human, executor: registered_agent }
       human_evidence: NONE
       pending_expiry: grant_expiry
       note: "The capability gate fails closed with isolation_unavailable where the host prerequisites are not met."

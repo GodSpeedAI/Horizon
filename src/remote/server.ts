@@ -231,6 +231,59 @@ export class RemoteController {
     return devices.find((device) => device.revoked_at === null && device.generation === this.pairing.generation) ?? null;
   }
 
+  /**
+   * The enrolment commit. It runs one at a time with refresh and stop, so a stop cannot interleave with the
+   * write it must revoke: the controller is checked against the pairing as it is now, not as it was at the request.
+   */
+  private async completeEnrolment(pendingId: string, now: number): Promise<Response> {
+    if (!this.pairing.isEnabled) return refusal(409, "remote_off", "Remote control is off on the desktop.");
+    const committed = await this.deps.enrollment.commit({
+      pendingId,
+      tenant: this.deps.tenant,
+      operator: this.deps.operator,
+      generation: this.pairing.generation,
+      currentControllers: await this.activeDeviceIds(),
+      now: new Date(now),
+    });
+    if (!committed.ok) {
+      if (committed.code === "not_authorized") return json(202, { status: "awaiting_operator_authorization" });
+      if (committed.code === "stale") return refusal(409, "controller_changed", "The desktop's controller changed while this phone waited. Refresh the QR on your desktop and scan again.");
+      if (committed.code === "expired") return refusal(410, "authorization_expired", "The desktop did not authorize this phone in time. Refresh the QR on your desktop and scan again.");
+      return refusal(410, "authorization_used", "This authorization was already used or is not valid. Refresh the QR on your desktop and scan again.");
+    }
+    const { registration, label } = committed.request;
+    try {
+      // One active controller, bound to one durable operator that the cockpit's session approved. The identity
+      // service revokes the previous device and its sessions in the same commit that enrols this one; it refuses
+      // when the operator does not exist or is not active, so the link cannot create an operator or grant a role.
+      const at = new Date(now).toISOString();
+      const enrolled = await this.deps.identity.replaceDevices({ tenant: this.deps.identityTenant, operatorId: this.deps.operator, label, registration });
+      for (const stale of await listDevices(this.deps.store, this.deps.tenant)) {
+        if (stale.revoked_at === null) await updateDevice(this.deps.store, stale.device_id, { revoked_at: at });
+      }
+      this.commands.clear();
+      const device: RemoteDevice = {
+        device_id: enrolled.device.id,
+        credential_id: registration.credentialId,
+        public_key: registration.publicKey,
+        sign_count: registration.signCount,
+        label,
+        generation: this.pairing.generation,
+        tenant: this.deps.tenant,
+        operator: this.deps.operator,
+        created_at: at,
+        last_seen: at,
+        revoked_at: null,
+      };
+      await addDevice(this.deps.store, device);
+      await auditRemote(this.deps.store, { tenant: this.deps.tenant, operator: this.deps.operator, device_id: device.device_id, action: "pair", outcome: "authorized", at });
+      return json(200, { ok: true, label: device.label }, { "set-cookie": sessionCookie(enrolled.session.token) });
+    } catch (error) {
+      const message = error instanceof IdentityError ? `Pairing refused: ${error.message}` : "The passkey could not be registered.";
+      return refusal(400, "passkey_refused", message);
+    }
+  }
+
   /** The ledger's active controllers, sorted: what an enrolment request names as the controllers it would replace. */
   private async activeDeviceIds(): Promise<string[]> {
     return (await listDevices(this.deps.store, this.deps.tenant)).filter((device) => device.revoked_at === null).map((device) => device.device_id).sort();
@@ -289,6 +342,10 @@ export class RemoteController {
 
   /** New link, new generation: every prior link, credential and session is revoked at once. */
   async refresh(): Promise<void> {
+    return this.serial(() => this.refreshNow());
+  }
+
+  private async refreshNow(): Promise<void> {
     if (this.server === null) return;
     const at = new Date(this.clock()).toISOString();
     await this.deps.enrollment.abandonWaiting("pairing refreshed");
@@ -298,6 +355,10 @@ export class RemoteController {
 
   /** Generation bump and listener closed: immediate revocation. */
   async stop(): Promise<void> {
+    return this.serial(() => this.stopNow());
+  }
+
+  private async stopNow(): Promise<void> {
     const at = new Date(this.clock()).toISOString();
     this.pairing.stop();
     await this.deps.enrollment.abandonWaiting("remote control stopped");
@@ -408,6 +469,7 @@ export class RemoteController {
 
     if (request.method === "POST" && path === "/m/api/pair/finish") {
       if (!this.limiter.allow("finish", 10, 60_000, now)) return refusal(429, "rate_limited", "REMOTE: too many attempts, wait a minute");
+      if (!this.pairing.isEnabled) return refusal(409, "remote_off", "Remote control is off on the desktop.");
       const body = await bodyOf(request);
       const challenge = this.pairing.takeChallenge(body?.ticket, "register", now);
       if (challenge === null) return refusal(410, "challenge_expired", "The passkey request expired. Scan the QR on your desktop again.");
@@ -440,51 +502,7 @@ export class RemoteController {
       const pendingId = typeof body?.pending_id === "string" ? body.pending_id : "";
       // The commit: applies the operator's confirmation exactly once, after checking the request is still the one
       // the operator saw. Only this writes an active controller, and only after that check.
-      const committed = await this.deps.enrollment.commit({
-        pendingId,
-        tenant: this.deps.tenant,
-        operator: this.deps.operator,
-        generation: this.pairing.generation,
-        currentControllers: await this.activeDeviceIds(),
-        now: new Date(now),
-      });
-      if (!committed.ok) {
-        if (committed.code === "not_authorized") return json(202, { status: "awaiting_operator_authorization" });
-        if (committed.code === "stale") return refusal(409, "controller_changed", "The desktop's controller changed while this phone waited. Refresh the QR on your desktop and scan again.");
-        if (committed.code === "expired") return refusal(410, "authorization_expired", "The desktop did not authorize this phone in time. Refresh the QR on your desktop and scan again.");
-        return refusal(410, "authorization_used", "This authorization was already used or is not valid. Refresh the QR on your desktop and scan again.");
-      }
-      const { registration, label } = committed.request;
-      try {
-        // One active controller, bound to one durable operator that the cockpit's session approved. The identity
-        // service revokes the previous device and its sessions in the same commit that enrols this one; it refuses
-        // when the operator does not exist or is not active, so the link cannot create an operator or grant a role.
-        const at = new Date(now).toISOString();
-        const enrolled = await this.deps.identity.replaceDevices({ tenant: this.deps.identityTenant, operatorId: this.deps.operator, label, registration });
-        for (const stale of await listDevices(this.deps.store, this.deps.tenant)) {
-          if (stale.revoked_at === null) await updateDevice(this.deps.store, stale.device_id, { revoked_at: at });
-        }
-        this.commands.clear();
-        const device: RemoteDevice = {
-          device_id: enrolled.device.id,
-          credential_id: registration.credentialId,
-          public_key: registration.publicKey,
-          sign_count: registration.signCount,
-          label,
-          generation: this.pairing.generation,
-          tenant: this.deps.tenant,
-          operator: this.deps.operator,
-          created_at: at,
-          last_seen: at,
-          revoked_at: null,
-        };
-        await addDevice(this.deps.store, device);
-        await auditRemote(this.deps.store, { tenant: this.deps.tenant, operator: this.deps.operator, device_id: device.device_id, action: "pair", outcome: "authorized", at });
-        return json(200, { ok: true, label: device.label }, { "set-cookie": sessionCookie(enrolled.session.token) });
-      } catch (error) {
-        const message = error instanceof IdentityError ? `Pairing refused: ${error.message}` : "The passkey could not be registered.";
-        return refusal(400, "passkey_refused", message);
-      }
+      return this.serial(() => this.completeEnrolment(pendingId, now));
     }
 
     if (request.method === "POST" && path === "/m/api/auth/options") {

@@ -739,6 +739,10 @@ export function parseOperationManifest(source: string): LoadedManifest {
       if (separation.approver === separation.requester || separation.approver === separation.executor) {
         throw new Error(`operations: the P3 row "${operation.id}" names one principal as approver and as requester or executor; separation of duty needs three distinct roles`);
       }
+      // The separation executor names the principal that performs the effect, so it must be the row's executor.
+      if (operation.executor !== null && separation.executor !== operation.executor) {
+        throw new Error(`operations: the P3 row "${operation.id}" names separation executor "${separation.executor}" but its executor is "${operation.executor}"`);
+      }
     }
     // R5-07: a public probe, an unauthenticated challenge and a one-time code identify no
     // person, so a row on one of those paths may not inherit an assurance predicate.

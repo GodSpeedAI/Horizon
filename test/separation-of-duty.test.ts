@@ -9,36 +9,38 @@ import { loadOperationManifest, parseOperationManifest } from "../src/contracts/
 const ROOT = new URL("..", import.meta.url).pathname;
 const loaded = loadOperationManifest();
 
-describe("separation of duty is stated by role, and a P3 row must name three distinct principals", () => {
+describe("separation of duty is stated by role, and a P3 approver must be distinct from the requester and the executor", () => {
   const sodSource = () => readFileSync(`${ROOT}contracts/identity/v1/operations.yaml`, "utf8");
 
-  test("PE-70: every P3 row names a requester, an approver and an executor, and the three are distinct", () => {
+  test("PE-70: every P3 row names a requester, an approver and an executor, the approver is distinct from the other two, and the executor is the row's executor", () => {
     for (const operation of loaded.byId.values()) {
       if (operation.class !== "P3") continue;
       const separation = operation.separationOfDuty;
       expect(separation, operation.id).not.toBeNull();
-      expect(new Set([separation?.requester, separation?.approver, separation?.executor]).size, operation.id).toBe(3);
+      expect(separation?.approver, operation.id).not.toBe(separation?.requester);
+      expect(separation?.approver, operation.id).not.toBe(separation?.executor);
+      if (operation.executor !== null) expect(separation?.executor, operation.id).toBe(operation.executor);
     }
   });
 
   test("NE-54: a P3 row whose approver is its own requester is refused", () => {
     const source = sodSource().replace(
-      "{ requester: requesting_human, approver: independent_human, executor: sea_forge }",
-      "{ requester: requesting_human, approver: requesting_human, executor: sea_forge }",
+      "{ requester: requesting_human, approver: independent_human, executor: human_session }",
+      "{ requester: requesting_human, approver: requesting_human, executor: human_session }",
     );
     expect(() => parseOperationManifest(source)).toThrow(/separation of duty needs three distinct roles/);
   });
 
   test("NE-55: a P3 row whose approver is its executor is refused", () => {
     const source = sodSource().replace(
-      "{ requester: run_owner_human, approver: independent_human, executor: sea_forge }",
+      "{ requester: run_owner_human, approver: independent_human, executor: human_session }",
       "{ requester: run_owner_human, approver: independent_human, executor: independent_human }",
     );
     expect(() => parseOperationManifest(source)).toThrow(/separation of duty needs three distinct roles/);
   });
 
   test("NE-56: a bare boolean is not a statement of separation and is refused by the schema", () => {
-    const source = sodSource().replace("{ requester: requesting_human, approver: independent_human, executor: sea_forge }", "true");
+    const source = sodSource().replace("{ requester: requesting_human, approver: independent_human, executor: human_session }", "true");
     expect(() => parseOperationManifest(source)).toThrow();
   });
 });

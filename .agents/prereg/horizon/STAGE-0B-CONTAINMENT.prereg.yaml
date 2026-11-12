@@ -18,7 +18,7 @@ preregistration:
   upstream_pins:
     spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
     plan: { id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23", line: 1725, reference: "contain Horizon's reserved operations with an immutable pending descriptor and a local terminal confirmation (A3-T)" }
-    design: { file: design_draft.md, sha256: "5740e2ef24b2825ab5a23a920a6a8f32b90569cf9dee0300ea598ee2554a74e7", lines: 963, sections: "12" }
+    design: { file: design_draft.md, sha256: "12159169641a04cc1f7a4fa077af214c416ef4e4f1ee0f4139ec5410c514d5b6", lines: 963, sections: "12" }
     prior_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-REMEDIATION-4.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-REMEDIATION-4, relationship: "the Stage 0A unit this containment follows" }
   # This unit settles no specification requirement. It adds a local confirmation to reserved
   # human writes. The Stage 0A requirements remain open until the sixth independent review rules.
@@ -114,8 +114,12 @@ preregistration:
         A refresh voids the open invitation, so its secret no longer redeems.
     - id: PE-70
       expectation: >-
-        Every P3 row in the catalog names a requester, an approver and an executor, and the three are
-        distinct principals.
+        Every P3 row in the catalog names a requester, an approver and an executor; the approver is
+        distinct from the requester and from the executor, and the separation executor is the row's executor.
+    - id: PE-71
+      expectation: >-
+        A confirmed enrolment that is not yet committed is ended by a stop or a refresh, and its commit
+        afterwards creates no device.
   negative_expectations:
     - id: NE-41
       expectation: >-
@@ -170,3 +174,10 @@ preregistration:
     - id: NE-56
       expectation: >-
         A P3 row that states separation of duty as a bare boolean is refused by the catalog schema.
+    - id: NE-57
+      expectation: >-
+        A pasted batch of wrong codes, typed together, still reaches the wrong-code limit and abandons the
+        enrolment.
+    - id: NE-58
+      expectation: >-
+        A confirmation typed in time but committed after its window is refused as expired and creates no device.

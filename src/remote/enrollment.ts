@@ -101,9 +101,14 @@ export type CommitOutcome =
 const shortId = (credentialId: string): string => credentialId.slice(-6);
 
 export class EnrollmentAuthority {
-  /** Pending enrolments waiting for the operator's code, with the wrong codes typed for each so far. */
-  private readonly waiting = new Map<string, { readonly tenant: string; wrong: number }>();
+  /**
+   * Enrolments the operator has not committed. `confirmed` marks one whose code was typed and that now awaits
+   * its commit; `wrong` counts the wrong codes typed while it waited.
+   */
+  private readonly open = new Map<string, { readonly tenant: string; wrong: number; confirmed: boolean }>();
   private stopReading: (() => void) | null = null;
+  /** Typed lines are handled one at a time, so a pasted batch of lines counts against the wrong-code limit line by line. */
+  private typing: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly store: DurableStore,
@@ -131,7 +136,7 @@ export class EnrollmentAuthority {
       appends: [],
       records: [{ collection: ENROLMENTS_COLLECTION, id: pendingId, expectedVersion: 0, value: input as unknown as { readonly [key: string]: Json } }],
     });
-    this.waiting.set(pendingId, { tenant: input.tenant, wrong: 0 });
+    this.open.set(pendingId, { tenant: input.tenant, wrong: 0, confirmed: false });
     this.listen(channel);
     return { ok: true, pendingId, expiresAt: summoned.summoned.expires_at };
   }
@@ -154,6 +159,12 @@ export class EnrollmentAuthority {
     if (state === "pending") return { ok: false, code: "not_authorized", state };
     if (state === "expired") return { ok: false, code: "expired", state };
     if (state !== "confirmed") return { ok: false, code: "used", state };
+    // A confirmation is only good inside its window: the commit checks the clock too, not only the typing.
+    if (input.now.getTime() > Date.parse(descriptor.expires_at)) {
+      await abandon(this.store, input.pendingId, input.now, "the authorization expired before the commit");
+      this.forget(input.pendingId);
+      return { ok: false, code: "expired", state: "expired" };
+    }
     const stale = request.generation !== input.generation || !sameIds(request.replaces, input.currentControllers);
     if (stale) {
       await abandon(this.store, input.pendingId, input.now, "the controller changed or the pairing was refreshed while waiting");
@@ -166,17 +177,20 @@ export class EnrollmentAuthority {
     return { ok: true, request };
   }
 
-  /** Refresh and stop: every waiting enrolment is ended, so a late code authorizes nothing. */
+  /** Refresh and stop end every open enrolment, confirmed or not, so a late code or a late commit authorizes nothing. */
   async abandonWaiting(reason: string): Promise<void> {
     const now = new Date(this.clock());
-    for (const pendingId of [...this.waiting.keys()]) await abandon(this.store, pendingId, now, reason);
-    this.waiting.clear();
+    for (const pendingId of [...this.open.keys()]) await abandon(this.store, pendingId, now, reason);
+    this.open.clear();
     this.stopListening();
   }
 
   private listen(channel: OperatorChannel): void {
     if (this.stopReading !== null) return;
-    this.stopReading = channel.read((line) => this.typed(line));
+    this.stopReading = channel.read((line) => {
+      this.typing = this.typing.then(() => this.typed(line));
+      return this.typing;
+    });
   }
 
   private stopListening(): void {
@@ -184,19 +198,25 @@ export class EnrollmentAuthority {
     this.stopReading = null;
   }
 
-  private forget(pendingId: string): void {
-    this.waiting.delete(pendingId);
-    if (this.waiting.size === 0) this.stopListening();
+  /** Stops reading once no enrolment is waiting for a code. */
+  private stopIfIdle(): void {
+    if (![...this.open.values()].some((entry) => !entry.confirmed)) this.stopListening();
   }
 
-  /** A line the operator typed: it authorizes the waiting enrolment whose code it is, and counts against the others. */
+  private forget(pendingId: string): void {
+    this.open.delete(pendingId);
+    this.stopIfIdle();
+  }
+
+  /** A line the operator typed: it confirms the waiting enrolment whose code it is, and counts against the others. */
   private async typed(line: string): Promise<void> {
     const code = line.trim();
     const now = new Date(this.clock());
-    for (const [pendingId, entry] of [...this.waiting]) {
+    for (const [pendingId, entry] of [...this.open]) {
+      if (entry.confirmed) continue;
       const result = await confirm(this.store, { tenant: entry.tenant, pendingId, typedCode: code, now });
       if (result.ok) {
-        this.forget(pendingId);
+        this.open.set(pendingId, { ...entry, confirmed: true });
         continue;
       }
       if (result.code !== "wrong_code") {
@@ -207,9 +227,10 @@ export class EnrollmentAuthority {
         await abandon(this.store, pendingId, now, "too many wrong codes");
         this.forget(pendingId);
       } else {
-        this.waiting.set(pendingId, { tenant: entry.tenant, wrong: entry.wrong + 1 });
+        this.open.set(pendingId, { ...entry, wrong: entry.wrong + 1 });
       }
     }
+    this.stopIfIdle();
   }
 }
 

@@ -20,6 +20,8 @@ import { TestOperatorChannel } from "./support/operator-channel.ts";
 import { Pairing, PAIRING_TTL_MS } from "../src/remote/pairing.ts";
 import { identityStoreOf } from "../src/remote/identity-store.ts";
 import { SESSIONS } from "@godspeed/identity";
+import { createMemoryStore } from "@godspeedai/cognate-store-memory";
+import { EnrollmentAuthority } from "../src/remote/enrollment.ts";
 
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -338,5 +340,61 @@ describe("invitations: they expire, they are single use, and a refresh voids the
     expect(stale.ok).toBe(false);
     const current = pairing.current(11);
     expect(current).not.toBeNull();
+  });
+});
+
+describe("the enrolment authority in isolation: a controllable clock and a memory store", () => {
+  const request = {
+    tenant: "tenant-a",
+    operator: "operator",
+    generation: 1,
+    label: "iPhone · Safari",
+    registration: { credentialId: "credential-abcdef", publicKey: "cose-key", alg: -7, signCount: 0 },
+    replaces: [] as string[],
+    requested_at: new Date(0).toISOString(),
+  };
+  const commitAt = (authority: EnrollmentAuthority, pendingId: string, at: number) =>
+    authority.commit({ pendingId, tenant: "tenant-a", operator: "operator", generation: 1, currentControllers: [], now: new Date(at) });
+
+  test("NE-58: a confirmation that is typed in time but committed after its window is refused and expires", async () => {
+    const store = createMemoryStore();
+    const channel = new TestOperatorChannel();
+    let at = Date.parse("2026-11-11T10:00:00Z");
+    const authority = new EnrollmentAuthority(store, channel, () => at);
+    const requested = await authority.request(request);
+    if (!requested.ok) throw new Error("the request should be held");
+    await channel.type(channel.codeFor(requested.pendingId));
+    at += 6 * 60_000;
+    const late = await commitAt(authority, requested.pendingId, at);
+    expect(late.ok).toBe(false);
+    if (!late.ok) expect(late.code).toBe("expired");
+  });
+
+  test("a pasted batch of wrong codes, typed together, still reaches the wrong-code limit (NE-57)", async () => {
+    const store = createMemoryStore();
+    const channel = new TestOperatorChannel();
+    const authority = new EnrollmentAuthority(store, channel);
+    const requested = await authority.request(request);
+    if (!requested.ok) throw new Error("the request should be held");
+    const code = channel.codeFor(requested.pendingId);
+    // Five lines arrive at once, as a paste does; none waits for the one before it.
+    await Promise.all(Array.from({ length: 5 }, () => channel.type("000000")));
+    await channel.type(code);
+    const outcome = await commitAt(authority, requested.pendingId, Date.now());
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(outcome.code).toBe("expired");
+  });
+
+  test("a confirmed enrolment that is not yet committed is ended by a stop or a refresh (PE-71)", async () => {
+    const store = createMemoryStore();
+    const channel = new TestOperatorChannel();
+    const authority = new EnrollmentAuthority(store, channel);
+    const requested = await authority.request(request);
+    if (!requested.ok) throw new Error("the request should be held");
+    await channel.type(channel.codeFor(requested.pendingId));
+    await authority.abandonWaiting("remote control stopped");
+    const outcome = await commitAt(authority, requested.pendingId, Date.now());
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(outcome.code).toBe("expired");
   });
 });
