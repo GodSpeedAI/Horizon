@@ -42,6 +42,7 @@ import type { RunView } from "@godspeedai/cognate-runtime-api";
 import { buildStructuralFrame, type NavigationFrameV1, type NavigationIntentRecord } from "./domain/frame.ts";
 import {
   actionFieldFor,
+  classify,
   classifyReference,
   loadOperationManifest,
   refusedPrefixesFor,
@@ -123,6 +124,10 @@ import { readLedgerDay } from "./adapters/ledger-day.ts";
 import { recordReader, type RecordReader } from "./adapters/realitytrace-economics.ts";
 import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
 import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, PAIR_FIRST_WORDS, PairingNeedsTerminal, printPairingCode } from "./desk/pairing.ts";
+import { gate as confirmationGate, type ConsumeResult } from "./capabilities/pending-confirmations.ts";
+import { runConfirm, type ConfirmIO, type ConfirmOutcome } from "./capabilities/confirm-command.ts";
+import { AUTHORITY_DECISION_INTERFACE, interfacePublicationStatus } from "./contracts/identity/interface-status.ts";
+import { terminalOutput as confirmationTerminal } from "./desk/pairing.ts";
 import { DEFAULT_AGENT_KEY_ID, DEFAULT_AGENT_NAME, ownerOfKey, readRegistry } from "./desk/agent-keys.ts";
 import { checkWithdraw, questionFingerprint } from "./capabilities/question-rules.ts";
 import { notRecordedWarnings } from "./capabilities/reconciliation.ts";
@@ -343,6 +348,8 @@ export interface HorizonApplication {
   startObservation(commit: IntentCommit): Promise<RunView>;
   researchContract(): ReturnType<typeof requireResearch>;
   startServer(port?: number): HttpServer;
+  /** Stage 0B: the local terminal side of a waiting reserved operation (`horizon confirm --pending <id>`). */
+  confirmPending(pendingId: string, io: ConfirmIO): Promise<ConfirmOutcome>;
   /** Resolves when the saved records are migrated. Until then every change is refused with words saying so (design v3, step 4). */
   readonly migrated: Promise<void>;
   close(): Promise<void>;
@@ -511,6 +518,8 @@ export async function createApplication(
      * start when the desk's records are not migrated yet. Every store write it attempts is refused.
      */
     readonly readOnly?: boolean;
+    /** Test seam only: lets an in-process test drive governed mode with a scripted wire while the owner has not published the authority decision. */
+    readonly unpublishedAuthorityForTests?: boolean;
   } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath, { readOnly: options.readOnly === true });
@@ -520,6 +529,10 @@ export async function createApplication(
   const caller: Caller = { actor: loaded.operator.principal, tenant: loaded.operator.tenant };
   const frames = createFrameRegister();
   const configured = options.governance ?? governanceFromEnv(process.env);
+  // Fail closed: governed mode consumes SEA-Forge's authority decision, which the owner has not published (external-interfaces.json).
+  if (configured.mode === "sea-forge" && !options.unpublishedAuthorityForTests && interfacePublicationStatus(AUTHORITY_DECISION_INTERFACE) !== "published") {
+    throw new Error("SEA-Forge governance is refused: sea_forge.authority_decision is specified_not_published, so Horizon cannot read a committed decision. Governance stays off until SEA-Forge publishes it.");
+  }
   // Poll SEA-Forge for decided escalations, so a commit approved or rejected at SEA-Forge directly
   // (not through resolveNavigationApproval) still resumes or fails on its own.
   const approvals = options.approvals ?? approvalAuthorityFromEnv(process.env, caller.actor.id);
@@ -935,12 +948,14 @@ export async function createApplication(
     // The gate is here as well as at the request boundary: this is the last place before a
     // capability runs and a record is appended, so an unclassified reference cannot reach it by
     // any other route into the application (R2-03).
+    // A classification refusal (unknown, governed, deployment-bound) appends nothing: the contract says no record is appended before refusal (NE-16).
+    let classificationRefusal: IntentError | null = null;
     try {
       const classification = classifyReference(identityCatalogOf(), intent.operation_ref, deploymentBoundRefs);
       if (!classification.allowed) {
         const governed = classification.reason === "governed_operation_needs_confirmation";
         const bound = classification.reason === "deployment_bound_operation_needs_its_own_path";
-        throw new IntentError(
+        classificationRefusal = new IntentError(
           governed || bound ? "failed_precondition" : "invalid_argument",
           governed
             ? `${intent.operation_ref} is a ${classification.class} row: it needs its pending record, its confirmation and its authority writer, not a plain intent`
@@ -950,12 +965,9 @@ export async function createApplication(
         );
       }
     } catch (error) {
-      if (error instanceof IntentError) {
-        await audit(intent, "refused", error.message);
-        throw error;
-      }
       throw new IntentError("failed_precondition", `the identity catalog could not be loaded, so nothing was committed (${error instanceof Error ? error.message : String(error)})`);
     }
+    if (classificationRefusal !== null) throw classificationRefusal;
     if (governance.mode === "sea-forge") return governedSubmit(intent);
     let result: CommitIntentOutput;
     try {
@@ -2056,6 +2068,9 @@ export async function createApplication(
     }
 
     if (operation === "lesson.decide") {
+      // Stage 0B: a lesson decision is a reserved person change; it waits for the local terminal.
+      const lessonWaiting = await confirmationGate(store, { tenant: caller.tenant, operator: caller.actor.id, operationId: "lesson.decide", params: { lesson_id: card.id, choice }, now }, confirmationTerminal());
+      if (!lessonWaiting.ok) return awaitingDeskConfirmation(lessonWaiting);
       const decided = await decideLesson(store, { lesson_id: card.id, choice: choice === "accept" ? "accept" : "reject", person: caller.actor.id, now });
       if (!decided.ok) {
         await audit("refused");
@@ -2730,6 +2745,14 @@ export async function createApplication(
       if (seen.kind === "reused") return fail(409, REUSED_REQUEST_WORDS);
       if (seen.kind === "replay") return Response.json(seen.response, { headers });
     }
+    // Stage 0B: a person's reserved (P2) change runs only after an exact local confirmation on the
+    // terminal. Low-risk collaboration (P1) is not gated. The request id is not part of the operation,
+    // so a new attempt at the same change matches the descriptor it was confirmed under.
+    if (panelOperation !== null && classify(identityCatalogOf(), panelOperation).class === "P2") {
+      const { request_id: _requestId, ...operationParams } = body;
+      const waiting = await confirmationGate(store, { tenant: caller.tenant, operator: caller.actor.id, operationId: panelOperation, params: operationParams, now: clock() }, confirmationTerminal());
+      if (!waiting.ok) return awaitingDeskConfirmation(waiting);
+    }
     const requestKeep = (response: { readonly ok: true; readonly message: string }): CommitRecord[] => (typeof requestId === "string" ? [requestRecord(deskScopeOf(caller.tenant, caller.actor.id), requestId, fingerprint, response)] : []);
     if (body.op === "human.stop_waiting") {
       if (typeof body.step !== "string" || body.step === "") return fail(400, "Say which step to stop waiting for.");
@@ -3242,6 +3265,7 @@ export async function createApplication(
     surfaceSchema: publishSurfaceSchema,
     commitSurfaceIntent,
     researchContract: () => requireResearch(research),
+    confirmPending: (pendingId: string, io: ConfirmIO) => runConfirm(runtime.runtime.store, pendingId, io, clock()),
     startServer(port = loaded.config.port): HttpServer {
       const route = async (request: Request): Promise<Response> => {
           const url = new URL(request.url);
@@ -3514,6 +3538,10 @@ export async function createApplication(
             const form = await request.formData().catch(() => null);
             if (form === null) return Response.json({ code: "invalid_argument", message: "LABEL: body is not a form" }, { status: 400 });
             const back = safeReturn(form.get("return"));
+            // Stage 0B: a label is a reserved human write. It runs only after an exact local confirmation.
+            const labelParams = { session: String(form.get("session") ?? ""), event: String(form.get("event") ?? ""), record_seq: String(form.get("record_seq") ?? ""), verdict: String(form.get("verdict") ?? ""), first_failure: String(form.get("first_failure") ?? "") };
+            const labelWaiting = await confirmationGate(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, operationId: "workspace.label", params: labelParams, now: clock() }, confirmationTerminal());
+            if (!labelWaiting.ok) return awaitingLocalConfirmation(request, labelWaiting, back ? `/workspace/compare?${back}` : "/workspace/compare");
             try {
               await putLabel(runtime.runtime.store, {
                 tenant: caller.tenant,
@@ -3761,6 +3789,33 @@ function remoteRailOf(status: RemoteStatus): { readonly state: string; readonly 
 }
 
 /** A `return` field is a query string for our own compare page, never a URL: no open redirect. */
+/** The desk's JSON answer while a reserved change waits for the local terminal. Nothing was written. */
+function awaitingDeskConfirmation(waiting: Extract<ConsumeResult, { ok: false }>): Response {
+  const pending = waiting.code === "awaiting_local_confirmation" ? waiting.pending_id : null;
+  const message =
+    pending !== null
+      ? `Confirm this on the Horizon terminal with: horizon confirm --pending ${pending}. Nothing was changed yet.`
+      : "Horizon has no terminal to confirm on, so nothing was changed.";
+  return Response.json({ ok: false, code: waiting.code, pending_id: pending, message }, { status: 409, headers: { "cache-control": "no-store" } });
+}
+
+/**
+ * The answer a reserved route gives while its operation waits for the local terminal (Stage 0B).
+ * Nothing was written: the route returns this instead of performing its write.
+ */
+function awaitingLocalConfirmation(request: Request, waiting: Extract<ConsumeResult, { ok: false }>, target: string): Response {
+  const pending = waiting.code === "awaiting_local_confirmation" ? waiting.pending_id : null;
+  const message =
+    pending !== null
+      ? `Confirm this on the Horizon terminal with: horizon confirm --pending ${pending}. Nothing was changed yet.`
+      : "Horizon has no terminal to confirm on, so nothing was changed.";
+  if ((request.headers.get("accept") ?? "").includes("application/json")) {
+    return Response.json({ ok: false, code: waiting.code, pending_id: pending, message }, { status: 409 });
+  }
+  const separator = target.includes("?") ? "&" : "?";
+  return Response.redirect(`${target}${separator}confirm=${encodeURIComponent(pending ?? "none")}`, 303);
+}
+
 function safeReturn(value: FormDataEntryValue | null): string {
   const text = typeof value === "string" ? value : "";
   return /^[A-Za-z0-9_=&%.:\-+]*$/.test(text) ? text : "";

@@ -23,7 +23,7 @@ preregistration:
   upstream_pins:
     spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
     plan: { id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23" }
-    design: { file: design_draft.md, sha256: "f65aed3ce333a11a8aa12b81b526aaa3793860ea856e2796ce555003c9112583", lines: 959, sections: "2, 6, 7, 9.1, 11, 12, Appendix A, Review Record" }
+    design: { file: design_draft.md, sha256: "3df398c7377140ea3c9daf423d3678b6d7e0a6890d0ca0fa49425e5f910d5f7f", lines: 959, sections: "2, 6, 7, 9.1, 11, 12, Appendix A, Review Record" }
     task_preregistration: { file: .agents/prereg/horizon/T23.prereg.yaml, id: HORIZON-PREREG-T23-0A, relationship: "the task-level preregistration that registers the Stage 0A expectations; this unit is one of its Stage 0A units" }
     prior_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-REMEDIATION-3.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-REMEDIATION-3, relationship: "the unit that closed the fourth independent review's findings" }
     prior_review: { file: .agents/evidence/2026-11-09-stage-0a-defects/independent-review-round-5.md, verdict: "REJECT", findings: 9, disposition: .agents/evidence/2026-11-09-stage-0a-defects/review-round-5-disposition.md }
@@ -48,21 +48,21 @@ preregistration:
   positive_expectations:
     - id: PE-44
       expectation: >-
-        Every fact the external-interface contract requires of a published owner artifact is
-        verified in the owner struct that carries it at the pinned commit, not merely somewhere in
-        the owner's files. The authority decision's facts are read per component: envelope fields
-        from the envelope source, ledger entry fields from the committed entry, checkpoint fields
-        from the signed checkpoint, and inclusion fields from the Merkle proof. A fact the owner's
-        named struct does not carry fails the check.
+        The authority decision interface is specified_not_published: SEA-Forge serializes its
+        envelope but commits and signs only the in-memory decision payload, so no owner struct is
+        read for it, every fact binds to unbound, and the contract check still passes. Every fact of
+        a published owner artifact is verified in the owner struct that carries it at the pinned
+        commit; a fact a published interface's named struct does not carry fails the check.
     - id: PE-45
       expectation: >-
-        The Merkle inclusion fields the verifier needs are present and bound. The contract names
-        the proof's leaf index and sibling hashes, and the entry's MMR leaf index, each with its
-        owner struct, and each binds to the envelope check that consumes it.
+        The Merkle inclusion fields the verifier needs are present as facts the owner must carry:
+        the proof's leaf index and sibling hashes, and the entry's MMR leaf index. Each is
+        unbound until SEA-Forge publishes a committed proof, so no envelope check consumes it yet.
     - id: PE-46
       expectation: >-
         Every fact binds to exactly one target: a field of a Horizon record kind the records
-        contract declares, or one of the closed envelope checks. The local record kinds that
+        contract declares, one of the closed envelope checks, or unbound while its interface is
+        unpublished (a published interface may not be unbound). The local record kinds that
         carry Horizon's own delegation and decision are named HorizonDelegationGrant and
         HorizonAuthorityDecision, so they no longer read as the owner's artifacts.
     - id: PE-47
@@ -98,10 +98,11 @@ preregistration:
   negative_expectations:
     - id: NE-38
       expectation: >-
-        An external-interface fact that names no owner component, or a struct the owner does not
-        declare, fails the check rather than being verified against the joined source. A fact
-        that binds to nothing, or to a record field records.json does not declare, or to an
-        envelope check the contract does not list, also fails the check.
+        Against a published owner at a pinned commit, a fact that names no owner component, a
+        struct the owner does not declare, or a field the struct does not carry fails the check,
+        rather than being verified against the joined source. A fact that binds to nothing, to a
+        record field records.json does not declare, to an envelope check the contract does not
+        list, or to unbound while the interface is published also fails the check.
     - id: NE-39
       expectation: >-
         A refused desk P3 row or the refused run start performs no target effect and appends
@@ -111,3 +112,13 @@ preregistration:
       expectation: >-
         A device credential never reaches the human commit path as the human, and a phone commit
         with no device-attributed delegation is never answered as if it had committed a move.
+    - id: NE-41
+      expectation: >-
+        A classification refusal of an intent (an unknown, governed or deployment-bound reference)
+        through the public submit boundary appends no intent attempt record, because the contract
+        requires that nothing be appended before a refusal. Added in the round-6 response.
+    - id: NE-42
+      expectation: >-
+        Governed mode is refused at startup while sea_forge.authority_decision is unpublished, so
+        no path reads a decision that nothing authenticates. The test seam that lets an in-process
+        test drive governed mode is named and used by one test only. Added in the round-6 response.

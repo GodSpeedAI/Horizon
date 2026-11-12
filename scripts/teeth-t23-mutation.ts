@@ -221,7 +221,7 @@ const MUTANTS: readonly Mutant[] = [
     expectation: "PE-34",
     file: "contracts/identity/v1/external-interfaces.json",
     testFile: REMEDIATION_3_TEST,
-    title: "a published external interface names the owner's real artifact, and an unpublished one fails closed (PE-34)",
+    title: "the decision interface names its facts but no artifact",
     find: ENTITLEMENT_FIND,
     replace: ENTITLEMENT_REPLACE,
   },
@@ -352,7 +352,7 @@ const MUTANTS: readonly Mutant[] = [
     expectation: "NE-38",
     file: "scripts/check-external-interface-facts.ts",
     testFile: REMEDIATION_4_TEST,
-    title: "NE-38: a fact with no component, an undeclared struct, or an unbound target fails the check",
+    title: "NE-38: a fact with no component",
     find: "if (!names.includes(field)) fail(",
     replace: "if (false && !names.includes(field)) fail(",
   },
@@ -363,7 +363,7 @@ const MUTANTS: readonly Mutant[] = [
     expectation: "NE-38",
     file: "scripts/check-external-interface-facts.ts",
     testFile: REMEDIATION_4_TEST,
-    title: "NE-38: a fact with no component, an undeclared struct, or an unbound target fails the check",
+    title: "NE-38: a fact with no component",
     find: "const scope = source.struct === null ? text : structBody(text, source.struct);",
     replace: "const scope = text;",
   },
@@ -399,6 +399,116 @@ const MUTANTS: readonly Mutant[] = [
     title: "PE-52: anonymous and code-holder rows state no human evidence",
     find: "    separationOfDuty: raw.separation_of_duty ?? base.separation_of_duty ?? null,",
     replace: "    separationOfDuty: raw.separation_of_duty ?? base.separation_of_duty ?? true,",
+  },
+  {
+    // Stage 0B. A label that runs without the gate's answer is written with no confirmation.
+    id: "M34 the label route ignores a waiting confirmation",
+    expectation: "PE-58",
+    file: "src/app.ts",
+    testFile: "test/containment-routes.test.ts",
+    title: "PE-58: a label without a confirmation is answered 409 and is not saved",
+    find: "if (!labelWaiting.ok) return awaitingLocalConfirmation(",
+    replace: "if (false) return awaitingLocalConfirmation(",
+  },
+  {
+    // Stage 0B. The stored descriptor holds the code itself, so the record would reveal the confirmation.
+    id: "M35 the descriptor stores the confirmation code",
+    expectation: "PE-54",
+    file: "src/capabilities/pending-confirmations.ts",
+    testFile: "test/pending-confirmations.test.ts",
+    title: "PE-54: the code is shown on the terminal and never stored",
+    find: "confirmation_digest: codeDigest(pendingId, code),",
+    replace: "confirmation_digest: code,",
+  },
+  {
+    // Stage 0B. A wrong code confirms.
+    id: "M36 a wrong code confirms the descriptor",
+    expectation: "NE-41",
+    file: "src/capabilities/pending-confirmations.ts",
+    testFile: "test/pending-confirmations.test.ts",
+    title: "NE-41: a wrong code confirms nothing",
+    find: "if (given.length !== want.length || !timingSafeEqual(given, want)) {",
+    replace: "if (false) {",
+  },
+  {
+    // Stage 0B. An expired descriptor can still be confirmed.
+    id: "M37 an expired descriptor can still be confirmed",
+    expectation: "NE-42",
+    file: "src/capabilities/pending-confirmations.ts",
+    testFile: "test/pending-confirmations.test.ts",
+    title: "NE-42: an expired descriptor cannot be confirmed",
+    find: "if (input.now.getTime() > Date.parse(descriptor.expires_at)) {",
+    replace: "if (false) {",
+  },
+  {
+    // Stage 0B. Two racing requests both run on one confirmation.
+    id: "M38 a lost race still runs the operation",
+    expectation: "NE-43",
+    file: "src/capabilities/pending-confirmations.ts",
+    testFile: "test/pending-confirmations.test.ts",
+    title: "NE-43: a confirmed descriptor is consumed exactly once",
+    find: "if (moved) return { ok: true, pending_id: descriptor.pending_id };",
+    replace: "if (true) return { ok: true, pending_id: descriptor.pending_id };",
+  },
+  {
+    // Stage 0B. A confirmation for one parameter set is applied to another.
+    id: "M39 a confirmation is matched without the operation digest",
+    expectation: "NE-45",
+    file: "src/capabilities/pending-confirmations.ts",
+    testFile: "test/pending-confirmations.test.ts",
+    title: "NE-45: a confirmation for one operation, parameters or operator is never consumed by another",
+    find: "{ tenant: input.tenant, operation_digest: digest }",
+    replace: "{ tenant: input.tenant }",
+  },
+  {
+    // Stage 0B. The terminal does not name the operation it asks the person to confirm.
+    id: "M40 the confirm command stops naming the operation",
+    expectation: "PE-56",
+    file: "src/capabilities/confirm-command.ts",
+    testFile: "test/pending-confirmations.test.ts",
+    title: "PE-56: the confirm command renders the exact operation",
+    find: "io.write(`Operation waiting for confirmation: ${descriptor.operation_id}`);",
+    replace: "io.write(\"Operation waiting for confirmation.\");",
+  },
+  {
+    // Stage 0B. A second request summons another descriptor instead of reusing the waiting one.
+    id: "M41 a waiting descriptor is not reused",
+    expectation: "PE-57",
+    file: "src/capabilities/pending-confirmations.ts",
+    testFile: "test/pending-confirmations.test.ts",
+    title: "PE-57: a second request while one descriptor still waits reuses it",
+    find: "if (head.state === \"pending\" && waiting === null) waiting = descriptor;",
+    replace: "if (false) waiting = descriptor;",
+  },
+  {
+    // Stage 0B. A confirmed descriptor is consumed but the operation is still answered as waiting.
+    id: "M42 a confirmed operation is not run",
+    expectation: "PE-55",
+    file: "src/capabilities/pending-confirmations.ts",
+    testFile: "test/pending-confirmations.test.ts",
+    title: "PE-55: the typed code confirms exactly the named operation",
+    find: "if (moved) return { ok: true, pending_id: descriptor.pending_id };",
+    replace: "if (moved) return { ok: false, code: \"awaiting_local_confirmation\", pending_id: descriptor.pending_id, expires_at: descriptor.expires_at };",
+  },
+  {
+    // Stage 0B. Without a terminal the descriptor is still written.
+    id: "M43 a request without a terminal still writes a descriptor",
+    expectation: "NE-44",
+    file: "src/capabilities/pending-confirmations.ts",
+    testFile: "test/pending-confirmations.test.ts",
+    title: "NE-44: without a terminal nothing is written",
+    find: "if (codeSink === null && !output.terminal(",
+    replace: "if (false && !output.terminal(",
+  },
+  {
+    // Stage 0B. The repeated unconfirmed label reports success.
+    id: "M44 the label route ignores a waiting confirmation on repeat",
+    expectation: "NE-46",
+    file: "src/app.ts",
+    testFile: "test/containment-routes.test.ts",
+    title: "NE-46: repeating the label without confirming",
+    find: "if (!labelWaiting.ok) return awaitingLocalConfirmation(",
+    replace: "if (false) return awaitingLocalConfirmation(",
   },
 ];
 

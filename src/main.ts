@@ -2,6 +2,7 @@ import { createApplication } from "./app.ts";
 import { mcpTools, renderText } from "./ui/surface2/render.ts";
 import { HORIZON_OPERATIONS, isConsequential, type HorizonOperation, type SurfaceRole } from "./ui/surface2/grammar.ts";
 import { openSequential, renderSequentialText, type SequentialIntent } from "./ui/sequential/controller.ts";
+import { ttyConfirmIO } from "./capabilities/confirm-command.ts";
 
 /**
  * Three transports, one surface. The CLI and MCP verbs below resolve their target through the
@@ -119,6 +120,18 @@ if (command === "frame") {
     ...(frameId === undefined ? {} : { frame_id: frameId }),
   }, roleFlag());
   process.stdout.write(`${JSON.stringify(outcome, null, 2)}\n`);
+  await application.close();
+  if (!outcome.ok) process.exit(1);
+} else if (command === "confirm") {
+  // Stage 0B: the local terminal names the waiting operation and asks for the code the Horizon terminal showed. It runs on /dev/tty only.
+  const pendingId = flag("pending");
+  if (pendingId === undefined) {
+    process.stderr.write("horizon confirm: name the waiting operation with --pending <id>\n");
+    await application.close();
+    process.exit(2);
+  }
+  const outcome = await application.confirmPending(pendingId, ttyConfirmIO());
+  process.stdout.write(`${outcome.message}\n`);
   await application.close();
   if (!outcome.ok) process.exit(1);
 } else if (command === "mcp") {

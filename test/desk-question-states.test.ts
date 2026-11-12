@@ -79,7 +79,11 @@ async function withCommits<T>(app: DeskApp, run: () => Promise<T>, failOn?: stri
   console.error = () => undefined;
   try {
     const result = await run();
-    return { result, commits: recorder.commits };
+    // A reserved change waits for its local confirmation (Stage 0B), and that gate writes its own
+    // pending descriptor, confirmation and applied transitions. Those are not the operation's commit,
+    // so they are not counted: the operation's own write must still be one commit.
+    const operational = recorder.commits.filter((collections) => collections.some((name) => !name.startsWith("horizon-pending")));
+    return { result, commits: operational };
   } finally {
     console.error = quiet;
     recorder.restore();

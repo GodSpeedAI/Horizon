@@ -211,6 +211,11 @@ export function checkExternalInterfaceFacts(
         fail(`${entry.interface_id}: fact "${entryFact.fact}" binds to nothing`);
         continue;
       }
+      if (bind.startsWith("unbound:")) {
+        // A fact the owner has not published binds to no Horizon field: an unpublished interface may not claim a binding.
+        if (entry.publication_status === "published") fail(`${entry.interface_id}: fact "${entryFact.fact}" is unbound, but the interface is published`);
+        continue;
+      }
       if (bind.startsWith("envelope:")) {
         if (!envelopeChecks.has(bind)) fail(`${entry.interface_id}: fact "${entryFact.fact}" binds to "${bind}", which is not a declared envelope check`);
         continue;

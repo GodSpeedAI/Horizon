@@ -27,394 +27,279 @@
       "interface_version": "2",
       "owner": "GodSpeedAI/SEA-Forge",
       "repository": "https://github.com/GodSpeedAI/SEA-Forge.git",
-      "pinned_commit": "b072ec50b1e50df75c45ddf1709caa6877d5c2f1",
-      "pinned_commit_date": "2026-10-30",
-      "artifact_path": "crates/sea-forge-authority/src/cep.rs",
-      "artifact_symbol": "godspeed.authority_decision",
-      "artifact_paths": [
-        "crates/sea-forge-authority/src/cep.rs",
-        "crates/sea-forge-core/src/types.rs",
-        "crates/sea-forge-ledger/src/types.rs"
-      ],
-      "publication_status": "published",
+      "pinned_commit": null,
+      "pinned_commit_date": null,
+      "artifact_path": null,
+      "artifact_symbol": null,
+      "artifact_paths": [],
+      "publication_status": "specified_not_published",
       "horizon_mints": false,
       "horizon_binding": "HorizonAuthorityDecision.decision_ref",
-      "horizon_view": "The owner publishes the decision as a cryptographic envelope, not as a struct: the `godspeed.authority_decision` profile at version 1.0.0, whose `extensions[\"godspeed.authority_decision\"]` names the disposition, the operation, the decision and the committed ledger entry. The envelope is committed to SEA-Forge's ledger as the entry whose `record_kind` is `authority_decision`; that entry's integrity is proved by the ledger's hash chain, by a signed `LedgerCheckpoint`, and by a `MerkleProof` that includes the entry. Horizon reads the envelope, the committed entry and the signed checkpoint. Horizon does not read the in-memory `AuthorityDecision` struct, which carries none of the facts this interface checks, and it does not read a grant: `ActionGrant` is move-only and intentionally not serializable.",
+      "horizon_view": "SEA-Forge serializes a `godspeed.authority_decision` envelope (`decision_envelope` in sea-forge-authority cep.rs) but does not commit or sign it. The ledger commits the in-memory AuthorityDecision payload, and the Merkle inclusion proof authenticates that payload only, so no envelope fact is authenticated. Horizon reads none of these facts until SEA-Forge publishes a committed or signed envelope, or a pinned projection that authenticates every consumed fact. Until then this interface is specified_not_published and every governed path that would consume it fails closed (governance refused at startup).",
       "required_facts": [
         {
           "fact": "envelope_id",
           "meaning": "the envelope's own identifier",
-          "binds": "envelope:profile",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "cep_version",
           "meaning": "the envelope protocol version",
-          "binds": "envelope:profile",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "envelope_kind",
           "meaning": "that the envelope is an authority decision",
-          "binds": "envelope:profile",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "created_at",
           "meaning": "when the owner decided",
-          "binds": "envelope:profile",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "created_by",
           "meaning": "the producer that wrote the envelope",
-          "binds": "envelope:profile",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "decision",
           "meaning": "the disposition the authority reached: allow, deny, boundary, degraded or unknown",
-          "binds": "HorizonAuthorityDecision.decision",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "decision_id",
           "meaning": "the decision's own identifier",
-          "binds": "HorizonAuthorityDecision.decision_ref",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "operation_id",
           "meaning": "the exact operation the decision is about",
-          "binds": "HorizonAuthorityDecision.operation_digest",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "request_ref",
           "meaning": "the request envelope the decision answers",
-          "binds": "envelope:profile",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "ledger_entry",
           "meaning": "the identifier of the committed ledger entry that carries the decision",
-          "binds": "envelope:ledger_chain",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "policy_bundle_hash",
           "meaning": "the hash of the policy bundle the decision was evaluated against",
-          "binds": "HorizonAuthorityDecision.policy_digest",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "action_request_hash",
           "meaning": "the hash of the exact action the decision is about",
-          "binds": "HorizonAuthorityDecision.operation_digest",
-          "component": "determinism",
-          "source": {
-            "file": "crates/sea-forge-core/src/types.rs",
-            "struct": "Determinism"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "identity_binding_hash",
           "meaning": "the hash of the identity binding the decision carries",
-          "binds": "envelope:profile",
-          "component": "determinism",
-          "source": {
-            "file": "crates/sea-forge-core/src/types.rs",
-            "struct": "Determinism"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "policy_basis",
           "meaning": "the policy references a constrained disposition was evaluated against",
-          "binds": "envelope:disposition",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          },
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null,
           "conditional": "only when the disposition is constrained (boundary or degraded)"
         },
         {
           "fact": "scope",
           "meaning": "the scope the decision covers",
-          "binds": "HorizonAuthorityDecision.resource_refs",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "authority",
           "meaning": "the authority's identifier and the subject actor the decision binds",
-          "binds": "HorizonAuthorityDecision.approver_ref",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "constraints",
           "meaning": "the constraints a constrained disposition carries",
-          "binds": "envelope:disposition",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          },
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null,
           "conditional": "only when the decision is boundary"
         },
         {
           "fact": "compensating_controls",
           "meaning": "the controls that stand in for a degraded disposition",
-          "binds": "envelope:disposition",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          },
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null,
           "conditional": "only when the decision is degraded"
         },
         {
           "fact": "approval_expires_at",
           "meaning": "when an approval the decision consumed stops being current",
-          "binds": "HorizonAuthorityDecision.expires_at",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          },
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null,
           "conditional": "only when an approval was consumed"
         },
         {
           "fact": "approved_by",
           "meaning": "who approved the decision, when an approval was consumed",
-          "binds": "HorizonAuthorityDecision.approver_ref",
-          "component": "envelope",
-          "source": {
-            "file": "crates/sea-forge-authority/src/cep.rs",
-            "struct": null
-          },
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null,
           "conditional": "only when an approval was consumed"
         },
         {
           "fact": "entry_hash",
           "meaning": "the committed entry's own hash",
-          "binds": "envelope:ledger_chain",
-          "component": "ledger_entry",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerEntry"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "previous_entry_hash",
           "meaning": "the committed entry's predecessor hash, which chains it to the ledger",
-          "binds": "envelope:ledger_chain",
-          "component": "ledger_entry",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerEntry"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "payload_hash",
           "meaning": "the hash of the committed payload",
-          "binds": "envelope:ledger_chain",
-          "component": "ledger_entry",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerEntry"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "append_ordinal",
           "meaning": "the entry's position in the ledger",
-          "binds": "envelope:ledger_chain",
-          "component": "ledger_entry",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerEntry"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "committed_at",
           "meaning": "when the owner committed the entry",
-          "binds": "envelope:ledger_chain",
-          "component": "ledger_entry",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerEntry"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "writer_identity_ref",
           "meaning": "the writer that committed the entry",
-          "binds": "envelope:ledger_chain",
-          "component": "ledger_entry",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerEntry"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "subject_refs",
           "meaning": "the subjects the committed entry is about",
-          "binds": "envelope:ledger_chain",
-          "component": "ledger_entry",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerEntry"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "canonicalization",
           "meaning": "the canonicalization the payload hash was taken over",
-          "binds": "envelope:ledger_chain",
-          "component": "ledger_entry",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerEntry"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "hash_algorithm",
           "meaning": "the hash algorithm the entry and the chain use",
-          "binds": "envelope:ledger_chain",
-          "component": "ledger_entry",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerEntry"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "checkpoint_hash",
           "meaning": "the signed checkpoint's own hash",
-          "binds": "envelope:checkpoint",
-          "component": "checkpoint",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerCheckpoint"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "mmr_root",
           "meaning": "the checkpoint's Merkle root, which the inclusion proof is checked against",
-          "binds": "envelope:checkpoint",
-          "component": "checkpoint",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerCheckpoint"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "signing_algorithm",
           "meaning": "the algorithm the checkpoint's signature was taken with",
-          "binds": "envelope:checkpoint",
-          "component": "checkpoint",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerCheckpoint"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "signing_key_id",
           "meaning": "the key the owner signed the checkpoint with",
-          "binds": "envelope:checkpoint",
-          "component": "checkpoint",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerCheckpoint"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "signature",
           "meaning": "the owner's signature over the checkpoint hash",
-          "binds": "envelope:checkpoint",
-          "component": "checkpoint",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerCheckpoint"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "mmr_leaf_index",
           "meaning": "the entry's position in the Merkle mountain range, which the inclusion proof is taken at",
-          "binds": "envelope:inclusion",
-          "component": "ledger_entry",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "LedgerEntry"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "leaf_index",
           "meaning": "the leaf position the inclusion proof starts from",
-          "binds": "envelope:inclusion",
-          "component": "inclusion",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "MerkleProof"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         },
         {
           "fact": "proof_hashes",
           "meaning": "the sibling hashes along the inclusion path up to the checkpoint root",
-          "binds": "envelope:inclusion",
-          "component": "inclusion",
-          "source": {
-            "file": "crates/sea-forge-ledger/src/types.rs",
-            "struct": "MerkleProof"
-          }
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
         }
       ],
       "horizon_checks": [
@@ -427,28 +312,7 @@
       ],
       "failure_rule": "A decision Horizon cannot resolve against the pinned interface is not authority. The operation is refused; it is never satisfied by a local policy, a session, or a grant. A decision whose signature does not verify against the owner's trust set at the pinned commit is refused whatever it says. The envelope carries no amount and no authority epoch, so Horizon checks the record's amount and epoch against the policy bundle and the trust set the decision names, never against a field the envelope does not have; an artifact that does not carry a fact the record needs is refused, not read around.",
       "dependency": null,
-      "components": {
-        "envelope": {
-          "file": "crates/sea-forge-authority/src/cep.rs",
-          "struct": null
-        },
-        "ledger_entry": {
-          "file": "crates/sea-forge-ledger/src/types.rs",
-          "struct": "LedgerEntry"
-        },
-        "checkpoint": {
-          "file": "crates/sea-forge-ledger/src/types.rs",
-          "struct": "LedgerCheckpoint"
-        },
-        "inclusion": {
-          "file": "crates/sea-forge-ledger/src/types.rs",
-          "struct": "MerkleProof"
-        },
-        "determinism": {
-          "file": "crates/sea-forge-core/src/types.rs",
-          "struct": "Determinism"
-        }
-      }
+      "components": {}
     },
     {
       "interface_id": "sea_forge.action_grant",

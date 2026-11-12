@@ -40,7 +40,7 @@ const manifest = loadOperationManifest();
 const records = loadRecordsContract();
 const params = Bun.YAML.parse(readFileSync(path.join(ROOT, "contracts/identity/v1/params.yaml"), "utf8")) as Record<string, any>;
 const interfaces = JSON.parse(readFileSync(path.join(ROOT, "contracts/identity/v1/external-interfaces.json"), "utf8")) as {
-  interfaces: { interface_id: string; publication_status: string; pinned_commit: string | null; artifact_path: string | null; required_facts: { fact: string }[] }[];
+  interfaces: { interface_id: string; publication_status: string; pinned_commit: string | null; artifact_path: string | null; required_facts: { fact: string; binds: string }[] }[];
   rules: Record<string, boolean>;
 };
 const fixtures = JSON.parse(readFileSync(path.join(ROOT, "contracts/identity/v1/fixtures/record-cases.json"), "utf8")) as {
@@ -67,16 +67,18 @@ const PUBLISHED_FACTS = [
 const byId = new Map(fixtures.cases.map((entry) => [entry.id, entry]));
 
 describe("the round-4 review's corrections", () => {
-  test("a published external interface names the owner's real artifact, and an unpublished one fails closed (PE-34)", () => {
+  test("the decision interface names its facts but no artifact, since the owner does not commit its envelope, and unpublished interfaces fail closed (PE-34)", () => {
     const decision = interfaces.interfaces.find((entry) => entry.interface_id === "sea_forge.authority_decision")!;
-    // The one interface the owner publishes is pinned to a commit and to the file that carries it.
-    expect(decision.publication_status).toBe("published");
-    expect(decision.pinned_commit).toBe("b072ec50b1e50df75c45ddf1709caa6877d5c2f1");
-    expect(decision.artifact_path).toBe("crates/sea-forge-authority/src/cep.rs");
+    // The decision is specified_not_published (round-6 review): SEA-Forge commits the payload, not the
+    // envelope, so the interface names no commit and no artifact, and every fact is unbound.
+    expect(decision.publication_status).toBe("specified_not_published");
+    expect(decision.pinned_commit).toBeNull();
+    expect(decision.artifact_path).toBeNull();
     expect(decision.required_facts.map((fact) => fact.fact)).toEqual(PUBLISHED_FACTS);
+    for (const fact of decision.required_facts) expect(fact.binds, fact.fact).toBe("unbound:owner_projection_not_published");
     // The two the owner has not published name no commit and no artifact, because there is
     // nothing to point at, and they fail closed.
-    for (const id of ["sea_forge.action_grant", "sea_forge.human_entitlement"]) {
+    for (const id of ["sea_forge.action_grant", "sea_forge.human_entitlement", "sea_forge.authority_decision"]) {
       const entry = interfaces.interfaces.find((candidate) => candidate.interface_id === id)!;
       expect(entry.publication_status, id).toBe("specified_not_published");
       expect(entry.pinned_commit, id).toBeNull();

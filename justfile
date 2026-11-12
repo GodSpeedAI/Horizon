@@ -268,6 +268,8 @@ check-t23:
     bun run scripts/check-stage0a-remediation-3-prereg-coverage.ts
     bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/STAGE-0A-REMEDIATION-4.prereg.yaml
     bun run scripts/check-stage0a-remediation-4-prereg-coverage.ts
+    bun run scripts/check-prereg-shape.ts .agents/prereg/horizon/STAGE-0B-CONTAINMENT.prereg.yaml
+    bun run scripts/check-stage0b-containment-prereg-coverage.ts
     bun run scripts/check-param-schema-binding.ts
     bun run scripts/check-design-contract-consistency.ts
     bun run scripts/check-delegation-register.ts
@@ -281,6 +283,7 @@ check-t23:
     bun test test/identity-remediation-2.test.ts
     bun test test/identity-remediation-3.test.ts
     bun test test/identity-remediation-4.test.ts
+    bun test test/pending-confirmations.test.ts test/containment-routes.test.ts
     uv run --project research pytest research/tests/test_identity_fixtures.py -q
 
 teeth-t23-mutation:

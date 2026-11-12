@@ -7,14 +7,12 @@
  * the pinned commit; none of them reads a stored verdict or a transcript.
  */
 import { describe, expect, test } from "bun:test";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, cpSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import {
-  checkExternalInterfaceFacts,
-  resolveOwnerCheckout,
-  structBody,
-} from "../scripts/check-external-interface-facts.ts";
+import { checkExternalInterfaceFacts, structBody } from "../scripts/check-external-interface-facts.ts";
+import { createApplication } from "../src/app.ts";
 import {
   EXECUTOR_CALLER_AUTHENTICATION,
   EXECUTORS,
@@ -25,12 +23,15 @@ import {
 } from "../src/contracts/identity/manifest.ts";
 import { frozenRefusal, refusalWords } from "../src/contracts/identity/enforcement.ts";
 import { loadRecordsContract } from "../src/contracts/identity/records.ts";
+import { readIntentAttempts } from "../src/capabilities/navigation-intent.ts";
+import { startDeskApp } from "./support/desk-app.ts";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const INTERFACES = JSON.parse(readFileSync(path.join(ROOT, "contracts/identity/v1/external-interfaces.json"), "utf8")) as {
   bind_targets: { envelope_checks: Record<string, string> };
   interfaces: {
     interface_id: string;
+    publication_status: string;
     required_facts: { fact: string; binds: string; component: string | null; conditional?: string }[];
     components?: Record<string, { file: string; struct: string | null }>;
   }[];
@@ -45,24 +46,24 @@ function authorityDecision() {
 }
 
 describe("the external-interface contract", () => {
-  test("PE-44: every published fact is verified in the owner struct that carries it, at the pinned commit", () => {
-    expect(resolveOwnerCheckout(ROOT)).not.toBeNull();
+  test("PE-44: the authority decision is unpublished, so no owner struct is read for it and the contract check still passes", () => {
     const result = checkExternalInterfaceFacts(ROOT, { quiet: true });
     expect(result.failures).toEqual([]);
     expect(result.ok).toBe(true);
     const decision = authorityDecision();
+    expect(decision.publication_status).toBe("specified_not_published");
     for (const fact of decision.required_facts) {
-      expect(fact.component, fact.fact).not.toBeNull();
+      expect(fact.component, fact.fact).toBeNull();
     }
   });
 
-  test("PE-45: the Merkle inclusion fields are present, component-named, and bound to the envelope check that consumes them", () => {
+  test("PE-45: the Merkle inclusion fields are present as facts the owner must carry, and bind to nothing until it publishes the proof", () => {
     const decision = authorityDecision();
     const byName = new Map(decision.required_facts.map((fact) => [fact.fact, fact]));
-    expect(byName.get("leaf_index")).toMatchObject({ component: "inclusion", binds: "envelope:inclusion" });
-    expect(byName.get("proof_hashes")).toMatchObject({ component: "inclusion", binds: "envelope:inclusion" });
-    expect(byName.get("mmr_leaf_index")).toMatchObject({ component: "ledger_entry", binds: "envelope:inclusion" });
-    expect(decision.components?.inclusion).toEqual({ file: "crates/sea-forge-ledger/src/types.rs", struct: "MerkleProof" });
+    for (const name of ["leaf_index", "proof_hashes", "mmr_leaf_index"]) {
+      expect(byName.get(name), name).toMatchObject({ component: null, binds: "unbound:owner_projection_not_published" });
+    }
+    expect(decision.components).toEqual({});
   });
 
   test("PE-46: every fact binds to a declared record field or a listed envelope check, and the Horizon kinds carry Horizon names", () => {
@@ -74,7 +75,9 @@ describe("the external-interface contract", () => {
     const checks = new Set(Object.keys(INTERFACES.bind_targets.envelope_checks));
     for (const entry of INTERFACES.interfaces) {
       for (const fact of entry.required_facts) {
-        if (fact.binds.startsWith("envelope:")) {
+        if (fact.binds.startsWith("unbound:")) {
+          expect(entry.publication_status, `${entry.interface_id}.${fact.fact}`).not.toBe("published");
+        } else if (fact.binds.startsWith("envelope:")) {
           expect(checks.has(fact.binds), `${entry.interface_id}.${fact.fact}`).toBe(true);
         } else {
           const [kind = "", field = ""] = fact.binds.split(".");
@@ -85,26 +88,54 @@ describe("the external-interface contract", () => {
     }
   });
 
-  test("NE-38: a fact with no component, an undeclared struct, or an unbound target fails the check", () => {
-    const sourceRoot = resolveOwnerCheckout(ROOT);
-    expect(sourceRoot).not.toBeNull();
+  test("NE-38: a fact with no component, an undeclared struct, a missing field or an unbound target fails the check against a published owner", () => {
+    // A synthetic owner repository at a pinned commit, so the struct checks run against real bytes.
+    const owner = mkdtempSync(path.join(tmpdir(), "owner-"));
+    const git = (args: string[]) => execFileSync("git", args, { cwd: owner, encoding: "utf8" }).trim();
+    git(["init", "-q"]);
+    mkdirSync(path.join(owner, "crates/x/src"), { recursive: true });
+    writeFileSync(path.join(owner, "crates/x/src/types.rs"), "pub struct Env { pub envelope_id: String }\n");
+    git(["add", "."]);
+    git(["-c", "user.name=owner", "-c", "user.email=owner@example.invalid", "commit", "-q", "-m", "owner fixture"]);
+    const pinned = git(["rev-parse", "HEAD"]);
     const scratch = mkdtempSync(path.join(tmpdir(), "ext-facts-"));
     mkdirSync(path.join(scratch, "contracts/identity/v1"), { recursive: true });
     cpSync(path.join(ROOT, "contracts/identity/v1/records.json"), path.join(scratch, "contracts/identity/v1/records.json"));
-    const mutated = JSON.parse(JSON.stringify(INTERFACES)) as typeof INTERFACES;
-    const decision = mutated.interfaces[0]!;
-    decision.required_facts[0]!.component = null;
-    decision.required_facts[1]!.binds = "HorizonAuthorityDecision.no_such_field";
-    decision.required_facts[2]!.binds = "envelope:unlisted";
-    decision.components = { ...decision.components, ghost: { file: "crates/sea-forge-ledger/src/types.rs", struct: "NoSuchStruct" } };
-    decision.required_facts[3]!.component = "ghost";
-    writeFileSync(path.join(scratch, "contracts/identity/v1/external-interfaces.json"), JSON.stringify(mutated));
-    const result = checkExternalInterfaceFacts(scratch, { quiet: true, sourceRoot: sourceRoot! });
-    expect(result.ok).toBe(false);
-    expect(result.failures.join("\n")).toContain("names no source component");
-    expect(result.failures.join("\n")).toContain("binds to HorizonAuthorityDecision.no_such_field");
-    expect(result.failures.join("\n")).toContain("envelope:unlisted");
-    expect(result.failures.join("\n")).toContain("NoSuchStruct");
+    const document = (facts: object[], components: Record<string, unknown>) => ({
+      ...INTERFACES,
+      interfaces: [
+        {
+          interface_id: "synthetic.owner",
+          publication_status: "published",
+          interface_version: "1",
+          owner: "fixture",
+          repository: "fixture",
+          pinned_commit: pinned,
+          pinned_commit_date: "2026-11-11",
+          artifact_path: "crates/x/src/types.rs",
+          artifact_symbol: null,
+          artifact_paths: ["crates/x/src/types.rs"],
+          horizon_mints: false,
+          horizon_binding: null,
+          horizon_view: "fixture",
+          components,
+          required_facts: facts,
+        },
+      ],
+    });
+    const good = { fact: "envelope_id", meaning: "fixture", binds: "envelope:profile", component: "env", source: null };
+    const env = { env: { file: "crates/x/src/types.rs", struct: "Env" } };
+    const run = (doc: object) => {
+      writeFileSync(path.join(scratch, "contracts/identity/v1/external-interfaces.json"), JSON.stringify(doc));
+      return checkExternalInterfaceFacts(scratch, { quiet: true, sourceRoot: owner });
+    };
+    expect(run(document([good], env)).failures).toEqual([]);
+    expect(run(document([{ ...good, component: null }], env)).failures.join("\n")).toContain("names no source component");
+    expect(run(document([good], { env: { file: "crates/x/src/types.rs", struct: "NoSuchStruct" } })).failures.join("\n")).toContain("NoSuchStruct");
+    expect(run(document([{ ...good, fact: "missing_field" }], env)).failures.join("\n")).toContain("does not carry");
+    expect(run(document([{ ...good, binds: "HorizonAuthorityDecision.no_such_field" }], env)).failures.join("\n")).toContain("binds to HorizonAuthorityDecision.no_such_field");
+    expect(run(document([{ ...good, binds: "envelope:unlisted" }], env)).failures.join("\n")).toContain("envelope:unlisted");
+    expect(run(document([{ ...good, binds: "unbound:owner_projection_not_published" }], env)).failures.join("\n")).toContain("is unbound, but the interface is published");
     expect(structBody("pub struct A { pub x: u8 }", "A")).toContain("pub x");
     expect(structBody("pub struct A { pub x: u8 }", "Missing")).toBeNull();
   });
@@ -161,6 +192,28 @@ describe("the phone and the executors", () => {
     expect(approval.separationOfDuty).toBe(true);
     const navigation = classify(manifest, "horizon.navigation.defer") as Operation;
     expect(navigation.separationOfDuty).toBeNull();
+  });
+});
+
+describe("governed mode waits for the owner's publication", () => {
+  test("NE-42: governed mode is refused at startup while the authority decision is unpublished", async () => {
+    await expect(createApplication({ governance: { mode: "sea-forge" } as never, realityTrace: null })).rejects.toThrow("specified_not_published");
+  });
+});
+
+describe("the public intent boundary appends nothing before a refusal", () => {
+  test("NE-41: a classification refusal through the public submitIntent appends no attempt record", async () => {
+    const app = await startDeskApp();
+    try {
+      const store = app.application.runtime.runtime.store;
+      const before = (await readIntentAttempts(store)).length;
+      for (const operation_ref of ["not.a.catalogued.operation", "human.answer"]) {
+        await expect(app.application.submitIntent({ operation_ref } as never)).rejects.toThrow();
+      }
+      expect((await readIntentAttempts(store)).length).toBe(before);
+    } finally {
+      await app.stop();
+    }
   });
 });
 

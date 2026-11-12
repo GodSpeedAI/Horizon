@@ -1,0 +1,99 @@
+preregistration:
+  id: HORIZON-PREREG-STAGE-0B-CONTAINMENT
+  task: STAGE-0B-CONTAINMENT
+  title: "Contain Horizon's reserved human writes behind an immutable pending descriptor and a local terminal confirmation"
+  recorded_at: "2026-11-11"
+  recorded_before_artifacts: false
+  claim: >-
+    A reserved human write (the workspace label, the desk panel P2 operations, and the lesson
+    decision) does not run when it is requested. It writes a pending descriptor that names the
+    exact operation, its parameters and its operator, and it answers that it is waiting. The
+    descriptor holds only a keyed digest of the confirmation code, never the code. The code is
+    shown on the Horizon terminal, and it is typed on the controlling terminal through
+    `horizon confirm --pending <id>`. The typed code confirms exactly the descriptor it was shown
+    for, and the operation then runs once. A wrong code, an expired descriptor, a request with no
+    terminal, and a confirmation presented to a different operation, parameter set or operator
+    each leave the operation unrun and write no effect. This unit does not claim a device
+    delegation, a human session, or any Stage 0A requirement beyond the containment it adds.
+  upstream_pins:
+    spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+    plan: { id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23", line: 1725, reference: "contain Horizon's reserved operations with an immutable pending descriptor and a local terminal confirmation (A3-T)" }
+    design: { file: design_draft.md, sha256: "3df398c7377140ea3c9daf423d3678b6d7e0a6890d0ca0fa49425e5f910d5f7f", lines: 959, sections: "12" }
+    prior_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-REMEDIATION-4.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-REMEDIATION-4, relationship: "the Stage 0A unit this containment follows" }
+  # This unit settles no specification requirement. It adds a local confirmation to reserved
+  # human writes. The Stage 0A requirements remain open until the sixth independent review rules.
+  settles: []
+  falsifier: >-
+    Any negative expectation reproducing on the committed files falsifies this claim: a reserved
+    write that runs without a confirmation, a descriptor that stores the code or any value from
+    which the code can be read back, a confirmation that applies to a different operation, a
+    parameter set or an operator, a second application of one confirmation, or an expired or
+    wrong-code confirmation that changes the operation's state.
+  known_confounds:
+    - >-
+      The test preload installs a confirmation sink that confirms for the suite, so the suite's
+      other route tests exercise the operations after confirmation. The waiting state is proved in
+      tests that remove the sink for their run, and the sink is restored afterwards.
+    - >-
+      `horizon confirm` opens the desk's writable store. While a desk process holds the store
+      lock, the command is refused by that lock, so a confirmation can be typed only when no desk
+      is running. Stage 0B does not redesign this. It is recorded as an incomplete item in the
+      report, not claimed as working in a running desk.
+    - >-
+      The confirmation code is six decimal digits. Its protection is the terminal channel, the
+      expiry of two minutes and the single application, not the code's entropy alone.
+    - >-
+      The route tests show the waiting response for the workspace label. The desk panel and the
+      lesson decision are gated in the same way, and their gate is proved by the unit tests of the
+      gate, not by a route test of each.
+  positive_expectations:
+    - id: PE-53
+      expectation: >-
+        A reserved operation requested without a confirmation writes no operational record, and the
+        request is answered as waiting with the pending descriptor's id.
+    - id: PE-54
+      expectation: >-
+        The confirmation code is shown on the Horizon terminal and is never stored. The stored
+        descriptor carries only a keyed digest of the code.
+    - id: PE-55
+      expectation: >-
+        A typed code that matches the descriptor confirms exactly that operation. The operation then
+        runs once, and a repeat request starts a new waiting descriptor rather than running again.
+    - id: PE-56
+      expectation: >-
+        The `horizon confirm` command renders the operation it is asked to confirm, its operator and
+        its expiry on the terminal before it asks for the code, and confirms through the terminal it
+        is given.
+    - id: PE-57
+      expectation: >-
+        A second request for the same operation while its descriptor still waits reuses that
+        descriptor rather than writing another one.
+    - id: PE-58
+      expectation: >-
+        A label request without a confirmation is answered with a 409 waiting response, and the label
+        is not saved.
+    - id: PE-59
+      expectation: >-
+        The waiting response for a label never carries the confirmation code.
+  negative_expectations:
+    - id: NE-41
+      expectation: >-
+        A wrong code confirms nothing: the descriptor stays pending and the operation does not run.
+    - id: NE-42
+      expectation: >-
+        An expired descriptor cannot be confirmed. It is marked expired, and a later request does not
+        run the operation under it.
+    - id: NE-43
+      expectation: >-
+        A confirmed descriptor is consumed exactly once when two requests race for it, and only one
+        request runs the operation.
+    - id: NE-44
+      expectation: >-
+        Without a terminal, nothing is written: no descriptor, no code and no operation.
+    - id: NE-45
+      expectation: >-
+        A confirmation for one operation, one parameter set or one operator is never consumed by
+        another. The original descriptor stays confirmed and unused.
+    - id: NE-46
+      expectation: >-
+        Repeating an unconfirmed label request still answers waiting and never reports success.

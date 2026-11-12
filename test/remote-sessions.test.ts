@@ -118,6 +118,7 @@ async function rig(name: string): Promise<Rig> {
     realityTrace: null,
     operators: { desktop_operator: "operator", delegable_actors: [MAPPED, "operator"], actors: { operator: MAPPED } },
     delegationClient: wire.client,
+    unpublishedAuthorityForTests: true,
   });
   await seedOperationalFixture(app.runtime.runtime.store, undefined, app.caller.tenant);
   await app.remote.start();
