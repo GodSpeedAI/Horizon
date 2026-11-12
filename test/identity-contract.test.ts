@@ -19,6 +19,20 @@ function readYaml(relative: string): Record<string, any> {
   return Bun.YAML.parse(readFileSync(`${ROOT}${relative}`, "utf8")) as Record<string, any>;
 }
 
+/**
+ * The catalog source with one class default's scope rule emptied. The class is found by its block and the
+ * rule by its key, never by its wording, so rewording a scope rule does not change what a test proves.
+ */
+function withoutClassScopeRule(source: string, cls: string): string {
+  const start = source.indexOf(`\n  ${cls}:\n`);
+  if (start < 0) throw new Error(`no class default ${cls}`);
+  const end = source.indexOf("\n  P", start + 1);
+  const block = source.slice(start, end);
+  const emptied = block.replace(/    scope_rule: (?:>-\n(?:      .*\n)+|".*"\n)/, '    scope_rule: ""\n');
+  if (emptied === block) throw new Error(`class default ${cls} states no scope rule to empty`);
+  return source.slice(0, start) + emptied + source.slice(end);
+}
+
 const loaded = loadOperationManifest();
 const operations = [...loaded.byId.values()];
 const policy = readYaml("contracts/identity/v1/policy.yaml");
@@ -499,7 +513,8 @@ describe("the browser's pairing route is a session, not a device enrollment", ()
   });
   test("device.pair is the phone's enrollment, and the browser's pairing is not it", () => {
     const row = loaded.byId.get("device.pair")!;
-    expect(row.class).toBe("P2");
+    // Enrolling a controller is a P3 authority change: the operator authorizes it at the desk's terminal.
+    expect(row.class).toBe("P3");
     // The phone's enrollment is live-bound: it enrols a credential and revokes the previous one
     // (R3-01). It is still not the browser's pairing route.
     expect(row.binding).toBe("verified");
@@ -752,13 +767,6 @@ describe("manifest is loadable from source, not only from disk", () => {
     // A row that names an evidence requirement the A3 mechanism does not declare is refused.
     expect(() => parseOperationManifest(source.replace("human_evidence: A3-UV", "human_evidence: A3_UV"))).toThrow();
     // A writable row with no scope rule is refused: the class alone does not say whose it is.
-    expect(() =>
-      parseOperationManifest(
-        source.replace(
-          "    scope_rule: >-\n      A P2 effect is reserved: it changes shared state or another principal's holding, so it needs\n      a named owner of the target (a panel, a question, the board, a session) or an explicit\n      statement that the effect is local and self-owned. A row that names no owner because it\n      changes only the caller's own local state says so here. P2 is set by the authority boundary,\n      not the technical one: an operation that crosses a paired device or a network transport but\n      only exercises an authority the session already holds stays P2. Such an operation creates no\n      authority of its own, and it may not widen the scope or lifetime of the authority it uses.\n",
-          '    scope_rule: ""\n',
-        ),
-      ),
-    ).toThrow();
+    expect(() => parseOperationManifest(withoutClassScopeRule(source, "P2"))).toThrow();
   });
 });

@@ -42,6 +42,7 @@ const DEFECTS_TEST = "test/identity-defects.test.ts";
 const REMEDIATION_2_TEST = "test/identity-remediation-2.test.ts";
 const REMEDIATION_3_TEST = "test/identity-remediation-3.test.ts";
 const REMEDIATION_4_TEST = "test/identity-remediation-4.test.ts";
+const ENROLMENT_TEST = "test/remote-enrollment.test.ts";
 
 const RECORDS_SPAN = "      const successors = allowed[from] ?? [];\n      const match = successors.find((entry) => entry.to === to);\n      if (match === undefined) fail(\"pending_transition_chain\");\n      else if (!match.reasons.includes(reason)) fail(\"pending_transition_chain\");\n      // The chain: the state this transition leaves is the state the operation's prior transitions\n      // leave it in, and `pending` when it is the first.\n      const prior = context?.pending_transitions ?? [];\n      const previous = prior.length === 0 ? \"pending\" : stringOf(prior[prior.length - 1]!, \"to_state\");\n      if (previous !== from) fail(\"pending_transition_chain\");\n";
 
@@ -392,13 +393,31 @@ const MUTANTS: readonly Mutant[] = [
   {
     // The round-5 remediation. An anonymous row states no human evidence; a loader that gives it
     // an assurance predicate instead would let a health probe claim an A0 it cannot produce.
-    id: "M33 a row that sets no separation of duty is treated as requiring it",
-    expectation: "PE-52",
+    id: "M33 a P3 row whose approver is its own requester is accepted",
+    expectation: "SOD-1",
     file: "src/contracts/identity/manifest.ts",
-    testFile: REMEDIATION_4_TEST,
-    title: "PE-52: anonymous and code-holder rows state no human evidence",
-    find: "    separationOfDuty: raw.separation_of_duty ?? base.separation_of_duty ?? null,",
-    replace: "    separationOfDuty: raw.separation_of_duty ?? base.separation_of_duty ?? true,",
+    testFile: "test/separation-of-duty.test.ts",
+    title: "NE-54: a P3 row whose approver is its own requester is refused",
+    find: "      if (separation.approver === separation.requester || separation.approver === separation.executor) {",
+    replace: "      if (false) {",
+  },
+  {
+    id: "M45 the enrolment commits a request the operator has not authorized",
+    expectation: "ENROL-1",
+    file: "src/remote/enrollment.ts",
+    testFile: ENROLMENT_TEST,
+    title: "NE-48: the phone's own retries before authorization do not sign it in",
+    find: '    if (state === "pending") return { ok: false, code: "not_authorized", state };',
+    replace: '    if (state === "pending" && false) return { ok: false, code: "not_authorized", state };',
+  },
+  {
+    id: "M46 a stale enrolment commits after the controller changed",
+    expectation: "ENROL-2",
+    file: "src/remote/enrollment.ts",
+    testFile: ENROLMENT_TEST,
+    title: "NE-52: a controller enrolled by another route while the request waits makes the request stale and it is refused",
+    find: "    const stale = request.generation !== input.generation || !sameIds(request.replaces, input.currentControllers);",
+    replace: "    const stale = false;",
   },
   {
     // Stage 0B. A label that runs without the gate's answer is written with no confirmation.
@@ -497,8 +516,8 @@ const MUTANTS: readonly Mutant[] = [
     file: "src/capabilities/pending-confirmations.ts",
     testFile: "test/pending-confirmations.test.ts",
     title: "NE-44: without a terminal nothing is written",
-    find: "if (codeSink === null && !output.terminal(",
-    replace: "if (false && !output.terminal(",
+    find: "      return output.terminal(",
+    replace: "      return true || output.terminal(",
   },
   {
     // Stage 0B. The repeated unconfirmed label reports success.

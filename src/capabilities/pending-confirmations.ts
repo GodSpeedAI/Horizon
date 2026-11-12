@@ -152,9 +152,27 @@ export async function summon(
   input: { readonly tenant: string; readonly operator: string; readonly operationId: string; readonly params: Readonly<Record<string, unknown>>; readonly now: Date },
   output: CodeOutput,
 ): Promise<SummonResult> {
+  return summonAnnounced(store, input, (pendingId, code) => {
+    if (codeSink === null) {
+      return output.terminal(`Confirm ${input.operationId} in Horizon with: horizon confirm --pending ${pendingId}. Code: ${code}. It works once and expires in two minutes.`);
+    }
+    codeSink(pendingId, code);
+    return true;
+  });
+}
+
+/**
+ * Starts a waiting operation and hands its one-time code to `announce`, which shows it to the person
+ * who must confirm. Returns no_terminal, writing nothing, when `announce` cannot show it.
+ */
+export async function summonAnnounced(
+  store: DurableStore,
+  input: { readonly tenant: string; readonly operator: string; readonly operationId: string; readonly params: Readonly<Record<string, unknown>>; readonly now: Date; readonly ttlMs?: number },
+  announce: (pendingId: string, code: string) => boolean,
+): Promise<SummonResult> {
   const pendingId = `pending_${randomUUID()}`;
   const code = newCode();
-  const expires = new Date(input.now.getTime() + CONFIRM_TTL_MS);
+  const expires = new Date(input.now.getTime() + (input.ttlMs ?? CONFIRM_TTL_MS));
   const descriptor: PendingDescriptor = {
     pending_id: pendingId,
     tenant: input.tenant,
@@ -165,10 +183,9 @@ export async function summon(
     created_at: input.now.toISOString(),
     expires_at: expires.toISOString(),
   };
-  if (codeSink === null && !output.terminal(`Confirm ${input.operationId} in Horizon with: horizon confirm --pending ${pendingId}. Code: ${code}. It works once and expires in two minutes.`)) {
+  if (!announce(pendingId, code)) {
     return { ok: false, code: "no_terminal", message: new ConfirmationNeedsTerminal().message };
   }
-  if (codeSink !== null) codeSink(pendingId, code);
   await store.commit({
     appends: [],
     records: [
@@ -220,6 +237,23 @@ export async function confirm(
   const moved = await transition(store, input.pendingId, head, "confirmed", "pending", "confirmed on the terminal", input.now);
   if (!moved) return { ok: false, code: "raced", message: "That operation changed while it was being confirmed. Nothing was confirmed." };
   return { ok: true, operation_id: descriptor.operation_id, operation_digest: descriptor.operation_digest };
+}
+
+/**
+ * Moves a confirmed descriptor to applied, exactly once. The operation calls this before its write, and
+ * writes only when it returns true: two concurrent callers cannot both get true.
+ */
+export async function applyConfirmed(store: DurableStore, pendingId: string, now: Date, reason: string): Promise<boolean> {
+  const head = await headOf(store, pendingId);
+  if (head === null || head.state !== "confirmed") return false;
+  return transition(store, pendingId, head, "applied", "confirmed", reason, now);
+}
+
+/** Ends a waiting or confirmed descriptor without applying it, so it can never be applied later. */
+export async function abandon(store: DurableStore, pendingId: string, now: Date, reason: string): Promise<boolean> {
+  const head = await headOf(store, pendingId);
+  if (head === null || (head.state !== "pending" && head.state !== "confirmed")) return false;
+  return transition(store, pendingId, head, "expired", head.state, reason, now);
 }
 
 export type ConsumeResult =

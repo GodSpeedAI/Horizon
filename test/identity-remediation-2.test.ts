@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createApplication, OPEN_READS, type HorizonApplication } from "../src/app.ts";
+import { TestOperatorChannel } from "./support/operator-channel.ts";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { readIntentAttempts } from "../src/capabilities/navigation-intent.ts";
 import { AUDIT_COLLECTION } from "../src/capabilities/remote-records.ts";
@@ -105,7 +106,7 @@ describe("the round-3 review's corrections", () => {
       "rule:settle",
     ]);
     // The device enrollment is the pairing-finish row, not a catalogued gap.
-    expect(manifest.byId.get("device.pair")?.routes).toEqual(["POST /m/api/pair/finish"]);
+    expect(manifest.byId.get("device.pair")?.routes).toEqual(["POST /m/api/pair/finish", "POST /m/api/pair/await"]);
     expect(manifest.manifest.catalog_gaps).toEqual([]);
     // The phone's server holds no approval resolver at all: the path is absent, not gated.
     const source = readFileSync(join(ROOT, "src/remote/server.ts"), "utf8");
@@ -621,6 +622,9 @@ describe("the round-3 review's refusals", () => {
   });
 });
 
+/** The desk terminal for the phone enrolment: the test operator types the code the desk shows. */
+const operatorChannel = new TestOperatorChannel();
+
 describe("the phone's approval path", () => {
   let application: HorizonApplication;
   let cockpit: ReturnType<HorizonApplication["startServer"]>;
@@ -653,7 +657,7 @@ describe("the phone's approval path", () => {
       join(root, "horizon.toml"),
       horizonDocument({ storePath: join(root, "remote.sqlite"), secretPath: join(root, "launch.secret") }),
     );
-    application = await createApplication({ configPath });
+    application = await createApplication({ configPath, operatorChannel });
     await seedOperationalFixture(application.runtime.runtime.store, undefined, application.caller.tenant);
     cockpit = application.startServer(0);
     cockpitBase = `http://127.0.0.1:${cockpit.port}`;
@@ -671,8 +675,13 @@ describe("the phone's approval path", () => {
     const authenticator = await new SoftwareAuthenticator().generate();
     const credential = await authenticator.register({ challenge: options.challenge, origin: phoneBase, rpId: options.rp.id });
     const finished = await phonePost("/m/api/pair/finish", { ticket, credential }, { "user-agent": IPHONE_UA });
-    if (finished.status !== 200) throw new Error(`the device enrollment was refused: ${finished.status}`);
-    const match = /__Host-hz_remote=[^;]+/.exec(finished.headers.get("set-cookie") ?? "");
+    if (finished.status !== 202) throw new Error(`the device enrollment was not held for the operator: ${finished.status}`);
+    // The operator types the code the desk showed on its terminal; only then does the phone's retry enrol it.
+    const { pending_id: pendingId } = (await finished.json()) as { pending_id: string };
+    await operatorChannel.type(operatorChannel.codeFor(pendingId));
+    const committed = await phonePost("/m/api/pair/await", { pending_id: pendingId });
+    if (committed.status !== 200) throw new Error(`the device enrollment was refused: ${committed.status}`);
+    const match = /__Host-hz_remote=[^;]+/.exec(committed.headers.get("set-cookie") ?? "");
     if (match === null) throw new Error("the phone session carries no cookie");
     cookie = match[0];
   }, 60_000);

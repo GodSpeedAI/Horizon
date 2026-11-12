@@ -189,7 +189,8 @@ describe("the phone and the executors", () => {
       expect(row.humanEvidence, id).toBeNull();
     }
     const approval = classify(manifest, "approval.approve") as Operation;
-    expect(approval.separationOfDuty).toBe(true);
+    // Separation of duty is stated by role: the approver is a different principal from the requester and the executor.
+    expect(approval.separationOfDuty).toEqual({ requester: "initiating_human", approver: "approving_human", executor: "sea_forge" });
     const navigation = classify(manifest, "horizon.navigation.defer") as Operation;
     expect(navigation.separationOfDuty).toBeNull();
   });

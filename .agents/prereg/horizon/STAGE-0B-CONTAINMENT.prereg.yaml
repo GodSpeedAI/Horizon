@@ -18,7 +18,7 @@ preregistration:
   upstream_pins:
     spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
     plan: { id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23", line: 1725, reference: "contain Horizon's reserved operations with an immutable pending descriptor and a local terminal confirmation (A3-T)" }
-    design: { file: design_draft.md, sha256: "adcf06f62dd7129031707dfbf7f269a8f87b3f2ff62aed6aaeee721ea095fa3d", lines: 959, sections: "12" }
+    design: { file: design_draft.md, sha256: "5740e2ef24b2825ab5a23a920a6a8f32b90569cf9dee0300ea598ee2554a74e7", lines: 963, sections: "12" }
     prior_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-REMEDIATION-4.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-REMEDIATION-4, relationship: "the Stage 0A unit this containment follows" }
   # This unit settles no specification requirement. It adds a local confirmation to reserved
   # human writes. The Stage 0A requirements remain open until the sixth independent review rules.
@@ -75,6 +75,47 @@ preregistration:
     - id: PE-59
       expectation: >-
         The waiting response for a label never carries the confirmation code.
+    - id: PE-60
+      expectation: >-
+        Starting remote control creates no device, credential or grant, and an unpaired phone cannot
+        read the desk or request options to sign in.
+    - id: PE-61
+      expectation: >-
+        A passkey registration that verifies is held as a pending enrolment. It creates no active
+        device, sets no session cookie and signs nothing in until the operator authorizes it.
+    - id: PE-62
+      expectation: >-
+        The operator's typed code authorizes the pending enrolment once: the commit creates the active
+        credential, the phone is signed in, and the desk shows the operator the phone it would authorize.
+    - id: PE-63
+      expectation: >-
+        A refresh before authorization ends the waiting enrolment, so a code typed afterwards authorizes
+        nothing and the phone's retry is refused.
+    - id: PE-64
+      expectation: >-
+        Stopping remote control before authorization ends the waiting enrolment, so no active device
+        results from it.
+    - id: PE-65
+      expectation: >-
+        A refresh revokes the enrolled phone's session and every open invitation, and a refreshed
+        invitation authorizes no controller by itself.
+    - id: PE-66
+      expectation: >-
+        A refreshed controller is not restored: its passkey gets no sign-in options and its session is
+        refused.
+    - id: PE-67
+      expectation: >-
+        Stopping remote control ends an authorized phone's remote access at once.
+    - id: PE-68
+      expectation: >-
+        An invitation redeems once, within its window, and never after it.
+    - id: PE-69
+      expectation: >-
+        A refresh voids the open invitation, so its secret no longer redeems.
+    - id: PE-70
+      expectation: >-
+        Every P3 row in the catalog names a requester, an approver and an executor, and the three are
+        distinct principals.
   negative_expectations:
     - id: NE-41
       expectation: >-
@@ -97,3 +138,35 @@ preregistration:
     - id: NE-46
       expectation: >-
         Repeating an unconfirmed label request still answers waiting and never reports success.
+    - id: NE-47
+      expectation: >-
+        A verified invitation redemption alone enrols no device and grants no session.
+    - id: NE-48
+      expectation: >-
+        The phone's own retries before the operator authorizes never sign it in.
+    - id: NE-49
+      expectation: >-
+        Five wrong codes abandon a pending enrolment, and the right code afterwards authorizes nothing.
+    - id: NE-50
+      expectation: >-
+        A replayed authorization is refused and creates no second device.
+    - id: NE-51
+      expectation: >-
+        Simultaneous requests after one authorization commit exactly one device.
+    - id: NE-52
+      expectation: >-
+        A pending enrolment whose controller set changed while it waited is refused, and the device
+        enrolled by the other route is left as it was.
+    - id: NE-53
+      expectation: >-
+        A redeemed invitation's ticket answers one registration challenge; a replay of the ticket
+        answers nothing.
+    - id: NE-54
+      expectation: >-
+        A P3 row whose approver is its own requester is refused by the catalog.
+    - id: NE-55
+      expectation: >-
+        A P3 row whose approver is its executor is refused by the catalog.
+    - id: NE-56
+      expectation: >-
+        A P3 row that states separation of duty as a bare boolean is refused by the catalog schema.

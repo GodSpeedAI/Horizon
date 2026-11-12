@@ -15,9 +15,12 @@ import { readIntentRecords } from "../src/capabilities/navigation-intent.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
+import { TestOperatorChannel } from "./support/operator-channel.ts";
 import { b64url } from "../src/remote/webauthn.ts";
 
 let application: HorizonApplication;
+/** The desk's terminal for the test: the operator authorizes each enrolment by typing the code it shows. */
+const operatorChannel = new TestOperatorChannel();
 let cockpit: ReturnType<HorizonApplication["startServer"]>;
 let cockpitBase: string;
 let savedPort: string | undefined;
@@ -37,7 +40,7 @@ beforeAll(async () => {
     join(root, "horizon.toml"),
     horizonDocument({ storePath: join(root, "remote.sqlite"), secretPath: join(root, "launch.secret") }),
   );
-  application = await createApplication({ configPath });
+  application = await createApplication({ configPath, operatorChannel });
   await seedOperationalFixture(application.runtime.runtime.store, undefined, application.caller.tenant);
   cockpit = application.startServer(0);
   cockpitBase = `http://127.0.0.1:${cockpit.port}`;
@@ -91,7 +94,12 @@ async function pairWith(link: string, device: SoftwareAuthenticator): Promise<Re
   expect(redeemed.status).toBe(200);
   const { ticket, options } = (await redeemed.json()) as { ticket: string; options: { challenge: string; rp: { id: string } } };
   const credential = await device.register({ challenge: options.challenge, origin: phoneBase(), rpId: options.rp.id });
-  return postJson("/m/api/pair/finish", { ticket, credential }, { "user-agent": IPHONE_UA });
+  const finished = await postJson("/m/api/pair/finish", { ticket, credential }, { "user-agent": IPHONE_UA });
+  expect(finished.status).toBe(202);
+  const { pending_id: pendingId } = (await finished.json()) as { pending_id: string };
+  // The operator types the code the desk showed on its terminal; only then does the phone's retry enrol it.
+  await operatorChannel.type(operatorChannel.codeFor(pendingId));
+  return postJson("/m/api/pair/await", { pending_id: pendingId });
 }
 
 async function signIn(device: SoftwareAuthenticator): Promise<Response> {

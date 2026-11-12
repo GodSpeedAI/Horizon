@@ -12,7 +12,7 @@ import path from "node:path";
 import { checkPreregShape } from "./check-prereg-shape.ts";
 
 const PREREG = ".agents/prereg/horizon/STAGE-0B-CONTAINMENT.prereg.yaml";
-const TEST_FILES = ["test/pending-confirmations.test.ts", "test/containment-routes.test.ts"];
+const TEST_FILES = ["test/pending-confirmations.test.ts", "test/containment-routes.test.ts", "test/remote-enrollment.test.ts", "test/separation-of-duty.test.ts"];
 
 interface CoverageResult {
   readonly ok: boolean;

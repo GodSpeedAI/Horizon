@@ -2861,7 +2861,7 @@
       "proof": "caller_not_substitutable",
       "catalog": {
         "operation_id": "device.pair",
-        "class": "P2",
+        "class": "P3",
         "params_schema": "params.device_pair",
         "params_schema_spec": {
           "fields": [
@@ -7436,7 +7436,7 @@
       "proof": "caller_not_substitutable",
       "catalog": {
         "operation_id": "device.pair",
-        "class": "P2",
+        "class": "P3",
         "params_schema": "params.device_pair",
         "params_schema_spec": {
           "fields": [
@@ -7504,7 +7504,7 @@
       "proof": "caller_not_substitutable",
       "catalog": {
         "operation_id": "device.pair",
-        "class": "P2",
+        "class": "P3",
         "params_schema": "params.device_pair",
         "params_schema_spec": {
           "fields": [

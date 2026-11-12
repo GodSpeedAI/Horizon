@@ -115,8 +115,9 @@ class_defaults:
       transport) is not by itself P3. It is never owned by the caller:
       the authority decision and the fence carry the responsibility, and the pending record names
       the requester, the executor and the approver separately. Separation of duty is a per-row
-      requirement and not a property of the class: every P3 row states it, and the catalog refuses
-      a P3 row that does not.
+      requirement and not a property of the class: every P3 row states its requester, approver and
+      executor, and the catalog refuses a P3 row whose approver is its requester or its executor.
+      A bare boolean is not a statement of separation and is refused.
   PX:
     executor: null
     authority_writer: null
@@ -543,6 +544,10 @@ operations:
         own-scope P1 write may not make. It still decides nothing — the ruling is a separate
         operation, horizon.settlement.rule — so it is P2 rather than P3, and it runs on the
         desk, under a human session, with a pending record and the person's A3-UV evidence.
+        It changes no settlement state: the evidence entry SEA-Forge records is an observation of
+        what was done, and an acknowledgement of the settlement is not part of this row. If the
+        owner counts an evidence-ledger write as a commitment, this row becomes P3 (an open owner
+        decision).
     - id: device.settlement.observe
       binding: verified
       routes: ["POST /m/api/command"]
@@ -610,12 +615,6 @@ operations:
       binding: verified
       routes: ["POST /workspace/label"]
       params_schema: params.workspace_label
-    - id: handoff.send
-      binding: verified
-      routes: ["POST /desk/handoff"]
-      params_schema: params.handoff_send
-      authority_writer: sea_forge
-      note: "POST /desk/handoff/preview is a read and is not a send."
     - id: case.task.complete
       binding: verified
       routes: ["POST /desk/decide"]
@@ -663,31 +662,6 @@ operations:
       note: >-
         P2 by architectural decision. Stop revokes the session's devices and closes the transport.
         It removes access and creates none.
-    - id: device.pair
-      binding: verified
-      routes: ["POST /m/api/pair/finish"]
-      executor: code_holder
-      caller_authentication: one_time_pairing_code
-      # No human confirmation applies to this row. The route proves possession of a one-time
-      # code and a verified registration, never a person, so the class default's assurance
-      # predicate is not evidence this route can produce (R5-07). The enrollment's own evidence
-      # is the ceremony's presence receipt, which the live-enforcement entry names as the thing
-      # Stage 0B adds; it is not a human confirmation and it is not an A3 predicate.
-      human_evidence: null
-      stage0b_evidence: LOCAL_ENROLLMENT_PRESENCE
-      pending_expiry: 5m
-      params_schema: params.device_pair
-      ownership: caller_own_session
-      note: >-
-        Device enrollment: the phone's pairing ticket is exchanged for a verified WebAuthn
-        registration, the credential is enrolled, and the previous device and its sessions are
-        revoked in the same commit. It is P2 because it changes another principal's holding - the
-        previous device's access - and because a revoked credential cannot be restored by the
-        person who enrolled the new one. Possession of the one-time pairing code is the whole
-        authentication here: the route proves the code and the registration, never who presented
-        them. The desk's browser-session pairing is a different effect and has its own row
-        (`session.pair`): it creates a local browser session from a code typed at the local
-        console, and it enrolls no credential.
     - id: device.remove
       binding: candidate
       params_schema: params.device_remove
@@ -716,7 +690,56 @@ operations:
         administrator's presence.
       params_schema: params.trust_rotate
       authority_writer: issuer_root
+
+  P3:
+    - { id: grant.create, binding: reserved, params_schema: params.grant_create, authority_writer: sea_forge, separation_of_duty: { requester: requesting_human, approver: independent_human, executor: sea_forge } }
+    - { id: grant.revoke, binding: reserved, params_schema: params.grant_revoke, authority_writer: sea_forge, separation_of_duty: { requester: revoking_human, approver: independent_human, executor: sea_forge }, note: "Specification only. No route exists and the SEA-Forge interface is unpublished, so this row is not runtime-accessible and the catalog makes no runtime claim for it. Compromised device authority is contained today by remote.stop and device.remove, which are local P2 rows." }
+    - { id: gauntlet.run.cancel, binding: reserved, params_schema: params.run_cancel, authority_writer: sea_forge, separation_of_duty: { requester: run_owner_human, approver: independent_human, executor: sea_forge }, note: "Specification only. No route exists and the SEA-Forge interface is unpublished, so this row is not runtime-accessible. Emergency halt of unsafe execution is not provided by any route yet; the containment path is an open owner decision." }
+    - { id: expert.install, binding: candidate, params_schema: params.expert_install, separation_of_duty: { requester: human_session, approver: independent_human, executor: cognate_local_continuation }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
+    - { id: expert.configure, binding: candidate, params_schema: params.expert_configure, separation_of_duty: { requester: human_session, approver: independent_human, executor: cognate_local_continuation }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
+    - { id: expert.remove, binding: candidate, params_schema: params.expert_remove, separation_of_duty: { requester: human_session, approver: independent_human, executor: cognate_local_continuation }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
+    - id: device.pair
+      separation_of_duty: { requester: code_holder, approver: operator_at_desk_terminal, executor: cognate_local_continuation }
+      binding: verified
+      routes: ["POST /m/api/pair/finish", "POST /m/api/pair/await"]
+      executor: code_holder
+      caller_authentication: one_time_pairing_code
+      # Two steps, one authority. The phone's finish route proves possession of the invitation and a
+      # verified registration, and it authorizes nothing: it holds the enrolment as pending. The
+      # enrolment commits only on the await route, after the operator types the one-time code the
+      # desk shows on its own terminal. The operator's typed code is the authorization; no route
+      # produces it, and a browser cannot type into the desk's terminal. No A3-UV is claimed for this
+      # path, because the A3 mechanism has no evidence that a terminal presence can produce. Whether a
+      # P3 enrolment needs A3-UV is an owner decision.
+      authority_writer: cognate_local_continuation
+      human_evidence: null
+      stage0b_evidence: LOCAL_ENROLLMENT_PRESENCE
+      pending_expiry: 5m
+      params_schema: params.device_pair
+      ownership: caller_own_session
+      note: >-
+        Device enrollment is a P3 authority change: it makes a new controller of this desktop and
+        revokes the controller it replaces. The invitation (the pairing link, issued by the P2
+        rows remote.start and remote.refresh) proves the phone was shown it; it does not authorize
+        a controller. A verified passkey registration proves the phone holds a new credential; it
+        does not authorize one either. The enrolment is held as pending until the operator types
+        the one-time code the desk shows on its terminal, which names the phone and the controllers
+        it replaces. Only then does the commit create the active credential, revoke the replaced
+        controller in the same commit, and expire after its pending window. A refresh or stop ends
+        a waiting enrolment. Possession of the one-time pairing code is the whole
+        authentication here: the route proves the code and the registration, never who presented
+        them. The desk's browser-session pairing is a different effect and has its own row
+        (`session.pair`): it creates a local browser session from a code typed at the local
+        console, and it enrolls no credential.
+    - id: handoff.send
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: sea_forge }
+      binding: verified
+      routes: ["POST /desk/handoff"]
+      params_schema: params.handoff_send
+      authority_writer: sea_forge
+      note: "POST /desk/handoff/preview is a read and is not a send."
     - id: grant.redelegate
+      separation_of_duty: { requester: registered_agent_or_human_session, approver: independent_human, executor: sea_forge }
       binding: reserved
       executor: registered_agent_or_human_session
       params_schema: params.grant_redelegate
@@ -727,20 +750,12 @@ operations:
         Narrowing only. An agent caller is gated by the parent's redelegate permission, remaining
         depth, and ancestor budget; a human caller needs A3-UV and a current SEA-Forge entitlement
         to redelegate the named live parent, since a human session has no delegation head.
-
-  P3:
-    - { id: grant.create, binding: reserved, params_schema: params.grant_create, authority_writer: sea_forge, separation_of_duty: true }
-    - { id: grant.revoke, binding: reserved, params_schema: params.grant_revoke, authority_writer: sea_forge, separation_of_duty: true }
-    - { id: gauntlet.run.cancel, binding: reserved, params_schema: params.run_cancel, authority_writer: sea_forge, separation_of_duty: true }
-    - { id: expert.install, binding: candidate, params_schema: params.expert_install, separation_of_duty: true, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
-    - { id: expert.configure, binding: candidate, params_schema: params.expert_configure, separation_of_duty: true, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
-    - { id: expert.remove, binding: candidate, params_schema: params.expert_remove, separation_of_duty: true, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
     - id: approval.approve
       binding: verified
       routes: ["POST /desk/decide"]
       params_schema: params.approval
       authority_writer: sea_forge
-      separation_of_duty: true
+      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: sea_forge }
       fixed_parameters: { choice: accept }
       pending_expiry: 10m
       note: "The approver is distinct from the initiating human, the requesting execution, and the executor. The pending window is the policy's ten minutes (pending_approval_ttl), not the P3 default's open-ended one: an approval that is not consumed inside it is expired and the operation must be requested again. The phone has its own refused row, `device.approval.approve`."
@@ -749,7 +764,7 @@ operations:
       routes: ["POST /desk/decide"]
       params_schema: params.approval
       authority_writer: sea_forge
-      separation_of_duty: true
+      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: sea_forge }
       fixed_parameters: { choice: reject }
       pending_expiry: 10m
       note: "A rejection expires on the same ten-minute pending window as an approval (pending_approval_ttl). The phone has its own refused row, `device.approval.reject`."
@@ -760,7 +775,7 @@ operations:
       caller_authentication: device_passkey_assertion
       params_schema: params.device_approval
       authority_writer: sea_forge
-      separation_of_duty: true
+      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: sea_forge }
       pending_expiry: 10m
       note: >-
         The phone's own approval row, and it is refused. An approval needs the operation-bound
@@ -775,7 +790,7 @@ operations:
       caller_authentication: device_passkey_assertion
       params_schema: params.device_approval
       authority_writer: sea_forge
-      separation_of_duty: true
+      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: sea_forge }
       pending_expiry: 10m
       note: >-
         The phone's own rejection row, and it is refused, for the same reason the approval row
@@ -786,7 +801,7 @@ operations:
       routes: ["POST /desk/decide"]
       params_schema: params.case_task_decide
       authority_writer: case_record.authority
-      separation_of_duty: true
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: case_record.authority }
       pending_expiry: 10m
       note: >-
         The case keeper's own approval, taken by the person: it approves or rejects the task the
@@ -797,7 +812,7 @@ operations:
       routes: ["POST /desk/decide"]
       params_schema: params.horizon_settlement_request
       authority_writer: sea_forge
-      separation_of_duty: false
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: sea_forge }
       fixed_parameters: { phase: rule }
       pending_expiry: 10m
       note: >-
@@ -811,7 +826,7 @@ operations:
       caller_authentication: device_passkey_assertion
       params_schema: params.device_settlement_request
       authority_writer: sea_forge
-      separation_of_duty: false
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: sea_forge }
       fixed_parameters: { phase: rule }
       pending_expiry: 10m
       note: >-
@@ -824,7 +839,7 @@ operations:
       executor: registered_agent
       params_schema: params.external_commit
       authority_writer: sea_forge
-      separation_of_duty: false
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: sea_forge }
       human_evidence: PER_TARGET_ROW
       pending_expiry: grant_expiry
     - id: workspace.export
@@ -833,7 +848,7 @@ operations:
       params_schema: params.workspace_export
       pending_expiry: 15m
       authority_writer: sea_forge
-      separation_of_duty: true
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: cognate_local_continuation }
       note: >-
         The export is a P3 row: the approver is distinct from the requester and from whoever
         executes the export. The separation is declared here and is not enforced by the running
@@ -844,7 +859,7 @@ operations:
       executor: registered_agent
       params_schema: params.isolation_request
       authority_writer: sea_forge
-      separation_of_duty: false
+      separation_of_duty: { requester: registered_agent, approver: independent_human, executor: sea_forge }
       human_evidence: NONE
       pending_expiry: grant_expiry
       note: "The capability gate fails closed with isolation_unavailable where the host prerequisites are not met."
@@ -1673,10 +1688,12 @@ live_enforcement:
       enforced_today: false
       refused_today: false
       enforced_by: >-
-        The one-time pairing code and the verified WebAuthn registration. The registration is
-        checked against the ticket's challenge and the transport's origin, and the previous
-        device is revoked in the same commit.
-      missing: [enrollment_presence_receipt, pending_record]
+        Implemented, not claimed as enforced: the one-time pairing code and the verified WebAuthn
+        registration are checked against the ticket's challenge and the transport's origin; the
+        enrolment is then held as a pending record, and it commits only after the operator types the
+        code the desk shows on its terminal (one compare-and-swap, once, within five minutes). A
+        refresh or stop ends a waiting enrolment. The desk's terminal is the only input.
+      missing: [enrollment_presence_receipt, authority_sea_forge]
       required_stage: "Stage 0B"
       production_stage: "Stage 3"
       note: >-

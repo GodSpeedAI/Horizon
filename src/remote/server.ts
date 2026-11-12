@@ -27,6 +27,7 @@ import { identityStoreOf } from "./identity-store.ts";
 import { reservedActorField, unknownField } from "../contracts/identity/reserved-fields.ts";
 import { refusalWords, type FrozenRefusal } from "../contracts/identity/enforcement.ts";
 import { Pairing } from "./pairing.ts";
+import type { EnrollmentAuthority } from "./enrollment.ts";
 import { clearedCookie, cookieOf, sessionCookie } from "./sessions.ts";
 import { phonePage, pairPage } from "./phone.ts";
 import type { RemoteSettings } from "./settings.ts";
@@ -66,6 +67,11 @@ export interface RemoteDeps {
    * passkey for exactly this operator; it never creates one and never grants a role.
    */
   readonly operator: string;
+  /**
+   * The operator's authorization of a new controller. A verified passkey is held here until the operator
+   * types the code the desk shows on its terminal; nothing is enrolled before that.
+   */
+  readonly enrollment: EnrollmentAuthority;
   /** The cockpit's default read: frame, closed surface view and its actions. */
   readonly workspace: () => Promise<{
     readonly frame: { readonly frame_id: string; readonly revision: number };
@@ -225,6 +231,11 @@ export class RemoteController {
     return devices.find((device) => device.revoked_at === null && device.generation === this.pairing.generation) ?? null;
   }
 
+  /** The ledger's active controllers, sorted: what an enrolment request names as the controllers it would replace. */
+  private async activeDeviceIds(): Promise<string[]> {
+    return (await listDevices(this.deps.store, this.deps.tenant)).filter((device) => device.revoked_at === null).map((device) => device.device_id).sort();
+  }
+
   /** Revoke every device in the Horizon ledger and in the identity service (which revokes their sessions). */
   private async revokeDevices(at: string, cause: string): Promise<void> {
     for (const device of await listDevices(this.deps.store, this.deps.tenant)) {
@@ -280,6 +291,7 @@ export class RemoteController {
   async refresh(): Promise<void> {
     if (this.server === null) return;
     const at = new Date(this.clock()).toISOString();
+    await this.deps.enrollment.abandonWaiting("pairing refreshed");
     await this.revokeDevices(at, "pairing refreshed");
     this.pairing.refresh(this.clock());
   }
@@ -288,6 +300,7 @@ export class RemoteController {
   async stop(): Promise<void> {
     const at = new Date(this.clock()).toISOString();
     this.pairing.stop();
+    await this.deps.enrollment.abandonWaiting("remote control stopped");
     await this.revokeDevices(at, "remote control stopped");
     this.server?.stop(true);
     this.server = null;
@@ -400,21 +413,63 @@ export class RemoteController {
       if (challenge === null) return refusal(410, "challenge_expired", "The passkey request expired. Scan the QR on your desktop again.");
       try {
         const verified = verifyRegistration(body?.credential as Parameters<typeof verifyRegistration>[0], { challenge, origin: this.origin, rpId: this.rpId });
+        // A verified passkey proves the phone holds a new credential. It authorizes nothing. The enrolment is held
+        // until the operator types the code the desk shows on its own terminal, which names this phone and the
+        // controllers it would replace. Nothing is enrolled, and no session is granted, until then.
+        const requested = await this.deps.enrollment.request({
+          tenant: this.deps.tenant,
+          operator: this.deps.operator,
+          generation: this.pairing.generation,
+          label: labelOf(request.headers.get("user-agent")),
+          registration: verified,
+          replaces: await this.activeDeviceIds(),
+          requested_at: new Date(now).toISOString(),
+        });
+        if (!requested.ok) return refusal(409, "no_operator_terminal", requested.message);
+        return json(202, { status: "awaiting_operator_authorization", pending_id: requested.pendingId, expires_at: requested.expiresAt });
+      } catch (error) {
+        const message = error instanceof WebAuthnError ? error.message : error instanceof IdentityError ? `Pairing refused: ${error.message}` : "The passkey could not be registered.";
+        return refusal(400, "passkey_refused", message);
+      }
+    }
+
+    if (request.method === "POST" && path === "/m/api/pair/await") {
+      if (!this.limiter.allow("await", 60, 60_000, now)) return refusal(429, "rate_limited", "REMOTE: too many attempts, wait a minute");
+      if (!this.pairing.isEnabled) return refusal(409, "remote_off", "Remote control is off on the desktop.");
+      const body = await bodyOf(request);
+      const pendingId = typeof body?.pending_id === "string" ? body.pending_id : "";
+      // The commit: applies the operator's confirmation exactly once, after checking the request is still the one
+      // the operator saw. Only this writes an active controller, and only after that check.
+      const committed = await this.deps.enrollment.commit({
+        pendingId,
+        tenant: this.deps.tenant,
+        operator: this.deps.operator,
+        generation: this.pairing.generation,
+        currentControllers: await this.activeDeviceIds(),
+        now: new Date(now),
+      });
+      if (!committed.ok) {
+        if (committed.code === "not_authorized") return json(202, { status: "awaiting_operator_authorization" });
+        if (committed.code === "stale") return refusal(409, "controller_changed", "The desktop's controller changed while this phone waited. Refresh the QR on your desktop and scan again.");
+        if (committed.code === "expired") return refusal(410, "authorization_expired", "The desktop did not authorize this phone in time. Refresh the QR on your desktop and scan again.");
+        return refusal(410, "authorization_used", "This authorization was already used or is not valid. Refresh the QR on your desktop and scan again.");
+      }
+      const { registration, label } = committed.request;
+      try {
         // One active controller, bound to one durable operator that the cockpit's session approved. The identity
         // service revokes the previous device and its sessions in the same commit that enrols this one; it refuses
         // when the operator does not exist or is not active, so the link cannot create an operator or grant a role.
         const at = new Date(now).toISOString();
-        const label = labelOf(request.headers.get("user-agent"));
-        const enrolled = await this.deps.identity.replaceDevices({ tenant: this.deps.identityTenant, operatorId: this.deps.operator, label, registration: verified });
+        const enrolled = await this.deps.identity.replaceDevices({ tenant: this.deps.identityTenant, operatorId: this.deps.operator, label, registration });
         for (const stale of await listDevices(this.deps.store, this.deps.tenant)) {
           if (stale.revoked_at === null) await updateDevice(this.deps.store, stale.device_id, { revoked_at: at });
         }
         this.commands.clear();
         const device: RemoteDevice = {
           device_id: enrolled.device.id,
-          credential_id: verified.credentialId,
-          public_key: verified.publicKey,
-          sign_count: verified.signCount,
+          credential_id: registration.credentialId,
+          public_key: registration.publicKey,
+          sign_count: registration.signCount,
           label,
           generation: this.pairing.generation,
           tenant: this.deps.tenant,
@@ -424,11 +479,10 @@ export class RemoteController {
           revoked_at: null,
         };
         await addDevice(this.deps.store, device);
-        const token = enrolled.session.token;
-        await auditRemote(this.deps.store, { tenant: this.deps.tenant, operator: this.deps.operator, device_id: device.device_id, action: "pair", outcome: "registered", at });
-        return json(200, { ok: true, label: device.label }, { "set-cookie": sessionCookie(token) });
+        await auditRemote(this.deps.store, { tenant: this.deps.tenant, operator: this.deps.operator, device_id: device.device_id, action: "pair", outcome: "authorized", at });
+        return json(200, { ok: true, label: device.label }, { "set-cookie": sessionCookie(enrolled.session.token) });
       } catch (error) {
-        const message = error instanceof WebAuthnError ? error.message : error instanceof IdentityError ? `Pairing refused: ${error.message}` : "The passkey could not be registered.";
+        const message = error instanceof IdentityError ? `Pairing refused: ${error.message}` : "The passkey could not be registered.";
         return refusal(400, "passkey_refused", message);
       }
     }

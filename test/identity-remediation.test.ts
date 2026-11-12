@@ -244,7 +244,7 @@ describe("the round-2 review's corrections", () => {
     expect(choice?.enum).toEqual(["accept", "reject"]);
     expect(manifest.byId.get("workspace.export")?.class).toBe("P3");
     const exportRow = manifest.manifest.operations.P3?.find((row) => row.id === "workspace.export");
-    expect(exportRow?.separation_of_duty).toBe(true);
+    expect(exportRow?.separation_of_duty).toEqual({ requester: "human_session", approver: "independent_human", executor: "cognate_local_continuation" });
     // The pairing row's caller path is the code holder: a one-time code proves possession of the
     // code and nothing about a person, so the row states that no assurance predicate applies
     // rather than inheriting the class's terminal one (R5-07).

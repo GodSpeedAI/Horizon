@@ -15,6 +15,18 @@ import { loadParamSchemas, wireName } from "./params.ts";
  */
 
 export const IDENTITY_CLASSES = ["P0", "P1", "P2", "P3", "PX"] as const;
+
+/**
+ * Separation of duty, stated by role. A P3 row names who asks, who approves and who executes, and the
+ * approver must be a different principal from both the requester and the executor. A bare boolean
+ * says nothing the catalog can check; the three roles are what the pending record enforces.
+ */
+export interface SeparationOfDuty {
+  readonly requester: string;
+  readonly approver: string;
+  readonly executor: string;
+}
+const separationOfDutySchema = z.object({ requester: z.string().min(1), approver: z.string().min(1), executor: z.string().min(1) }).strict();
 export type IdentityClass = (typeof IDENTITY_CLASSES)[number];
 
 /** Classes whose effects are externally binding or human-reserved. These may never be satisfied
@@ -207,7 +219,7 @@ const rowSchema = z
     observed_code_ops: z.array(z.string()).optional(),
     dispatcher: z.boolean().optional(),
     inherits: z.array(z.string()).optional(),
-    separation_of_duty: z.boolean().optional(),
+    separation_of_duty: separationOfDutySchema.optional(),
     fixed_parameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
     note: z.string().optional(),
   })
@@ -433,7 +445,7 @@ export interface Operation {
   readonly scopeRule: string;
   /** Whether an approver must differ from the requester and the executor. A P3 row states it;
    * a row of another class leaves it unset. */
-  readonly separationOfDuty: boolean | null;
+  readonly separationOfDuty: SeparationOfDuty | null;
   /** The caller kinds a record for this row may name. A dispatcher inherits every kind, because
    * its targets decide what class it binds and the caller only asks. */
   readonly permittedCallerKinds: readonly string[];
@@ -721,8 +733,12 @@ export function parseOperationManifest(source: string): LoadedManifest {
     // R5-09: separation of duty is a closed per-row requirement. The P3 class no longer claims
     // it for every row, so every P3 row states it and a row that says nothing is a contract
     // error rather than a row that happens not to need it.
-    if (operation.class === "P3" && operation.separationOfDuty === null) {
-      throw new Error(`operations: the P3 row "${operation.id}" does not state separation_of_duty`);
+    if (operation.class === "P3") {
+      const separation = operation.separationOfDuty;
+      if (separation === null) throw new Error(`operations: the P3 row "${operation.id}" does not state separation_of_duty`);
+      if (separation.approver === separation.requester || separation.approver === separation.executor) {
+        throw new Error(`operations: the P3 row "${operation.id}" names one principal as approver and as requester or executor; separation of duty needs three distinct roles`);
+      }
     }
     // R5-07: a public probe, an unauthenticated challenge and a one-time code identify no
     // person, so a row on one of those paths may not inherit an assurance predicate.

@@ -375,6 +375,7 @@ async function create(redeemed) {
       timeout: options.timeout,
     } });
     const finished = await post("/m/api/pair/finish", { ticket: redeemed.ticket, credential: credentialJSON(credential) });
+    if (finished.status === 202) return waitForOperator(finished.data.pending_id);
     if (finished.status !== 200) return say(messageFor(finished.data, "The passkey could not be registered."), "error");
     location.replace("/m");
   } catch {
@@ -387,6 +388,19 @@ async function create(redeemed) {
     $("app").append(retry);
     retry.focus();
   }
+}
+
+// The passkey is registered but the desk has not enrolled it: the operator must type the code the desk shows
+// on its terminal. Ask again every two seconds until the desk says it is authorized, or the authorization ends.
+async function waitForOperator(pendingId) {
+  say("Waiting for the operator to authorize this phone on the desktop.");
+  for (let attempt = 0; attempt < 150; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const awaited = await post("/m/api/pair/await", { pending_id: pendingId });
+    if (awaited.status === 200) return location.replace("/m");
+    if (awaited.status !== 202) return say(messageFor(awaited.data, "The authorization is no longer valid. Refresh the QR on your desktop and scan again."), "error");
+  }
+  say("The desktop did not authorize this phone in time. Refresh the QR on your desktop and scan again.", "error");
 }
 
 pair();

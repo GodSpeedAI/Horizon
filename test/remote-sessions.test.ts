@@ -25,6 +25,7 @@ import { OperatorActors, OperatorMappingError, resolveOperatorsConfig, validateO
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { horizonDocument, PINNED_WORLD_REF, writeConfig } from "./support/config.ts";
 import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
+import { TestOperatorChannel } from "./support/operator-channel.ts";
 
 const MAPPED = "sea-actor-alice";
 const SERVICE = "cognate-service";
@@ -99,6 +100,7 @@ interface Rig {
   readonly app: HorizonApplication;
   readonly wire: ReturnType<typeof scriptedWire>;
   readonly base: () => string;
+  readonly channel: TestOperatorChannel;
   readonly close: () => Promise<void>;
 }
 
@@ -110,6 +112,7 @@ async function rig(name: string): Promise<Rig> {
   const root = mkdtempSync(join(tmpdir(), `${name}-`));
   const world = loadWorld(PINNED_WORLD_REF).cognateWorldRef;
   const wire = scriptedWire(world);
+  const channel = new TestOperatorChannel();
   const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "s.sqlite"), secretPath: join(root, "launch.secret") }));
   const app = await createApplication({
     configPath,
@@ -119,6 +122,7 @@ async function rig(name: string): Promise<Rig> {
     operators: { desktop_operator: "operator", delegable_actors: [MAPPED, "operator"], actors: { operator: MAPPED } },
     delegationClient: wire.client,
     unpublishedAuthorityForTests: true,
+    operatorChannel: channel,
   });
   await seedOperationalFixture(app.runtime.runtime.store, undefined, app.caller.tenant);
   await app.remote.start();
@@ -126,6 +130,7 @@ async function rig(name: string): Promise<Rig> {
     app,
     wire,
     base: () => app.remote.origin,
+    channel,
     close: async () => {
       await app.remote.stop().catch(() => undefined);
       await app.close();
@@ -154,10 +159,17 @@ class Phone {
     expect(redeemed.status).toBe(200);
     const { ticket, options } = (await redeemed.json()) as { ticket: string; options: { challenge: string; rp: { id: string } } };
     const credential = await device.register({ challenge: options.challenge, origin: this.r.base(), rpId: options.rp.id });
-    const response = await this.post("/m/api/pair/finish", { ticket, credential }, { "user-agent": IPHONE_UA });
+    const finished = await this.post("/m/api/pair/finish", { ticket, credential }, { "user-agent": IPHONE_UA });
+    // The enrolment waits for the operator: type the code the desk showed on its terminal, then retry.
+    const response = finished.status === 202 ? await this.authorize(finished) : finished;
     const cookie = /__Host-hz_remote=[^;]+/.exec(response.headers.get("set-cookie") ?? "")?.[0];
     if (cookie !== undefined) this.cookie = cookie;
     return response;
+  }
+  async authorize(waiting: Response): Promise<Response> {
+    const { pending_id: pendingId } = (await waiting.json()) as { pending_id: string };
+    await this.r.channel.type(this.r.channel.codeFor(pendingId));
+    return this.post("/m/api/pair/await", { pending_id: pendingId });
   }
   async signIn(device: SoftwareAuthenticator): Promise<Response> {
     const first = await this.post("/m/api/auth/options", {});

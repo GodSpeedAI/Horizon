@@ -10,6 +10,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright-core";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
+import { presentOperator, TestOperatorChannel } from "./support/operator-channel.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 import { testCodeFor } from "./support/write-token.ts";
@@ -44,6 +45,8 @@ suite("phone remote control, end to end in Chromium", () => {
   let secondPhone: typeof phone;
   let link = "";
   let savedPort: string | undefined;
+  const operatorTerminal = new TestOperatorChannel();
+  let stopOperator: () => void = () => undefined;
 
   async function openPhone(): Promise<typeof phone> {
     const context = await chrome.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: IPHONE_UA, deviceScaleFactor: 2 });
@@ -64,7 +67,9 @@ suite("phone remote control, end to end in Chromium", () => {
     process.env.HORIZON_REMOTE_PORT = "0";
     const root = mkdtempSync(join(tmpdir(), "e2e-remote-"));
     const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "e2e.sqlite"), secretPath: join(root, "launch.secret") }));
-    application = await createApplication({ configPath });
+    // The operator is at the desk terminal: each enrolment the phone asks for is authorized by the code the desk shows.
+    application = await createApplication({ configPath, operatorChannel: operatorTerminal });
+    stopOperator = presentOperator(operatorTerminal);
     await seedOperationalFixture(application.runtime.runtime.store, undefined, application.caller.tenant);
     cockpit = application.startServer(0);
     cockpitBase = `http://127.0.0.1:${cockpit.port}`;
@@ -76,6 +81,7 @@ suite("phone remote control, end to end in Chromium", () => {
   }, 120_000);
 
   afterAll(async () => {
+    stopOperator();
     await chrome?.close().catch(() => undefined);
     await application?.remote.stop().catch(() => undefined);
     await cockpit?.stop(true);
