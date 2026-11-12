@@ -1,6 +1,33 @@
 # Horizon Current Status
 
-**Revision:** 37 · **Recorded:** 2026-11-11T23:30:00Z · **Stage:** unchanged plan settlement state — spec HORIZON-001 **1.2.0** frozen; next dependency-ready plan task **T11**. Stage 0A's contract set has been through five independent manifest reviews and all five returned **REJECT**; the round-5 remediation wave is the open work inside plan task **T23**; no task is settled and no requirement is claimed.
+**Revision:** 38 · **Recorded:** 2026-11-11 · **Stage:** Stage 0A remediation-4 wave in progress (plan task T23). Checkpoint commit `f88cb20` holds all prior work. Remaining work is the checklist below; nothing in it is claimed complete until its evidence is recorded.
+
+## Remaining-work checklist (remediation-4 wave, then Stage 0B containment)
+
+Scope: finish Stage 0A to a blind-critic ACCEPT, then Stage 0B interim containment, then PR and merge.
+
+- [ ] R5-01 desk P3 rows refused on every path — gates wired in `src/app.ts`; prove with tests in `test/identity-remediation-4.test.ts` and record in the evidence table
+- [ ] R5-02 `run.start` refused before `startCase` — gate wired; prove likewise
+- [ ] R5-03 device credential is a service principal; phone commit refused (`no_device_delegation`) — code and tests green; prove in remediation-4 tests
+- [ ] R5-04 `agent_execution` → `registered_agent` executor mapping — catalog done; prove by fixture
+- [ ] R5-05 caller-kind enum and `caller_kind_permitted` constraint — triple (TS/Python/fixtures) done; re-verify
+- [ ] R5-06 split `external-interfaces.json` into exact source components, conditional facts marked, Merkle fields added, every fact bound, local grant/decision kinds renamed; update `scripts/check-external-interface-facts.ts` and design §9.1 — NOT STARTED
+- [ ] R5-07 `human_evidence: null` on the six anonymous/code-holder rows — catalog done; prove
+- [ ] R5-08 refusal audits stated in design prose ("before any target effect plus audited refusal") — prose NOT DONE
+- [ ] R5-09 separation of duty per row, not by class rule — done; prove
+- [ ] Design prose for R5-01/02/03/05/07/08/09 in `design_draft.md` — NOT DONE (generated tables already regenerated)
+- [ ] `.agents/prereg/horizon/STAGE-0A-REMEDIATION-4.prereg.yaml` with PE-44…, NE-38… — NOT STARTED
+- [ ] `scripts/check-stage0a-remediation-4-prereg-coverage.ts` — NOT STARTED
+- [ ] `test/identity-remediation-4.test.ts` — NOT STARTED
+- [ ] Teeth M29+ in `scripts/teeth-t23-mutation.ts`; wire `check-t23` and copy the prereg in `scripts/freeze-stage0a-contract-set.sh` — NOT STARTED
+- [ ] Re-freeze as `frozen-round-6` with MANIFEST; write `review-prompt-round-6.md` — NOT STARTED
+- [ ] Blind critic round 6 (`codex exec` read-only, ephemeral, no builder reasoning); retain verdict, transcript, no-mutation proof — NOT STARTED
+- [ ] Repeat rounds until no blocking findings; disposition each finding — NOT STARTED
+- [ ] Stage 0B: `src/capabilities/pending-confirmations.ts`, `horizon confirm --pending <id>`, reserved-operation routing, `test/pending-confirmations.test.ts`, `test/containment.test.ts`, `test/desk-write-token.test.ts` — NOT STARTED
+- [ ] Evidence table mapping every requirement to CI/script/critic evidence with reproduce commands — NOT STARTED
+- [ ] Final report in `.agents/reports/`; PR to `main`; merge; delete branch and worktree — NOT STARTED
+
+**Previous revision 37 follows.** Stage: unchanged plan settlement state — spec HORIZON-001 **1.2.0** frozen; next dependency-ready plan task **T11**. Stage 0A's contract set has been through five independent manifest reviews and all five returned **REJECT**; the round-5 remediation wave is the open work inside plan task **T23**; no task is settled and no requirement is claimed.
 
 **Spec:** HORIZON-001 v1.2.0, frozen 2026-11-02 (REQ-SEC-006: operator identity is a configured durable actor bound to a WebAuthn credential and mapped to a SEA-Forge actor; the OS account is diagnostic only); SHA-256 `7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435`.
 
