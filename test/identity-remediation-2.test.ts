@@ -23,6 +23,7 @@ import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { horizonDocument, writeConfig } from "./support/config.ts";
 import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
 import "./support/write-token.ts";
+import { p3AuthorityDouble } from "./support/p3-authority-double.ts";
 
 /**
  * The third independent review's findings, closed with executable checks (T23, Stage 0A).
@@ -379,7 +380,7 @@ describe("the round-3 review's refusals", () => {
     process.env.HORIZON_SECRET_FILE = join(root, "launch.secret");
     let application: HorizonApplication | null = null;
     try {
-      application = await createApplication({ configPath, deskRoot: join(root, "desk") });
+      application = await createApplication({ configPath, deskRoot: join(root, "desk"), remoteP3Authority: p3AuthorityDouble() });
       await application.migrated;
       const server = application.startServer(0);
       const base = `http://${server.hostname}:${server.port}`;
@@ -658,7 +659,7 @@ describe("the phone's approval path", () => {
       join(root, "horizon.toml"),
       horizonDocument({ storePath: join(root, "remote.sqlite"), secretPath: join(root, "launch.secret") }),
     );
-    application = await createApplication({ configPath });
+    application = await createApplication({ configPath, remoteP3Authority: p3AuthorityDouble() });
     await seedOperationalFixture(application.runtime.runtime.store, undefined, application.caller.tenant);
     cockpit = application.startServer(0);
     cockpitBase = `http://127.0.0.1:${cockpit.port}`;

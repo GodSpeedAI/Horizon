@@ -34,6 +34,28 @@ export const ENROLMENT_OPERATION = "device.pair";
 export const ENROLMENTS_COLLECTION = "horizon-remote-enrollments";
 /** The approval record: the active controller that signed the proof, written once with the confirmation. */
 export const APPROVALS_COLLECTION = "horizon-remote-enrollment-approvals";
+/** The P3 authority's decision on the exact operation digest. It precedes any approval and any activation. */
+export const P3_DECISIONS_COLLECTION = "horizon-remote-p3-decisions";
+
+/**
+ * The designated P3 authority for device enrolment: SEA-Forge. It decides whether this exact operation is authorized
+ * under policy. It is a different category from A3-UV evidence (which only shows a human participated) and from the
+ * identity service (which only issues credentials). Production wires none; until one is wired, enrolment is refused.
+ */
+export interface P3Authority {
+  decide(input: { readonly tenant: string; readonly operator: string; readonly operationId: string; readonly operationDigest: string; readonly pendingId: string }): Promise<P3Decision>;
+}
+export type P3Decision =
+  | { readonly decision: "approved"; readonly decisionId: string }
+  | { readonly decision: "unavailable"; readonly reason: string };
+
+/** The production default: no P3 authority is wired, so every decision is unavailable and nothing is held or activated. */
+export const UNAVAILABLE_P3_AUTHORITY: P3Authority = {
+  decide: async () => ({
+    decision: "unavailable",
+    reason: "The SEA-Forge P3 authority for device enrolment is not wired in this build, so no enrolment can be authorized.",
+  }),
+};
 /** The catalog's pending window for device.pair (pending_expiry 5m). */
 export const ENROLMENT_WINDOW_MS = 5 * 60_000;
 
@@ -70,7 +92,9 @@ export interface Waiting {
   readonly challenge: Uint8Array;
 }
 
-export type RequestOutcome = { readonly ok: true; readonly pendingId: string; readonly expiresAt: string };
+export type RequestOutcome =
+  | { readonly ok: true; readonly pendingId: string; readonly expiresAt: string }
+  | { readonly ok: false; readonly code: "authority_unavailable"; readonly message: string };
 
 export type AuthorizeOutcome =
   | { readonly ok: true; readonly signCount: number }
@@ -78,7 +102,7 @@ export type AuthorizeOutcome =
 
 export type CommitOutcome =
   | { readonly ok: true; readonly request: EnrolmentRequest; readonly approval: Approval }
-  | { readonly ok: false; readonly code: "not_authorized" | "unapproved" | "expired" | "stale" | "used" | "unknown"; readonly state: PendingState | null };
+  | { readonly ok: false; readonly code: "not_authorized" | "undecided" | "unapproved" | "expired" | "stale" | "used" | "unknown"; readonly state: PendingState | null };
 
 export function sameIds(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((id, index) => id === right[index]);
@@ -88,7 +112,13 @@ export class EnrollmentAuthority {
   constructor(
     private readonly store: DurableStore,
     private readonly clock: () => number = () => Date.now(),
+    private readonly p3: P3Authority = UNAVAILABLE_P3_AUTHORITY,
   ) {}
+
+  /** Whether a P3 authority is wired. Without one, device enrolment is refused before anything is held. */
+  get authorityWired(): boolean {
+    return this.p3 !== UNAVAILABLE_P3_AUTHORITY;
+  }
 
   /** Holds a verified registration as pending. A newer request ends an older one, so one enrolment waits at a time. */
   async request(input: EnrolmentRequest): Promise<RequestOutcome> {
@@ -101,9 +131,24 @@ export class EnrollmentAuthority {
       now: new Date(this.clock()),
       ttlMs: ENROLMENT_WINDOW_MS,
     });
+    // Authorization comes before anything is held: an undecided operation is abandoned and creates no request record.
+    const decided = await this.p3.decide({
+      tenant: input.tenant,
+      operator: input.operator,
+      operationId: ENROLMENT_OPERATION,
+      operationDigest: opened.operation_digest,
+      pendingId: opened.pending_id,
+    });
+    if (decided.decision !== "approved") {
+      await abandon(this.store, opened.pending_id, new Date(this.clock()), "no P3 authority decided it");
+      return { ok: false, code: "authority_unavailable", message: decided.reason };
+    }
     await this.store.commit({
       appends: [],
-      records: [{ collection: ENROLMENTS_COLLECTION, id: opened.pending_id, expectedVersion: 0, value: input as unknown as { readonly [key: string]: Json } }],
+      records: [
+        { collection: ENROLMENTS_COLLECTION, id: opened.pending_id, expectedVersion: 0, value: input as unknown as { readonly [key: string]: Json } },
+        { collection: P3_DECISIONS_COLLECTION, id: opened.pending_id, expectedVersion: 0, value: { pending_id: opened.pending_id, decision_id: decided.decisionId, digest: opened.operation_digest, decided_at: new Date(this.clock()).toISOString() } as unknown as { readonly [key: string]: Json } },
+      ],
     });
     return { ok: true, pendingId: opened.pending_id, expiresAt: opened.expires_at };
   }
@@ -209,6 +254,10 @@ export class EnrollmentAuthority {
     }
     // The authority decision the commit needs: an approval written with the confirmation, by a controller still active.
     const approval = await this.approvalOf(input.pendingId);
+    // Authorization before activation: the P3 decision must exist and name this exact digest.
+    const decision = await this.store.getRecord(P3_DECISIONS_COLLECTION, input.pendingId);
+    const decided = decision === undefined || decision === null ? null : (decision.value as unknown as { digest: string });
+    if (decided === null || decided.digest !== descriptor.operation_digest) return { ok: false, code: "undecided", state };
     // A confirmation with no approval by a current controller can never be committed: it is reported as unapproved.
     if (approval === null || !input.currentControllers.includes(approval.authorizer_device_id)) {
       return { ok: false, code: "unapproved", state };

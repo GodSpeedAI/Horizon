@@ -216,3 +216,12 @@ preregistration:
     - id: NE-72
       expectation: >-
         The commit audit names the requester, the human authorizer, the decision and the issuer as separate roles.
+    - id: NE-73
+      expectation: >-
+        Production wires no P3 authority, so device enrolment is refused with authority_unavailable before anything is held.
+    - id: NE-74
+      expectation: >-
+        With no P3 authority decided, the enrolment authority holds no request and records no decision.
+    - id: NE-75
+      expectation: >-
+        A confirmed, approved enrolment without a P3 decision for its digest is refused as undecided at commit.

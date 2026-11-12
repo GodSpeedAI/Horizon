@@ -18,10 +18,11 @@ import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { horizonDocument, writeConfig } from "./support/config.ts";
 import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
 import { failNextReplace, identityDeviceOf, seedController } from "./support/controller.ts";
-import { EnrollmentAuthority, ENROLMENTS_COLLECTION } from "../src/remote/enrollment.ts";
+import { EnrollmentAuthority, ENROLMENTS_COLLECTION, P3_DECISIONS_COLLECTION } from "../src/remote/enrollment.ts";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
-import { confirmWithProof, stateOf } from "../src/capabilities/pending-confirmations.ts";
+import { confirmWithProof, PENDING_COLLECTION, stateOf } from "../src/capabilities/pending-confirmations.ts";
 import { auditRemote } from "../src/capabilities/remote-records.ts";
+import { p3AuthorityDouble } from "./support/p3-authority-double.ts";
 
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -38,7 +39,7 @@ async function freshRig(): Promise<Rig> {
   process.env.HORIZON_REMOTE_PORT = "0";
   const root = mkdtempSync(join(tmpdir(), "enrol-"));
   const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "e.sqlite"), secretPath: join(root, "launch.secret") }));
-  const app = await createApplication({ configPath });
+  const app = await createApplication({ configPath, remoteP3Authority: p3AuthorityDouble() });
   await seedOperationalFixture(app.runtime.runtime.store, undefined, app.caller.tenant);
   await app.remote.start();
   const rig: Rig = {
@@ -444,7 +445,7 @@ describe("concurrency and window: a late authorization or commit authorizes noth
   test("NE-58: a confirmed enrolment committed after its window is refused as expired and creates nothing", async () => {
     let now = 1_000_000;
     const store = createMemoryStore();
-    const authority = new EnrollmentAuthority(store, () => now);
+    const authority = new EnrollmentAuthority(store, () => now, p3AuthorityDouble());
     const registration = { credentialId: "cred-late", publicKey: "key", alg: -7, signCount: 0 };
     const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "late", registration: registration as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(now).toISOString() });
     if (!opened.ok) throw new Error("request refused");
@@ -472,7 +473,7 @@ describe("concurrency and window: a late authorization or commit authorizes noth
 
   test("NE-61: a newer request ends an older one, which cannot be authorized or committed", async () => {
     const store = createMemoryStore();
-    const authority = new EnrollmentAuthority(store, () => 1_000_000);
+    const authority = new EnrollmentAuthority(store, () => 1_000_000, p3AuthorityDouble());
     const registration = { credentialId: "cred-first", publicKey: "key", alg: -7, signCount: 0 };
     const first = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "first", registration: registration as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() });
     const second = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "second", registration: { ...registration, credentialId: "cred-second" } as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() });
@@ -486,7 +487,7 @@ describe("concurrency and window: a late authorization or commit authorizes noth
 
   test("PE-71: a confirmed enrolment that is not yet committed is ended by a stop, and its commit afterwards creates nothing", async () => {
     const store = createMemoryStore();
-    const authority = new EnrollmentAuthority(store, () => 1_000_000);
+    const authority = new EnrollmentAuthority(store, () => 1_000_000, p3AuthorityDouble());
     const registration = { credentialId: "cred-confirmed", publicKey: "key", alg: -7, signCount: 0 };
     const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "confirmed", registration: registration as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() });
     if (!opened.ok) throw new Error("request refused");
@@ -500,7 +501,7 @@ describe("concurrency and window: a late authorization or commit authorizes noth
 
   test("NE-60: an abandoned enrolment is never confirmed, even when the proof arrives after the abandon", async () => {
     const store = createMemoryStore();
-    const authority = new EnrollmentAuthority(store, () => 1_000_000);
+    const authority = new EnrollmentAuthority(store, () => 1_000_000, p3AuthorityDouble());
     const registration = { credentialId: "cred-abandon", publicKey: "key", alg: -7, signCount: 0 };
     const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "gone", registration: registration as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() });
     if (!opened.ok) throw new Error("request refused");
@@ -510,6 +511,64 @@ describe("concurrency and window: a late authorization or commit authorizes noth
     expect(await stateOf(store, opened.pendingId)).toBe("expired");
     const committed = await authority.commit({ pendingId: opened.pendingId, tenant: "t", generation: 1, currentControllers: [], now: new Date(1_000_000) });
     expect(committed.ok).toBe(false);
+  });
+});
+
+describe("production refusal and the authority chain: nothing is held or activated without a P3 decision", () => {
+  test("NE-73: production wires no P3 authority, so enrolment is refused with authority_unavailable before anything is held", async () => {
+    const root = mkdtempSync(join(tmpdir(), "enrol-prod-"));
+    savedPort = process.env.HORIZON_REMOTE_PORT;
+    process.env.HORIZON_REMOTE_PORT = "0";
+    const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "e.sqlite"), secretPath: join(root, "launch.secret") }));
+    const app = await createApplication({ configPath });
+    await seedOperationalFixture(app.runtime.runtime.store, undefined, app.caller.tenant);
+    try {
+      await app.remote.start();
+      const link = app.remote.pairingLink();
+      const secret = new URLSearchParams(link!.split("#")[1] ?? "").get("p");
+      const origin = app.remote.origin;
+      const redeemed = await fetch(`${origin}/m/api/pair/redeem`, { method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ secret }) });
+      const { ticket, options } = (await redeemed.json()) as { ticket: string; options: { challenge: string; rp: { id: string } } };
+      const credential = await new SoftwareAuthenticator().generate().then((auth) => auth.register({ challenge: options.challenge, origin, rpId: options.rp.id }));
+      const finished = await fetch(`${origin}/m/api/pair/finish`, { method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ ticket, credential }) });
+      expect(finished.status).toBe(503);
+      expect(((await finished.json()) as { code?: string }).code).toBe("authority_unavailable");
+      const pending = await app.runtime.runtime.store.listRecords(PENDING_COLLECTION, { tenant: app.caller.tenant });
+      expect(pending).toHaveLength(0);
+    } finally {
+      await app.remote.stop().catch(() => undefined);
+      await app.close();
+      if (savedPort === undefined) delete process.env.HORIZON_REMOTE_PORT;
+      else process.env.HORIZON_REMOTE_PORT = savedPort;
+    }
+  });
+
+  test("NE-74: the unit authority holds nothing and records no decision when the P3 authority is unavailable", async () => {
+    const store = createMemoryStore();
+    const authority = new EnrollmentAuthority(store, () => 1_000_000);
+    const registration = { credentialId: "cred-undecided", publicKey: "key", alg: -7, signCount: 0 };
+    const outcome = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "undecided", registration: registration as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() });
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok ? "" : outcome.code).toBe("authority_unavailable");
+    expect(await store.listRecords(ENROLMENTS_COLLECTION, {})).toHaveLength(0);
+    expect(await store.listRecords(P3_DECISIONS_COLLECTION, {})).toHaveLength(0);
+  });
+
+  test("NE-75: a confirmed, approved enrolment without a P3 decision for its digest is refused as undecided at commit", async () => {
+    const store = createMemoryStore();
+    const authority = new EnrollmentAuthority(store, () => 1_000_000, p3AuthorityDouble());
+    const registration = { credentialId: "cred-no-decision", publicKey: "key", alg: -7, signCount: 0 };
+    const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "nd", registration: registration as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() });
+    if (!opened.ok) throw new Error("request refused");
+    // The P3 decision record is removed by a stale writer: the commit must not activate on the approval alone.
+    const decision = await store.getRecord(P3_DECISIONS_COLLECTION, opened.pendingId);
+    expect(decision).toBeDefined();
+    await store.commit({ appends: [], records: [{ collection: P3_DECISIONS_COLLECTION, id: opened.pendingId, expectedVersion: 1, value: { pending_id: opened.pendingId, decision_id: "forged", digest: "wrong-digest", decided_at: "x" } as never }] });
+    const authorized = await authority.authorize({ tenant: "t", pendingId: opened.pendingId, now: new Date(1_000_000), generation: 1, currentControllers: [], authorizer: { deviceId: "d1", credentialId: "c1" }, verify: async () => 1 });
+    expect(authorized.ok).toBe(true);
+    const committed = await authority.commit({ pendingId: opened.pendingId, tenant: "t", generation: 1, currentControllers: [], now: new Date(1_000_000) });
+    expect(committed.ok).toBe(false);
+    expect(committed.ok ? "" : committed.code).toBe("undecided");
   });
 });
 
@@ -545,7 +604,7 @@ describe("the designated writer: no bypass, no partial device, four roles in the
 
   test("NE-69: a confirmation with no approval recorded by a current controller is refused at commit as unapproved", async () => {
     const store = createMemoryStore();
-    const authority = new EnrollmentAuthority(store, () => 1_000_000);
+    const authority = new EnrollmentAuthority(store, () => 1_000_000, p3AuthorityDouble());
     const registration = { credentialId: "cred-no-approval", publicKey: "key", alg: -7, signCount: 0 };
     const base = { tenant: "t", operator: "o", generation: 1, label: "x", registration: registration as never, replaces: ["c1"], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() };
     // A proof from a device that is not a current controller confirms, but its approval cannot satisfy the commit.
@@ -566,7 +625,7 @@ describe("the designated writer: no bypass, no partial device, four roles in the
 
   test("NE-70: the digest binds the permissions: an altered stored grant is refused at commit, and its confirmation is spent, not applied", async () => {
     const store = createMemoryStore();
-    const authority = new EnrollmentAuthority(store, () => 1_000_000);
+    const authority = new EnrollmentAuthority(store, () => 1_000_000, p3AuthorityDouble());
     const registration = { credentialId: "cred-grant", publicKey: "key", alg: -7, signCount: 0 };
     const opened = await authority.request({ tenant: "t", operator: "o", generation: 1, label: "grant", registration: registration as never, replaces: [], permissions: ["remote_controller"], requested_at: new Date(1_000_000).toISOString() });
     if (!opened.ok) throw new Error("request refused");

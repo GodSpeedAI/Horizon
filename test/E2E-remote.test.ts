@@ -15,6 +15,7 @@ import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 import { testCodeFor } from "./support/write-token.ts";
+import { p3AuthorityDouble } from "./support/p3-authority-double.ts";
 
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -94,7 +95,7 @@ suite("phone remote control, end to end in Chromium", () => {
     process.env.HORIZON_REMOTE_PORT = "0";
     const root = mkdtempSync(join(tmpdir(), "e2e-remote-"));
     const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "e2e.sqlite"), secretPath: join(root, "launch.secret") }));
-    application = await createApplication({ configPath });
+    application = await createApplication({ configPath, remoteP3Authority: p3AuthorityDouble() });
     await seedOperationalFixture(application.runtime.runtime.store, undefined, application.caller.tenant);
     cockpit = application.startServer(0);
     cockpitBase = `http://127.0.0.1:${cockpit.port}`;

@@ -1756,9 +1756,11 @@ live_enforcement:
       enforced_by: >-
         Implemented, not claimed as enforced: the commit creates an active credential only for a
         confirmed enrolment with a recorded approval by a current controller, inside its window, for
-        the same generation and controllers, re-derives the digest the controller proved, and applies
-        the confirmation once. Stage 0B does not obtain a SEA-Forge P3 authority decision, and the
-        identity service's vendored API accepts no evidence, so Horizon verifies the evidence first.
+        the same generation and controllers, after a recorded P3 decision for the same digest, re-derives
+        the digest the controller proved, and applies the confirmation once. Production wires no P3
+        authority, so the request is refused with authority_unavailable before anything is held; the
+        commit path is exercised only by test rigs that wire a double. The identity service's vendored
+        API accepts no evidence, so Horizon verifies the evidence first.
       missing: [authority_sea_forge, identity_service_evidence_check]
       required_stage: "Stage 0B"
       production_stage: "Stage 3"

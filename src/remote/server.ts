@@ -249,6 +249,7 @@ export class RemoteController {
     });
     if (!committed.ok) {
       if (committed.code === "not_authorized") return json(202, { status: "awaiting_phone_authorization" });
+      if (committed.code === "undecided") return refusal(409, "authorization_incomplete", "No P3 authority has decided this enrolment. Refresh the QR on your desktop and scan again.");
       if (committed.code === "unapproved") return refusal(409, "authorization_incomplete", "The desktop has no recorded authorization for this phone. Refresh the QR on your desktop and scan again.");
       if (committed.code === "stale") return refusal(409, "controller_changed", "The desktop's controller changed while this phone waited. Refresh the QR on your desktop and scan again.");
       if (committed.code === "expired") return refusal(410, "authorization_expired", "The desktop did not authorize this phone in time. Refresh the QR on your desktop and scan again.");
@@ -523,6 +524,10 @@ export class RemoteController {
         // until the active controller authorizes it with its own user-verified passkey. With no active controller
         // there is no authorizer, and the request is refused. The request is recorded inside the serial chain, so a
         // stop or refresh cannot land between reading the controllers and recording the request.
+        // Production refuses enrolment until the P3 authority is wired: nothing is verified, held or issued without it.
+        if (!this.deps.enrollment.authorityWired) {
+          return refusal(503, "authority_unavailable", "Device enrolment is refused: the SEA-Forge P3 authority for it is not wired in this build.");
+        }
         const requested = await this.serial(async () => {
           if (!this.pairing.isEnabled) return "remote_off" as const;
           const controllers = await this.activeDeviceIds();
@@ -539,6 +544,7 @@ export class RemoteController {
           });
         });
         if (requested === "remote_off") return refusal(409, "remote_off", "Remote control is off on the desktop.");
+        if (typeof requested === "object" && !requested.ok) return refusal(503, "authority_unavailable", requested.message);
         if (requested === "no_controller") {
           return refusal(409, "no_controller", "No phone is an active controller, so no phone can authorize this one. A first controller needs the desk's own passkey, which this build does not yet provide.");
         }

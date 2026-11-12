@@ -137,7 +137,7 @@ import { existsSync as fileExists, mkdirSync as makeDir, readFileSync as readFil
 import { dirname as dirOf, join as joinPath } from "node:path";
 import { tmpdir as tmpDir } from "node:os";
 import type { Server } from "bun";
-import { EnrollmentAuthority } from "./remote/enrollment.ts";
+import { EnrollmentAuthority, type P3Authority } from "./remote/enrollment.ts";
 import { DEVICE_ACTOR_PREFIX, RemoteController, type RemoteStatus } from "./remote/server.ts";
 import { remoteSettings } from "./remote/settings.ts";
 import { qrSvg, remotePanelPage } from "./remote/panel.ts";
@@ -466,6 +466,8 @@ function deskCardKind(card: { readonly kind: string; readonly id: string }): str
 export async function createApplication(
   options: {
     readonly storePath?: string;
+    /** The SEA-Forge P3 authority for device enrolment. Omitted in production, where enrolment is refused. Tests wire a double. */
+    readonly remoteP3Authority?: P3Authority;
     readonly configPath?: string;
     /**
      * The Context Kernel adapter to bind, instead of building one from `context_kernel.command`.
@@ -3210,7 +3212,8 @@ export async function createApplication(
     identity,
     identityTenant,
     operator: mappedActors.desktopOperator,
-    enrollment: new EnrollmentAuthority(runtime.runtime.store),
+    // The P3 authority for device enrolment. Production wires none, so enrolment is refused (see UNAVAILABLE_P3_AUTHORITY).
+    enrollment: new EnrollmentAuthority(runtime.runtime.store, undefined, options.remoteP3Authority),
     workspace: () => workspace(),
     chrome: (receipt) => cockpitChrome({ receipt: receipt ?? null }),
     position: () => lastPosition(runtime),

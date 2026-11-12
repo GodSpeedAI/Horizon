@@ -10,6 +10,7 @@ import { createApplication, type HorizonApplication } from "../src/app.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { horizonDocument, writeConfig } from "./support/config.ts";
 import "./support/write-token.ts";
+import { p3AuthorityDouble } from "./support/p3-authority-double.ts";
 
 let application: HorizonApplication;
 let cockpit: ReturnType<HorizonApplication["startServer"]>;
@@ -21,7 +22,7 @@ beforeAll(async () => {
   process.env.HORIZON_REMOTE_PORT = "0";
   const root = mkdtempSync(join(tmpdir(), "enrollment-"));
   const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "e.sqlite"), secretPath: join(root, "launch.secret") }));
-  application = await createApplication({ configPath });
+  application = await createApplication({ configPath, remoteP3Authority: p3AuthorityDouble() });
   await seedOperationalFixture(application.runtime.runtime.store, undefined, application.caller.tenant);
   cockpit = application.startServer(0);
   base = `http://127.0.0.1:${cockpit.port}`;

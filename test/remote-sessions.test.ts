@@ -26,6 +26,7 @@ import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { horizonDocument, PINNED_WORLD_REF, writeConfig } from "./support/config.ts";
 import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
 import { seedController } from "./support/controller.ts";
+import { p3AuthorityDouble } from "./support/p3-authority-double.ts";
 
 const MAPPED = "sea-actor-alice";
 const SERVICE = "cognate-service";
@@ -116,6 +117,7 @@ async function rig(name: string): Promise<Rig> {
   const configPath = await writeConfig(join(root, "horizon.toml"), horizonDocument({ storePath: join(root, "s.sqlite"), secretPath: join(root, "launch.secret") }));
   const app = await createApplication({
     configPath,
+    remoteP3Authority: p3AuthorityDouble(),
     governance: { mode: "sea-forge", authority: wire.inner, worldRef: world },
     approvals: approvalAuthority({ socketPath: join(root, "none.sock"), operatorId: "actor:operator" }),
     realityTrace: null,

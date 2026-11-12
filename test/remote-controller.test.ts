@@ -17,6 +17,7 @@ import { writeConfig, horizonDocument } from "./support/config.ts";
 import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
 import { seedController } from "./support/controller.ts";
 import { b64url } from "../src/remote/webauthn.ts";
+import { p3AuthorityDouble } from "./support/p3-authority-double.ts";
 
 let application: HorizonApplication;
 /** The desk's terminal for the test: the operator authorizes each enrolment by typing the code it shows. */
@@ -41,7 +42,7 @@ beforeAll(async () => {
     join(root, "horizon.toml"),
     horizonDocument({ storePath: join(root, "remote.sqlite"), secretPath: join(root, "launch.secret") }),
   );
-  application = await createApplication({ configPath });
+  application = await createApplication({ configPath, remoteP3Authority: p3AuthorityDouble() });
   await seedOperationalFixture(application.runtime.runtime.store, undefined, application.caller.tenant);
   cockpit = application.startServer(0);
   cockpitBase = `http://127.0.0.1:${cockpit.port}`;
