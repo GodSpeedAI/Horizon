@@ -1,0 +1,531 @@
+{
+  "external_interface_contract_version": "horizon.identity.external_interfaces/1",
+  "contract_id": "horizon.identity.external_interfaces",
+  "contract_version": "1.3.0",
+  "frozen_at": "2026-11-11",
+  "authority": {
+    "design": "design_draft.md section 9.1 (external interfaces Horizon consumes)",
+    "spec": {
+      "id": "HORIZON-001",
+      "version": "1.2.0",
+      "sha256": "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435"
+    },
+    "note": "A JSON descriptor rather than YAML so the same bytes are read by the TypeScript contract and an independent Python checker with no new dependency. Every entry here is an interface another project owns. Horizon mints none of them, defines none of their payloads, and cannot grant authority by asserting that one exists. An interface whose owner has not published it is named as an open dependency, and the path that depends on it fails closed until it exists."
+  },
+  "rules": {
+    "horizon_mints_no_external_record": true,
+    "horizon_defines_no_external_payload": true,
+    "an_unknown_interface_is_refused": true,
+    "an_unpublished_interface_fails_closed": true,
+    "an_external_record_never_substitutes_for_authority": true,
+    "an_external_reference_is_never_a_horizon_record": true,
+    "an_unsigned_external_record_is_not_authority": true
+  },
+  "interfaces": [
+    {
+      "interface_id": "sea_forge.authority_decision",
+      "interface_version": "2",
+      "owner": "GodSpeedAI/SEA-Forge",
+      "repository": "https://github.com/GodSpeedAI/SEA-Forge.git",
+      "pinned_commit": null,
+      "pinned_commit_date": null,
+      "artifact_path": null,
+      "artifact_symbol": null,
+      "artifact_paths": [],
+      "publication_status": "specified_not_published",
+      "horizon_mints": false,
+      "horizon_binding": "HorizonAuthorityDecision.decision_ref",
+      "horizon_view": "SEA-Forge serializes a `godspeed.authority_decision` envelope (`decision_envelope` in sea-forge-authority cep.rs) but does not commit or sign it. The ledger commits the in-memory AuthorityDecision payload, and the Merkle inclusion proof authenticates that payload only, so no envelope fact is authenticated. Horizon reads none of these facts until SEA-Forge publishes a committed or signed envelope, or a pinned projection that authenticates every consumed fact. Until then this interface is specified_not_published and every governed path that would consume it fails closed (governance refused at startup).",
+      "required_facts": [
+        {
+          "fact": "envelope_id",
+          "meaning": "the envelope's own identifier",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "cep_version",
+          "meaning": "the envelope protocol version",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "envelope_kind",
+          "meaning": "that the envelope is an authority decision",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "created_at",
+          "meaning": "when the owner decided",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "created_by",
+          "meaning": "the producer that wrote the envelope",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "decision",
+          "meaning": "the disposition the authority reached: allow, deny, boundary, degraded or unknown",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "decision_id",
+          "meaning": "the decision's own identifier",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "operation_id",
+          "meaning": "the exact operation the decision is about",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "request_ref",
+          "meaning": "the request envelope the decision answers",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "ledger_entry",
+          "meaning": "the identifier of the committed ledger entry that carries the decision",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "policy_bundle_hash",
+          "meaning": "the hash of the policy bundle the decision was evaluated against",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "action_request_hash",
+          "meaning": "the hash of the exact action the decision is about",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "identity_binding_hash",
+          "meaning": "the hash of the identity binding the decision carries",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "policy_basis",
+          "meaning": "the policy references a constrained disposition was evaluated against",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null,
+          "conditional": "only when the disposition is constrained (boundary or degraded)"
+        },
+        {
+          "fact": "scope",
+          "meaning": "the scope the decision covers",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "authority",
+          "meaning": "the authority's identifier and the subject actor the decision binds",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "constraints",
+          "meaning": "the constraints a constrained disposition carries",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null,
+          "conditional": "only when the decision is boundary"
+        },
+        {
+          "fact": "compensating_controls",
+          "meaning": "the controls that stand in for a degraded disposition",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null,
+          "conditional": "only when the decision is degraded"
+        },
+        {
+          "fact": "approval_expires_at",
+          "meaning": "when an approval the decision consumed stops being current",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null,
+          "conditional": "only when an approval was consumed"
+        },
+        {
+          "fact": "approved_by",
+          "meaning": "who approved the decision, when an approval was consumed",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null,
+          "conditional": "only when an approval was consumed"
+        },
+        {
+          "fact": "entry_hash",
+          "meaning": "the committed entry's own hash",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "previous_entry_hash",
+          "meaning": "the committed entry's predecessor hash, which chains it to the ledger",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "payload_hash",
+          "meaning": "the hash of the committed payload",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "append_ordinal",
+          "meaning": "the entry's position in the ledger",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "committed_at",
+          "meaning": "when the owner committed the entry",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "writer_identity_ref",
+          "meaning": "the writer that committed the entry",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "subject_refs",
+          "meaning": "the subjects the committed entry is about",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "canonicalization",
+          "meaning": "the canonicalization the payload hash was taken over",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "hash_algorithm",
+          "meaning": "the hash algorithm the entry and the chain use",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "checkpoint_hash",
+          "meaning": "the signed checkpoint's own hash",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "mmr_root",
+          "meaning": "the checkpoint's Merkle root, which the inclusion proof is checked against",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "signing_algorithm",
+          "meaning": "the algorithm the checkpoint's signature was taken with",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "signing_key_id",
+          "meaning": "the key the owner signed the checkpoint with",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "signature",
+          "meaning": "the owner's signature over the checkpoint hash",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "mmr_leaf_index",
+          "meaning": "the entry's position in the Merkle mountain range, which the inclusion proof is taken at",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "leaf_index",
+          "meaning": "the leaf position the inclusion proof starts from",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "proof_hashes",
+          "meaning": "the sibling hashes along the inclusion path up to the checkpoint root",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        }
+      ],
+      "horizon_checks": [
+        "the decision is an Allow before Horizon treats it as authority",
+        "the decision names the same operation digest the Horizon record carries",
+        "the decision's subject actor is the principal the record names",
+        "the envelope's ledger entry is committed and its hash chain verifies",
+        "the checkpoint's signature verifies against the owner's trust set at the pinned commit",
+        "the checkpoint's Merkle inclusion proof covers the entry the envelope names"
+      ],
+      "failure_rule": "A decision Horizon cannot resolve against the pinned interface is not authority. The operation is refused; it is never satisfied by a local policy, a session, or a grant. A decision whose signature does not verify against the owner's trust set at the pinned commit is refused whatever it says. The envelope carries no amount and no authority epoch, so Horizon checks the record's amount and epoch against the policy bundle and the trust set the decision names, never against a field the envelope does not have; an artifact that does not carry a fact the record needs is refused, not read around.",
+      "dependency": null,
+      "components": {}
+    },
+    {
+      "interface_id": "sea_forge.action_grant",
+      "interface_version": "2",
+      "owner": "GodSpeedAI/SEA-Forge",
+      "repository": "https://github.com/GodSpeedAI/SEA-Forge.git",
+      "pinned_commit": null,
+      "pinned_commit_date": null,
+      "artifact_path": null,
+      "artifact_symbol": null,
+      "artifact_paths": [],
+      "publication_status": "specified_not_published",
+      "horizon_mints": false,
+      "horizon_binding": "HorizonDelegationGrant.grant_ref",
+      "horizon_view": "SEA-Forge mints a grant as a move-only capability and says so: `ActionGrant` is \"intentionally not serializable or cloneable\" and its fields are private. There is therefore no grant artifact for Horizon to resolve, to check, or to hold, and this interface names what the owner would have to publish before an agent's delegation could be verified independently. Horizon pins no commit, because there is nothing at a commit to point at.",
+      "required_facts": [
+        {
+          "fact": "grant_ref",
+          "meaning": "the grant's own identifier, which the delegating record names",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "issuer_key_id",
+          "meaning": "the key the owner signed the grant with",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "signature",
+          "meaning": "the owner's signature over the grant",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "action_hash",
+          "meaning": "the hash of the exact action the grant authorizes",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "boundaries",
+          "meaning": "the resource scope the grant permits",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "amount",
+          "meaning": "the spend ceiling the grant permits, with its unit",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "authority_epoch",
+          "meaning": "the authority epoch the grant was issued against",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "expires_at",
+          "meaning": "when the grant stops being usable",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "committed_decision",
+          "meaning": "the committed Allow decision the grant was minted from",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        }
+      ],
+      "horizon_checks": [
+        "the grant was minted from an Allow decision, never from a Deny or an Escalate",
+        "the grant's action hash covers the operation the record carries",
+        "the grant's boundaries cover the operation's resource scope",
+        "the grant's amount covers the operation's amount in the same unit",
+        "the grant's authority epoch is the epoch the trust set names as current",
+        "the grant has not expired",
+        "the grant carries a signature from a key the owner's trust set names"
+      ],
+      "failure_rule": "While this interface is unpublished there is no grant artifact to resolve, so the delegated path fails closed: a delegation reference a record carries is a name, not an authority, and the operation is refused. The path never falls back to a session, a local policy, or a human entitlement, and a delegation reference never becomes authority by being asserted.",
+      "dependency": "SEA-Forge owns the grant artifact and publishes none at the pinned revision: `ActionGrant` is a move-only, non-serializable capability, so there is nothing durable for Horizon to verify. Until the owner publishes a grant issuance record carrying the facts above, no agent's delegation can be verified independently and the delegated path refuses.",
+      "components": {}
+    },
+    {
+      "interface_id": "sea_forge.human_entitlement",
+      "interface_version": "1",
+      "owner": "GodSpeedAI/SEA-Forge",
+      "repository": "https://github.com/GodSpeedAI/SEA-Forge.git",
+      "pinned_commit": null,
+      "pinned_commit_date": null,
+      "artifact_path": null,
+      "artifact_symbol": null,
+      "publication_status": "specified_not_published",
+      "horizon_mints": false,
+      "horizon_binding": "HorizonAuthorityDecision.entitlement_ref",
+      "required_facts": [
+        {
+          "fact": "entitlement_ref",
+          "meaning": "the entitlement's own identifier",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "subject_ref",
+          "meaning": "the principal the entitlement was issued to",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "issuer_ref",
+          "meaning": "the authority that issued the entitlement",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "issuer_key_id",
+          "meaning": "the key the issuer signed the entitlement with",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "signature",
+          "meaning": "the issuer's signature over the entitlement",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "operation_digest",
+          "meaning": "the exact operation the entitlement permits",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "resource_refs",
+          "meaning": "the resource scope the entitlement covers",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "amount",
+          "meaning": "the spend ceiling the entitlement grants",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "authority_epoch",
+          "meaning": "the authority epoch the entitlement was issued in",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "expires_at",
+          "meaning": "when the entitlement stops being current",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        },
+        {
+          "fact": "revocation_state",
+          "meaning": "whether the entitlement has been revoked",
+          "binds": "unbound:owner_projection_not_published",
+          "component": null,
+          "source": null
+        }
+      ],
+      "horizon_checks": [
+        "the entitlement names the same subject as the human it authorizes, through the record kind's own subject field",
+        "the entitlement names the same operation digest as the record",
+        "the entitlement's resource scope covers every resource the record names",
+        "the entitlement's amount covers the record's amount in the same unit",
+        "the entitlement carries the same authority epoch as the record",
+        "the entitlement expires no earlier than the record it authorizes",
+        "the entitlement is active",
+        "the entitlement carries the issuer's signature over a key the owner's trust set names"
+      ],
+      "horizon_view": "The owner may name its payload fields as it likes. Horizon reads the external artifact through an adapter that maps it onto the facts this interface declares; the contract fixes the facts, not the owner's field names. The subject a fact binds to is named per record kind in `subject_binding`, so no fact points at a field that does not exist.",
+      "failure_rule": "While this interface is unpublished the entitlement-backed path is unavailable: every record that names an entitlement is refused, whatever facts it is handed, because an artifact nobody has published cannot be authenticated. When the interface is published, an entitlement that is missing a fact, names a different subject or operation, covers a narrower scope or a smaller amount, carries a different epoch, expires before the record it authorizes, is not active, or is not signed by the issuer the interface names, is refused. The path never falls back to a grant, a session, or a policy decision.",
+      "dependency": "SEA-Forge owns the entitlement artifact and has not published one at the pinned revision. Horizon pins no commit and mints no entitlement. Until the owner publishes an interface that carries every fact above, no human authority may rest on an entitlement, and the governed human path refuses.",
+      "subject_binding": {
+        "HorizonAuthorityDecision": "approver_ref",
+        "EffectFence": "caller_ref"
+      },
+      "components": {}
+    }
+  ],
+  "bind_targets": {
+    "record_fields": "a field of a Horizon record kind named in contracts/identity/v1/records.json, written as Kind.field",
+    "envelope_checks": {
+      "envelope:profile": "the envelope is the godspeed.authority_decision profile and names its own identity, kind, time and producer",
+      "envelope:disposition": "the disposition-dependent fields the envelope carries for the decision it reaches",
+      "envelope:ledger_chain": "the committed ledger entry, its hash chain and its position in the ledger",
+      "envelope:checkpoint": "the signed checkpoint the entry is covered by",
+      "envelope:inclusion": "the Merkle inclusion proof of the entry under the checkpoint root"
+    },
+    "rule": "Every required fact names exactly one binds target. A fact Horizon stores binds to a record field; a fact Horizon only uses to verify the owner's artifact binds to an envelope check. Any other target is refused by scripts/check-external-interface-facts.ts."
+  }
+}

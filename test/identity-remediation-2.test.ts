@@ -284,11 +284,8 @@ describe("the round-3 review's corrections", () => {
       expect(facts, fact).toContain(fact);
     }
     // Every subject fact binds to a field the record kind actually has.
-    expect(entitlement.subject_binding).toEqual({ HorizonAuthorityDecision: "approver_ref", EffectFence: "caller_ref" });
-    for (const kind of Object.keys(entitlement.subject_binding!)) {
-      const field = entitlement.subject_binding![kind];
-      expect(records.records[kind]?.fields.some((candidate) => candidate.name === field), `${kind}.${field}`).toBe(true);
-    }
+    // The unpublished entitlement names no subject mapping: a map onto Horizon fields would bind an owner subject to the wrong field (round-8 review).
+    expect(entitlement.subject_binding).toBeUndefined();
     // Every entitlement-backed fixture is refused, whatever facts it is handed.
     for (const entry of fixtures.cases) {
       if (entry.context?.entitlement === undefined) continue;

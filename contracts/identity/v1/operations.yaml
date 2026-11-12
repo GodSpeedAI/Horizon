@@ -1772,8 +1772,7 @@ binding_defects:
       agent door refuses a body that names an actor.
     evidence: "test/identity-defects.test.ts (the recorded executor is the authenticated key; a body that names an executor is refused; another key cannot route this question) and test/identity-contract.test.ts (the row's executor and caller authentication)."
     residual: >-
-      The design draft's Appendix A P2/P3 table named a human session for `ask.route`; the table now
-      names the agent execution, and section 11 names the same executor in the catalog's own row
+      The design draft's Appendix A P2/P3 table named a human session for `ask.route`; the table names `registered_agent`, the key the agent door authenticates, and section 11 names the same executor in the catalog's own row
       list and in the freeze's live-enforcement table. The row's only caller is an agent
       execution, so Stage 0B does not enable it: an interim A3-T receipt and a pending record
       cannot supply the live bounded grant or the person's A3-UV evidence. The execution proof

@@ -19,7 +19,8 @@
     "an_unpublished_interface_fails_closed": true,
     "an_external_record_never_substitutes_for_authority": true,
     "an_external_reference_is_never_a_horizon_record": true,
-    "an_unsigned_external_record_is_not_authority": true
+    "an_unsigned_external_record_is_not_authority": true,
+    "unbound_only_while_unpublished": true
   },
   "interfaces": [
     {
@@ -510,10 +511,6 @@
       "horizon_view": "The owner may name its payload fields as it likes. Horizon reads the external artifact through an adapter that maps it onto the facts this interface declares; the contract fixes the facts, not the owner's field names. The subject a fact binds to is named per record kind in `subject_binding`, so no fact points at a field that does not exist.",
       "failure_rule": "While this interface is unpublished the entitlement-backed path is unavailable: every record that names an entitlement is refused, whatever facts it is handed, because an artifact nobody has published cannot be authenticated. When the interface is published, an entitlement that is missing a fact, names a different subject or operation, covers a narrower scope or a smaller amount, carries a different epoch, expires before the record it authorizes, is not active, or is not signed by the issuer the interface names, is refused. The path never falls back to a grant, a session, or a policy decision.",
       "dependency": "SEA-Forge owns the entitlement artifact and has not published one at the pinned revision. Horizon pins no commit and mints no entitlement. Until the owner publishes an interface that carries every fact above, no human authority may rest on an entitlement, and the governed human path refuses.",
-      "subject_binding": {
-        "HorizonAuthorityDecision": "approver_ref",
-        "EffectFence": "caller_ref"
-      },
       "components": {}
     }
   ],
@@ -526,6 +523,10 @@
       "envelope:checkpoint": "the signed checkpoint the entry is covered by",
       "envelope:inclusion": "the Merkle inclusion proof of the entry under the checkpoint root"
     },
-    "rule": "Every required fact names exactly one binds target. A fact Horizon stores binds to a record field; a fact Horizon only uses to verify the owner's artifact binds to an envelope check. Any other target is refused by scripts/check-external-interface-facts.ts."
+    "rule": "Every required fact names exactly one binds target. A fact Horizon stores binds to a record field; a fact Horizon only uses to verify the owner's artifact binds to an envelope check. Any other target is refused by scripts/check-external-interface-facts.ts.",
+    "unbound_marker": {
+      "value": "unbound:owner_projection_not_published",
+      "condition": "only while the interface's publication_status is specified_not_published; a published interface may not carry it"
+    }
   }
 }
