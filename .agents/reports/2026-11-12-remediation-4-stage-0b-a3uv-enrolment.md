@@ -85,3 +85,24 @@ The smallest feasible production solution is a loopback local-console WebAuthn r
 ## Blind critic and EGM review
 
 Recorded in the section appended after the critic and EGM runs complete.
+
+## Review round (EGM and blind critic on 0f25a38)
+
+EGM (mechanism review): no path creates a credential without a verified controller proof, none commits a stale or abandoned enrolment, none double-applies. Two points were acted on: the commit now re-derives the request digest and refuses a mismatch; a fresh start ends waiting enrolments left by a previous process.
+
+Blind critic (0f25a38): REJECT. Findings and disposition, commit `6a828df`:
+
+| Severity | Finding | Disposition |
+|---|---|---|
+| High | Post-apply failure after `replaceDevices` leaves an identity device without a ledger row | Fixed: the new identity device is revoked on failure; the refusal says to refresh and scan again. Compensation is best-effort (`catch`). |
+| High | Requirements 4 and 5: `cognate_local_continuation` is catalog text; no runtime writer is called | **Open, architectural.** The commit applies the pending record through the store CAS and calls the identity service directly. No designated writer exists in code. See the owner question below. |
+| Medium | Approver sees only the label from the phone's User-Agent, not the public key or credential | Open. The digest is signed opaquely; showing more needs a design choice about what the controller displays. |
+| Medium | No test names the separation values of `device.pair` and `device.pair.authorize` | Fixed: test added in `test/identity-remediation-4.test.ts`. |
+| Medium | Restart not tested as a restart | Fixed in code: fresh start ends waiting enrolments. PE-64 and PE-65 exercise stop then start. |
+| Medium | NE-59 weak | Strengthened: the race result is asserted, and a stop that lands first is accepted. |
+| Low | `/m/api/pair/await` is unauthenticated but the catalog says `caller_own_session` | Open. Catalog text needs correcting. |
+| Low | Filler assertion in PE-68 | Fixed. |
+| Low | NE-41 and NE-42 reused with different meanings in two files | Open. Pre-existing IDs; renaming needs the prereg updated too. |
+| Low | `pending-confirmations.ts` gate auto-confirms when a code sink is installed | Open. Test-only seam; production leaves the sink unset. |
+
+Owner question for the open High item: what is the designated authority writer for device enrolment? Options: (a) a named Horizon-local writer that is the only caller of `replaceDevices` and `applyConfirmed` for `device.pair`, so the catalog claim is true in code; (b) correct the catalog to say the store CAS and the identity service are the writers, with no third party. The critic cannot accept until one of these is chosen.
