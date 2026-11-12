@@ -331,7 +331,7 @@ describe("the round-2 review's corrections", () => {
     expect(entitlement!.pinned_commit).toBeNull();
     expect(entitlement!.dependency).toContain("refuses");
     // The record contract binds the entitlement, and the design names the same interface.
-    expect(records.constraints["entitlement_is_external"]?.applies_to).toEqual(["AuthorityDecision", "EffectFence"]);
+    expect(records.constraints["entitlement_is_external"]?.applies_to).toEqual(["HorizonAuthorityDecision", "EffectFence"]);
     expect(records.constraints["entitlement_is_external"]?.rule).toContain("sea_forge.human_entitlement");
     expect(design).toContain("### 9.1 External interfaces Horizon consumes");
     expect(design).toContain("`sea_forge.human_entitlement`");

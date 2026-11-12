@@ -49,11 +49,11 @@ describe("the descriptor is the whole contract", () => {
     expect(signed.sort()).toEqual([
       "A3Receipt",
       "Approval",
-      "AuthorityDecision",
       "Credential",
-      "DelegationGrant",
       "EffectFence",
       "EvidenceRecord",
+      "HorizonAuthorityDecision",
+      "HorizonDelegationGrant",
       "OperationDescriptor",
       "PendingOperation",
       "PendingTransition",
@@ -417,7 +417,7 @@ describe("the validator refuses rather than repairs", () => {
   test("a numeric amount is never accepted as money", () => {
     const credential = fixtures.cases.find((entry) => entry.kind === "Credential" && entry.expect === "valid")!.record;
     const grant = fixtures.cases.find((entry) => entry.id === "GRANT-ROOT-OK")!.record;
-    expect(validateRecord(contract, "DelegationGrant", { ...grant, budget: { amount: 1000, unit: "tokens" } })).toContain(
+    expect(validateRecord(contract, "HorizonDelegationGrant", { ...grant, budget: { amount: 1000, unit: "tokens" } })).toContain(
       "type:budget:money",
     );
     // A JS number where a uint64 belongs is a type violation, not a silently coerced value.

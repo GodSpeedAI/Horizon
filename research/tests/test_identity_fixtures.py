@@ -205,12 +205,12 @@ def test_numbers_are_never_accepted_where_a_decimal_string_belongs() -> None:
     grant = next(case for case in CASES if case["id"] == "GRANT-ROOT-OK")
     assert validate(
         CONTRACT,
-        "DelegationGrant",
+        "HorizonDelegationGrant",
         {**grant["record"], "budget": {"amount": 1000, "unit": "tokens"}},
     ) == ["type:budget:money"]
     assert validate(
         CONTRACT,
-        "DelegationGrant",
+        "HorizonDelegationGrant",
         {**grant["record"], "budget": {"amount": "1000"}},
     ) == ["type:budget:money"]
 

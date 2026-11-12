@@ -699,7 +699,7 @@ export function checkConstraints(
     if (approver !== null && (approver === requester || (executor !== null && approver === executor))) fail("separation_of_duty");
   }
 
-  if (kind === "DelegationGrant") {
+  if (kind === "HorizonDelegationGrant") {
     const parent = context?.parent_grant;
     if (isObject(parent)) {
       const parentOperations = Array.isArray(parent.operations) ? (parent.operations as string[]) : [];
@@ -740,7 +740,7 @@ export function checkConstraints(
     }
   }
 
-  if (kind === "EffectFence" || kind === "AuthorityDecision") {
+  if (kind === "EffectFence" || kind === "HorizonAuthorityDecision") {
     const hasGrant = !isNull(record, "grant_ref");
     const hasEntitlement = !isNull(record, "entitlement_ref");
     if (hasGrant === hasEntitlement) fail("fence_authority_exactly_one");
@@ -800,7 +800,7 @@ export function validateRecord(
 /** A child grant with an absent field grants nothing. The absent field is not inherited from the
  * parent, so this reports the effective authority of the child as written. */
 export function effectiveChildGrant(contract: RecordsContract, child: Record<string, unknown>): Record<string, unknown> {
-  const spec = contract.records.DelegationGrant;
+  const spec = contract.records.HorizonDelegationGrant;
   const effective: Record<string, unknown> = {};
   for (const field of spec?.fields ?? []) {
     if (field.name === "signature") continue;

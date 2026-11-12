@@ -40,7 +40,30 @@ interface ExternalInterface {
   readonly pinned_commit: string | null;
   readonly artifact_path: string | null;
   readonly artifact_paths?: readonly string[];
-  readonly required_facts: readonly { readonly fact: string }[];
+  readonly required_facts: readonly {
+    readonly fact: string;
+    readonly binds?: string | null;
+    readonly component?: string | null;
+    readonly conditional?: string;
+  }[];
+  readonly components?: Readonly<Record<string, { readonly file: string; readonly struct: string | null }>>;
+  readonly subject_binding?: unknown;
+}
+
+/** The body of `pub struct NAME { ... }` in a Rust source text, or null when the struct is absent. */
+export function structBody(text: string, name: string): string | null {
+  const head = new RegExp(`\\bpub\\s+struct\\s+${name}\\b[^{;]*\\{`).exec(text);
+  if (head === null) return null;
+  let depth = 1;
+  for (let index = head.index + head[0].length; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "{") depth += 1;
+    else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return text.slice(head.index + head[0].length, index);
+    }
+  }
+  return null;
 }
 
 /** The owner checkout: the environment first, then the plan's documented sibling path. */
@@ -98,7 +121,10 @@ export function checkExternalInterfaceFacts(
   };
   const document = JSON.parse(
     readFileSync(path.join(root, "contracts/identity/v1/external-interfaces.json"), "utf8"),
-  ) as { readonly interfaces: readonly ExternalInterface[] };
+  ) as {
+    readonly interfaces: readonly ExternalInterface[];
+    readonly bind_targets?: { readonly envelope_checks?: Readonly<Record<string, string>> };
+  };
   const checkout = options.sourceRoot ?? resolveOwnerCheckout(root);
   let facts = 0;
 
@@ -140,16 +166,70 @@ export function checkExternalInterfaceFacts(
       texts.push(read.text);
     }
     if (readFailure) continue;
-    const source = texts.join("\n");
-    const missing = entry.required_facts.map((entryFact) => entryFact.fact).filter((name) => !sourceCarriesFact(source, name));
-    facts += entry.required_facts.length;
+    const byFile = new Map<string, string>(files.map((file, index) => [file, texts[index] ?? ""]));
+    const components = entry.components ?? {};
+    const missing: string[] = [];
+    for (const entryFact of entry.required_facts) {
+      facts += 1;
+      const name = entryFact.fact;
+      const component = entryFact.component ?? null;
+      if (component === null || components[component] === undefined) {
+        fail(`${id}: fact "${name}" names no source component, so there is no owner struct it is checked against`);
+        continue;
+      }
+      const source = components[component];
+      const text = byFile.get(source.file);
+      if (text === undefined) {
+        fail(`${id}: component "${component}" reads ${source.file}, which the interface does not list as an artifact file`);
+        continue;
+      }
+      const scope = source.struct === null ? text : structBody(text, source.struct);
+      if (scope === null) {
+        fail(`${id}: component "${component}" names struct ${source.struct}, which ${source.file} does not declare at ${entry.pinned_commit.slice(0, 12)}`);
+        continue;
+      }
+      if (!sourceCarriesFact(scope, name)) missing.push(`${name} (${component})`);
+    }
     if (missing.length > 0) {
       fail(
         `${id}: the owner's source at ${entry.pinned_commit.slice(0, 12)} does not carry ${missing.length} declared fact(s): ${missing.join(", ")}. The contract would be checking a field the artifact does not have.`,
       );
       continue;
     }
-    ok(`${id}: ${entry.required_facts.length} facts verified against the owner's source at ${entry.pinned_commit.slice(0, 12)}`);
+    ok(`${id}: ${entry.required_facts.length} facts verified in their named owner components at ${entry.pinned_commit.slice(0, 12)}`);
+  }
+
+  // Every fact names what it binds to: a Horizon record field, or a closed envelope check.
+  const records = JSON.parse(readFileSync(path.join(root, "contracts/identity/v1/records.json"), "utf8")) as {
+    readonly records: Readonly<Record<string, { readonly fields: readonly ({ readonly name: string } | string)[] }>>;
+  };
+  const envelopeChecks = new Set(Object.keys(document.bind_targets?.envelope_checks ?? {}));
+  for (const entry of document.interfaces) {
+    for (const entryFact of entry.required_facts) {
+      const bind = entryFact.binds ?? null;
+      if (bind === null) {
+        fail(`${entry.interface_id}: fact "${entryFact.fact}" binds to nothing`);
+        continue;
+      }
+      if (bind.startsWith("envelope:")) {
+        if (!envelopeChecks.has(bind)) fail(`${entry.interface_id}: fact "${entryFact.fact}" binds to "${bind}", which is not a declared envelope check`);
+        continue;
+      }
+      const match = /^(Horizon[A-Za-z]+)\.([a-z_]+)$/.exec(bind);
+      if (match === null) {
+        fail(`${entry.interface_id}: fact "${entryFact.fact}" binds to "${bind}", which is neither a Horizon record field nor an envelope check`);
+        continue;
+      }
+      const [, kind, field] = match as unknown as [string, string, string];
+      const record = records.records[kind];
+      const names = (record?.fields ?? []).map((f) => (typeof f === "string" ? f : f.name));
+      if (!names.includes(field)) fail(`${entry.interface_id}: fact "${entryFact.fact}" binds to ${kind}.${field}, which records.json does not declare`);
+    }
+    for (const entryFact of entry.required_facts) {
+      if (entryFact.conditional !== undefined && !entryFact.conditional.startsWith("only when")) {
+        fail(`${entry.interface_id}: fact "${entryFact.fact}" has a condition that does not say when it applies`);
+      }
+    }
   }
 
   if (failures.length === 0) {

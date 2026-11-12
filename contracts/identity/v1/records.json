@@ -203,7 +203,7 @@
         }
       ]
     },
-    "DelegationGrant": {
+    "HorizonDelegationGrant": {
       "signed": true,
       "identity": "A bounded grant from a person (root) or from a live parent grant (child). It never expands authority and is never issued for a human session.",
       "nullability": "parent_ref and execution_ref are null for a root grant; a child grant requires a live parent and may bind an execution.",
@@ -284,7 +284,7 @@
         }
       ]
     },
-    "AuthorityDecision": {
+    "HorizonAuthorityDecision": {
       "signed": true,
       "identity": "The authority writer's answer for one operation digest, one set of resources, and one amount.",
       "nullability": "grant_ref is null only for a root grant.create or for an entitlement-backed human P2/P3, in which case entitlement_ref is non-null and current. approver_ref is null only for an autonomous policy decision; a human-reserved decision requires it. An entitlement_ref names a record of the `sea_forge.human_entitlement` interface, which SEA-Forge owns; see `contracts/identity/v1/external-interfaces.json`. The entitlement is an external record whose interface is specified but not yet published, so the entitlement-backed path is unavailable until its owner publishes it.",
@@ -969,14 +969,14 @@
     },
     "child_subset_of_parent": {
       "applies_to": [
-        "DelegationGrant"
+        "HorizonDelegationGrant"
       ],
       "rule": "A child grant is a strict subset of its live parent: operations, resources, budget, expiry, depth, audience, and the redelegate and offline permissions may only narrow. An absent child field grants nothing; it is not inherited."
     },
     "fence_authority_exactly_one": {
       "applies_to": [
         "EffectFence",
-        "AuthorityDecision"
+        "HorizonAuthorityDecision"
       ],
       "rule": "An effect is fenced either by a grant or by a current human entitlement, never by both and never by neither. An authority decision names exactly one of the two; a decision naming neither was not made by an authority."
     },
@@ -1048,7 +1048,7 @@
     },
     "entitlement_is_external": {
       "applies_to": [
-        "AuthorityDecision",
+        "HorizonAuthorityDecision",
         "EffectFence"
       ],
       "rule": "An entitlement_ref names a record of the `sea_forge.human_entitlement` interface, which SEA-Forge owns and mints. It never names a Horizon record, and Horizon never mints one. While that interface is unpublished the entitlement-backed path is unavailable: a record that names an entitlement is refused, because nothing can authenticate an artifact nobody has published. When the interface is published, the external entitlement is supplied with the record as the facts that interface declares \u2014 including the issuer, the issuer's key identifier and the owner's signature over the artifact \u2014 and it binds the same subject, the same operation digest, a resource scope and an amount that cover the record's, the same authority epoch, and an expiry no earlier than the record's. An entitlement that names a different subject or operation, covers a narrower scope or a smaller amount, carries a different epoch, expires before the record it authorizes, is not active, or is not signed by the issuer the interface names, is refused. Publication and currentness are properties of the authority that owns the entitlement, so they are named in `not_enforceable_from_one_record`; the path never falls back to a grant, a session, or a policy decision."

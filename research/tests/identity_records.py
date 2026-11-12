@@ -750,7 +750,7 @@ def check_constraints(
         if approver is not None and (approver == requester or (executor is not None and approver == executor)):
             fail("separation_of_duty")
 
-    if kind == "DelegationGrant":
+    if kind == "HorizonDelegationGrant":
         parent = (context or {}).get("parent_grant")
         if is_object(parent):
             def listed(container: object) -> list[str]:
@@ -802,7 +802,7 @@ def check_constraints(
             if wider:
                 fail("child_subset_of_parent")
 
-    if kind in ("EffectFence", "AuthorityDecision"):
+    if kind in ("EffectFence", "HorizonAuthorityDecision"):
         has_grant = not _is_null(record, "grant_ref")
         has_entitlement = not _is_null(record, "entitlement_ref")
         if has_grant == has_entitlement:
@@ -867,7 +867,7 @@ def effective_child_grant(contract: dict[str, Any], child: dict[str, Any]) -> di
     """A child grant with an absent field grants nothing; the field is not inherited."""
 
     effective: dict[str, Any] = {}
-    for field in contract["records"]["DelegationGrant"]["fields"]:
+    for field in contract["records"]["HorizonDelegationGrant"]["fields"]:
         name = field["name"]
         if name == "signature":
             continue
