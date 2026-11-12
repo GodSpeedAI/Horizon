@@ -198,6 +198,11 @@ describe("the phone and the executors", () => {
   });
 });
 
+test("the enrolment rows name distinct requester, approver and executor principals", () => {
+  expect((classify(manifest, "device.pair") as Operation).separationOfDuty).toEqual({ requester: "prospective_device", approver: "operator_with_active_controller", executor: "credential_issuer" });
+  expect((classify(manifest, "device.pair.authorize") as Operation).separationOfDuty).toEqual({ requester: "prospective_device", approver: "operator_with_active_controller", executor: "device_credential" });
+});
+
 describe("governed mode waits for the owner's publication", () => {
   test("NE-42: governed mode is refused at startup while the authority decision is unpublished", async () => {
     await expect(createApplication({ governance: { mode: "sea-forge" } as never, realityTrace: null })).rejects.toThrow("specified_not_published");

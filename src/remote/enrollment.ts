@@ -20,6 +20,7 @@ import {
   confirmWithProof,
   describe,
   openAwaitingProof,
+  operationDigest,
   PENDING_COLLECTION,
   stateOf,
   type PendingDescriptor,
@@ -162,6 +163,11 @@ export class EnrollmentAuthority {
     }
     const request = await this.requestOf(input.pendingId);
     if (request === null) return { ok: false, code: "unknown", state };
+    // The credential created must be the one the controller signed: the request is re-derived and must match the digest proven.
+    if (operationDigest(ENROLMENT_OPERATION, request as unknown as Record<string, unknown>) !== descriptor.operation_digest) {
+      await abandon(this.store, input.pendingId, input.now, "the stored request no longer matches the authorized digest");
+      return { ok: false, code: "stale", state: "expired" };
+    }
     if (request.generation !== input.generation || !sameIds(request.replaces, input.currentControllers)) {
       await abandon(this.store, input.pendingId, input.now, "the controller changed or the pairing was refreshed while waiting");
       return { ok: false, code: "stale", state: "expired" };

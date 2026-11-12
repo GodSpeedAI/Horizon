@@ -252,12 +252,14 @@ export class RemoteController {
       return refusal(410, "authorization_used", "This authorization was already used or is not valid. Refresh the QR on your desktop and scan again.");
     }
     const { registration, label } = committed.request;
+    let enrolledId: string | null = null;
     try {
       // One active controller, bound to one durable operator that the cockpit's session approved. The identity
       // service revokes the previous device and its sessions in the same commit that enrols this one; it refuses
       // when the operator does not exist or is not active, so the link cannot create an operator or grant a role.
       const at = new Date(now).toISOString();
       const enrolled = await this.deps.identity.replaceDevices({ tenant: this.deps.identityTenant, operatorId: this.deps.operator, label, registration });
+      enrolledId = enrolled.device.id;
       for (const stale of await listDevices(this.deps.store, this.deps.tenant)) {
         if (stale.revoked_at === null) await updateDevice(this.deps.store, stale.device_id, { revoked_at: at });
       }
@@ -279,8 +281,11 @@ export class RemoteController {
       await auditRemote(this.deps.store, { tenant: this.deps.tenant, operator: this.deps.operator, device_id: device.device_id, action: "pair", outcome: "authorized", at });
       return json(200, { ok: true, label: device.label }, { "set-cookie": sessionCookie(enrolled.session.token) });
     } catch (error) {
+      // The authorization is spent. If the identity service enrolled the phone but the ledger did not record it,
+      // the new device is revoked so no identity credential exists that the ledger does not list.
+      if (enrolledId !== null) await this.deps.identity.revokeDevice(enrolledId, "enrolment did not complete").catch(() => undefined);
       const message = error instanceof IdentityError ? `Pairing refused: ${error.message}` : "The passkey could not be registered.";
-      return refusal(400, "passkey_refused", message);
+      return refusal(400, "passkey_refused", `${message} Refresh the QR on your desktop and scan again.`);
     }
   }
 
@@ -335,6 +340,8 @@ export class RemoteController {
       this.pairing.invite(this.clock());
       return;
     }
+    // A fresh start after a restart ends any enrolment left in the store by the previous process.
+    await this.deps.enrollment.endWaiting(this.deps.tenant, "remote control started again");
     // The cockpit's own session approves pairing for one durable operator that must already exist and be active.
     const operator = await this.deps.identity.getOperator(this.deps.identityTenant, this.deps.operator);
     if (operator === undefined || operator.status !== "active") throw new Error(`REMOTE: operator ${this.deps.operator} is not an active durable operator; a pairing link never creates one`);

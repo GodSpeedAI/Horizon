@@ -307,7 +307,6 @@ describe("enrolment: the invitation proposes a controller and the active control
     await pendingOf(await rig!.phone.finish(await new SoftwareAuthenticator().generate()));
     const secondRedeem = await rig!.phone.post("/m/api/pair/redeem", { secret: secretOf(link as string) });
     expect(secondRedeem.status).not.toBe(200);
-    expect(seeded.controller).toBeDefined();
   });
 
   test("PE-63: starting remote control again while a request waits grants no authority and leaves the waiting request as it was", async () => {
@@ -460,7 +459,9 @@ describe("concurrency and window: a late authorization or commit authorizes noth
     const newPhone = await new SoftwareAuthenticator().generate();
     const pendingId = await pendingOf(await rig!.phone.finish(newPhone));
     // The stop may land before or after the authorization. Either way the enrolment cannot survive the stop.
-    await Promise.all([rig!.phone.authorize(seeded.controller, pendingId).catch(() => undefined), rig!.app.remote.stop()]);
+    // If the stop lands first the listener is down and the authorization never reaches it (null); otherwise it is answered.
+    const [authorized] = await Promise.all([rig!.phone.authorize(seeded.controller, pendingId).catch(() => null), rig!.app.remote.stop()]);
+    if (authorized !== null) expect(authorized.status).toBeLessThan(500);
     await rig!.app.remote.start();
     expect((await new Client(() => rig!).awaitAuthorization(pendingId)).status).not.toBe(200);
     expect(await activeDevices(rig!)).toHaveLength(0);
