@@ -1500,7 +1500,7 @@ live_enforcement:
       enforced_today: false
       refused_today: true
       refusal_reason: >-
-        P2 and the observation submits an evidence packet to SEA-Forge, so the effect
+        P3 and the observation submits an evidence packet to SEA-Forge, so the effect
         leaves this application: the pending record and the person's evidence do not
         exist at this freeze, so the row is refused before any target effect and the
         refusal is audited.
@@ -1513,16 +1513,16 @@ live_enforcement:
       required_stage: "Stage 0B"
       production_stage: "Stage 3"
       note: >-
-        The observation is P2 because the handler observes through RealityTrace, builds an
+        The observation is P3 because the handler observes through RealityTrace, builds an
         evidence packet and submits it to SEA-Forge, so the effect leaves this application. The
-        desk path still writes the observation without the pending record and the person's
-        A3-UV evidence, which is what this row says.
+        desk route refuses the row before the handler runs (refused_today), so no observation is
+        written; the pending record and the person's A3-UV evidence are missing.
     - id: device.settlement.observe
       caller_path: device_credential
       enforced_today: false
       refused_today: true
       refusal_reason: >-
-        P2 and a device credential proves which enrolled device is at the route, never
+        P3 and a device credential proves which enrolled device is at the route, never
         which person is holding it: there is no pending record and no protected
         confirmation, so the row is refused before any target effect and the refusal is
         audited.

@@ -297,14 +297,17 @@ describe("refresh and stop: the controller's authority ends and does not come ba
     expect(((await options.json()) as { code: string }).code).toBe("not_paired");
   });
 
-  test("PE-67: stop invalidates an authorized phone's remote access at once", async () => {
+  test("PE-67: stop invalidates an authorized phone's credential, so the old cookie is refused once the listener returns", async () => {
     const device = await new SoftwareAuthenticator().generate();
     const pendingId = await pendingOf(await rig.phone.finish(device));
     await rig.channel.type(rig.channel.codeFor(pendingId));
     rig.phone.adopt((await rig.phone.awaitAuthorization(pendingId)) as Response);
-    const origin = rig.base;
+    const before = await fetch(`${rig.app.remote.origin}/m/api/state`, { headers: { cookie: rig.phone.cookie } });
+    expect(before.status).toBe(200);
     await rig.app.remote.stop();
-    await expect(fetch(`${origin}/m/api/state`, { headers: { cookie: rig.phone.cookie } })).rejects.toThrow();
+    await rig.app.remote.start();
+    const after = await fetch(`${rig.app.remote.origin}/m/api/state`, { headers: { cookie: rig.phone.cookie } });
+    expect(after.ok).toBe(false);
     expect(await activeDevices(rig)).toHaveLength(0);
   });
 });

@@ -478,15 +478,22 @@ export class RemoteController {
         // A verified passkey proves the phone holds a new credential. It authorizes nothing. The enrolment is held
         // until the operator types the code the desk shows on its own terminal, which names this phone and the
         // controllers it would replace. Nothing is enrolled, and no session is granted, until then.
-        const requested = await this.deps.enrollment.request({
-          tenant: this.deps.tenant,
-          operator: this.deps.operator,
-          generation: this.pairing.generation,
-          label: labelOf(request.headers.get("user-agent")),
-          registration: verified,
-          replaces: await this.activeDeviceIds(),
-          requested_at: new Date(now).toISOString(),
-        });
+        // Read the generation and the controllers, and record the request, inside the serial chain, so a stop or
+        // refresh cannot land between the read and the record and leave a waiting enrolment behind it.
+        const requested = await this.serial(async () =>
+          this.pairing.isEnabled
+            ? this.deps.enrollment.request({
+                tenant: this.deps.tenant,
+                operator: this.deps.operator,
+                generation: this.pairing.generation,
+                label: labelOf(request.headers.get("user-agent")),
+                registration: verified,
+                replaces: await this.activeDeviceIds(),
+                requested_at: new Date(now).toISOString(),
+              })
+            : null,
+        );
+        if (requested === null) return refusal(409, "remote_off", "Remote control is off on the desktop.");
         if (!requested.ok) return refusal(409, "no_operator_terminal", requested.message);
         return json(202, { status: "awaiting_operator_authorization", pending_id: requested.pendingId, expires_at: requested.expiresAt });
       } catch (error) {
