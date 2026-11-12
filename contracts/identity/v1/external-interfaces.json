@@ -332,63 +332,63 @@
         {
           "fact": "grant_ref",
           "meaning": "the grant's own identifier, which the delegating record names",
-          "binds": "HorizonDelegationGrant.grant_ref",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "issuer_key_id",
           "meaning": "the key the owner signed the grant with",
-          "binds": "HorizonDelegationGrant.signature",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "signature",
           "meaning": "the owner's signature over the grant",
-          "binds": "HorizonDelegationGrant.signature",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "action_hash",
           "meaning": "the hash of the exact action the grant authorizes",
-          "binds": "HorizonDelegationGrant.operations",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "boundaries",
           "meaning": "the resource scope the grant permits",
-          "binds": "HorizonDelegationGrant.resource_selectors",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "amount",
           "meaning": "the spend ceiling the grant permits, with its unit",
-          "binds": "HorizonDelegationGrant.budget",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "authority_epoch",
           "meaning": "the authority epoch the grant was issued against",
-          "binds": "HorizonDelegationGrant.authority_epoch",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "expires_at",
           "meaning": "when the grant stops being usable",
-          "binds": "HorizonDelegationGrant.expires_at",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "committed_decision",
           "meaning": "the committed Allow decision the grant was minted from",
-          "binds": "HorizonAuthorityDecision.decision_ref",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         }
@@ -403,7 +403,8 @@
         "the grant carries a signature from a key the owner's trust set names"
       ],
       "failure_rule": "While this interface is unpublished there is no grant artifact to resolve, so the delegated path fails closed: a delegation reference a record carries is a name, not an authority, and the operation is refused. The path never falls back to a session, a local policy, or a human entitlement, and a delegation reference never becomes authority by being asserted.",
-      "dependency": "SEA-Forge owns the grant artifact and publishes none at the pinned revision: `ActionGrant` is a move-only, non-serializable capability, so there is nothing durable for Horizon to verify. Until the owner publishes a grant issuance record carrying the facts above, no agent's delegation can be verified independently and the delegated path refuses."
+      "dependency": "SEA-Forge owns the grant artifact and publishes none at the pinned revision: `ActionGrant` is a move-only, non-serializable capability, so there is nothing durable for Horizon to verify. Until the owner publishes a grant issuance record carrying the facts above, no agent's delegation can be verified independently and the delegated path refuses.",
+      "components": {}
     },
     {
       "interface_id": "sea_forge.human_entitlement",
@@ -421,77 +422,77 @@
         {
           "fact": "entitlement_ref",
           "meaning": "the entitlement's own identifier",
-          "binds": "HorizonAuthorityDecision.entitlement_ref",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "subject_ref",
           "meaning": "the principal the entitlement was issued to",
-          "binds": "HorizonAuthorityDecision.approver_ref",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "issuer_ref",
           "meaning": "the authority that issued the entitlement",
-          "binds": "HorizonAuthorityDecision.approver_ref",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "issuer_key_id",
           "meaning": "the key the issuer signed the entitlement with",
-          "binds": "HorizonAuthorityDecision.signature",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "signature",
           "meaning": "the issuer's signature over the entitlement",
-          "binds": "HorizonAuthorityDecision.signature",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "operation_digest",
           "meaning": "the exact operation the entitlement permits",
-          "binds": "HorizonAuthorityDecision.operation_digest",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "resource_refs",
           "meaning": "the resource scope the entitlement covers",
-          "binds": "HorizonAuthorityDecision.resource_refs",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "amount",
           "meaning": "the spend ceiling the entitlement grants",
-          "binds": "HorizonAuthorityDecision.amount",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "authority_epoch",
           "meaning": "the authority epoch the entitlement was issued in",
-          "binds": "HorizonAuthorityDecision.authority_epoch",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "expires_at",
           "meaning": "when the entitlement stops being current",
-          "binds": "HorizonAuthorityDecision.expires_at",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         },
         {
           "fact": "revocation_state",
           "meaning": "whether the entitlement has been revoked",
-          "binds": "HorizonAuthorityDecision.entitlement_ref",
+          "binds": "unbound:owner_projection_not_published",
           "component": null,
           "source": null
         }
@@ -512,7 +513,8 @@
       "subject_binding": {
         "HorizonAuthorityDecision": "approver_ref",
         "EffectFence": "caller_ref"
-      }
+      },
+      "components": {}
     }
   ],
   "bind_targets": {

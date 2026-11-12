@@ -1762,9 +1762,9 @@ binding_defects:
     stage: "Stage 0B — the owner decides whether the agent's route claim is P2-with-agent-executor or a separate operation."
     resolution: >-
       Closed at Stage 0A by the owner's rule that the row may be corrected when the executor evidence
-      is missing. The row now names `executor: agent_execution` and
-      `caller_authentication: registered_agent_key`, matching the design's own definition of the
-      executor (the agent or service acting) and the sibling agent-door rows. The class (P2), the
+      is missing. The row now names `executor: registered_agent` and
+      `caller_authentication: registered_agent_key`, the key the agent door authenticates, matching the
+      sibling agent-door rows. `agent_execution` is the caller kind of an issuer-issued execution, not this row's executor. The class (P2), the
       authority writer (`case_record.authority`), the human evidence (A3-UV, A3-T under Stage 0B)
       and the pending expiry (10m) are unchanged, so the agent proposes and the human authorises.
       The runtime record changed too: the answer record carries `executed_by_key` and the

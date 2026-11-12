@@ -675,7 +675,7 @@
     "PendingOperation": {
       "signed": true,
       "identity": "The immutable descriptor for one governed operation: what was asked, by whom, under which authority, and the window in which it may be confirmed. It is written once, before the effect, and never rewritten. It carries no state: the state lives in appended PendingTransition records, so a confirmation is never erased by a later expiry and the signed descriptor stays true for as long as it exists.",
-      "nullability": "created_at is the descriptor's creation time and expires_at its expiry. The descriptor's confirmer_ref, presence_evidence and local_receipt are always null: the confirmation is a PendingTransition from pending to confirmed, and that record carries them. case_authority is local or governed and is immutable for this record; a replacement record must carry the same one. execution_ref and delegation_ref are null for a human or console caller. The confirmation_code is single use and binds the confirming actor.",
+      "nullability": "created_at is the descriptor's creation time and expires_at its expiry. The descriptor has no confirmer, presence-evidence or receipt field: the confirmation is a PendingTransition from pending to confirmed, and that record carries them. case_authority is local or governed and is immutable for this record; a replacement record must carry the same one. execution_ref and delegation_ref are null for a human or console caller. confirmation_digest is a keyed digest of the single-use code, which is shown on the terminal and never stored; the digest binds the pending_id, so a code confirms only its own descriptor.",
       "fields": [
         {
           "name": "pending_id",
@@ -769,16 +769,6 @@
           "nullable": true
         },
         {
-          "name": "confirmer_ref",
-          "type": "string",
-          "nullable": true
-        },
-        {
-          "name": "presence_evidence",
-          "type": "object",
-          "nullable": true
-        },
-        {
           "name": "created_at",
           "type": "timestamp"
         },
@@ -787,7 +777,7 @@
           "type": "timestamp"
         },
         {
-          "name": "confirmation_code",
+          "name": "confirmation_digest",
           "type": "base64url"
         },
         {
@@ -810,11 +800,6 @@
         {
           "name": "supersedes_ref",
           "type": "string",
-          "nullable": true
-        },
-        {
-          "name": "local_receipt",
-          "type": "object",
           "nullable": true
         },
         {
@@ -904,7 +889,7 @@
         "OperationDescriptor",
         "PendingOperation"
       ],
-      "rule": "A human_session caller has no grant and no delegation head. delegation_ref is null, and no parameter that names a delegation as the caller's own authority may be present. The register of delegation reference parameters says which parameter is which, per schema and caller kind: a delegation named as the operation's target \u2014 the grant a revocation revokes, the parent a redelegation narrows \u2014 is not a delegation the caller holds, so a human session may name it. No grant is fabricated, defaulted, or synthesized to satisfy a shared schema. The entitlement-backed P2/P3 case is covered by fence_authority_exactly_one."
+      "rule": "A human_session caller has no grant and no delegation head. delegation_ref is null, and no parameter that names a delegation as the caller's own authority may be present. The register of delegation reference parameters says which parameter is which, per schema and caller kind: a delegation named as the operation's target — the grant a revocation revokes, the parent a redelegation narrows — is not a delegation the caller holds, so a human session may name it. No grant is fabricated, defaulted, or synthesized to satisfy a shared schema. The entitlement-backed P2/P3 case is covered by fence_authority_exactly_one."
     },
     "human_has_no_credential": {
       "applies_to": [
@@ -1007,7 +992,7 @@
         "PendingOperation",
         "PendingTransition"
       ],
-      "rule": "A pending descriptor carries no confirmation: its confirmer_ref, presence_evidence and local_receipt are always null, and the confirmation lives in the PendingTransition that moves the operation from pending to confirmed. The confirmation is written by the confirmation step, never by the caller: a transition that names a confirmer, presence evidence or a receipt on any other transition, or that moves into confirmed without all three, is refused."
+      "rule": "A pending descriptor carries no confirmation: it has no confirmer, presence-evidence or receipt field, and the confirmation lives in the PendingTransition that moves the operation from pending to confirmed. The confirmation is written by the confirmation step, never by the caller: a transition that names a confirmer, presence evidence or a receipt on any other transition, or that moves into confirmed without all three, is refused."
     },
     "pending_case_authority_immutable": {
       "applies_to": [
@@ -1019,7 +1004,7 @@
       "applies_to": [
         "PendingOperation"
       ],
-      "rule": "A row whose authority comes from outside the local continuation \u2014 every P3 row, and any row whose authority writer is SEA-Forge or the issuer root \u2014 acts on a governed case and requires case_authority governed. A local pending record may not stand in for a governed decision, and an interim local receipt may not enable the row."
+      "rule": "A row whose authority comes from outside the local continuation — every P3 row, and any row whose authority writer is SEA-Forge or the issuer root — acts on a governed case and requires case_authority governed. A local pending record may not stand in for a governed decision, and an interim local receipt may not enable the row."
     },
     "pending_case_authority_matches_case": {
       "applies_to": [
@@ -1051,7 +1036,7 @@
         "HorizonAuthorityDecision",
         "EffectFence"
       ],
-      "rule": "An entitlement_ref names a record of the `sea_forge.human_entitlement` interface, which SEA-Forge owns and mints. It never names a Horizon record, and Horizon never mints one. While that interface is unpublished the entitlement-backed path is unavailable: a record that names an entitlement is refused, because nothing can authenticate an artifact nobody has published. When the interface is published, the external entitlement is supplied with the record as the facts that interface declares \u2014 including the issuer, the issuer's key identifier and the owner's signature over the artifact \u2014 and it binds the same subject, the same operation digest, a resource scope and an amount that cover the record's, the same authority epoch, and an expiry no earlier than the record's. An entitlement that names a different subject or operation, covers a narrower scope or a smaller amount, carries a different epoch, expires before the record it authorizes, is not active, or is not signed by the issuer the interface names, is refused. Publication and currentness are properties of the authority that owns the entitlement, so they are named in `not_enforceable_from_one_record`; the path never falls back to a grant, a session, or a policy decision."
+      "rule": "An entitlement_ref names a record of the `sea_forge.human_entitlement` interface, which SEA-Forge owns and mints. It never names a Horizon record, and Horizon never mints one. While that interface is unpublished the entitlement-backed path is unavailable: a record that names an entitlement is refused, because nothing can authenticate an artifact nobody has published. When the interface is published, the external entitlement is supplied with the record as the facts that interface declares — including the issuer, the issuer's key identifier and the owner's signature over the artifact — and it binds the same subject, the same operation digest, a resource scope and an amount that cover the record's, the same authority epoch, and an expiry no earlier than the record's. An entitlement that names a different subject or operation, covers a narrower scope or a smaller amount, carries a different epoch, expires before the record it authorizes, is not active, or is not signed by the issuer the interface names, is refused. Publication and currentness are properties of the authority that owns the entitlement, so they are named in `not_enforceable_from_one_record`; the path never falls back to a grant, a session, or a policy decision."
     },
     "caller_channel_exclusive": {
       "applies_to": [

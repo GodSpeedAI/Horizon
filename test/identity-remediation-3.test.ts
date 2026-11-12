@@ -177,8 +177,9 @@ describe("the round-4 review's corrections", () => {
     const transition = records.records["PendingTransition"]!;
     // The descriptor is immutable and carries no state.
     expect(pending.fields.map((field) => field.name)).not.toContain("state");
-    // The confirmation lives in the transition that makes it.
-    expect(pending.fields.map((field) => field.name)).toContain("confirmer_ref");
+    // The descriptor has no confirmer field: the confirmation lives in the transition that makes it.
+    expect(pending.fields.map((field) => field.name)).not.toContain("confirmer_ref");
+    expect(transition.fields.map((field) => field.name)).toContain("confirmer_ref");
     expect(transition.signed).toBe(true);
     expect(transition.fields.map((field) => field.name)).toEqual(
       expect.arrayContaining(["transition_id", "pending_id", "from_state", "to_state", "reason", "at", "launch_generation"]),

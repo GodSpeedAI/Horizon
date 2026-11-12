@@ -142,18 +142,15 @@ describe("the round-2 review's corrections", () => {
       execution_ref: null,
       delegation_ref: null,
       session_ref: "session:session-0001",
-      confirmer_ref: null,
-      presence_evidence: null,
       created_at: "2026-11-09T12:00:00Z",
       expires_at: "2026-11-09T12:10:00Z",
-      confirmation_code: "Y29uZmlybWF0aW9uLWNvZGUwMDAx",
+      confirmation_digest: "Y29uZmlybWF0aW9uLWNvZGUwMDAx",
       launch_generation: "launch-0001",
       // The descriptor carries no state: a pending operation's state lives in the appended
       // transition records, so the descriptor stays immutable (R4-05).
       effect_class: "db_local",
       effect_idempotency_key: null,
       supersedes_ref: null,
-      local_receipt: null,
       signature: "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
     };
     const catalog = {

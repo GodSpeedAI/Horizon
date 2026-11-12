@@ -23,7 +23,7 @@ preregistration:
   upstream_pins:
     spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
     plan: { id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23" }
-    design: { file: design_draft.md, sha256: "3df398c7377140ea3c9daf423d3678b6d7e0a6890d0ca0fa49425e5f910d5f7f", lines: 959, sections: "2, 6, 7, 9.1, 11, 12, Appendix A, Review Record" }
+    design: { file: design_draft.md, sha256: "537b966d32340aeca04b4cb9f02527ee4f70aafeb5a413d95ac03a0b41b60775", lines: 959, sections: "2, 6, 7, 9.1, 11, 12, Appendix A, Review Record" }
     task_preregistration: { file: .agents/prereg/horizon/T23.prereg.yaml, id: HORIZON-PREREG-T23-0A, relationship: "the task-level preregistration that registers the Stage 0A expectations; this unit is one of its Stage 0A units" }
     prior_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-REMEDIATION-3.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-REMEDIATION-3, relationship: "the unit that closed the fourth independent review's findings" }
     prior_review: { file: .agents/evidence/2026-11-09-stage-0a-defects/independent-review-round-5.md, verdict: "REJECT", findings: 9, disposition: .agents/evidence/2026-11-09-stage-0a-defects/review-round-5-disposition.md }
