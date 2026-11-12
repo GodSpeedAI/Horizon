@@ -106,3 +106,31 @@ Blind critic (0f25a38): REJECT. Findings and disposition, commit `6a828df`:
 | Low | `pending-confirmations.ts` gate auto-confirms when a code sink is installed | Open. Test-only seam; production leaves the sink unset. |
 
 Owner question for the open High item: what is the designated authority writer for device enrolment? Options: (a) a named Horizon-local writer that is the only caller of `replaceDevices` and `applyConfirmed` for `device.pair`, so the catalog claim is true in code; (b) correct the catalog to say the store CAS and the identity service are the writers, with no third party. The critic cannot accept until one of these is chosen.
+
+## Owner decision B: designated writer (commit d0ca846)
+
+The identity service is the designated device-enrolment state writer. Store compare-and-swap enforces the atomic transition. Horizon presents and orchestrates. No Horizon-local writer and no competing approval system was added.
+
+Three responsibilities, kept separate:
+
+1. **Authorization.** The P3 approver (`operator_with_active_controller`) approves the exact operation digest by an A3-UV proof. The digest binds the proposed credential, label, the permissions it would hold (`remote_controller`), the controllers it replaces, the generation and the request time. **Gap:** no SEA-Forge P3 authority decision exists for enrolment in Stage 0B (`sea_forge.human_entitlement` is unpublished). This is recorded as `authority_sea_forge` in the live enforcement entry. No success of the identity write or the CAS is read as a SEA-Forge decision.
+2. **Identity lifecycle.** The identity service performs credential enrolment and replacement (`replaceDevices`). **Gap:** its vendored API accepts no authorization evidence. Horizon verifies the A3-UV proof before calling it. Recorded as `identity_service_evidence_check`.
+3. **Atomic persistence.** Store CAS moves the pending record pending → confirmed → applied, once. The approval record is written with the confirmation. The commit requires that approval, and its approver must still be a current controller. The commit re-derives the request digest and refuses a mismatch.
+
+Enforcement added and tested (`test/remote-enrollment.test.ts`):
+
+| ID | Property | Result |
+|---|---|---|
+| NE-68 | Only the enrolment commit writes a device credential (source scan of `src/`) | pass |
+| NE-69 | A confirmation with no approval by a current controller is refused at commit | pass |
+| NE-70 | An altered stored grant fails the digest check and creates nothing | pass |
+| NE-71 | A failure after identity enrolment leaves no active ledger device, and the identity device is revoked | pass |
+| NE-72 | The commit audit names requester, authorizer, decision and issuer as four roles | pass |
+
+Catalog: `identity_service` is in the authority-writer vocabulary. `device.pair` and `device.pair.authorize` name it. Design draft Appendix A and a responsibilities paragraph are updated. `check-design-contract-consistency` agrees 14/14.
+
+Validation at d0ca846: `tsc` clean; `bun test` 1628 pass, 0 fail (before the final typing fix; the E2E suite is included); teeth 46/46 (M46 retargeted to the approver membership guard, which NE-69 now covers; the older stale-check mutant is no longer independently killed because the approver guard also refuses it); prereg coverage 48 linked; Stage 0A coverage 14; param binding 72; external facts ok; Python fixtures 146 pass.
+
+Design pin: `68f11d7832ad254703f10e3bb57d52c70979f911dcaeb992ef54508e46973365`, 972 lines.
+
+Preserved: the P2 remote lifecycle (`remote.start`, `device.pair.request`, `remote.refresh`, `remote.stop`) and the P3 classification of `device.pair`.
