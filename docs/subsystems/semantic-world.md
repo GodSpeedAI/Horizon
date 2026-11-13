@@ -66,7 +66,7 @@ of the application.
 | --- | --- | --- |
 | Pinned world mismatch | startup throws `SemanticAdapterError` | recompile with pinned DomainForge; never edit frozen `.sea` |
 | Missing/corrupt sources | startup throws | restore `.sea/interaction` from git |
-| DomainForge version drift | caught by `just check-toolchain` (requires 0.21.1) | set `DOMAINFORGE_BIN` to the pinned binary |
+| DomainForge version drift | caught by `just check-toolchain` (requires 0.21.2) | set `DOMAINFORGE_BIN` to the pinned binary |
 
 ## Extension points
 

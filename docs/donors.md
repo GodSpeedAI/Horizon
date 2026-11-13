@@ -34,7 +34,7 @@ names a donor that this file does not, or the reverse.
 
 ## DomainForge
 
-- Source: `GodSpeedAI/DomainForge`, TypeScript binding `@godspeedai/domainforge` `0.21.1`,
+- Source: `GodSpeedAI/DomainForge`, TypeScript binding `@godspeedai/domainforge` `0.21.2`,
   Apache-2.0.
 - Used only through `@godspeedai/cognate-domainforge` for semantic projection and identity
   verification.

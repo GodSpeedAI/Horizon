@@ -117,8 +117,8 @@ verify: check boundaries idm-integrity test ledger wayfinder teeth
     @echo "verify: ok (active frozen artifacts: requirements/ledger.yaml + .wayfinder/answer-key.md)"
 
 check-toolchain:
-    @test -x "{{domainforge_bin}}" || (echo "domainforge missing: set DOMAINFORGE_BIN to the 0.21.1 binary" && exit 1)
-    @test "$({{domainforge_bin}} --version | tr -d '[:space:]')" = "domainforge0.21.1" || (echo "domainforge must be 0.21.1" && exit 1)
+    @test -x "{{domainforge_bin}}" || (echo "domainforge missing: set DOMAINFORGE_BIN to the 0.21.2 binary" && exit 1)
+    @test "$({{domainforge_bin}} --version | tr -d '[:space:]')" = "domainforge0.21.2" || (echo "domainforge must be 0.21.2" && exit 1)
 
 gate-t01: check-toolchain
     {{domainforge_bin}} validate .sea/interaction/interaction-model.sea --application --format human
