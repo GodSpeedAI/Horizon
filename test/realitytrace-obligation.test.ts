@@ -178,6 +178,40 @@ esac`,
     expect(ticks).toBeGreaterThan(10);
   });
 
+  // Commit b7ce7f4 made repo() asynchronous but stored its memo after the awaits, so concurrent first callers each ran git init.
+  test("concurrent first callers initialise the git repository and enrol once", async () => {
+    const { rt, bin, dir } = rig(`echo "$1 $2" >> $0.log\ncase "$1 $2" in "repo list") echo '{"repos":[]}';; "repo enroll") echo '{"repo_id":"R1"}';; esac`);
+    const ids = await Promise.all([rt.repo(), rt.repo(), rt.repo(), rt.repo(), rt.repo()]);
+    expect(ids).toEqual(["R1", "R1", "R1", "R1", "R1"]);
+    const count = spawnSync("git", ["rev-list", "--count", "HEAD"], { cwd: join(dir, "repo"), encoding: "utf8" });
+    expect(count.stdout.trim()).toBe("1");
+    const calls = readFileSync(`${bin}.log`, "utf8").trim().split("\n");
+    expect(calls.filter((c) => c === "repo enroll")).toHaveLength(1);
+  });
+
+  test("concurrent snapshot callers configure and snapshot once", async () => {
+    const SNAP = "sha256:" + "cd".repeat(32);
+    const { rt, bin } = rig(
+      `echo "$1 $2" >> $0.log\ncase "$1 $2" in "repo list") echo '{"repos":[]}';; "repo enroll") echo '{"repo_id":"R1"}';; "semantic configure") echo '{}';; "snapshot create") echo '{"snapshot_id":"${SNAP}"}';; esac`,
+      undefined,
+      "/rulebook/interaction-model.sea",
+    );
+    expect(await Promise.all([rt.snapshot(), rt.snapshot(), rt.snapshot()])).toEqual([SNAP, SNAP, SNAP]);
+    const calls = readFileSync(`${bin}.log`, "utf8").trim().split("\n");
+    expect(calls.filter((c) => c === "snapshot create")).toHaveLength(1);
+    expect(calls.filter((c) => c === "semantic configure")).toHaveLength(1);
+  });
+
+  test("a failed initialisation is not cached: every waiter sees the error and a later call retries", async () => {
+    // The binary fails until a marker file exists, so the failure is removed without touching the adapter.
+    const { rt, dir } = rig(`[ -f ${"$"}0.ok ] || { echo boom >&2; exit 3; }\ncase "$1 $2" in "repo list") echo '{"repos":[]}';; "repo enroll") echo '{"repo_id":"R1"}';; esac`);
+    const failed = await Promise.allSettled([rt.repo(), rt.repo(), rt.repo()]);
+    expect(failed.map((r) => r.status)).toEqual(["rejected", "rejected", "rejected"]);
+    for (const r of failed) expect(String((r as PromiseRejectedResult).reason)).toMatch(/boom/);
+    writeFileSync(join(dir, "realitytrace.ok"), "");
+    expect(await rt.repo()).toBe("R1");
+  });
+
   test("a timeout kills the child", async () => {
     const { rt, dir } = rig(`echo $$ > $0.pid\nexec sleep 30`, 300);
     const started = Date.now();

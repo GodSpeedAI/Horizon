@@ -71,7 +71,10 @@ export class RealityTraceError extends Error {
 
 export class RealityTraceObligation {
   private repoId: string | null = null;
+  /** The initialisation in flight, stored before its first await so concurrent callers share it (cleared on failure). */
+  private repoInit: Promise<string> | null = null;
   private snapshotId: string | null = null;
+  private snapshotInit: Promise<string> | null = null;
   private rulebookOk: boolean | null = null;
 
   constructor(private readonly config: RealityTraceObligationConfig) {}
@@ -117,8 +120,17 @@ export class RealityTraceObligation {
   }
 
   /** The enrolled repository, enrolling it once (an empty git repository is enough). */
-  async repo(): Promise<string> {
-    if (this.repoId !== null) return this.repoId;
+  repo(): Promise<string> {
+    if (this.repoId !== null) return Promise.resolve(this.repoId);
+    // The promise is stored synchronously: callers arriving while git init runs await it instead of starting a second init.
+    this.repoInit ??= this.initRepo().catch((error: unknown) => {
+      this.repoInit = null; // a failure is not cached; the next call retries
+      throw error;
+    });
+    return this.repoInit;
+  }
+
+  private async initRepo(): Promise<string> {
     mkdirSync(this.config.repoDir, { recursive: true });
     if ((await this.git(["rev-parse", "--git-dir"])).code !== 0) {
       const init = await this.git(["init", "-q", "--template="]);
@@ -150,8 +162,16 @@ export class RealityTraceObligation {
    * The real snapshot id of the rulebook, made once: configure the repository's semantics with the rulebook entry, then
    * `snapshot create`. If that fails the genesis snapshot is used and rulebookConnected() says false (it is tried again next call).
    */
-  async snapshot(): Promise<string> {
-    if (this.snapshotId !== null) return this.snapshotId;
+  snapshot(): Promise<string> {
+    if (this.snapshotId !== null) return Promise.resolve(this.snapshotId);
+    // Single flight: the app fires this at construction while the first intent may already be asking. Cleared when done, so a genesis fallback is retried.
+    this.snapshotInit ??= this.makeSnapshot().finally(() => {
+      this.snapshotInit = null;
+    });
+    return this.snapshotInit;
+  }
+
+  private async makeSnapshot(): Promise<string> {
     const entry = this.config.rulebookEntry;
     if (entry === undefined) {
       this.rulebookOk = false;
