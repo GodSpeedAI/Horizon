@@ -51,7 +51,7 @@ starter example domain and test.
 DomainForge: https://github.com/GodSpeedAI/DomainForge
 
 License: Apache-2.0
-Source: TypeScript binding `@godspeedai/domainforge` version 0.21.1 (pinned
+Source: TypeScript binding `@godspeedai/domainforge` version 0.21.2 (pinned
 package version; consumed only through `@godspeedai/cognate-domainforge`, also
 0.6.1 and Apache-2.0, whose full license text is retained in its package
 directory).

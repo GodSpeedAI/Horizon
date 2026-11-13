@@ -1,33 +1,33 @@
-# DomainForge 0.21.1 — T01 IDM validation output (verbatim)
+# DomainForge 0.21.2 — T01 IDM validation output (verbatim)
 # Re-captured at T04 after the INV-08 requirement_ref correction
 # (REQ-NAV-001 -> REQ-INT-003); no entity or invariant semantics changed.
 
 ## validate --application
-# T01 gate-01 validate --application (pinned 0.21.1)
+# T01 gate-01 validate --application (pinned 0.21.2)
 $ $DOMAINFORGE_BIN --version
-domainforge 0.21.1
-$ /home/sprime01/projects/domainforge/target/release/domainforge validate .sea/interaction/interaction-model.sea --application --format human
+domainforge 0.21.2
+$ /home/sprime01/.local/share/mise/shims/domainforge validate .sea/interaction/interaction-model.sea --application --format human
 Validation succeeded: 0 violations total
-Application contract valid: 4 operation(s), 8 record(s), 16 enum(s), 24 entities
+Application contract valid: 4 operation(s), 8 record(s), 21 enum(s), 29 entities
 exit=0
 
 ## contract
 # T01 gate-03 contract identity (DomainForge-owned)
-$ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/interaction/interaction-model.sea
+$ /home/sprime01/.local/share/mise/shims/domainforge contract .sea/interaction/interaction-model.sea
 {
   "schema_version": "domainforge-application-contract/v1",
   "producer": {
     "name": "domainforge-core",
-    "version": "0.21.1"
+    "version": "0.21.2"
   },
   "inputs": {
-    "source_set_hash": "sha256:4b3133412e72b20c31b94c9e52eaf676136796a69a4dbaab95e2eab84bc21a78",
+    "source_set_hash": "sha256:cf48dd9ea8e3ab0edaae54d26eefe7e5ed9e0998a2c1b9b51d6dcc6276b6eb3b",
     "semantic_pack_set_hash": "sha256:6e5312099a8d89e1d271bd89d9fcb36b031069bd8dad72be397af6b331d85c40",
     "language_schema_version": "domainforge-ast/v3",
     "interpretation_version": "domainforge-interpretation/v1"
   },
-  "self_hash": "sha256:f2042b3efc8e1473249a3de28bc4d6c3eb9be6fd1ec4483d9e6f582b7b4966b3",
-  "semantic_closure_hash": "sha256:6c18d6a608bd9d83e6aa354d5a8cc804009ca208562021c1736ee429412309f0",
+  "self_hash": "sha256:27fd5f0389989bbf5873c35eb5757b1c69ed64389828eb701560725cc12617d5",
+  "semantic_closure_hash": "sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
   "contract": {
     "enums": [
       {
@@ -143,6 +143,62 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
         ]
       },
       {
+        "id": "horizon.interaction.enum.CapacityPeriod",
+        "name": "CapacityPeriod",
+        "members": [
+          {
+            "name": "none",
+            "wire": "none"
+          },
+          {
+            "name": "day",
+            "wire": "day"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.Currency",
+        "name": "Currency",
+        "members": [
+          {
+            "name": "steering_attention",
+            "wire": "steering_attention"
+          },
+          {
+            "name": "orchestration",
+            "wire": "orchestration"
+          },
+          {
+            "name": "compute",
+            "wire": "compute"
+          },
+          {
+            "name": "verification",
+            "wire": "verification"
+          },
+          {
+            "name": "recovery",
+            "wire": "recovery"
+          },
+          {
+            "name": "structural_maintenance",
+            "wire": "structural_maintenance"
+          },
+          {
+            "name": "representational_formation",
+            "wire": "representational_formation"
+          },
+          {
+            "name": "risk_irreversibility",
+            "wire": "risk_irreversibility"
+          },
+          {
+            "name": "opportunity",
+            "wire": "opportunity"
+          }
+        ]
+      },
+      {
         "id": "horizon.interaction.enum.EpistemicStatus",
         "name": "EpistemicStatus",
         "members": [
@@ -201,6 +257,24 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
           {
             "name": "bounded_gauntlet",
             "wire": "bounded_gauntlet"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.ExpectationModality",
+        "name": "ExpectationModality",
+        "members": [
+          {
+            "name": "obligation",
+            "wire": "obligation"
+          },
+          {
+            "name": "prohibition",
+            "wire": "prohibition"
+          },
+          {
+            "name": "permission",
+            "wire": "permission"
           }
         ]
       },
@@ -287,6 +361,20 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
         ]
       },
       {
+        "id": "horizon.interaction.enum.PaymentBasis",
+        "name": "PaymentBasis",
+        "members": [
+          {
+            "name": "declared_bound",
+            "wire": "declared_bound"
+          },
+          {
+            "name": "predicted",
+            "wire": "predicted"
+          }
+        ]
+      },
+      {
         "id": "horizon.interaction.enum.ReversibilityClass",
         "name": "ReversibilityClass",
         "members": [
@@ -339,6 +427,24 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
           {
             "name": "defer",
             "wire": "defer"
+          }
+        ]
+      },
+      {
+        "id": "horizon.interaction.enum.SettlementStage",
+        "name": "SettlementStage",
+        "members": [
+          {
+            "name": "unobserved",
+            "wire": "unobserved"
+          },
+          {
+            "name": "observed",
+            "wire": "observed"
+          },
+          {
+            "name": "ruled",
+            "wire": "ruled"
           }
         ]
       },
@@ -560,6 +666,64 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
             },
             "optional": false,
             "constraints": []
+          },
+          {
+            "name": "contract_version",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "int"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min",
+                "data": {
+                  "value": "1"
+                }
+              }
+            ]
+          },
+          {
+            "name": "expected_outcome",
+            "field_type": {
+              "kind": "entity_ref",
+              "data": {
+                "entity": "c564c23d-e9d7-5cd8-afe8-0bffc7bc1cd8"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          },
+          {
+            "name": "realitytrace_threshold_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          },
+          {
+            "name": "realitytrace_threshold_position",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "int"
+              }
+            },
+            "optional": true,
+            "constraints": [
+              {
+                "kind": "min",
+                "data": {
+                  "value": "0"
+                }
+              }
+            ]
           }
         ]
       },
@@ -851,12 +1015,17 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
           {
             "name": "payment_estimate",
             "field_type": {
-              "kind": "scalar",
+              "kind": "list",
               "data": {
-                "scalar": "string"
+                "element": {
+                  "kind": "entity_ref",
+                  "data": {
+                    "entity": "82d9c37b-cbed-5c6e-ae00-e882795cfa0e"
+                  }
+                }
               }
             },
-            "optional": true,
+            "optional": false,
             "constraints": []
           },
           {
@@ -1581,6 +1750,64 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
             },
             "optional": true,
             "constraints": []
+          },
+          {
+            "name": "contract_version",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "int"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min",
+                "data": {
+                  "value": "1"
+                }
+              }
+            ]
+          },
+          {
+            "name": "expected_outcome",
+            "field_type": {
+              "kind": "entity_ref",
+              "data": {
+                "entity": "c564c23d-e9d7-5cd8-afe8-0bffc7bc1cd8"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          },
+          {
+            "name": "realitytrace_threshold_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          },
+          {
+            "name": "realitytrace_threshold_position",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "int"
+              }
+            },
+            "optional": true,
+            "constraints": [
+              {
+                "kind": "min",
+                "data": {
+                  "value": "0"
+                }
+              }
+            ]
           }
         ]
       },
@@ -1854,6 +2081,164 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
         ]
       },
       {
+        "concept_id": "82d9c37b-cbed-5c6e-ae00-e882795cfa0e",
+        "name": "PaymentEntry",
+        "key_field": "entry_id",
+        "fields": [
+          {
+            "name": "entry_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "uuid"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "currency",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.Currency"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "unit",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "amount",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "decimal"
+              }
+            },
+            "optional": true,
+            "constraints": [
+              {
+                "kind": "min",
+                "data": {
+                  "value": "0"
+                }
+              }
+            ]
+          },
+          {
+            "name": "basis",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.PaymentBasis"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "source_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "853f3b11-e91f-53eb-8fb8-e26f8d79e2c1",
+        "name": "CapacityReservation",
+        "key_field": "reservation_id",
+        "fields": [
+          {
+            "name": "reservation_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "ledger",
+            "field_type": {
+              "kind": "entity_ref",
+              "data": {
+                "entity": "a7829d50-b73a-5a0f-afaf-6ddbe57bb4a5"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "intent_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "uuid"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "bounds",
+            "field_type": {
+              "kind": "list",
+              "data": {
+                "element": {
+                  "kind": "entity_ref",
+                  "data": {
+                    "entity": "82d9c37b-cbed-5c6e-ae00-e882795cfa0e"
+                  }
+                }
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "reserved_at",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "timestamp"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "terminal_at",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "timestamp"
+              }
+            },
+            "optional": true,
+            "constraints": []
+          }
+        ]
+      },
+      {
         "concept_id": "954473ab-67ca-5e5e-b0b9-7839bc860d6c",
         "name": "SettlementReviewRecord",
         "key_field": "review_id",
@@ -1897,6 +2282,17 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
               "kind": "enum",
               "data": {
                 "symbol": "horizon.interaction.enum.ReviewDisposition"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "settlement_stage",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.SettlementStage"
               }
             },
             "optional": false,
@@ -2094,6 +2490,35 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
         ]
       },
       {
+        "concept_id": "a7829d50-b73a-5a0f-afaf-6ddbe57bb4a5",
+        "name": "CapacityLedger",
+        "key_field": "ledger_id",
+        "fields": [
+          {
+            "name": "ledger_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "tenant",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
         "concept_id": "b36ffb74-9ab9-53e8-9fe5-25757e73786d",
         "name": "StrategistProduct",
         "key_field": "product_ref",
@@ -2144,6 +2569,75 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
               "kind": "scalar",
               "data": {
                 "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "bb095b7c-365a-5227-ab3c-b6b1d09037ef",
+        "name": "CapacityAllowance",
+        "key_field": "allowance_id",
+        "fields": [
+          {
+            "name": "allowance_id",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "currency",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.Currency"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "unit",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "allowance",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "decimal"
+              }
+            },
+            "optional": true,
+            "constraints": [
+              {
+                "kind": "min",
+                "data": {
+                  "value": "0"
+                }
+              }
+            ]
+          },
+          {
+            "name": "period",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.CapacityPeriod"
               }
             },
             "optional": false,
@@ -2217,6 +2711,118 @@ $ /home/sprime01/projects/domainforge/target/release/domainforge contract .sea/i
             },
             "optional": false,
             "constraints": []
+          }
+        ]
+      },
+      {
+        "concept_id": "c564c23d-e9d7-5cd8-afe8-0bffc7bc1cd8",
+        "name": "ExpectedOutcome",
+        "key_field": "expectation_digest",
+        "fields": [
+          {
+            "name": "expectation_digest",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "modality",
+            "field_type": {
+              "kind": "enum",
+              "data": {
+                "symbol": "horizon.interaction.enum.ExpectationModality"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "statement",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "refuted_by",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "irrelevant",
+            "field_type": {
+              "kind": "list",
+              "data": {
+                "element": {
+                  "kind": "scalar",
+                  "data": {
+                    "scalar": "string"
+                  }
+                }
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "unaccounted",
+            "field_type": {
+              "kind": "list",
+              "data": {
+                "element": {
+                  "kind": "scalar",
+                  "data": {
+                    "scalar": "string"
+                  }
+                }
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "verifier_template_ref",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "string"
+              }
+            },
+            "optional": false,
+            "constraints": []
+          },
+          {
+            "name": "window_s",
+            "field_type": {
+              "kind": "scalar",
+              "data": {
+                "scalar": "int"
+              }
+            },
+            "optional": false,
+            "constraints": [
+              {
+                "kind": "min",
+                "data": {
+                  "value": "1"
+                }
+              }
+            ]
           }
         ]
       },

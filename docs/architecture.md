@@ -114,7 +114,7 @@ Direction rules (verified by `just boundaries` → `scripts/check-boundaries.ts`
 | `src/ui` ✗ `adapters/context-kernel` | Retrieval must not leak into rendering (T10 tooth PE-14) |
 
 External dependencies: Cognate 0.6.1 (vendored), OpenTUI + React (terminal and GUI
-rendering), DomainForge CLI 0.21.1 (gate-time only, pinned via `DOMAINFORGE_BIN`), Python
+rendering), DomainForge CLI 0.21.2 (gate-time only, pinned via `DOMAINFORGE_BIN`), Python
 ≥ 3.12 with uv (research subsystem and behavioral proof engine).
 
 ## 4. Data architecture

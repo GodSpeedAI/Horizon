@@ -16,7 +16,7 @@ with the config value. Recover: restore the pinned `.sea` from git, or (governed
 re-pin after a legitimate spec/plan revision. Never silence the assertion.
 
 **Symptom: `just check-toolchain` fails.**
-`DOMAINFORGE_BIN` missing or not exactly 0.21.1. Recover: point `DOMAINFORGE_BIN` at the
+`DOMAINFORGE_BIN` missing or not exactly 0.21.2. Recover: point `DOMAINFORGE_BIN` at the
 pinned binary (default `../domainforge/target/release/domainforge`).
 
 **Symptom: `ConfigError` at boot.**
