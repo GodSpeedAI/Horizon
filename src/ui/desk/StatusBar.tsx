@@ -45,6 +45,11 @@ export function StatusBar({ status, onPresenting, remote = null }: StatusBarProp
           </li>
         ))}
       </ul>
+      {(status.reconciliation ?? []).map((line) => (
+        <p key={line} className="status-line needs-you" data-field="reconciliation" role="status">
+          {line}
+        </p>
+      ))}
       {status.rulebookWarning ? (
         <p className="status-line needs-you" data-field="rulebook-warning" role="status">
           {status.rulebookWarning}

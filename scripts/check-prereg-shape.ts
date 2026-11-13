@@ -27,6 +27,7 @@ const ROOT_KEYS = new Set([
   "claim",
   "upstream_pins",
   "settles",
+  "settlement_targets",
   "positive_expectations",
   "negative_expectations",
   "falsifier",

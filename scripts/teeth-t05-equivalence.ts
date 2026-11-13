@@ -58,11 +58,16 @@ function ok(message: string): void {
 /**
  * Start the real server and wait for the line that names the port it actually bound. Reading
  * the port from the process's own output keeps this independent of a chosen fixed port.
+ *
+ * The server shows its pairing code only on its controlling terminal (/dev/tty), and it never writes the code to standard
+ * output or standard error. So the server runs under a pseudo-terminal (`script`), which is the terminal a person would use:
+ * the code appears there, and nowhere else. Without a terminal the server listens but refuses pairing (see desk/pairing.ts).
  */
-async function startServer(store: string): Promise<{ url: string; stop: () => void }> {
-  const proc = Bun.spawn(["bun", "run", "src/main.ts"], {
+async function startServer(store: string): Promise<{ url: string; code: string; stop: () => void }> {
+  const proc = Bun.spawn(["script", "-qefc", "bun run src/main.ts", "/dev/null"], {
     cwd: process.cwd(),
     env: isolatedEnv(store),
+    stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -76,9 +81,14 @@ async function startServer(store: string): Promise<{ url: string; stop: () => vo
     if (chunk === null) continue;
     seen += decoder.decode(chunk.value, { stream: true });
     const match = /listening on (http:\/\/127\.0\.0\.1:\d+)\//.exec(seen);
-    if (match?.[1] !== undefined) {
+    // The code arrives on the server's terminal only; the script holds it in memory to pair its own client. It is never printed here.
+    const code = /pairing code: ([2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4})\./.exec(seen)?.[1];
+    if (match?.[1] !== undefined && code !== undefined) {
       reader.releaseLock();
-      return { url: match[1], stop: () => proc.kill() };
+      // Pair this client once, as a browser would. Reads and writes after this carry the session cookie; the code is spent.
+      const paired = await fetch(`${match[1]}/desk/pair`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code }) });
+      sessions.set(match[1], /horizon_desk=[^;]+/.exec(paired.headers.get("set-cookie") ?? "")?.[0] ?? "");
+      return { url: match[1], code, stop: () => proc.kill() };
     }
     if (chunk.done) break;
   }
@@ -86,8 +96,11 @@ async function startServer(store: string): Promise<{ url: string; stop: () => vo
   fail(`server did not report a listener: ${seen}`);
 }
 
+/** The session cookie this client holds for each server it paired with. */
+const sessions = new Map<string, string>();
+
 async function get(url: string, accept: string): Promise<{ status: number; body: string }> {
-  const response = await fetch(url, { headers: { accept } });
+  const response = await fetch(url, { headers: { accept, cookie: sessions.get(new URL(url).origin) ?? "" } });
   return { status: response.status, body: await response.text() };
 }
 
@@ -142,10 +155,11 @@ async function main(): Promise<void> {
   await withStore(async (store) => {
     const server = await startServer(store);
     try {
+      const cookie = sessions.get(server.url) ?? "";
       const submit = async (body: unknown): Promise<number> => {
         const response = await fetch(`${server.url}/surface/intent`, {
           method: "POST",
-          headers: { "content-type": "application/json", accept: "application/json" },
+          headers: { "content-type": "application/json", accept: "application/json", cookie },
           body: JSON.stringify(body),
         });
         return response.status;

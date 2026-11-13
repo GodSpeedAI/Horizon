@@ -11,11 +11,12 @@ import { caseStateWords } from "../work-build.ts";
 import { caseTitle } from "../model.ts";
 import { Cost } from "./Cost.tsx";
 import type { ViewProps } from "./Today.tsx";
+import { ExportButton } from "../../workspace/export-button.tsx";
 
 export interface WorkViewProps extends ViewProps {
   readonly saveLabel: SaveLabel;
   /** Starts the steps of a case that were added and are waiting. */
-  readonly startCase?: (caseId: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
+  readonly startCase?: (caseId: string, previewed: readonly string[]) => Promise<{ readonly ok: boolean; readonly message: string }>;
 }
 
 /** A folder name, not a full path. */
@@ -142,10 +143,10 @@ export function Work({ ui, dispatch, saveLabel, startCase }: WorkViewProps): Rea
         </>
       ) : null}
       <p className="muted">
-        Export: <a href="/workspace/export?kind=labels&standins=1">labels</a>
+        Export: <ExportButton label="labels" fields={[["kind", "labels"], ["standins", "1"]]} />
         {compare.view ? (
           <>
-            , <a href={`/workspace/export?kind=comparison&source=${encodeURIComponent(compare.selection.source ?? "")}&repo=${encodeURIComponent(compare.selection.repo ?? "")}&day=${encodeURIComponent(compare.selection.day)}&session=${encodeURIComponent(compare.selection.session ?? "")}&standins=1`}>this comparison</a>
+            , <ExportButton label="this comparison" fields={[["kind", "comparison"], ["source", compare.selection.source ?? ""], ["repo", compare.selection.repo ?? ""], ["day", compare.selection.day], ["session", compare.selection.session ?? ""], ["standins", "1"]]} />
           </>
         ) : null}
         . Exports use stand-ins for project names by default.
@@ -170,7 +171,7 @@ export function Work({ ui, dispatch, saveLabel, startCase }: WorkViewProps): Rea
                     ))}
                   </ul>
                   {startCase ? (
-                    <button type="button" onClick={() => void startCase(c.case_id).then((r) => setStartNote(r.message))} data-start-case>
+                    <button type="button" onClick={() => void startCase(c.case_id, (c.waiting ?? []).map((w) => w.plan_item_id)).then((r) => setStartNote(r.message))} data-start-case>
                       Start it
                     </button>
                   ) : null}

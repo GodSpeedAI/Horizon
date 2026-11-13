@@ -65,13 +65,13 @@ const review = async (assign: boolean, stepId: string) => {
 };
 
 describe("Run a review", () => {
-  test("run a review adds a step with the review marker", async () => {
+  test("run a review is refused at this freeze: no review step is added", async () => {
     adds.length = 0;
     const result = await review(false, "draft_note");
-    expect(result.status).toBe(200);
-    expect(adds).toHaveLength(1);
-    expect(adds[0]!.item.markers).toEqual({ required: false, review: true });
-    expect(adds[0]!.item.item_kind).toBe("human_task");
+    // The preview still names what could be reviewed; the send is refused before any step is added (R5-01).
+    expect(result.status).toBe(403);
+    expect(result.body.outcome).toBe("refused");
+    expect(adds).toHaveLength(0);
     expect(converse).toHaveLength(0);
   });
 
@@ -82,22 +82,21 @@ describe("Run a review", () => {
     expect(adds).toHaveLength(0);
   });
 
-  test("a review assigned to an agent passes the reviewed assignment", async () => {
+  test("a review assigned to an agent is refused too, and no agent is given anything", async () => {
     converse.length = 0;
     const result = await review(true, "draft_note");
-    expect(result.status).toBe(200);
-    expect(converse).toHaveLength(1);
-    expect(converse[0]).toMatchObject({ reviews: `assign:${CASE}:draft_note` });
-    expect((converse[0] as { id: string }).id).toMatch(`assign:${CASE}:`);
+    expect(result.status).toBe(403);
+    expect(converse).toHaveLength(0);
   });
 
-  test("an ordinary Hand off is not a review and passes no reviewed assignment", async () => {
+  test("an ordinary Hand off is refused and passes no reviewed assignment", async () => {
     converse.length = 0;
     adds.length = 0;
     const { draftId } = (await app.get("/desk/draft")) as { draftId: string };
     const preview = await (await app.post("/desk/handoff/preview", { draft_id: draftId, text: "Fix the checkout total" })).json();
-    await app.post("/desk/handoff", { draft_id: draftId, text: "Fix the checkout total", plan_precondition: preview.preview.plan_precondition, assign: true });
-    expect(adds[0]!.item.markers.review).toBe(false);
-    expect(converse[0]).not.toHaveProperty("reviews");
+    const sent = await app.post("/desk/handoff", { draft_id: draftId, text: "Fix the checkout total", plan_precondition: preview.preview.plan_precondition, assign: true });
+    expect(sent.status).toBe(403);
+    expect(adds).toHaveLength(0);
+    expect(converse).toHaveLength(0);
   });
 });

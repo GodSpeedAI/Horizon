@@ -11,12 +11,18 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createApplication, type HorizonApplication } from "../src/app.ts";
 import { listDevices } from "../src/capabilities/remote-records.ts";
+import { readIntentRecords } from "../src/capabilities/navigation-intent.ts";
 import { seedOperationalFixture } from "./support/operational-fixture.ts";
 import { writeConfig, horizonDocument } from "./support/config.ts";
 import { SoftwareAuthenticator } from "./support/remote-authenticator.ts";
+import { seedController } from "./support/controller.ts";
 import { b64url } from "../src/remote/webauthn.ts";
+import { p3AuthorityDouble } from "./support/p3-authority-double.ts";
 
 let application: HorizonApplication;
+/** The desk's terminal for the test: the operator authorizes each enrolment by typing the code it shows. */
+/** The active controller that authorizes each new phone, and its session cookie. Null when no controller is left. */
+let controller: { auth: SoftwareAuthenticator; cookie: string } | null = null;
 let cockpit: ReturnType<HorizonApplication["startServer"]>;
 let cockpitBase: string;
 let savedPort: string | undefined;
@@ -24,6 +30,8 @@ let phone: { readonly origin: string } | null = null;
 let cookie = "";
 let authenticator: SoftwareAuthenticator;
 let phoneLink = "";
+
+const intents = async () => (await readIntentRecords(application.runtime.runtime.store)).length;
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
 beforeAll(async () => {
@@ -34,7 +42,7 @@ beforeAll(async () => {
     join(root, "horizon.toml"),
     horizonDocument({ storePath: join(root, "remote.sqlite"), secretPath: join(root, "launch.secret") }),
   );
-  application = await createApplication({ configPath });
+  application = await createApplication({ configPath, remoteP3Authority: p3AuthorityDouble() });
   await seedOperationalFixture(application.runtime.runtime.store, undefined, application.caller.tenant);
   cockpit = application.startServer(0);
   cockpitBase = `http://127.0.0.1:${cockpit.port}`;
@@ -83,12 +91,35 @@ async function startFromCockpit(): Promise<string> {
   return link;
 }
 
+/** Seeds the first controller, signed in, when none exists. Production has no first-controller path yet (see the report). */
+async function ensureController(): Promise<void> {
+  if (controller !== null) return;
+  const auth = await new SoftwareAuthenticator().generate();
+  await seedController(application, auth, "controller phone");
+  const response = await signIn(auth);
+  expect(response.status).toBe(200);
+  controller = { auth, cookie: sessionCookieOf(response) };
+}
+
+/** Redeems the link, registers the device, and has the active controller authorize it with its own passkey. */
 async function pairWith(link: string, device: SoftwareAuthenticator): Promise<Response> {
   const redeemed = await postJson("/m/api/pair/redeem", { secret: secretOf(link) });
   expect(redeemed.status).toBe(200);
   const { ticket, options } = (await redeemed.json()) as { ticket: string; options: { challenge: string; rp: { id: string } } };
   const credential = await device.register({ challenge: options.challenge, origin: phoneBase(), rpId: options.rp.id });
-  return postJson("/m/api/pair/finish", { ticket, credential }, { "user-agent": IPHONE_UA });
+  const finished = await postJson("/m/api/pair/finish", { ticket, credential }, { "user-agent": IPHONE_UA });
+  if (finished.status !== 202) return finished;
+  const { pending_id: pendingId } = (await finished.json()) as { pending_id: string };
+  if (controller === null) throw new Error("no controller is signed in to authorize the phone");
+  const current = controller;
+  const waiting = await fetch(`${phoneBase()}/m/api/pair/pending`, { headers: { origin: phoneBase(), cookie: current.cookie } });
+  const { options: signing } = (await waiting.json()) as { options: { challenge: string; rpId: string } };
+  const proof = await current.auth.assert({ challenge: signing.challenge, origin: phoneBase(), rpId: signing.rpId });
+  const authorized = await postJson("/m/api/pair/authorize", { pending_id: pendingId, credential: proof }, { cookie: current.cookie });
+  expect(authorized.status).toBe(200);
+  const committed = await postJson("/m/api/pair/await", { pending_id: pendingId });
+  if (committed.status === 200) controller = { auth: device, cookie: sessionCookieOf(committed) };
+  return committed;
 }
 
 async function signIn(device: SoftwareAuthenticator): Promise<Response> {
@@ -179,6 +210,7 @@ describe("pairing: the link authorizes one passkey registration and nothing else
   });
 
   test("a valid link registers the passkey, signs the phone in, and the cookie is host-bound and strict", async () => {
+    await ensureController();
     const response = await pairWith(phoneLink, authenticator);
     expect(response.status).toBe(200);
     const header = response.headers.get("set-cookie") ?? "";
@@ -275,7 +307,12 @@ describe("commands: one command id, one outcome; claims stay distinct", () => {
     expect((await postJson("/m/api/command", { command_id: randomUUID(), kind: "delete_everything" })).status).toBe(400);
   });
 
-  test("a commit with a stale frame revision is refused as stale_surface and commits nothing", async () => {
+  test("a commit from the phone is refused before the frame is even checked, and nothing commits", async () => {
+    // The commit runs under the person's own principal, and a device credential proves which
+    // device is at the route and never which person is holding it: there is no device-attributed
+    // delegation from the operator at this freeze, so the row is refused in the catalog's own
+    // words before any commit is attempted. A stale frame is therefore not the reason, and
+    // nothing at all is written (R5-03).
     const response = await postJson("/m/api/command", {
       command_id: randomUUID(),
       kind: "commit",
@@ -283,11 +320,17 @@ describe("commands: one command id, one outcome; claims stay distinct", () => {
       frame_revision: 0,
       action_id: "horizon-health",
     });
-    expect(response.status).toBe(409);
-    expect(((await response.json()) as { outcome: { code: string } }).outcome.code).toBe("stale_surface");
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as { accepted: boolean; outcome: { state: string; code: string; message: string } };
+    expect(body.accepted).toBe(false);
+    expect(body.outcome).toMatchObject({ state: "refused", code: "refused" });
+    expect(body.outcome.message).toContain("delegation");
+    const audit = await (await fetch(`${cockpitBase}/desk/state.json`)).json();
+    expect(JSON.stringify(audit)).not.toContain("horizon-health");
+    expect(await intents()).toBe(0);
   });
 
-  test("a commit of an offered move from the phone is the cockpit's commit, and the desktop shows its receipt", async () => {
+  test("a commit of an offered move from the phone is refused: no receipt, no intent, and the desktop sees nothing", async () => {
     const state = (await (await phoneRequest("/m/api/state")).json()) as {
       frame: { frame_id: string; revision: number };
       actions: { action_id: string }[];
@@ -301,20 +344,17 @@ describe("commands: one command id, one outcome; claims stay distinct", () => {
       frame_revision: state.frame.revision,
       action_id: action.action_id,
     });
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as { accepted: boolean; outcome: { intent_id: string; receipt: { found: boolean } | null } };
-    expect(body.accepted).toBe(true);
-    expect(body.outcome.receipt?.found).toBe(true);
-    const desktop = (await (await fetch(`${cockpitBase}/desk/state.json?receipt=${body.outcome.intent_id}`)).json()) as { home: { receipt: { found: boolean } | null } };
-    expect(desktop.home.receipt?.found).toBe(true);
-    const { Desk } = await import("../src/ui/desk/Desk.tsx");
-    const { START } = await import("../src/ui/desk/attention.ts");
-    const { quietIo } = await import("./support/desk-io.ts");
-    const { renderToStaticMarkup } = await import("react-dom/server");
-    const { createElement } = await import("react");
-    const drawn = renderToStaticMarkup(createElement(Desk, { ui: { ...START, data: desktop as never }, dispatch: () => undefined, io: quietIo() }));
-    expect(drawn).toContain('data-claim="decided"');
-    expect(drawn).toContain("Recorded by Horizon, ");
+    // The action is genuinely offered and the frame genuinely holds; the refusal is about who is
+    // asking, not about the move. The phone answers in the catalog's words and the desktop is
+    // never told a move happened, because none did (R5-01, R5-03).
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as { accepted: boolean; outcome: { state: string; code: string; message: string } };
+    expect(body.accepted).toBe(false);
+    expect(body.outcome.state).toBe("refused");
+    expect(body.outcome.message).toContain("delegation");
+    expect(await intents()).toBe(0);
+    const desktop = (await (await fetch(`${cockpitBase}/desk/state.json`)).json()) as { home: { receipt: { found: boolean } | null } };
+    expect(desktop.home.receipt).toBeNull();
   });
 });
 
@@ -327,20 +367,22 @@ describe("revocation: refresh and replacement", () => {
     expect((await postJson("/m/api/pair/redeem", { secret: secretOf(oldLink) })).status).toBe(401);
     const devices = await listDevices(application.runtime.runtime.store, application.caller.tenant);
     expect(devices.every((device) => device.revoked_at !== null)).toBe(true);
+    controller = null;
   });
 
-  test("a second phone pairs and replaces the first, which is revoked for good", async () => {
+  test("after a refresh no controller is left, so a new phone is refused and nothing is held", async () => {
     const link = application.remote.pairingLink();
     if (link === null) throw new Error("refresh should have opened a new link");
     const second = await new SoftwareAuthenticator().generate();
-    const response = await pairWith(link, second);
-    expect(response.status).toBe(200);
-    cookie = sessionCookieOf(response);
+    const redeemed = await postJson("/m/api/pair/redeem", { secret: secretOf(link) });
+    expect(redeemed.status).toBe(200);
+    const { ticket, options } = (await redeemed.json()) as { ticket: string; options: { challenge: string; rp: { id: string } } };
+    const credential = await second.register({ challenge: options.challenge, origin: phoneBase(), rpId: options.rp.id });
+    const finished = await postJson("/m/api/pair/finish", { ticket, credential }, { "user-agent": IPHONE_UA });
+    expect(finished.status).toBe(409);
+    expect(((await finished.json()) as { code: string }).code).toBe("no_controller");
     const active = (await listDevices(application.runtime.runtime.store, application.caller.tenant)).filter((device) => device.revoked_at === null);
-    expect(active.length).toBe(1);
-    expect(active[0]?.credential_id).toBe(b64url(second.credentialId));
-    const status = (await (await fetch(`${cockpitBase}/workspace/remote/status`)).json()) as { state: string };
-    expect(status.state).toBe("connected");
+    expect(active).toHaveLength(0);
   });
 
   test("the audit trail records the remote commands with their outcomes and no secret", async () => {

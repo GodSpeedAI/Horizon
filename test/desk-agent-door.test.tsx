@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { revisionOf } from "./support/answer-revision.ts";
 import { readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -10,6 +11,8 @@ import { PanelCard, echoesOf } from "../src/ui/desk/Panels.tsx";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
 import { deskState } from "./support/desk-fixture.ts";
 import { quietIo } from "./support/desk-io.ts";
+import { withRequestId } from "./support/request-body.ts";
+import { agentInProcess } from "./support/agent-door.ts";
 
 const select = { id: "which_way", question: "Which plan should we use?", why_needed: "Two plans", options: [{ option_id: "plan_a", label: "Plan A" }, { option_id: "plan_b", label: "Plan B" }] };
 const multi = { id: "many", input: "multiselect", question: "Which parts?", why_needed: "x", options: [{ option_id: "o1", label: "Part one" }, { option_id: "o2", label: "Part two" }] };
@@ -23,8 +26,14 @@ beforeAll(async () => {
 afterAll(async () => app.stop());
 
 const door = (path: string, body?: unknown, auth: string | null = `Bearer ${key}`, extra: Record<string, string> = {}) =>
-  fetch(`${app.base}${path}`, { method: body === undefined ? "GET" : "POST", headers: { ...(auth === null ? {} : { authorization: auth }), "content-type": "application/json", ...extra }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  fetch(`${app.base}${path}`, { method: body === undefined ? "GET" : "POST", headers: { ...(auth === null ? {} : { authorization: auth }), "content-type": "application/json", ...extra }, ...(body === undefined ? {} : { body: JSON.stringify(withRequestId(body)) }) });
 const rows = async (): Promise<any[]> => (await (await fetch(`${app.base}/desk/conversation`)).json()).rows;
+/**
+ * The door's own machinery, at the function the door calls after its checks. The door refuses
+ * `answer.route` and `ask.withdraw` at this freeze (R5-01); the rules they enforce are still the
+ * things these tests are about, so they are exercised where the door would run them.
+ */
+const inProcess = (body: unknown) => agentInProcess(app.application, "default", undefined, body);
 
 describe("the agent door", () => {
   test("no key and a wrong key are refused, and nothing changes", async () => {
@@ -72,8 +81,15 @@ describe("the agent door", () => {
   });
 
   test("the person's operations are refused over the door", async () => {
-    for (const body of [{ op: "human.answer", panel: "plan", ask: "which_way", outcome: "answered", value: "plan_a" }, { op: "human.close", id: "plan" }, { op: "human.pin", id: "plan", pinned: true }]) {
+    // The route's action field is `tool`, so the reserved-operation refusal is read from `tool`
+    // and from nowhere else (R2-10). A reserved operation named in any other field is not an
+    // action the door performs, so it is refused as an unreadable request rather than silently
+    // ignored.
+    for (const body of [{ tool: "human.answer", panel: "plan", ask: "which_way", ...(await revisionOf(app, "plan", "which_way")), outcome: "answered", value: "plan_a" }, { tool: "human.close", id: "plan" }, { tool: "human.pin", id: "plan", pinned: true }]) {
       expect((await door("/agent/panels", body)).status).toBe(403);
+    }
+    for (const body of [{ op: "human.answer", panel: "plan", ask: "which_way", ...(await revisionOf(app, "plan", "which_way")), outcome: "answered", value: "plan_a" }, { op: "human.close", id: "plan" }, { op: "human.pin", id: "plan", pinned: true }]) {
+      expect((await door("/agent/panels", body)).status).toBe(400);
     }
     expect((await door("/agent/panels", { tool: "nonsense" })).status).toBe(400);
     expect((await app.state()).panels.open.find((p: any) => p.id === "plan").pinned).toBe(false);
@@ -82,7 +98,7 @@ describe("the agent door", () => {
   test("one entry per answer: labels, waiting, then done by answer.route; the panel entry is not left waiting", async () => {
     await door("/agent/panels", { tool: "ask_human", panel: "plan2", ask: select });
     await door("/agent/panels", { tool: "ask_human", panel: "plan2", ask: multi });
-    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "plan2", ask: "which_way", outcome: "answered", value: "plan_a" })).status).toBe(200);
+    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "plan2", ask: "which_way", ...(await revisionOf(app, "plan2", "which_way")), outcome: "answered", value: "plan_a" })).status).toBe(200);
     let mine = (await rows()).filter((r) => r.kind === "answer" && r.refs.panel_id === "plan2");
     expect(mine).toHaveLength(1);
     expect(mine[0].words).toBe("You answered: Plan A");
@@ -90,16 +106,19 @@ describe("the agent door", () => {
     expect(mine[0].outcome).toBe("Waiting for the agent to say where it went");
     // one question is still open, so the panel is still waiting for you
     expect((await rows()).find((r) => r.kind === "panel" && r.refs.panel_id === "plan2").status).toBe("waiting");
-    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "plan2", ask: "many", outcome: "answered", value: ["o1", "o2"] })).status).toBe(200);
+    expect((await app.post("/desk/panels/op", { op: "human.answer", panel: "plan2", ask: "many", ...(await revisionOf(app, "plan2", "many")), outcome: "answered", value: ["o1", "o2"] })).status).toBe(200);
     expect((await rows()).find((r) => r.kind === "panel" && r.refs.panel_id === "plan2").status).toBe("done");
     const waiting = await (await door("/agent/panels/answers")).json();
     expect(waiting.responses.filter((a: any) => a.panel_id === "plan2")).toHaveLength(2);
-    expect((await door("/agent/panels", { tool: "answer.route", panel_id: "plan2", ask_id: "which_way", routed_as: "no" })).status).toBe(400);
-    expect((await door("/agent/panels", { tool: "answer.route", panel_id: "plan2", ask_id: "which_way", routed_as: "step s1 in Seed: triage" })).status).toBe(200);
+    // The door refuses the row itself at this freeze, before any effect (R5-01).
+    expect((await door("/agent/panels", { tool: "answer.route", panel_id: "plan2", ask_id: "which_way", routed_as: "step s1 in Seed: triage" })).status).toBe(403);
+    // The rule the route applies is unchanged: words that say nothing about where it went are refused, real words are taken.
+    expect((await inProcess({ tool: "answer.route", panel_id: "plan2", ask_id: "which_way", routed_as: "no" })).status).toBe(400);
+    expect((await inProcess({ tool: "answer.route", panel_id: "plan2", ask_id: "which_way", routed_as: "step s1 in Seed: triage" })).status).toBe(200);
     mine = (await rows()).filter((r) => r.kind === "answer" && r.refs.panel_id === "plan2" && r.refs.ask_id === "which_way");
     expect(mine).toHaveLength(1);
-    expect(mine[0].status).toBe("done");
-    expect(mine[0].outcome).toBe("The agent took it to: step s1 in Seed: triage");
+    expect(mine[0].status).toBe("claimed");
+    expect(mine[0].outcome).toContain("The agent says it took it to: step s1 in Seed: triage");
     expect(mine[0].words).toBe("You answered: Plan A");
     expect((await door("/agent/panels/answers").then((r) => r.json())).responses.filter((a: any) => a.ask === "which_way")).toHaveLength(0);
     const text = JSON.stringify(await rows());
@@ -107,9 +126,10 @@ describe("the agent door", () => {
     expect(text).not.toContain("Your answer to which_way");
   });
 
-  test("withdraw closes the question's entry with the reason", async () => {
+  test("withdraw closes the question's entry with the reason; the door refuses the row itself at this freeze", async () => {
     await door("/agent/panels", { tool: "ask_human", panel: "plan3", ask: select });
-    expect((await door("/agent/panels", { tool: "ask.withdraw", panel_id: "plan3", ask_id: "which_way", reason: "Found it myself" })).status).toBe(200);
+    expect((await door("/agent/panels", { tool: "ask.withdraw", panel_id: "plan3", ask_id: "which_way", reason: "Found it myself" })).status).toBe(403);
+    expect((await inProcess({ tool: "ask.withdraw", panel_id: "plan3", ask_id: "which_way", reason: "Found it myself" })).status).toBe(200);
     const row = (await rows()).find((r) => r.kind === "panel" && r.refs.panel_id === "plan3");
     expect(row.status).toBe("done");
     expect(row.outcome).toBe("The agent withdrew this question: Found it myself");
@@ -151,6 +171,6 @@ describe("what waits for you, in one number", () => {
     expect(summary).toContain("You answered: Plan A");
     expect(summary).toContain("Waiting for the agent to say where it went");
     const routed = panel({ outcome: "answered", value: "plan_a", note: null, routed_as: "step s1 in Seed" });
-    expect(renderToStaticMarkup(<PanelCard panel={routed} io={quietIo().panels} />)).toContain("The agent took it to: step s1 in Seed");
+    expect(renderToStaticMarkup(<PanelCard panel={routed} io={quietIo().panels} />)).toContain("The agent says it took it to: step s1 in Seed");
   });
 });

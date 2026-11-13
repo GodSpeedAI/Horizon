@@ -54,7 +54,7 @@ export async function updateDevice(store: DurableStore, deviceId: string, change
 /** One line per remote command: who asked, what, which device, and the outcome the phone was given. */
 export async function auditRemote(
   store: DurableStore,
-  entry: { readonly tenant: string; readonly operator: string; readonly device_id: string; readonly action: string; readonly outcome: string; readonly at: string },
+  entry: { readonly tenant: string; readonly operator: string; readonly device_id: string; readonly action: string; readonly outcome: string; readonly at: string; readonly actors?: { readonly [role: string]: unknown } },
 ): Promise<void> {
   const id = `remote-audit:${randomUUID()}`;
   await store.commit({

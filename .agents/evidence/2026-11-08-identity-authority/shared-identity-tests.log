@@ -1,0 +1,52 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/identity/test/pairing.test.ts:
+(pass) pairing link > lifetime constants are 5 minutes and 2 minutes [0.02ms]
+(pass) pairing link > a link is single use [0.64ms]
+(pass) pairing link > redeeming yields enrolment only for the approved subject [0.07ms]
+(pass) pairing link > a link expires after five minutes [0.07ms]
+(pass) pairing link > the secret is not recoverable and malformed or wrong secrets are invalid [0.18ms]
+(pass) pairing link > off, refresh and stop fence older links [0.07ms]
+(pass) challenge store > a challenge is taken once [0.08ms]
+(pass) challenge store > a challenge expires after two minutes, and a wrong kind burns it [0.05ms]
+
+packages/identity/test/collections.test.ts:
+(pass) identity collection names > each collection name is lowercase letters and hyphens only [0.07ms]
+
+packages/identity/test/service.test.ts:
+(pass) operator and session > a session resolves to the durable identity and its Caller [1.82ms]
+(pass) operator and session > only the token hash is stored [0.23ms]
+(pass) operator and session > an unknown token, a forged identity string and a malformed token resolve to nothing [1.27ms]
+(pass) operator and session > issuing for an unprovisioned operator fails: sessions never create identities [0.33ms]
+(pass) operator and session > a revoked session is refused [2.32ms]
+(pass) operator and session > an expired session is refused [2.44ms]
+(pass) operator and session > bumping the generation revokes all sessions and devices [18.13ms]
+(pass) operator and session > a suspended operator resolves to nothing [3.81ms]
+(pass) operator and session > operators are keyed by tenant and id [3.75ms]
+(pass) devices > enrolment needs an existing active operator [4.85ms]
+(pass) devices > enrolment issues a session bound to the device [1.74ms]
+(pass) devices > replacement revokes the old device and its session [2.92ms]
+(pass) devices > revoking a device revokes its session; a credential cannot be enrolled twice [1.21ms]
+(pass) devices > re-authentication advances the sign count, rotates the session, and refuses replay [3.53ms]
+(pass) devices > re-authentication is refused for a revoked device and for a wrong origin [0.94ms]
+
+packages/identity/test/webauthn.test.ts:
+(pass) registration > accepts a valid registration [0.39ms]
+(pass) registration > rejects wrong origin, wrong RP ID and missing user verification [0.72ms]
+(pass) assertion > accepts a valid assertion and reports the new sign count [1.20ms]
+(pass) assertion > rejects wrong origin and wrong RP ID [0.75ms]
+(pass) assertion > rejects missing user verification and missing user presence [0.43ms]
+(pass) assertion > rejects a sign count that does not increase [0.53ms]
+(pass) assertion > rejects a signature made by another key [1.12ms]
+(pass) assertion > a replayed challenge is refused: it can be taken only once [1.24ms]
+(pass) relying party configuration > is required and validated, never derived [0.15ms]
+
+packages/identity/test/posture.test.ts:
+(pass) execution posture > defaults to contained [0.04ms]
+(pass) execution posture > uncontained-local is the only other value
+(pass) execution posture > any other value throws [0.08ms]
+
+ 36 pass
+ 0 fail
+ 91 expect() calls
+Ran 36 tests across 5 files. [135.00ms]

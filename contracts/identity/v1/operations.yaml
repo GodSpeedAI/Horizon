@@ -1,0 +1,1928 @@
+manifest_version: "horizon.identity.operations/2"
+contract_id: "horizon.identity.operations"
+contract_version: "2.0.0"
+frozen_at: "2026-11-09"
+authority:
+  design: "design_draft.md sections 11 and Appendix A"
+  spec: { id: "HORIZON-001", version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+  owner_decision: "2026-11-09 — owner authorized reconciling the catalog against implemented behaviour, classifying the agent door per semantic action, treating session logout as session lifecycle, aliasing the third intent route, and classifying search by effect."
+  note: >-
+    This file is the implementation binding of a closed catalog. An operation ID that is not
+    listed below, or a write route that maps to no row, is Px and fails closed. A route name,
+    HTTP method, client label, or caller role can never move an operation to a weaker class.
+    A route that carries several semantic actions is dispatched by the handler from the action
+    the handler actually performs (see `dispatch`), never from a blanket route class.
+
+# Operations the identity catalog does not classify.
+#
+# The catalog classifies Horizon's own operations. A deployment may bind other operations — a
+# product operation whose authority is its own binding contract and whose escalation is the
+# obligation path. Such an operation is declared by the deployment configuration, and the
+# identity catalog never calls it a P0/P1 local write.
+#
+# The runtime rule: an operation reference that reaches an intent commit or a dispatcher is
+# classified before anything runs. A reference the catalog knows takes the catalog's class, and a
+# governed or Px row is never committed through the intent path. A reference the catalog does not
+# know must be a deployment-bound operation. A reference that is neither is Px: it is refused
+# before any capability invocation and before any record is appended.
+deployment_operations:
+  rule: >-
+    An operation reference that is neither a catalogued row nor a deployment-bound operation is
+    Px. The intent and dispatcher boundaries classify the reference first, so an operation outside
+    both sets never reaches a capability and never becomes a record.
+  minimum_class: P2
+  refusal_rule: >-
+    A deployment-bound reference is never carried by the plain intent path. That path has no
+    pending record, no confirmation and no authority writer, so it cannot honour the binding
+    contract's authority, its evidence or its expiry, and a bound operation may escalate for
+    authority, spend, or an external effect. The reference is refused there before any capability
+    is invoked and before any record is appended, and it reaches the binding contract's own path
+    instead.
+  note: >-
+    A deployment-bound operation keeps its own binding contract: its authority, its evidence and
+    its expiry are the binding's, not this catalog's. It is never a P0/P1 local write, because a
+    bound operation may escalate for authority, spend, or an external effect.
+
+classes: [P0, P1, P2, P3, PX]
+
+authority_writers:
+  local_read_policy: "Local read policy only. Cannot write, create a grant, or create a pending approval."
+  cognate_local_policy: "Cognate local policy. No grant creation."
+  cognate_local_continuation: "Cognate continuation for a local decision."
+  sea_forge: "SEA-Forge decision, epoch, and bounded grant."
+  issuer_root: "Cognate/issuer root, local console only."
+  identity_service: "The identity service. The designated device-enrolment state writer: it enrols and replaces device credentials. It decides no authorization, and its vendored API checks no evidence: Horizon checks the P3 approval and the A3-UV proof before calling it, which is a disclosed Stage 0B gap. Store compare-and-swap makes the transition atomic."
+  case_record.authority: "Selected per record: local → Cognate continuation; governed → SEA-Forge."
+
+budget_units: [currency, tokens, calls, bytes]
+
+class_defaults:
+  P0:
+    executor: human_session
+    authority_writer: local_read_policy
+    human_evidence: A0
+    pending_expiry: null
+    params_schema: params.read
+    offline_allowed: true
+    writable: false
+    ownership: none_required
+    scope_rule: >-
+      A read has no effect to own: it observes state and changes nothing. `none_required` here
+      states that, and it is the only reason no owner is named.
+  P1:
+    executor: human_session
+    authority_writer: cognate_local_policy
+    human_evidence: A0_OR_A1
+    pending_expiry: null
+    params_schema: params.local_write
+    offline_allowed: true
+    writable: true
+    ownership: none_required
+    scope_rule: >-
+      A P1 effect is reversible work inside the caller's own scope: a draft, note, panel, row or
+      frame the caller already owns. The design's P1 rule ("authenticated execution inside its
+      existing ownership and scope") is the scope, so `none_required` means "no owner beyond the
+      caller", never "no owner named". A P1 row that reaches outside the caller's scope declares
+      an explicit `ownership` instead.
+  P2:
+    executor: human_session
+    authority_writer: cognate_local_continuation
+    human_evidence: A3-UV
+    stage0b_evidence: A3-T
+    pending_expiry: 10m
+    offline_allowed: false
+    writable: true
+    ownership: none_required
+    scope_rule: >-
+      A P2 effect is reserved: it changes shared state or another principal's holding, so it needs
+      a named owner of the target (a panel, a question, the board, a session) or an explicit
+      statement that the effect is local and self-owned. A row that names no owner because it
+      changes only the caller's own local state says so here. P2 is set by the authority boundary,
+      not the technical one: an operation that crosses a paired device or a network transport but
+      only exercises an authority the session already holds stays P2. Such an operation creates no
+      authority of its own, and it may not widen the scope or lifetime of the authority it uses.
+  P3:
+    executor: human_session
+    authority_writer: sea_forge
+    human_evidence: A3-UV
+    pending_expiry: null
+    offline_allowed: false
+    writable: true
+    ownership: none_required
+    scope_rule: >-
+      A P3 effect commits an external commitment or changes authority outside Horizon's own scoped
+      authority: a SEA-Forge decision, a grant issued or widened, a run or handoff that binds beyond
+      the caller's envelope. Crossing a technical trust boundary (a paired device, a network
+      transport) is not by itself P3. It is never owned by the caller:
+      the authority decision and the fence carry the responsibility, and the pending record names
+      the requester, the executor and the approver separately. Separation of duty is a per-row
+      requirement and not a property of the class: every P3 row states its requester, approver and
+      executor, and the catalog refuses a P3 row whose approver is its requester or its executor.
+      A bare boolean is not a statement of separation and is refused.
+  PX:
+    executor: null
+    authority_writer: null
+    human_evidence: null
+    pending_expiry: null
+    offline_allowed: false
+    writable: false
+    ownership: none_required
+    scope_rule: "A Px row has no effect, so it has no scope and no owner."
+
+# Each class is a group; a row may restate a field to override its class default.
+# binding: verified  — a route or code op in this repository was read and maps to this row
+#          candidate — the row is frozen by the catalog but no route binding was confirmed
+#          reserved  — no route exists yet; the row is the target of a later stage
+# ownership: none_required | caller_owns_panel | caller_owns_question | caller_own_session |
+#            person_owns_board | caller_scoped_own_rows
+operations:
+  P0:
+    - id: horizon.health
+      binding: verified
+      human_evidence: null
+      # No human confirmation applies to this row: its caller path proves possession of a
+      # credential or of a one-time code, never a person, so the class default's assurance
+      # predicate is not evidence this route can produce (R5-07).
+      routes: ["GET /health"]
+      params_schema: params.horizon_health
+      executor: anonymous_connection
+      caller_authentication: none_public_liveness
+      note: >-
+        The liveness probe is deliberately public: it answers before any session exists, so it
+        authenticates no caller and owns nothing. It says the process is up and nothing else: it
+        answers `{ ok: true }` to every caller, paired or not, and exposes no deployment profile,
+        operator reference, semantic world, research state or transport. The detail a paired
+        caller may read is a separate operation, horizon.diagnostics.read.
+    - id: horizon.diagnostics.read
+      binding: verified
+      routes: ["GET /diagnostics"]
+      params_schema: params.horizon_diagnostics_read
+      note: >-
+        The authenticated diagnostics read. It reports the deployment profile, the operator
+        reference, the semantic world, the research state and the transports to a paired caller,
+        and writes nothing. It is a separate operation from the liveness probe because the probe
+        is public and this is not.
+    - id: remote.health
+      binding: verified
+      human_evidence: null
+      # No human confirmation applies to this row: its caller path proves possession of a
+      # credential or of a one-time code, never a person, so the class default's assurance
+      # predicate is not evidence this route can produce (R5-07).
+      routes: ["GET /m/health"]
+      params_schema: params.remote_health
+      executor: anonymous_connection
+      caller_authentication: none_public_liveness
+      note: >-
+        The phone transport's own liveness probe. It answers before any device is paired and says
+        only that the transport is up and which schema it speaks. It reads no device, no operator
+        and no workspace.
+    - id: remote.state.read
+      binding: verified
+      routes: ["GET /m/api/state"]
+      params_schema: params.remote_state_read
+      executor: device_credential
+      caller_authentication: device_passkey_assertion
+      note: >-
+        The phone's home: the canonical reads the cockpit makes, shaped for a narrow screen. It
+        reads and writes nothing.
+    - id: remote.events.read
+      binding: verified
+      routes: ["GET /m/api/events"]
+      params_schema: params.remote_events_read
+      executor: device_credential
+      caller_authentication: device_passkey_assertion
+      note: "The phone's event stream. It reads and writes nothing."
+    - { id: horizon.research.health, binding: candidate }
+    - id: horizon.workspace.read
+      binding: verified
+      routes: ["GET /workspace.json", "GET /desk/state.json", "GET /desk/next.json", "GET /desk/first-move.json"]
+      params_schema: params.horizon_workspace_read
+      note: >-
+        The workspace read. Every route here answers the caller's view of the same semantic
+        world: the whole workspace, the desk's state projection, the frame-based next decision,
+        and the one move the first-run path offers. The selectors are optional and vary by
+        route; none of them changes what the world is, only which part of it is shown.
+    - { id: horizon.case.read, binding: candidate }
+    - { id: horizon.evidence.read, binding: candidate }
+    - { id: horizon.economics.read, binding: verified, routes: ["GET /workspace/economics"], params_schema: params.horizon_economics_read }
+    - id: horizon.inspect.focus
+      binding: verified
+      routes: ["GET /workspace/inspect"]
+      params_schema: params.horizon_inspect_read
+      note: >-
+        The focused inspection: one reference, one checkpoint or one operation looked at
+        closely. The selectors are optional; an inspection with no selector inspects the
+        caller's current focus.
+    - id: horizon.inspect.neighborhood
+      binding: verified
+      routes: ["GET /workspace/inspect"]
+      params_schema: params.horizon_inspect_read
+      note: >-
+        The neighbourhood inspection: what surrounds the focus. It shares the inspection route
+        with the focused read because the route answers both, and it takes the same optional
+        selectors.
+    - id: horizon.navigation.inspect
+      binding: verified
+      routes: ["GET /frame"]
+      params_schema: params.horizon_navigation_inspect
+      note: >-
+        The navigation frame read. It issues the caller's current frame and reads nothing else;
+        it takes no parameter because the frame is what the world is seen through, not a thing
+        the caller chooses.
+    - { id: horizon.context.query_reference, binding: candidate }
+    - id: horizon.remote.status
+      binding: verified
+      routes: ["GET /workspace/remote/status", "GET /desk/remote.json", "GET /workspace/remote"]
+      params_schema: params.horizon_remote_status
+      note: >-
+        The transport's status read. The desk's JSON view, the desk's panel page and the
+        workspace's status route all answer the same read and change nothing.
+    - { id: workbench.view.read, binding: candidate }
+    - { id: gauntlet.run.read, binding: candidate }
+    - { id: realitytrace.observation.read, binding: candidate }
+    - id: horizon.search.read
+      binding: verified
+      routes: ["GET /desk/search", "POST /desk/search"]
+      params_schema: params.horizon_search_read
+      note: >-
+        Classified by effect, not by HTTP method: the POST form is the Find action and reads
+        only. The same route also performs horizon.search.record when, and only when, the body
+        asks the find to be recorded; that write is a separate operation with its own class.
+    - id: agent.response.read
+      binding: verified
+      routes: ["POST /agent/panels", "GET /agent/panels/answers"]
+      code_ops: ["read_responses"]
+      params_schema: params.agent_response_read
+      executor: registered_agent
+      caller_authentication: registered_agent_key
+      ownership: caller_owns_question
+      note: >-
+        An agent reads only the answers to questions its own key put up. Read-only: no panel,
+        conversation row, or receipt is written.
+    - id: horizon.compare.read
+      binding: verified
+      routes: ["GET /workspace/compare"]
+      params_schema: params.horizon_compare_read
+      note: >-
+        The comparison read. It reads the allow-listed record sources and Horizon's own labels
+        and writes nothing; the theme is a presentation choice, not a parameter of the world.
+    - id: horizon.work.read
+      binding: verified
+      routes: ["GET /desk/work.json"]
+      params_schema: params.horizon_work_read
+      note: >-
+        The desk's work read: the cases the caller may see, what they show about accepted
+        outcomes, and the record sources behind them. It writes nothing.
+    - id: horizon.remote.events.read
+      binding: verified
+      routes: ["GET /workspace/remote/events"]
+      params_schema: params.horizon_remote_events_read
+      note: >-
+        The desk's panel event stream. It is the transport's state read for the signed-in desk
+        caller, and it is a separate operation from the phone's own event stream because the
+        caller path is the human session rather than a device credential.
+    - id: horizon.decide.read
+      binding: verified
+      routes: ["GET /desk/decide.json"]
+      params_schema: params.horizon_decide_read
+      note: >-
+        The decision read: the cards the caller may answer right now, and why each one is
+        blocked. It writes nothing, and the decision itself is a separate operation.
+    - id: horizon.conversation.read
+      binding: verified
+      routes: ["GET /desk/conversation"]
+      params_schema: params.horizon_conversation_read
+      note: >-
+        The conversation read: the caller's own conversation rows, with the withheld ones
+        withheld. It writes nothing.
+    - id: horizon.draft.read
+      binding: verified
+      routes: ["GET /desk/draft"]
+      params_schema: params.horizon_draft_read
+      note: >-
+        The draft read: the caller's own current draft. It writes nothing, and the draft's
+        absence is an empty draft rather than a refusal.
+    - id: horizon.lesson.read
+      binding: verified
+      routes: ["GET /desk/lessons.json"]
+      params_schema: params.horizon_lesson_read
+      note: >-
+        The lesson read: the lessons the tenant has proposed and decided. It writes nothing.
+    - id: session.read
+      binding: verified
+      routes: ["GET /desk/session"]
+      params_schema: params.session_read
+      note: >-
+        The session status read: whether this browser is paired, and nothing else. It is a
+        separate operation from session.pair and session.logout because it changes nothing and
+        establishes no session.
+    - id: horizon.surface.read
+      binding: verified
+      routes: ["GET /surface"]
+      params_schema: params.horizon_surface_read
+      note: >-
+        The surface read: the caller's surface reduced for one role. The role selects the
+        projection and never establishes identity or authority, so it is a selector and not a
+        claim about who is asking.
+  P1:
+    - { id: horizon.navigation.defer, binding: candidate, observed_code_ops: ["navigation.defer"] }
+    - { id: horizon.navigation.reframe, binding: candidate, observed_code_ops: ["navigation.reframe"] }
+    - { id: horizon.navigation.disagree, binding: candidate, observed_code_ops: ["navigation.disagree"] }
+    - { id: horizon.navigation.intent.commit, binding: verified, routes: ["POST /intent"], params_schema: params.horizon_navigation_intent_commit }
+    - id: horizon.surface.intent.commit
+      binding: verified
+      routes: ["POST /surface/intent", "POST /workspace/intent"]
+      params_schema: params.horizon_surface_intent_commit
+      note: >-
+        The desk commits the action it was offered: the transport is `gui`, the role is the
+        session's, the action must still be offered and available, and the frame it was
+        rendered against must still hold. The phone commits the same action under its own
+        device-credential row, `device.surface.intent.commit`, because a device credential
+        proves which enrolled device is at the route and never which person is holding it.
+    - { id: device.surface.intent.commit, binding: verified, routes: ["POST /m/api/command"], executor: device_credential, caller_authentication: device_passkey_assertion, params_schema: params.device_surface_intent_commit, note: "The phone's own commit row, and it is refused. The device credential proves which enrolled device is at the route, never which person is holding it, and the commit runs under the person's own principal: there is no device-attributed delegation from an operator at this freeze, so the phone's move cannot be committed from the phone. It is refused rather than run as the operator, because that would substitute an operator actor for the device caller." }
+    - { id: horizon.note.save, binding: verified, routes: ["POST /desk/note"], params_schema: params.horizon_note_save }
+    - { id: horizon.note.remove, binding: candidate }
+    - { id: horizon.draft.save, binding: verified, routes: ["POST /desk/draft"], params_schema: params.horizon_draft_save }
+    - { id: horizon.conversation.discard, binding: verified, routes: ["POST /desk/conversation/discard"], params_schema: params.horizon_conversation_discard }
+    - id: horizon.case.open
+      binding: verified
+      routes: ["POST /workspace/case"]
+      params_schema: params.horizon_case_open
+      note: >-
+        The desk opens the case with the purpose the person typed. The phone opens the same
+        case under its own device-credential row, `device.case.open`, because a device
+        credential proves which enrolled device is at the route and never which person is
+        holding it.
+    - { id: device.case.open, binding: verified, routes: ["POST /m/api/command"], executor: device_credential, caller_authentication: device_passkey_assertion, params_schema: params.device_case_open, note: "The phone's own open-case row. The purpose the person typed on the phone is the caller's own; the row is P1 because the case is the caller's own work and nothing outside it is decided." }
+    - { id: horizon.lesson.propose, binding: verified, routes: ["POST /desk/lesson"], params_schema: params.horizon_lesson_propose }
+    - { id: horizon.onboarding.skip, binding: verified, routes: ["POST /workspace/onboarding/skip"], params_schema: params.horizon_onboarding_skip }
+    - { id: horizon.onboarding.resume, binding: verified, routes: ["POST /workspace/onboarding/resume"], params_schema: params.horizon_onboarding_resume }
+    - { id: horizon.workspace.presenting, binding: verified, routes: ["POST /workspace/presenting"], params_schema: params.horizon_workspace_presenting }
+    - { id: workbench.draft.save, binding: candidate }
+    - { id: workbench.conversation.discard, binding: candidate }
+    - { id: workbench.expert.launch, binding: candidate }
+    - id: horizon.search.record
+      binding: verified
+      routes: ["POST /desk/search"]
+      params_schema: params.horizon_search_record
+      ownership: caller_scoped_own_rows
+      note: >-
+        The write half of the Find action: one conversation row in the caller's own scope, and
+        only when the body sets `record` and the query is not empty. The class rises with the
+        effect; the read half stays P0.
+    - id: session.pair
+      binding: verified
+      human_evidence: null
+      # No human confirmation applies to this row: its caller path proves possession of a
+      # credential or of a one-time code, never a person, so the class default's assurance
+      # predicate is not evidence this route can produce (R5-07).
+      routes: ["POST /desk/pair"]
+      params_schema: params.session_pair
+      executor: code_holder
+      caller_authentication: one_time_pairing_code
+      ownership: caller_own_session
+      note: >-
+        The desk's browser-session ceremony: a code shown at the local console is exchanged for a
+        local session cookie. It creates one local session and enrolls no credential, so it is a
+        local, reversible P1 effect on the caller's own session rather than the governed device
+        enrollment (`device.pair`). The code is possession evidence for this local session only:
+        it is not an assurance predicate and grants no authority over anything else.
+        The route cannot tell who presented the code, so it does not claim that the caller is at
+        the console: possession of the one-time code is the whole authentication.
+    - id: session.logout
+      binding: verified
+      routes: ["POST /desk/pair/logout"]
+      params_schema: params.session_logout
+      ownership: caller_own_session
+      note: >-
+        Session lifecycle, not device removal: the handler deletes only the session named by the
+        caller's own cookie. Ending another session or removing a paired device is governed
+        (see device.remove).
+    - id: agent.surface.publish
+      binding: verified
+      routes: ["POST /agent/panels"]
+      code_ops: ["show_surface"]
+      params_schema: params.agent_surface_publish
+      executor: registered_agent
+      caller_authentication: registered_agent_key
+      ownership: caller_owns_panel
+      note: >-
+        P1 because the implemented path creates or updates an agent-owned shared surface: the
+        panel is admitted to the shared board and a conversation row is committed with it. An
+        update is refused when another key owns the panel. A P0 private, ephemeral presentation
+        with no shared write is a distinct semantic action; no such path exists in this handler,
+        so it has no row and cannot be claimed here.
+    - id: agent.surface.arrange
+      binding: verified
+      routes: ["POST /agent/panels"]
+      code_ops: ["arrange"]
+      params_schema: params.agent_surface_arrange
+      executor: registered_agent
+      caller_authentication: registered_agent_key
+      ownership: caller_owns_panel
+      note: >-
+        `surface.remove` writes: it removes an agent-owned panel only when every question on it
+        belongs to the same key, and refuses a pinned panel. Every other arrange sub-action is
+        observed to write nothing (focus and placement are the person's). The row stays P1 for
+        all sub-actions because the handler cannot be classified from a request-supplied label;
+        a sub-action that later gains an ownership-transferring effect is a P2 row, not a P1
+        variant.
+    - id: agent.surface.annotate
+      binding: verified
+      routes: ["POST /agent/panels"]
+      code_ops: ["annotate"]
+      params_schema: params.agent_surface_annotate
+      executor: registered_agent
+      caller_authentication: registered_agent_key
+      ownership: caller_owns_panel
+      note: "A note is added only to a panel the caller's key owns; a panel with no recorded owner has no agent that may annotate it."
+    - id: agent.question.ask
+      binding: verified
+      routes: ["POST /agent/panels"]
+      code_ops: ["ask_human"]
+      params_schema: params.agent_question_ask
+      executor: registered_agent
+      caller_authentication: registered_agent_key
+      ownership: caller_owns_panel
+      note: >-
+        Proposing an ordinary question is P1. It grants nothing: the person's `human.answer`
+        stays P2 with its own confirmation, and moving a question to another agent (ask.reassign)
+        and a required decision remain governed.
+    - id: remote.pair.redeem
+      binding: verified
+      human_evidence: null
+      # No human confirmation applies to this row: its caller path proves possession of a
+      # credential or of a one-time code, never a person, so the class default's assurance
+      # predicate is not evidence this route can produce (R5-07).
+      routes: ["POST /m/api/pair/redeem"]
+      params_schema: params.remote_pair_redeem
+      executor: code_holder
+      caller_authentication: one_time_pairing_code
+      ownership: none_required
+      note: >-
+        The one-time pairing code is exchanged for a registration ticket. Possession of the code
+        proves no identity: it is single use, it expires, and the route says so. The effect is the
+        ticket and the challenge, nothing more; no device is enrolled and no session exists yet.
+    - id: remote.session.challenge
+      binding: verified
+      human_evidence: null
+      # No human confirmation applies to this row: its caller path proves possession of a
+      # credential or of a one-time code, never a person, so the class default's assurance
+      # predicate is not evidence this route can produce (R5-07).
+      routes: ["POST /m/api/auth/options"]
+      params_schema: params.remote_session_challenge
+      executor: unauthenticated_caller
+      caller_authentication: none_unauthenticated
+      ownership: none_required
+      note: >-
+        The sign-in challenge. The caller has proved nothing when it asks, so the route reveals
+        only whether a device is enrolled and issues a single-use challenge. It writes the
+        challenge and nothing else.
+    - id: remote.session.authenticate
+      binding: verified
+      routes: ["POST /m/api/auth/finish"]
+      params_schema: params.remote_session_authenticate
+      executor: device_credential
+      caller_authentication: device_passkey_assertion
+      ownership: caller_own_session
+      note: >-
+        The phone's passkey is verified against the challenge and the enrolled device, and a
+        session is issued for it. The session is the device's own and ends when the device signs
+        out or the credential is revoked.
+    - id: remote.session.logout
+      binding: verified
+      routes: ["POST /m/api/signout"]
+      params_schema: params.remote_session_logout
+      executor: device_credential
+      caller_authentication: device_passkey_assertion
+      ownership: caller_own_session
+      note: >-
+        The session it revokes is the one the caller presented. Ending another session, or
+        removing an enrolled device, is a different operation (device.remove).
+    - id: decision.hold
+      binding: verified
+      routes: ["POST /desk/decide"]
+      params_schema: params.decision_hold
+      note: >-
+        Holding a card changes nothing the card waits for: the step keeps waiting, and the person
+        releases the hold when they are ready. It is P1 because it touches the person's own
+        decision state and nothing anyone else holds.
+    - id: decision.release
+      binding: verified
+      routes: ["POST /desk/decide"]
+      params_schema: params.decision_release
+      note: "Releasing a hold puts the card back under Needs you. It is P1 for the same reason as the hold."
+    - id: human.panel.open
+      binding: verified
+      routes: ["POST /desk/panels/op"]
+      code_ops: ["human.open"]
+      params_schema: params.human_panel_open
+      ownership: person_owns_board
+      note: "Opens a person-owned panel from a closed template; no agent key may perform it and it creates no pending decision."
+    - id: human.panel.close
+      binding: verified
+      routes: ["POST /desk/panels/op"]
+      code_ops: ["human.close"]
+      params_schema: params.human_panel_close
+      ownership: person_owns_board
+      note: >-
+        The person closes a panel. It is P1 because it is the person's own board and it settles
+        nothing; a question left unanswered on a closed panel is still unanswered, and closing a
+        panel is never an answer (the answer rows and their rules are untouched).
+
+  P2:
+    - id: human.answer
+      binding: verified
+      routes: ["POST /desk/panels/op"]
+      code_ops: ["human.answer"]
+      params_schema: params.human_answer
+      ownership: none_required
+      note: "The agent door refuses every human.* op with 403; only the person's paired panel route performs it."
+    - id: ask.route
+      binding: verified
+      routes: ["POST /agent/panels"]
+      code_ops: ["answer.route"]
+      params_schema: params.ask_route
+      executor: registered_agent
+      caller_authentication: registered_agent_key
+      authority_writer: case_record.authority
+      ownership: caller_owns_question
+      note: >-
+        The agent records where an answer went. It is a claim, not delivery: the row stays
+        claimed and nothing marks a step done without independent evidence. The executor is the
+        agent execution, authenticated by its registered key, because that is who acts: the design
+        defines the executor as the agent or service acting, and the only credential that reaches
+        this handler is the agent key. The P2 human evidence is unchanged (A3-UV, and A3-T under
+        Stage 0B), so the agent proposes the route and the human authorises the effect. The
+        design's P2/P3 table cell that named a human session for this row is corrected here and in
+        the defect record; the class, the authority writer and the evidence are not changed.
+    - id: ask.reassign
+      binding: verified
+      routes: ["POST /desk/panels/op"]
+      code_ops: ["human.reassign_owner"]
+      params_schema: params.ask_reassign
+      authority_writer: case_record.authority
+      ownership: person_owns_board
+      note: "Moving a waiting question to another registered agent is a person-reserved ownership change; an agent cannot perform it."
+    - id: ask.withdraw
+      binding: verified
+      routes: ["POST /desk/panels/op", "POST /agent/panels"]
+      code_ops: ["human.stop_waiting", "ask.withdraw"]
+      params_schema: params.ask_withdraw
+      executor: registered_agent_or_human_session
+      caller_authentication: registered_agent_key_or_human_session
+      authority_writer: case_record.authority
+      ownership: none_required
+      note: "`human.stop_waiting` stops waiting on a step; the agent's `ask.withdraw` withdraws its own unanswered question and is refused once the question is answered, agreed, or required. The row has two callers: the person on the desk route and a registered agent key on the agent door, so the executor and the credential are named per caller. The class and the human evidence are unchanged."
+    - id: owner.pin
+      binding: verified
+      routes: ["POST /desk/panels/op"]
+      code_ops: ["human.pin"]
+      params_schema: params.owner_pin
+      ownership: person_owns_board
+    - id: workspace.label
+      binding: verified
+      routes: ["POST /workspace/label"]
+      params_schema: params.workspace_label
+    - id: case.task.complete
+      binding: verified
+      routes: ["POST /desk/decide"]
+      params_schema: params.case_task_complete
+      authority_writer: case_record.authority
+      ownership: none_required
+      note: >-
+        The person marks a step of their own case done. The case keeper records the completion
+        with the person's reason, and the steps that were waiting for it may start. It is P2
+        because it changes the shared case, not because it commits anything outside it.
+    - id: lesson.decide
+      binding: verified
+      routes: ["POST /desk/decide"]
+      params_schema: params.lesson_decide
+      note: >-
+        The person's decision on a proposed lesson: accepted or rejected. It is P2 because the
+        lesson becomes active and applies to other people's work. The choice is fixed by the
+        operation the card kind resolves to; a body that names a choice this effect does not have
+        is refused.
+    - id: device.pair.request
+      binding: verified
+      routes: ["POST /m/api/pair/finish"]
+      executor: code_holder
+      human_evidence: null
+      params_schema: params.device_pair
+      ownership: caller_own_session
+      note: >-
+        P2. A phone that holds a live invitation proves the invitation with a verified passkey
+        registration and asks to join. It creates no device, credential, session or controller.
+        It holds one pending enrolment whose operation digest covers the exact credential,
+        public key, label and controllers it would replace, and it is refused when no active
+        controller exists to authorize it. The authority change is the separate row
+        device.pair.authorize, and the credential is created only by device.pair.
+    - id: remote.start
+      binding: verified
+      routes: ["POST /workspace/remote/start"]
+      params_schema: params.remote_control
+      fixed_parameters: { action: start }
+      note: >-
+        P2 by architectural decision, not an exception to PE-47. Starting remote control opens a
+        pairing window bound to 127.0.0.1 and creates no device, credential or grant. It exercises
+        the existing scoped authority of the session and creates none. Enrolling a device is the
+        separate row `device.pair`.
+    - id: remote.refresh
+      binding: verified
+      routes: ["POST /workspace/remote/refresh"]
+      params_schema: params.remote_control
+      fixed_parameters: { action: refresh }
+      note: >-
+        P2 by architectural decision. Refresh revokes the devices currently paired and issues a
+        new pairing link. It must not extend a session beyond its maximum expiry, and it must
+        respect revocation of the session's authority. It widens no scope. Refresh is a second
+        replacement path beside `device.pair`, and that gap is recorded as an open item.
+    - id: remote.stop
+      binding: verified
+      routes: ["POST /workspace/remote/stop"]
+      params_schema: params.remote_control
+      fixed_parameters: { action: stop }
+      note: >-
+        P2 by architectural decision. Stop revokes the session's devices and closes the transport.
+        It removes access and creates none.
+    - id: device.remove
+      binding: candidate
+      params_schema: params.device_remove
+      note: "Removing a paired device, including a session that is not the caller's own, stays governed. It is not session.logout."
+    - id: device.recover
+      binding: reserved
+      executor: local_console
+      human_evidence: RECOVERY_CODE_PRESENCE_FRESH_PASSKEY
+      stage0b_evidence: RECOVERY_CODE_PRESENCE_FRESH_PASSKEY
+      pending_expiry: 5m
+      params_schema: params.device_recover
+      note: >-
+        Recovery is its own ceremony and never inherits the class default. The recovery code plus
+        local presence plus a fresh passkey is the evidence; A3-T is not enough and is not a
+        substitute for it.
+    - { id: expert.answer, binding: candidate, params_schema: params.expert_answer }
+    - id: trust.rotate
+      binding: reserved
+      executor: local_console
+      human_evidence: ADMIN_PRESENCE_INDEPENDENT_ADMIN
+      stage0b_evidence: ADMIN_PRESENCE_INDEPENDENT_ADMIN
+      pending_expiry: 30m
+      note: >-
+        Rotating the trust root needs an administrator who is independent of the operation being
+        rotated. A3-T is not enough: the interim terminal path never stands in for the independent
+        administrator's presence.
+      params_schema: params.trust_rotate
+      authority_writer: issuer_root
+
+  P3:
+    - { id: grant.create, binding: reserved, params_schema: params.grant_create, authority_writer: sea_forge, separation_of_duty: { requester: requesting_human, approver: independent_human, executor: human_session } }
+    - { id: grant.revoke, binding: reserved, params_schema: params.grant_revoke, authority_writer: sea_forge, separation_of_duty: { requester: revoking_human, approver: independent_human, executor: human_session }, note: "Specification only. No route exists and the SEA-Forge interface is unpublished, so this row is not runtime-accessible and the catalog makes no runtime claim for it. Compromised device authority is contained today by remote.stop and device.remove, which are local P2 rows." }
+    - { id: gauntlet.run.cancel, binding: reserved, params_schema: params.run_cancel, authority_writer: sea_forge, separation_of_duty: { requester: run_owner_human, approver: independent_human, executor: human_session }, note: "Specification only. No route exists and the SEA-Forge interface is unpublished, so this row is not runtime-accessible. Emergency halt of unsafe execution is not provided by any route yet; the containment path is an open owner decision." }
+    - { id: expert.install, binding: candidate, params_schema: params.expert_install, separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
+    - { id: expert.configure, binding: candidate, params_schema: params.expert_configure, separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
+    - { id: expert.remove, binding: candidate, params_schema: params.expert_remove, separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }, note: "P3 candidate, non-executable. Its effects, authority writer and separation-of-duty requirements are not yet defined, so the row names the class default writer and no executor path." }
+    - id: device.pair.authorize
+      separation_of_duty: { requester: prospective_device, approver: operator_with_active_controller, executor: device_credential }
+      binding: verified
+      routes: ["GET /m/api/pair/pending", "POST /m/api/pair/authorize"]
+      executor: device_credential
+      human_evidence: A3-UV
+      authority_writer: identity_service
+      pending_expiry: 5m
+      params_schema: params.device_pair_authorize
+      ownership: caller_own_session
+      note: >-
+        P3. The operator authorizes one enrolment with the active controller's own passkey, and
+        the signature requires user verification on that phone. The challenge is the enrolment's
+        operation digest, which names the new credential, its key, its label and the controllers
+        it replaces, so one proof authorizes exactly that transaction. The proof is verified
+        against the identity service's stored key and sign count, and it issues no session. A
+        verified proof moves the pending enrolment to confirmed, once, by one compare-and-swap.
+        Three responsibilities are kept apart. Authorization: the P3 approver (the active controller,
+        by its A3-UV proof) approves this exact operation digest, which binds the proposed credential,
+        its label, the permissions it would hold, the controllers it replaces and the generation it
+        was requested under. No SEA-Forge P3 authority decision exists for this enrolment in Stage 0B;
+        that integration gap is recorded in live_enforcement, not treated as satisfied. Identity
+        lifecycle: the identity service is the designated state writer for the credential itself.
+        Atomic persistence: store compare-and-swap moves the pending record pending to confirmed, once.
+        The approval record is written by a second store write after that confirmation; the commit refuses
+        a confirmation that has no approval, so a failed approval write fails closed. The proof is
+        human-authentication evidence (A3-UV). It does not commit anything. A browser cannot produce it,
+        and a terminal's typed text cannot either.
+    - id: device.pair
+      separation_of_duty: { requester: prospective_device, approver: operator_with_active_controller, executor: credential_issuer }
+      binding: verified
+      routes: ["POST /m/api/pair/await"]
+      executor: credential_issuer
+      authority_writer: identity_service
+      human_evidence: A3-UV
+      pending_expiry: 5m
+      params_schema: params.device_pair_await
+      ownership: none_required
+      note: >-
+        P3. The authorized credential issuer creates the active credential only for an enrolment
+        that device.pair.authorize confirmed, inside its window, for the same generation and
+        controllers, and it applies that confirmation once. The commit replaces the controller
+        it names. Those writes are separate and in sequence (identity enrolment, ledger revocation,
+        ledger add, audit), not one atomic commit across identity, ledger and approval; a failed step
+        is compensated and audited. A refresh or stop
+        ends every waiting or confirmed enrolment. The route authenticates the pending record
+        alone: the caller presents a pending id, and only the record's own confirmation lets it
+        create anything.
+    - id: handoff.send
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }
+      binding: verified
+      routes: ["POST /desk/handoff"]
+      params_schema: params.handoff_send
+      authority_writer: sea_forge
+      note: "POST /desk/handoff/preview is a read and is not a send."
+    - id: grant.redelegate
+      separation_of_duty: { requester: registered_agent_or_human_session, approver: independent_human, executor: registered_agent_or_human_session }
+      binding: reserved
+      executor: registered_agent_or_human_session
+      params_schema: params.grant_redelegate
+      authority_writer: sea_forge
+      human_evidence: AGENT_NONE_HUMAN_A3_UV
+      pending_expiry: parent_grant_expiry_or_10m
+      note: >-
+        Narrowing only. An agent caller is gated by the parent's redelegate permission, remaining
+        depth, and ancestor budget; a human caller needs A3-UV and a current SEA-Forge entitlement
+        to redelegate the named live parent, since a human session has no delegation head.
+    - id: horizon.settlement.observe
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }
+      executor: human_session
+      binding: verified
+      routes: ["POST /desk/decide"]
+      params_schema: params.horizon_settlement_request
+      fixed_parameters: { phase: observe }
+      pending_expiry: 10m
+      note: >-
+        It reads the settlement target through RealityTrace, submits an evidence packet to SEA-
+        Forge's evidence ledger, and records a local settlement state of pending with the window
+        open. The ledger entry is consequential: it is the evidence a later ruling uses, and it
+        leaves this application. The effect, not any route refusal, is why the row is P3. It
+        acknowledges no settlement and writes no ruling; the ruling is horizon.settlement.rule.
+    - id: device.settlement.observe
+      separation_of_duty: { requester: device_credential, approver: independent_human, executor: device_credential }
+      binding: verified
+      routes: ["POST /m/api/command"]
+      executor: device_credential
+      caller_authentication: device_passkey_assertion
+      params_schema: params.device_settlement_request
+      fixed_parameters: { phase: observe }
+      pending_expiry: 10m
+      note: >-
+        Same effect as horizon.settlement.observe, requested from the phone: it reads the
+        target, submits the evidence packet to SEA-Forge's ledger, and records the local window.
+        P3 because of that external ledger write. A device credential proves which device is at
+        the route, never which person holds it, so it cannot supply the approval the separation
+        of duty requires; the phone route refuses it.
+    - id: approval.approve
+      binding: verified
+      routes: ["POST /desk/decide"]
+      params_schema: params.approval
+      authority_writer: sea_forge
+      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: human_session }
+      fixed_parameters: { choice: accept }
+      pending_expiry: 10m
+      note: "The approver is distinct from the initiating human, the requesting execution, and the executor. The pending window is the policy's ten minutes (pending_approval_ttl), not the P3 default's open-ended one: an approval that is not consumed inside it is expired and the operation must be requested again. The phone has its own refused row, `device.approval.approve`."
+    - id: approval.reject
+      binding: verified
+      routes: ["POST /desk/decide"]
+      params_schema: params.approval
+      authority_writer: sea_forge
+      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: human_session }
+      fixed_parameters: { choice: reject }
+      pending_expiry: 10m
+      note: "A rejection expires on the same ten-minute pending window as an approval (pending_approval_ttl). The phone has its own refused row, `device.approval.reject`."
+    - id: device.approval.approve
+      binding: verified
+      routes: ["POST /m/api/command"]
+      executor: device_credential
+      caller_authentication: device_passkey_assertion
+      params_schema: params.device_approval
+      authority_writer: sea_forge
+      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: device_credential }
+      pending_expiry: 10m
+      note: >-
+        The phone's own approval row, and it is refused. An approval needs the operation-bound
+        pending record, the protected confirmation and the separation-of-duty check, and the
+        remote path has none of them: a device credential proves which enrolled device is at
+        the route, never which person is holding it, so it can never stand in for the
+        approver. The refusal is a containment, not a downgrade.
+    - id: device.approval.reject
+      binding: verified
+      routes: ["POST /m/api/command"]
+      executor: device_credential
+      caller_authentication: device_passkey_assertion
+      params_schema: params.device_approval
+      authority_writer: sea_forge
+      separation_of_duty: { requester: initiating_human, approver: approving_human, executor: device_credential }
+      pending_expiry: 10m
+      note: >-
+        The phone's own rejection row, and it is refused, for the same reason the approval row
+        is: the remote path has no operation-bound pending record and no protected
+        confirmation, and a device credential is not one.
+    - id: case.task.decide
+      binding: verified
+      routes: ["POST /desk/decide"]
+      params_schema: params.case_task_decide
+      authority_writer: case_record.authority
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }
+      pending_expiry: 10m
+      note: >-
+        The case keeper's own approval, taken by the person: it approves or rejects the task the
+        keeper asked about, under the versions the person saw. It is P3 because the case keeper
+        acts on it outside this application, and the approver is distinct from the requester.
+    - id: horizon.settlement.rule
+      binding: verified
+      routes: ["POST /desk/decide"]
+      params_schema: params.horizon_settlement_request
+      authority_writer: sea_forge
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }
+      fixed_parameters: { phase: rule }
+      pending_expiry: 10m
+      note: >-
+        The final sign-off: the case keeper rules on the evidence and the answer is recorded. It
+        is P3 because the ruling commits outside this application and cannot be undone here.
+        The phone has its own refused row, `device.settlement.rule`.
+    - id: device.settlement.rule
+      binding: verified
+      routes: ["POST /m/api/command"]
+      executor: device_credential
+      caller_authentication: device_passkey_assertion
+      params_schema: params.device_settlement_request
+      authority_writer: sea_forge
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: device_credential }
+      fixed_parameters: { phase: rule }
+      pending_expiry: 10m
+      note: >-
+        The phone's own ruling row, and it is refused. The ruling is the final settlement call
+        to SEA-Forge, so it needs the operation-bound pending record and the protected
+        confirmation, and the remote path has neither; a device credential proves the device,
+        never the person holding it. The refusal is a containment, not a downgrade.
+    - id: external.commit
+      binding: reserved
+      executor: registered_agent
+      params_schema: params.external_commit
+      authority_writer: sea_forge
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: registered_agent }
+      human_evidence: PER_TARGET_ROW
+      pending_expiry: grant_expiry
+    - id: workspace.export
+      binding: verified
+      routes: ["POST /workspace/export"]
+      params_schema: params.workspace_export
+      pending_expiry: 15m
+      authority_writer: sea_forge
+      separation_of_duty: { requester: human_session, approver: independent_human, executor: human_session }
+      note: >-
+        The export is a P3 row: the approver is distinct from the requester and from whoever
+        executes the export. The separation is declared here and is not enforced by the running
+        code at this freeze; the enforcement entry says so and names Stage 3 as the stage that
+        closes it.
+    - id: isolation.request
+      binding: reserved
+      executor: registered_agent
+      params_schema: params.isolation_request
+      authority_writer: sea_forge
+      separation_of_duty: { requester: registered_agent, approver: independent_human, executor: registered_agent }
+      human_evidence: NONE
+      pending_expiry: grant_expiry
+      note: "The capability gate fails closed with isolation_unavailable where the host prerequisites are not met."
+
+  PX:
+    - id: capability.invoke
+      binding: reserved
+      dispatcher: true
+      params_schema: params.capability_invoke
+      inherits: [class, executor, authority_writer, human_evidence, pending_expiry]
+      note: "A family. The target operation ID, resource, amount, and effect are part of the descriptor and the resolved row. An unresolvable target is Px."
+    - id: run.start
+      binding: verified
+      dispatcher: true
+      routes: ["POST /desk/start"]
+      params_schema: params.run_start
+      inherits: [class, executor, authority_writer, human_evidence, pending_expiry]
+      note: >-
+        Resolves every target from the pinned plan. A plan whose targets are all local P0/P1
+        resolves in Cognate with no grant and no SEA-Forge call; any governed target binds the
+        whole run at the highest class present. The desk start route is this dispatcher and
+        nothing else: it starts the waiting steps of a case, which is shared case execution, so
+        it is not a P1 local write until its targets are resolved and every one of them is local.
+
+# Routes that carry more than one semantic action. The applied operation is chosen by the
+# handler from the action it actually performs. An action not listed here is Px, whatever the
+# route is called and whatever class the request claims for itself.
+dispatch:
+  - route: "POST /agent/panels"
+    action_field: tool
+    actions:
+      show_surface: agent.surface.publish
+      ask_human: agent.question.ask
+      arrange: agent.surface.arrange
+      annotate: agent.surface.annotate
+      read_responses: agent.response.read
+      ask.withdraw: ask.withdraw
+      answer.route: ask.route
+    unknown_action: PX
+    refused_prefixes: ["human."]
+    note: >-
+      The door refuses any human.* operation outright; a person's reserved operations are not
+      reachable from an agent key at a stronger class.
+  - route: "POST /desk/panels/op"
+    action_field: op
+    actions:
+      human.answer: human.answer
+      human.reassign_owner: ask.reassign
+      human.stop_waiting: ask.withdraw
+      human.pin: owner.pin
+      human.open: human.panel.open
+      human.close: human.panel.close
+    unknown_action: PX
+  - route: "POST /desk/decide"
+    action_field: choice
+    # The card kind is resolved by the server from the card the body names, never from the body.
+    # The pair (resolved card kind, chosen action) chooses the operation, and each pair has its
+    # own row and its own schema. A pair the catalog does not list is Px.
+    resolved_field: card_kind
+    actions:
+      hold: decision.hold
+      release: decision.release
+    combinations:
+      - { resolved: escalation, action: accept, operation: approval.approve }
+      - { resolved: escalation, action: reject, operation: approval.reject }
+      - { resolved: lesson, action: accept, operation: lesson.decide }
+      - { resolved: lesson, action: reject, operation: lesson.decide }
+      - { resolved: case_task, action: accept, operation: case.task.decide }
+      - { resolved: case_task, action: reject, operation: case.task.decide }
+      - { resolved: human_step, action: accept, operation: case.task.complete }
+      - { resolved: acceptance_observe, action: accept, operation: horizon.settlement.observe }
+      - { resolved: acceptance_rule, action: accept, operation: horizon.settlement.rule }
+    unknown_action: PX
+    note: >-
+      One route, several effects, one class each. Holding and releasing a card are the person's
+      own P1 state and do not depend on what the card is. Everything else is decided by the kind
+      of card the server fetched: an escalation is a P3 approval, a lesson is a P2 decision, a case
+      task is the case keeper's own P3 approval, a human step is a P2 completion, and an acceptance
+      card is one of the two settlement halves. The route itself carries no class, so no card can
+      be downgraded by taking a weaker path to it.
+  - route: "POST /m/api/command"
+    action_field: kind
+    # The phone names a kind, never an operation. The server maps the kind to the row; for the
+    # settlement command the phase selects which of the two settlement rows runs.
+    resolved_field: phase
+    # The phone's caller path. Every row this route selects is a device-credential row: the
+    # phone proves which enrolled device is at the route, never which person is holding it.
+    caller_path: device_credential
+    actions:
+      open_case: device.case.open
+      commit: device.surface.intent.commit
+      approve: device.approval.approve
+      reject: device.approval.reject
+    combinations:
+      - { resolved: observe, action: settle, operation: device.settlement.observe }
+      - { resolved: rule, action: settle, operation: device.settlement.rule }
+    unknown_action: PX
+    note: >-
+      The phone's command route. The kind is a closed vocabulary, and the row it selects carries
+      the class, the authority writer and the evidence. Every row here is a device-credential
+      row, because the phone's credential is a device credential and not a human session: a
+      device credential never inherits a human row's authority, so the phone cannot answer an
+      approval or rule a settlement. A kind the catalog does not list is Px and never reaches a
+      capability.
+  - route: "POST /desk/search"
+    action_field: record
+    actions:
+      "false_or_absent": horizon.search.read
+      "true_with_non_empty_q": horizon.search.record
+    # The literal values of `record` that select each action. `absent` means the field is not in
+    # the body at all. Every other value is Px and is refused before the search runs, so an
+    # unlisted action can never execute a read.
+    action_values:
+      false_or_absent:
+        values: [absent, false, "0"]
+      true_with_non_empty_q:
+        values: [true, "1"]
+        requires_non_empty_query: true
+    unknown_action: PX
+    note: >-
+      Effect-based dispatch on one POST route: the read is P0 even though the method is POST,
+      and the recorded find is the P1 write. The write path also performs the read, so a
+      recorded find is governed by horizon.search.record alone.
+
+# A route that is a transport alias of a listed operation. The alias adds no class and no
+# authority; it may only narrow.
+route_aliases:
+  - route: "POST /workspace/intent"
+    operation: horizon.surface.intent.commit
+    target_class: P1
+    basis: "Both handlers call commitSurfaceIntent; the effect is one committed surface intent."
+    narrowing: >-
+      /workspace/intent is strictly narrower: it hard-codes transport `gui` and the session's
+      role `human`, and it additionally requires the action to be offered and available in the
+      current frame with a matching frame revision.
+    # The narrowing is stated as data so a check never has to read the prose above. Each entry
+    # names one machine-checkable difference between this route and the route it stands in for;
+    # a supplied value that disagrees with a fixed parameter is refused.
+    fixed_parameters:
+      transport: gui
+      role: human
+    narrowing_checks:
+      - { kind: fixed_parameter, name: transport, equals: gui }
+      - { kind: fixed_parameter, name: role, equals: human }
+      - { kind: offered_action_required, name: action_id }
+      - { kind: frame_revision_match, name: frame_revision }
+    added_requirements: [transport_fixed_gui, role_fixed_human, offered_action_required, frame_revision_match]
+
+live_enforcement:
+  version: 1
+  # The two authority paths, and the local-console ceremony. They are distinct, and no caller can
+  # use the other one: a human session holds an entitlement and has no delegation head, while an
+  # agent holds a live bounded grant and never holds an entitlement.
+  paths:
+    human_session:
+      authority: >-
+        A current SEA-Forge entitlement for the named operation, held by the durable human
+        principal the issuer bound to this session.
+      evidence: A3-UV
+      note: >-
+        A human session cannot hold a delegation grant, so it cannot be authorised by an agent's
+        scope. The entitlement path is the only authority it has.
+    registered_agent:
+      authority: >-
+        A live bounded delegation grant from SEA-Forge: the execution proof, the remaining depth,
+        the remaining ancestor budget and the expiry.
+      evidence: NONE
+      note: >-
+        The registered agent key is a caller identity, never an authority. The grant is the
+        authority, and it is checked against the execution that presents it. The path is named for
+        the principal the route proves, not for a logical execution: the agent door authenticates
+        a stable registered key and holds no issuer-bound execution or attempt proof, so a row
+        whose authority depends on the execution says so in what is missing (R5-04).
+    local_console:
+      authority: >-
+        The one-time code shown at the local console. Possession of it is evidence for this local
+        session only; it is not an assurance predicate and it grants no authority over anything
+        else.
+      evidence: NONE
+      note: "The desk's browser-session ceremony. It creates one local session and enrolls no credential."
+    code_holder:
+      authority: >-
+        None beyond possession of the one-time code. The route cannot establish who presented the
+        code, so it establishes neither local-console presence nor any authority over anything
+        else.
+      evidence: NONE
+      note: >-
+        A separate path from `local_console`, because the route proves less. `local_console` is a
+        console that proves its own presence; `code_holder` is whoever holds the code. The two are
+        never interchangeable.
+    none:
+      authority: "No authority: the row has no effect to authorize."
+      evidence: NONE
+      note: "The public liveness probe."
+    none_unauthenticated:
+      authority: "No authority: the caller proved nothing when it asked."
+      evidence: NONE
+      note: >-
+        A caller that has not authenticated. It may ask for a challenge and learn whether a device
+        is enrolled, and nothing else. It is a different path from `none`: the liveness probe
+        writes nothing and says nothing about the deployment, while this path writes a challenge.
+    device_credential:
+      authority: >-
+        The enrolled device's credential, verified against the challenge it was issued for. The
+        session it opens is the device's own and ends when the device signs out or the credential
+        is revoked.
+      evidence: NONE
+      note: >-
+        A phone that signed in with its passkey. It is not a human session: the device credential
+        proves which enrolled device is at the route, never which person is holding it.
+    authorized_pending_record:
+      authority: >-
+        A pending enrolment that the active controller's user-verified passkey confirmed, moved by one
+        compare-and-swap, inside its window and for the same generation and controllers. The writer
+        applies it once.
+      evidence: A3-UV
+      note: >-
+        The route presents only a pending id. What it proves is the record's own state: the confirmation
+        is the controller's A3-UV proof, verified by the authorize route, and nothing the caller presents
+        at this route can create a confirmation.
+  # One entry per live-bound row. `enforced_today` is a statement about this repository's running
+  # code at the freeze, checked against the source. A row whose enforcement is missing says what
+  # is missing and which stage must close it; it is never left implied by the class.
+  rows:
+    - id: horizon.health
+      caller_path: none
+      enforced_today: true
+      enforced_by: >-
+        The route answers before any authentication and answers every caller the same way: the
+        process is up, and nothing else. It reports no deployment profile, operator reference,
+        semantic world, research state or transport, to a paired caller or an unpaired one.
+      missing: []
+    - id: horizon.diagnostics.read
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: >-
+        The paired desk session cookie. The read is refused to an unpaired caller by the same
+        central rule that guards every other route, and it writes nothing.
+      missing: []
+    - id: remote.health
+      caller_path: none
+      enforced_today: true
+      enforced_by: >-
+        The route answers before any device is paired and says only that the transport is up and
+        which schema it speaks. It reads no device, no operator and no workspace.
+      missing: []
+    - id: remote.state.read
+      caller_path: device_credential
+      enforced_today: true
+      enforced_by: >-
+        The device session cookie, resolved against the enrolled device, the operator and the
+        tenant before the snapshot is read.
+      missing: []
+    - id: remote.events.read
+      caller_path: device_credential
+      enforced_today: true
+      enforced_by: "The device session cookie, resolved against the enrolled device before the stream is opened."
+      missing: []
+    - id: remote.pair.redeem
+      caller_path: code_holder
+      enforced_today: true
+      enforced_by: >-
+        The one-time pairing code, which is single use and expires. The route proves possession of
+        the code and nothing else: it does not claim who presented it, and it enrols no device and
+        issues no session.
+      missing: []
+    - id: remote.session.challenge
+      caller_path: none_unauthenticated
+      enforced_today: true
+      enforced_by: >-
+        The route proves nothing about the caller. It reveals only whether a device is enrolled
+        and issues a single-use challenge.
+      missing: []
+    - id: remote.session.authenticate
+      caller_path: device_credential
+      enforced_today: true
+      enforced_by: >-
+        The WebAuthn assertion is verified against the issued challenge, the enrolled device's
+        credential and the transport's origin before a session is issued.
+      missing: []
+    - id: remote.session.logout
+      caller_path: device_credential
+      enforced_today: true
+      enforced_by: "The session revoked is the one the caller presented, resolved from its own cookie."
+      missing: []
+    - id: horizon.economics.read
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie. The read reaches the local workspace economics only."
+      missing: []
+    - id: horizon.remote.status
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie."
+      missing: []
+    - id: horizon.workspace.read
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: >-
+        The paired desk session cookie. The read reaches the caller's own view of the local
+        workspace and writes nothing.
+      missing: []
+    - id: horizon.navigation.inspect
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie. The read issues the caller's current frame and writes nothing."
+      missing: []
+    - id: horizon.inspect.focus
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie. The read reaches the local records and writes nothing."
+      missing: []
+    - id: horizon.inspect.neighborhood
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie. The read reaches the local records and writes nothing."
+      missing: []
+    - id: horizon.compare.read
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: >-
+        The paired desk session cookie, and the allow-list of record sources the comparison reads.
+        It writes nothing.
+      missing: []
+    - id: horizon.work.read
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie. The read reaches the caller's own cases and writes nothing."
+      missing: []
+    - id: horizon.remote.events.read
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie. The stream reports the transport's state and writes nothing."
+      missing: []
+    - id: horizon.decide.read
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie. The read reports the cards the caller may answer and writes nothing."
+      missing: []
+    - id: horizon.conversation.read
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie. The read reaches the caller's own conversation rows and writes nothing."
+      missing: []
+    - id: horizon.draft.read
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie. The read reaches the caller's own draft and writes nothing."
+      missing: []
+    - id: horizon.lesson.read
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie. The read reaches the tenant's lessons and writes nothing."
+      missing: []
+    - id: session.read
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: >-
+        The paired desk session cookie itself. The read says whether this browser is paired and
+        establishes no session, so it neither creates nor extends one.
+      missing: []
+    - id: horizon.surface.read
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: >-
+        The paired desk session cookie. The read reduces the local surface for the caller's role
+        and writes nothing; the role selects the projection and never establishes identity.
+      missing: []
+    - id: horizon.search.read
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: >-
+        The paired desk session cookie, and the dispatch rule: a `record` value outside the
+        catalog's two actions is refused before the search runs, so an unlisted action never
+        executes this read.
+      missing: []
+    - id: agent.response.read
+      caller_path: registered_agent
+      enforced_today: true
+      enforced_by: >-
+        The agent key in the Authorization header, checked against the key registry when the
+        command runs. A page-agent label is refused.
+      missing: []
+    - id: horizon.navigation.intent.commit
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie; the intent commits as the configured operator."
+      missing: []
+    - id: horizon.surface.intent.commit
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: >-
+        The paired desk session cookie, and the actor rule: a body that names its own role or
+        actor is refused (400 forbidden_field), so the role always comes from the session.
+      missing: []
+    - id: horizon.note.save
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie; the note is the caller's own."
+      missing: []
+    - id: horizon.draft.save
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie; the draft is the caller's own."
+      missing: []
+    - id: horizon.conversation.discard
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie; only the caller's own rows are discarded."
+      missing: []
+    - id: horizon.case.open
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie; the case is opened for the configured operator."
+      missing: []
+    - id: horizon.lesson.propose
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie; the proposal is the caller's own."
+      missing: []
+    - id: horizon.onboarding.skip
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie."
+      missing: []
+    - id: horizon.onboarding.resume
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie."
+      missing: []
+    - id: horizon.workspace.presenting
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie."
+      missing: []
+    - id: horizon.search.record
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: >-
+        The paired desk session cookie, and the dispatch rule: the find is recorded only for the
+        catalog's recorded-find action, and the row is the caller's own.
+      missing: []
+    - id: session.pair
+      caller_path: code_holder
+      enforced_today: true
+      enforced_by: >-
+        Possession of the one-time code shown at the local console. The cookie it returns is the
+        session's only credential; no credential is enrolled and no authority is granted. The route
+        does not establish that the caller is at the console, and the row does not claim it.
+      missing: []
+    - id: session.logout
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie; the session it clears is the caller's own."
+      missing: []
+    - id: agent.surface.publish
+      caller_path: registered_agent
+      enforced_today: true
+      enforced_by: >-
+        The agent key in the Authorization header. A body that names an executor, a role or an
+        actor is refused, so the recorded executor is the authenticated key.
+      missing: []
+    - id: agent.surface.arrange
+      caller_path: registered_agent
+      enforced_today: true
+      enforced_by: "The agent key in the Authorization header."
+      missing: []
+    - id: agent.surface.annotate
+      caller_path: registered_agent
+      enforced_today: true
+      enforced_by: "The agent key in the Authorization header."
+      missing: []
+    - id: agent.question.ask
+      caller_path: registered_agent
+      enforced_today: true
+      enforced_by: >-
+        The agent key in the Authorization header, which owns the question it puts up.
+      missing: []
+    - id: human.panel.open
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie."
+      missing: []
+    - id: human.panel.close
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie."
+      missing: []
+    - id: human.answer
+      caller_path: human_session
+      enforced_today: false
+      refused_today: false
+      enforced_by: >-
+        The paired desk session cookie only. The answer is written immediately: nothing asks for
+        an A3-UV receipt, nothing consults the Cognate continuation authority, and no pending
+        record with an expiry is written.
+      missing: [durable_principal_binding, evidence_A3_UV, authority_cognate_local_continuation, pending_record]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+      note: >-
+        The desk session is possession of a pairing cookie, not a binding to the durable human
+        principal the issuer contract names, so the A3-T confirmation resolves `confirmer_ref`
+        through the configured operator actor rather than through the browser session.
+    - id: ask.route
+      caller_path: registered_agent
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P2 and the agent door proves a registered agent's key: it holds no bounded
+        grant, no execution proof and no pending record, so the row is refused before
+        any target effect and the refusal is audited.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        The agent key in the Authorization header only. The route claim is committed immediately:
+        nothing proves an execution, no live bounded grant is checked, and the person's A3-UV
+        evidence is never asked for.
+      missing: [execution_proof, live_bounded_grant, pending_record, evidence_A3_UV]
+      required_stage: "Stage 3"
+      note: >-
+        The execution proof arrives with the issuer at Stage 1, the live bounded grant with the
+        SEA-Forge bridge at Stage 2, and the person's A3-UV evidence at Stage 3; the row is fully
+        closed at Stage 3, when every piece is present. A registered key alone never routes a
+        question, and Stage 0B does not enable it: an interim A3-T receipt cannot stand in for the
+        grant or for the person's evidence.
+    - id: ask.reassign
+      caller_path: human_session
+      enforced_today: false
+      refused_today: false
+      enforced_by: >-
+        The paired desk session cookie only. The reassignment is written immediately: no A3-UV
+        receipt, no authority check, no pending record.
+      missing: [durable_principal_binding, evidence_A3_UV, authority_cognate_local_continuation, pending_record]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+    - id: ask.withdraw
+      enforced_today: false
+      enforced_by: >-
+        The paired desk session cookie on the desk route and the agent key on the agent route.
+        Neither path asks for evidence or an authority before the withdrawal is written.
+      missing: [durable_principal_binding, evidence_A3_UV, authority_cognate_local_continuation, execution_proof, live_bounded_grant, pending_record]
+      required_stage: "Stage 0B for the desk variant; Stage 2 for the agent variant"
+      variants:
+        - code_op: human.stop_waiting
+          routes: ["POST /desk/panels/op"]
+          caller_path: human_session
+          refused_today: false
+          required_stage: "Stage 0B"
+          production_stage: "Stage 3"
+        - code_op: ask.withdraw
+          routes: ["POST /agent/panels"]
+          caller_path: registered_agent
+          refused_today: true
+          refusal_reason: >-
+            P2 and the agent door proves a registered agent's key: it holds no bounded grant, no
+            execution proof and no pending record, so this variant is refused before any target
+            effect and the refusal is audited.
+          required_stage: "Stage 2"
+    - id: owner.pin
+      caller_path: human_session
+      enforced_today: false
+      refused_today: false
+      enforced_by: "The paired desk session cookie only. The pin is written immediately."
+      missing: [durable_principal_binding, evidence_A3_UV, authority_cognate_local_continuation, pending_record]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+    - id: workspace.label
+      caller_path: human_session
+      enforced_today: false
+      refused_today: false
+      enforced_by: "The paired desk session cookie only. The label is written immediately."
+      missing: [durable_principal_binding, evidence_A3_UV, authority_cognate_local_continuation, pending_record]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+    - id: handoff.send
+      caller_path: human_session
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P2 and the handoff commits to SEA-Forge: there is no SEA-Forge bridge and no
+        bounded grant at this freeze, so the row is refused before any target effect and
+        the refusal is audited.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: "The paired desk session cookie only. The hand off is sent immediately."
+      missing: [durable_principal_binding, evidence_A3_UV, authority_sea_forge, pending_record]
+      required_stage: "Stage 3"
+      note: >-
+        A hand off is shared state outside the caller's own scope, so it stays refused in Stage 0B
+        even with a valid interim A3-T receipt; the local pending confirmation cannot enable it.
+    - id: lesson.decide
+      caller_path: human_session
+      enforced_today: false
+      refused_today: false
+      enforced_by: >-
+        The paired desk session cookie, and the dispatch rule: the card kind is resolved by the
+        server and the choice is fixed by the operation.
+      missing: [durable_principal_binding, evidence_A3_UV, authority_cognate_local_continuation, pending_record]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+    - id: decision.hold
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: >-
+        The paired desk session cookie, and the dispatch rule: the hold is a P1 effect on the
+        caller's own card, and a hold without a reason is refused.
+      missing: []
+    - id: decision.release
+      caller_path: human_session
+      enforced_today: true
+      enforced_by: "The paired desk session cookie, and the dispatch rule: only a held card can be released."
+      missing: []
+    - id: case.task.decide
+      caller_path: human_session
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P3 and the row needs the case keeper's authority, the operation-bound pending
+        record, the person's A3-UV confirmation and the separation-of-duty check. None
+        of them exists at this freeze, so the row is refused before any target effect
+        and the refusal is audited.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        The paired desk session cookie, and the dispatch rule: the card kind is resolved by the
+        server and the decision is the caller's own.
+      missing: [durable_principal_binding, evidence_A3_UV, pending_record, separation_of_duty_check]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+    - id: case.task.complete
+      caller_path: human_session
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P2 and the row writes through the case keeper, which is outside this
+        application: the pending record and the person's evidence do not exist at this
+        freeze, so the row is refused before any target effect and the refusal is
+        audited.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        The paired desk session cookie, and the dispatch rule: the card kind is resolved by the
+        server, and the case version the person saw is pinned in the request.
+      missing: [durable_principal_binding, evidence_A3_UV, pending_record]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+    - id: horizon.settlement.observe
+      caller_path: human_session
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P3: the observation submits an evidence packet to SEA-Forge's ledger, an external
+        consequential write. The pending record and the person's A3-UV evidence do not exist at
+        this freeze, so the row is refused before any target effect and the refusal is audited.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        The paired desk session cookie, and the dispatch rule: the acceptance card names the move
+        and the observation phase is fixed by the card.
+      missing: [durable_principal_binding, evidence_A3_UV, pending_record]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+      note: >-
+        The classification follows the effect described in the row's note. The desk route
+        refuses the row before the handler runs (refused_today), so no observation is written at
+        this freeze.
+    - id: device.settlement.observe
+      caller_path: device_credential
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P3: the observation submits an evidence packet to SEA-Forge's ledger. A device
+        credential proves which device is at the route, never which person holds it: there is no
+        pending record and no protected confirmation, so the row is refused before any target
+        effect and the refusal is audited.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        Nothing runs. The phone's command route resolves the kind to this row, sees that it is
+        governed, and refuses with `no_protected_confirmation_path` before any capability is
+        invoked and before any record is appended.
+      missing: [durable_principal_binding, evidence_A3_UV, pending_record]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+      note: >-
+        The phone's observation row. A device credential proves which enrolled device is at the
+        route and never which person is holding it, so it can never be the A3-UV confirmation
+        the row needs. The refusal is the containment; the row keeps its P2 class, so nothing is
+        downgraded to make it reachable.
+    - id: device.settlement.rule
+      caller_path: device_credential
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P3 and a device credential is never the approver: there is no pending record and
+        no protected confirmation, so the row is refused before any target effect and
+        the refusal is audited.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        Nothing runs. The phone's command route resolves the kind to this row, sees that it is
+        governed, and refuses with `no_protected_confirmation_path` before any capability is
+        invoked and before any record is appended.
+      missing: [durable_principal_binding, evidence_A3_UV, pending_record]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+      note: >-
+        The phone's ruling row. The ruling is SEA-Forge's final settlement call, so it must
+        never be reachable from a device session with no pending record and no protected
+        confirmation.
+    - id: device.approval.approve
+      caller_path: device_credential
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P3 and a device credential is never the approver: there is no pending record, no
+        protected confirmation and no separation of duty, so the row is refused before
+        any target effect and the refusal is audited.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        Nothing runs. The phone's command route resolves the kind to this row, sees that it is
+        governed, and refuses with `no_protected_confirmation_path` before any capability is
+        invoked and before any record is appended.
+      missing: [durable_principal_binding, evidence_A3_UV, pending_record, separation_of_duty_check]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+      note: >-
+        The phone's approval row. An approval needs the operation-bound pending record, the
+        protected confirmation and the separation-of-duty check; the remote path has none of
+        them, and a device credential is never the approver.
+    - id: device.approval.reject
+      caller_path: device_credential
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P3 and a device credential is never the approver: there is no pending record, no
+        protected confirmation and no separation of duty, so the row is refused before
+        any target effect and the refusal is audited.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        Nothing runs. The phone's command route resolves the kind to this row, sees that it is
+        governed, and refuses with `no_protected_confirmation_path` before any capability is
+        invoked and before any record is appended.
+      missing: [durable_principal_binding, evidence_A3_UV, pending_record, separation_of_duty_check]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+      note: >-
+        The phone's rejection row, refused for the same reason the approval row is.
+    - id: device.case.open
+      caller_path: device_credential
+      enforced_today: true
+      enforced_by: >-
+        The device's passkey assertion and the session it opens. The purpose the person typed
+        on the phone is checked for emptiness and length, and the case it opens is the caller's own
+        work; nothing outside it is decided and no authority is claimed. The caller recorded on the
+        case is the device, and the durable operator the enrolment belongs to is recorded beside it
+        as attribution rather than substituted for it (R5-03).
+      missing: []
+    - id: device.surface.intent.commit
+      caller_path: device_credential
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P1 and the commit path is the person's: a device credential proves which enrolled device
+        is at the route and never which person is holding it, and there is no device-attributed
+        delegation from an operator at this freeze, so the row is refused before any target effect
+        and the refusal is audited.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        Nothing runs. The phone's command route resolves the kind to this row, reads the refusal
+        the catalog states, and refuses before the commit is called. The commit path itself refuses
+        a device actor as a backstop, so a catalog that drifted back to the row still cannot run it.
+      missing:
+        - device_delegation_from_operator
+        - pending_record
+      required_stage: Stage 0B
+      production_stage: Stage 3
+    - id: horizon.settlement.rule
+      caller_path: human_session
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P3 and the ruling commits to SEA-Forge: the authority decision, the
+        operation-bound pending record and the person's A3-UV confirmation do not exist
+        at this freeze, so the row is refused before any target effect and the refusal
+        is audited.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        The paired desk session cookie, and the dispatch rule: the acceptance card names the move
+        and the ruling phase is fixed by the card.
+      missing: [durable_principal_binding, evidence_A3_UV, pending_record, authority_sea_forge_confirmation]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+    - id: approval.approve
+      caller_path: human_session
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P3 and the row needs the operation-bound pending record, the person's A3-UV
+        confirmation, the SEA-Forge authority decision and the separation-of-duty check.
+        None of them exists at this freeze, so the desk refuses the decision before any
+        target effect and audits the refusal.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        The paired desk session cookie, and the dispatch rule: the card kind is resolved by the
+        server and the choice is fixed by the operation.
+      missing: [durable_principal_binding, evidence_A3_UV, pending_record, separation_of_duty_check]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+    - id: approval.reject
+      caller_path: human_session
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P3 and the row needs the operation-bound pending record, the person's A3-UV
+        confirmation, the SEA-Forge authority decision and the separation-of-duty check.
+        None of them exists at this freeze, so the desk refuses the decision before any
+        target effect and audits the refusal.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        The paired desk session cookie, and the dispatch rule: the card kind is resolved by the
+        server and the choice is fixed by the operation.
+      missing: [durable_principal_binding, evidence_A3_UV, pending_record, separation_of_duty_check]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+    - id: device.pair.request
+      caller_path: code_holder
+      enforced_today: false
+      refused_today: false
+      enforced_by: >-
+        Implemented, not claimed as enforced: the invitation's ticket and a verified passkey registration
+        are checked, and the request is held as a pending enrolment that no controller has authorized. It
+        creates no credential and no session.
+      missing: [durable_principal_binding]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+      note: >-
+        The route proves the invitation and the registration, never which person holds the phone. The
+        request is refused when no active controller exists to authorize it.
+    - id: device.pair.authorize
+      caller_path: device_credential
+      enforced_today: false
+      refused_today: false
+      enforced_by: >-
+        Implemented, not claimed as enforced: the controller's passkey assertion is verified
+        with user verification against the identity service's stored key and sign count, over
+        the enrolment's operation digest, and the confirmation is one compare-and-swap. Nothing
+        enrols until device.pair commits.
+      missing: [authority_sea_forge, enrollment_presence_receipt]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+      note: >-
+        The authorization is A3-UV evidence from the controller's own passkey, recorded as the approval
+        for the exact operation digest. It is not a SEA-Forge authority decision and not the state writer:
+        the state writer is the identity service, and store compare-and-swap enforces the transition. The
+        SEA-Forge authority is not yet published, so this row is not enforced as a governed decision.
+    - id: device.pair
+      caller_path: authorized_pending_record
+      enforced_today: false
+      refused_today: false
+      enforced_by: >-
+        Implemented, not claimed as enforced: the commit creates an active credential only for a
+        confirmed enrolment with a recorded approval by a current controller, inside its window, for
+        the same generation and controllers, after a recorded P3 decision for the same digest, re-derives
+        the digest the controller proved, and applies the confirmation once. Production wires no P3
+        authority, so the request is refused with authority_unavailable before anything is held; the
+        commit path is exercised only by test rigs that wire a double. The identity service's vendored
+        API accepts no evidence, so Horizon verifies the evidence first.
+      missing: [authority_sea_forge, identity_service_evidence_check]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+      note: >-
+        The commit is the designated writer's act. The stop and refresh paths end waiting and
+        confirmed enrolments in the store, so a restart does not revive them.
+    - id: remote.start
+      caller_path: human_session
+      enforced_today: false
+      refused_today: false
+      enforced_by: "The paired desk session cookie only. The remote starts immediately."
+      missing: [durable_principal_binding, evidence_A3_UV, authority_cognate_local_continuation, pending_record]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+    - id: remote.refresh
+      caller_path: human_session
+      enforced_today: false
+      refused_today: false
+      enforced_by: "The paired desk session cookie only. The remote refreshes immediately."
+      missing: [durable_principal_binding, evidence_A3_UV, authority_cognate_local_continuation, pending_record]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+    - id: remote.stop
+      caller_path: human_session
+      enforced_today: false
+      refused_today: false
+      enforced_by: "The paired desk session cookie only. The remote stops immediately."
+      missing: [durable_principal_binding, evidence_A3_UV, authority_cognate_local_continuation, pending_record]
+      required_stage: "Stage 0B"
+      production_stage: "Stage 3"
+    - id: workspace.export
+      caller_path: human_session
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        P3 and the export needs the SEA-Forge authority decision, the operation-bound
+        pending record, the person's A3-UV confirmation and a separation of duty. None
+        of them exists at this freeze, so the row is refused before any target effect
+        and the refusal is audited.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        The paired desk session cookie only. The export is produced immediately, and no approver
+        distinct from the requester is ever named.
+      missing: [durable_principal_binding, evidence_A3_UV, authority_sea_forge, separation_of_duty, pending_record]
+      required_stage: "Stage 3"
+      note: >-
+        A P3 row stays refused in Stage 0B: a local pending record or an interim A3-T receipt
+        cannot stand in for the SEA-Forge decision or the separation of duty.
+    - id: run.start
+      caller_path: human_session
+      enforced_today: false
+      refused_today: true
+      refusal_reason: >-
+        the dispatcher's targets are not resolved: the pinned plan's operations are not
+        classified in this catalog, so the route cannot know the class or the authority
+        of what it starts. The route is refused before any target effect and the refusal
+        is audited.
+      target_effect: none
+      refusal_audit: appends_refusal_audit
+      enforced_by: >-
+        The paired desk session cookie only. The route starts the waiting steps of a case without
+        resolving the targets of the pinned plan.
+      missing: [target_resolution, resolved_row_evidence, resolved_row_authority]
+      required_stage: "Stage 1"
+      note: >-
+        The dispatcher is a family: a plan whose targets are all local P0/P1 resolves in Cognate
+        with no grant and no SEA-Forge call, and any governed target binds the whole run at the
+        highest class present. Until that resolution exists, the route is refused.
+
+# Bindings that were read and do not yet meet the design's contract. A defect is recorded here,
+# not waived: the row above is the reviewable statement of what the route must become.
+binding_defects:
+  - id: DEF-ROLE-FROM-REQUEST
+    route: "POST /surface/intent"
+    operation: horizon.surface.intent.commit
+    observed: "commitSurfaceIntent reads `role` from the request body and falls back to human."
+    required: "The caller kind and role come from the authenticated session; a request-supplied role is refused, not honoured."
+    consequence: "A caller able to reach the route can ask to be reduced to the agent projection, or claim the human one."
+    status: fixed
+    stage: "Stage 3 (operation descriptor) — the descriptor carries caller_kind from the session."
+    resolution: >-
+      Closed at Stage 0A. `SurfaceIntentRequestBody` no longer has a role field, `commitSurfaceIntent`
+      takes the role as an argument its caller supplies from the authenticated context, and the route
+      refuses a body that names an actor (`ACTOR_NAMING_FIELDS`, 400 forbidden_field) instead of
+      honouring or ignoring it. The route is a human-session route, so the role is the session's
+      "human"; the agent door is the only agent-authenticated route and it never reads a role.
+    evidence: "test/identity-defects.test.ts (a body role is refused and nothing is written; the recorded intent names the session's actor) and test/identity-contract.test.ts (the source no longer reads a role from a submission)."
+    residual: >-
+      The operation descriptor still does not carry caller_kind; Stage 3 adds it. The residual is an
+      extension of the descriptor, not an open path for a request-supplied role.
+  - id: DEF-ASK-ROUTE-EXECUTOR
+    route: "POST /agent/panels"
+    operation: ask.route
+    observed: "The handler is on the agent door and is performed by an agent key."
+    required: "The design's P2 row names a human_session executor for ask.route."
+    consequence: "The class is not in doubt (both are governed), but the executor evidence is."
+    status: fixed
+    stage: "Stage 0B — the owner decides whether the agent's route claim is P2-with-agent-executor or a separate operation."
+    resolution: >-
+      Closed at Stage 0A by the owner's rule that the row may be corrected when the executor evidence
+      is missing. The row now names `executor: registered_agent` and
+      `caller_authentication: registered_agent_key`, the key the agent door authenticates, matching the
+      sibling agent-door rows. `agent_execution` is the caller kind of an issuer-issued execution, not this row's executor. The class (P2), the
+      authority writer (`case_record.authority`), the human evidence (A3-UV, A3-T under Stage 0B)
+      and the pending expiry (10m) are unchanged, so the agent proposes and the human authorises.
+      The runtime record changed too: the answer record carries `executed_by_key` and the
+      conversation row carries `refs.executor_key`, both taken from the authenticated key, and the
+      agent door refuses a body that names an actor.
+    evidence: "test/identity-defects.test.ts (the recorded executor is the authenticated key; a body that names an executor is refused; another key cannot route this question) and test/identity-contract.test.ts (the row's executor and caller authentication)."
+    residual: >-
+      The design draft's Appendix A P2/P3 table named a human session for `ask.route`; the table names `registered_agent`, the key the agent door authenticates, and section 11 names the same executor in the catalog's own row
+      list and in the freeze's live-enforcement table. The row's only caller is an agent
+      execution, so Stage 0B does not enable it: an interim A3-T receipt and a pending record
+      cannot supply the live bounded grant or the person's A3-UV evidence. The execution proof
+      arrives with the issuer at Stage 1, the grant with the SEA-Forge bridge at Stage 2, and the
+      person's evidence at Stage 3.
+
+# Write routes and code operations the catalog does not yet contain. Empty: the reconciliation
+# closed every gap that reading the router found. A new entry here is a defect, not a waiver.
+catalog_gaps: []
+
+# The route census. Every route either server answers is named exactly once above: by an
+# operation row's `routes`, by a dispatch entry, by a route alias, by an acknowledged catalog
+# gap, or by the non-operation list below. A route that is in none of them is a census gap,
+# and `scripts/check-route-census.ts` refuses the build rather than letting an unaccounted
+# route answer (R4-09).
+#
+# A non-operation route answers without performing a catalogued operation: it renders a page,
+# an asset, or a redirect, or it publishes a closed vocabulary. A route that reads the world,
+# the store or the transport is an operation route even when it only projects, because the
+# read is the operation. A route answers the method the catalog binds and no other: a method a
+# row does not claim never reaches the handler behind it.
+non_operation_routes:
+  - { route: "GET /m", reason: "The phone's sign-in page. It reads no state and writes none." }
+  - { route: "GET /m/", reason: "The phone's sign-in page under its trailing-slash alias. It is the same page, and it reads no state and writes none." }
+  - { route: "GET /", reason: "The root path. It redirects to the workspace and performs no operation." }
+  - { route: "GET /desk", reason: "The desk's HTML shell. Every view is drawn from the desk's JSON reads." }
+  - { route: "GET /workspace", reason: "The workspace's HTML shell. It is the desk's shell, and every view is drawn from the desk's JSON reads." }
+  - { route: "GET /workspace/approvals", reason: "The approvals page's HTML shell. It is the same shell, and the approvals themselves are read from the desk's JSON reads." }
+  - { route: "GET /desk/setup-guide", reason: "The static runbook behind the desk's Settings. It names programs, files and settings, and reads no state." }
+  - { route: "GET /surface/schema", reason: "Read of the closed surface vocabulary. It publishes the schema itself and reads no state." }
+  - { route: "GET /m/pair", reason: "The phone's pairing page. It reads no state and writes none." }
+  - { route: "GET /desk/app.js", reason: "Static asset." }
+  - { route: "GET /desk/app.css", reason: "Static asset." }
+  - { route: "GET /agent/panels/catalogue", reason: "Read of the closed surface vocabulary." }
+  - { route: "GET /desk/panels/catalogue", reason: "Read of the closed surface vocabulary." }
+  - { route: "POST /desk/handoff/preview", reason: "Renders a review without sending; handoff.send is the write." }
+
+# Refusal is a first-class outcome: every blocked action reports why and what would repair it.
+refusal_codes:
+  unlisted_operation: "The operation is not in the closed catalog. Nothing was written."
+  unmapped_route: "The route maps to no catalog row. Nothing was written."
+  unknown_action: "The route is listed but the semantic action is not. Nothing was written."
+  insufficient_evidence: "The required human evidence is absent or weaker than the row demands."
+  grant_required: "A governed target needs a live grant or a current entitlement."
+  grant_not_allowed: "A human caller has no grant; supplying one is refused rather than ignored."
+  stale_revision: "The resource moved since the operation was described."
+  authority_unavailable: "The authority writer could not decide. No effect was dispatched."
+  isolation_unavailable: "This host does not meet the isolation prerequisites."
+  separation_of_duty: "The approver must differ from the requester and the executor."
+  budget_required: "A P3 grant without an explicit numeric budget is refused."
+  not_owner: "The caller's key does not own the panel or question the action names."
+  caller_substituted: "The caller kind, role, or reference disagrees with the authenticated session."
+  alias_action_mismatch: "The request's action or resolution disagrees with the operation ID that fixes it."

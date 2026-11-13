@@ -1,0 +1,13 @@
+Date: 2026-11-09T00:58:28Z
+
+Command: non-interactive SSH to jetson host; read-only host facts
+hostname=jetson
+kernel=5.15.185-tegra
+machine=aarch64
+os=Ubuntu 22.04
+lsm=capability,yama,selinux
+landlock_abi=Function not implemented
+newuidmap=missing
+unshare=present
+
+Interpretation: Landlock create-ruleset version syscall returned ENOSYS and landlock is absent from the active LSM list. newuidmap is missing. SEA-Forge Isolated class prerequisites are not met on this host. Identity authentication remains implementable; per-workload isolation is unavailable.

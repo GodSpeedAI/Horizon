@@ -24,15 +24,36 @@ import { auditRemote, addDevice, listDevices, updateDevice, type RemoteDevice } 
 import { checkPurpose } from "../capabilities/workspace-records.ts";
 import type { WorkspaceChrome, WorkspaceMove, WorkspaceReceipt } from "../ui/workspace/model.ts";
 import { identityStoreOf } from "./identity-store.ts";
+import { verifyAssertion } from "./webauthn.ts";
+import { reservedActorField, unknownField } from "../contracts/identity/reserved-fields.ts";
+import { refusalWords, type FrozenRefusal } from "../contracts/identity/enforcement.ts";
 import { Pairing } from "./pairing.ts";
+import type { EnrollmentAuthority } from "./enrollment.ts";
 import { clearedCookie, cookieOf, sessionCookie } from "./sessions.ts";
 import { phonePage, pairPage } from "./phone.ts";
 import type { RemoteSettings } from "./settings.ts";
 
 export const REMOTE_SCHEMA = "horizon.remote/1";
+/** The actor id an enrolled device is called by. It is not a person, and its prefix says so in every record it writes. */
+export const DEVICE_ACTOR_PREFIX = "device:";
+/** The one permission a phone enrolled through the remote gets: it is a controller of this desktop's remote session. */
+export const REMOTE_CONTROLLER_PERMISSION = "remote_controller";
+/**
+ * The durable operator an enrolled device is associated with. It is attribution — who the device
+ * belongs to and who is answerable for it — never the caller of a device-authenticated request.
+ */
+export interface DeviceAttribution {
+  readonly operator: string;
+}
 const BODY_LIMIT = 16 * 1024;
-/** Request fields that would name an actor. The actor is never taken from the request. */
-const FORBIDDEN_FIELDS = ["actor", "actor_id", "actor_ref", "on_behalf_of", "operator", "operator_id", "caller", "role"] as const;
+/**
+ * Request fields that would name an actor. The actor is never taken from the request.
+ *
+ * The list is the contract's one list (`contracts/identity/reserved-fields.ts`), not a copy of
+ * it: the phone once kept a shorter set of its own, so a field the desktop refused outright —
+ * `caller_ref`, `principal`, `executor`, `authority` — was an ordinary unknown field here
+ * (R4-07).
+ */
 const COMMAND_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** What the listener needs from the application: reads, and the same write paths the cockpit uses. */
@@ -49,6 +70,11 @@ export interface RemoteDeps {
    * passkey for exactly this operator; it never creates one and never grants a role.
    */
   readonly operator: string;
+  /**
+   * The operator's authorization of a new controller. A verified passkey is held here until the active
+   * controller signs the enrolment with its own user-verified passkey; nothing is enrolled before that.
+   */
+  readonly enrollment: EnrollmentAuthority;
   /** The cockpit's default read: frame, closed surface view and its actions. */
   readonly workspace: () => Promise<{
     readonly frame: { readonly frame_id: string; readonly revision: number };
@@ -56,13 +82,36 @@ export interface RemoteDeps {
   }>;
   readonly chrome: (receipt?: string | null) => Promise<WorkspaceChrome>;
   readonly position: () => Promise<number>;
-  readonly approvalIntent: (approvalId: string) => Promise<string | null>;
-  /** Throws when SEA-Forge refuses; a rejected commit is audited and throws by design. */
-  readonly resolveApproval: (approvalId: string, resolution: "approved" | "rejected", who: Caller) => Promise<void>;
-  /** The cockpit's commit of one offered action, run with the session's Caller (never the server operator's). */
-  readonly commitAction: (actionId: string, intentId: string, who: Caller) => Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }>;
-  readonly settle: (intentId: string, phase: "observe" | "rule", who: Caller) => Promise<void>;
-  readonly openCase: (purpose: string, who: Caller) => Promise<void>;
+  /**
+   * The cockpit's commit of one offered action, run with the session's Caller (never the server
+   * operator's) and the operator the enrolled device is associated with, as attribution only.
+   */
+  readonly commitAction: (
+    actionId: string,
+    intentId: string,
+    who: Caller,
+    attribution: DeviceAttribution,
+  ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }>;
+  readonly openCase: (purpose: string, who: Caller, attribution: DeviceAttribution) => Promise<void>;
+  /**
+   * The operation the phone's command performs, resolved from the identity catalog's dispatch
+   * table for `POST /m/api/command`, and the class that operation carries.
+   *
+   * The phone names a kind, never an operation. The catalog says which row a kind selects, and
+   * the settlement command's phase selects between the two settlement rows. A kind or a pair
+   * the catalog does not list resolves to nothing, and the command is refused before any effect
+   * runs (R3-01, R3-02).
+   *
+   * The class comes back with the operation because the phone's credential is a device
+   * credential: it proves which enrolled device is at the route and never which person is
+   * holding it. A governed row therefore needs a protected operation-bound confirmation the
+   * remote path does not have, and the command is refused rather than downgraded (R4-02).
+   *
+   * The catalog's own refusal comes back with the operation (R5-01): the row the catalog refuses
+   * is the row the command refuses, with the catalog's own words and its refusal audit, so the
+   * contract and this route cannot drift.
+   */
+  readonly resolveCommand: (kind: string, phase: string | null) => { readonly operation: string; readonly class: string; readonly fields: readonly string[]; readonly refusal: FrozenRefusal | null } | null;
 }
 
 export interface RemoteStatus {
@@ -185,6 +234,100 @@ export class RemoteController {
     return devices.find((device) => device.revoked_at === null && device.generation === this.pairing.generation) ?? null;
   }
 
+  /**
+   * The enrolment commit. It runs one at a time with refresh and stop, so a stop cannot interleave with the
+   * write it must revoke: the controller is checked against the pairing as it is now, not as it was at the request.
+   */
+  private async completeEnrolment(pendingId: string, now: number): Promise<Response> {
+    if (!this.pairing.isEnabled) return refusal(409, "remote_off", "Remote control is off on the desktop.");
+    const committed = await this.deps.enrollment.commit({
+      pendingId,
+      tenant: this.deps.tenant,
+      generation: this.pairing.generation,
+      currentControllers: await this.activeDeviceIds(),
+      now: new Date(now),
+    });
+    if (!committed.ok) {
+      if (committed.code === "not_authorized") return json(202, { status: "awaiting_phone_authorization" });
+      if (committed.code === "undecided") return refusal(409, "authorization_incomplete", "No P3 authority has decided this enrolment. Refresh the QR on your desktop and scan again.");
+      if (committed.code === "unapproved") return refusal(409, "authorization_incomplete", "The desktop has no recorded authorization for this phone. Refresh the QR on your desktop and scan again.");
+      if (committed.code === "stale") return refusal(409, "controller_changed", "The desktop's controller changed while this phone waited. Refresh the QR on your desktop and scan again.");
+      if (committed.code === "expired") return refusal(410, "authorization_expired", "The desktop did not authorize this phone in time. Refresh the QR on your desktop and scan again.");
+      return refusal(410, "authorization_used", "This authorization was already used or is not valid. Refresh the QR on your desktop and scan again.");
+    }
+    const { registration, label } = committed.request;
+    const { approval } = committed;
+    let enrolledId: string | null = null;
+    let ledgerAdded = false;
+    try {
+      // One active controller, bound to one durable operator that the cockpit's session approved. The identity
+      // service revokes the previous device and its sessions in the same commit that enrols this one; it refuses
+      // when the operator does not exist or is not active, so the link cannot create an operator or grant a role.
+      const at = new Date(now).toISOString();
+      const enrolled = await this.deps.identity.replaceDevices({ tenant: this.deps.identityTenant, operatorId: this.deps.operator, label, registration });
+      enrolledId = enrolled.device.id;
+      for (const stale of await listDevices(this.deps.store, this.deps.tenant)) {
+        if (stale.revoked_at === null) await updateDevice(this.deps.store, stale.device_id, { revoked_at: at });
+      }
+      this.commands.clear();
+      const device: RemoteDevice = {
+        device_id: enrolled.device.id,
+        credential_id: registration.credentialId,
+        public_key: registration.publicKey,
+        sign_count: registration.signCount,
+        label,
+        generation: this.pairing.generation,
+        tenant: this.deps.tenant,
+        operator: this.deps.operator,
+        created_at: at,
+        last_seen: at,
+        revoked_at: null,
+      };
+      await addDevice(this.deps.store, device);
+      ledgerAdded = true;
+      // The committed record keeps the four roles apart: who asked, which human authorized it, the authority decision
+      // it rests on, and which component issued the credential.
+      await auditRemote(this.deps.store, {
+        tenant: this.deps.tenant,
+        operator: this.deps.operator,
+        device_id: device.device_id,
+        action: "pair",
+        outcome: "authorized",
+        at,
+        actors: {
+          requester: { credential_id: registration.credentialId, label, role: "prospective_device" },
+          authorizer: { device_id: approval.authorizer_device_id, credential_id: approval.authorizer_credential_id, role: "operator_with_active_controller" },
+          decision: { pending_id: approval.pending_id, digest: approval.digest, approved_at: approval.approved_at, role: "controller_approval" },
+          issuer: { component: "identity_service", identity_device_id: enrolled.device.id, role: "credential_issuer" },
+        },
+      });
+      return json(200, { ok: true, label: device.label }, { "set-cookie": sessionCookie(enrolled.session.token) });
+    } catch (error) {
+      // The authorization is spent. If the identity service enrolled the phone but the ledger did not record it,
+      // the new device is revoked so no identity credential exists that the ledger does not list.
+      // Each compensating write is separate, because nothing here is atomic across identity, ledger and approval. A
+      // failed compensation is recorded in the audit so it is visible, not swallowed.
+      const failures: string[] = [];
+      if (ledgerAdded) await updateDevice(this.deps.store, enrolledId ?? "", { revoked_at: new Date(now).toISOString() }).catch(() => failures.push("ledger"));
+      if (enrolledId !== null) await this.deps.identity.revokeDevice(enrolledId, "enrolment did not complete").catch(() => failures.push("identity"));
+      await auditRemote(this.deps.store, {
+        tenant: this.deps.tenant,
+        operator: this.deps.operator,
+        device_id: enrolledId ?? "none",
+        action: "pair",
+        outcome: `refused after authorization: ${failures.length === 0 ? "compensated" : `compensation failed: ${failures.join(",")}`}`,
+        at: new Date(now).toISOString(),
+      }).catch(() => undefined);
+      const message = error instanceof IdentityError ? `Pairing refused: ${error.message}` : "The passkey could not be registered.";
+      return refusal(400, "passkey_refused", `${message} Refresh the QR on your desktop and scan again.`);
+    }
+  }
+
+  /** The ledger's active controllers, sorted: what an enrolment request names as the controllers it would replace. */
+  private async activeDeviceIds(): Promise<string[]> {
+    return (await listDevices(this.deps.store, this.deps.tenant)).filter((device) => device.revoked_at === null).map((device) => device.device_id).sort();
+  }
+
   /** Revoke every device in the Horizon ledger and in the identity service (which revokes their sessions). */
   private async revokeDevices(at: string, cause: string): Promise<void> {
     for (const device of await listDevices(this.deps.store, this.deps.tenant)) {
@@ -205,14 +348,34 @@ export class RemoteController {
     return session !== undefined && session.status === "active" && Date.parse(session.expiresAt) > now;
   }
 
-  /** The Caller for a resolved session: the durable operator's actor, in the runtime tenant. Never the server operator. */
+  /**
+   * The Caller for a resolved session: the enrolled device, in the runtime tenant.
+   *
+   * A device credential proves which device is at the route, never which person is holding it
+   * (design §7), so the durable operator behind the enrolment is not substituted for the caller:
+   * the device acts, and the operator is recorded beside it as attribution. The operator's own
+   * actor still reaches the cockpit's own paths; it is simply not the caller of a
+   * device-authenticated request (R5-03). `Principal.kind` has no device kind, so the device is
+   * carried as a service principal whose id says it is one.
+   */
   private callerOf(session: ResolvedSession): Caller {
-    return { tenant: this.deps.tenant, actor: session.caller.actor };
+    return { tenant: this.deps.tenant, actor: { id: `${DEVICE_ACTOR_PREFIX}${session.session.deviceId ?? session.session.sid}`, kind: "service" } };
+  }
+
+  /** The operator the enrolled device is associated with, as attribution beside the device caller. */
+  private attributionOf(session: ResolvedSession): DeviceAttribution {
+    return { operator: session.caller.actor.id };
   }
 
   /** Bind the loopback listener and open a pairing link. Old devices stay revoked from any earlier stop. */
   async start(): Promise<void> {
-    if (this.server !== null) return;
+    if (this.server !== null) {
+      // Already listening: a new invitation for another phone. It grants no authority and revokes no controller.
+      this.pairing.invite(this.clock());
+      return;
+    }
+    // A fresh start after a restart ends any enrolment left in the store by the previous process.
+    await this.deps.enrollment.endWaiting(this.deps.tenant, "remote control started again");
     // The cockpit's own session approves pairing for one durable operator that must already exist and be active.
     const operator = await this.deps.identity.getOperator(this.deps.identityTenant, this.deps.operator);
     if (operator === undefined || operator.status !== "active") throw new Error(`REMOTE: operator ${this.deps.operator} is not an active durable operator; a pairing link never creates one`);
@@ -224,16 +387,26 @@ export class RemoteController {
 
   /** New link, new generation: every prior link, credential and session is revoked at once. */
   async refresh(): Promise<void> {
+    return this.serial(() => this.refreshNow());
+  }
+
+  private async refreshNow(): Promise<void> {
     if (this.server === null) return;
     const at = new Date(this.clock()).toISOString();
+    await this.deps.enrollment.endWaiting(this.deps.tenant, "pairing refreshed");
     await this.revokeDevices(at, "pairing refreshed");
     this.pairing.refresh(this.clock());
   }
 
   /** Generation bump and listener closed: immediate revocation. */
   async stop(): Promise<void> {
+    return this.serial(() => this.stopNow());
+  }
+
+  private async stopNow(): Promise<void> {
     const at = new Date(this.clock()).toISOString();
     this.pairing.stop();
+    await this.deps.enrollment.endWaiting(this.deps.tenant, "remote control stopped");
     await this.revokeDevices(at, "remote control stopped");
     this.server?.stop(true);
     this.server = null;
@@ -341,42 +514,55 @@ export class RemoteController {
 
     if (request.method === "POST" && path === "/m/api/pair/finish") {
       if (!this.limiter.allow("finish", 10, 60_000, now)) return refusal(429, "rate_limited", "REMOTE: too many attempts, wait a minute");
+      if (!this.pairing.isEnabled) return refusal(409, "remote_off", "Remote control is off on the desktop.");
       const body = await bodyOf(request);
       const challenge = this.pairing.takeChallenge(body?.ticket, "register", now);
       if (challenge === null) return refusal(410, "challenge_expired", "The passkey request expired. Scan the QR on your desktop again.");
       try {
         const verified = verifyRegistration(body?.credential as Parameters<typeof verifyRegistration>[0], { challenge, origin: this.origin, rpId: this.rpId });
-        // One active controller, bound to one durable operator that the cockpit's session approved. The identity
-        // service revokes the previous device and its sessions in the same commit that enrols this one; it refuses
-        // when the operator does not exist or is not active, so the link cannot create an operator or grant a role.
-        const at = new Date(now).toISOString();
-        const label = labelOf(request.headers.get("user-agent"));
-        const enrolled = await this.deps.identity.replaceDevices({ tenant: this.deps.identityTenant, operatorId: this.deps.operator, label, registration: verified });
-        for (const stale of await listDevices(this.deps.store, this.deps.tenant)) {
-          if (stale.revoked_at === null) await updateDevice(this.deps.store, stale.device_id, { revoked_at: at });
+        // A verified passkey proves the phone holds a new credential. It authorizes nothing: the enrolment is held
+        // until the active controller authorizes it with its own user-verified passkey. With no active controller
+        // there is no authorizer, and the request is refused. The request is recorded inside the serial chain, so a
+        // stop or refresh cannot land between reading the controllers and recording the request.
+        // Production refuses enrolment until the P3 authority is wired: nothing is verified, held or issued without it.
+        if (!this.deps.enrollment.authorityWired) {
+          return refusal(503, "authority_unavailable", "Device enrolment is refused: the SEA-Forge P3 authority for it is not wired in this build.");
         }
-        this.commands.clear();
-        const device: RemoteDevice = {
-          device_id: enrolled.device.id,
-          credential_id: verified.credentialId,
-          public_key: verified.publicKey,
-          sign_count: verified.signCount,
-          label,
-          generation: this.pairing.generation,
-          tenant: this.deps.tenant,
-          operator: this.deps.operator,
-          created_at: at,
-          last_seen: at,
-          revoked_at: null,
-        };
-        await addDevice(this.deps.store, device);
-        const token = enrolled.session.token;
-        await auditRemote(this.deps.store, { tenant: this.deps.tenant, operator: this.deps.operator, device_id: device.device_id, action: "pair", outcome: "registered", at });
-        return json(200, { ok: true, label: device.label }, { "set-cookie": sessionCookie(token) });
+        const requested = await this.serial(async () => {
+          if (!this.pairing.isEnabled) return "remote_off" as const;
+          const controllers = await this.activeDeviceIds();
+          if (controllers.length === 0) return "no_controller" as const;
+          return this.deps.enrollment.request({
+            tenant: this.deps.tenant,
+            operator: this.deps.operator,
+            generation: this.pairing.generation,
+            label: labelOf(request.headers.get("user-agent")),
+            registration: verified,
+            replaces: controllers,
+            permissions: [REMOTE_CONTROLLER_PERMISSION],
+            requested_at: new Date(now).toISOString(),
+          });
+        });
+        if (requested === "remote_off") return refusal(409, "remote_off", "Remote control is off on the desktop.");
+        if (typeof requested === "object" && !requested.ok) return refusal(503, "authority_unavailable", requested.message);
+        if (requested === "no_controller") {
+          return refusal(409, "no_controller", "No phone is an active controller, so no phone can authorize this one. A first controller needs the desk's own passkey, which this build does not yet provide.");
+        }
+        return json(202, { status: "awaiting_phone_authorization", pending_id: requested.pendingId, expires_at: requested.expiresAt });
       } catch (error) {
         const message = error instanceof WebAuthnError ? error.message : error instanceof IdentityError ? `Pairing refused: ${error.message}` : "The passkey could not be registered.";
         return refusal(400, "passkey_refused", message);
       }
+    }
+
+    if (request.method === "POST" && path === "/m/api/pair/await") {
+      if (!this.limiter.allow("await", 60, 60_000, now)) return refusal(429, "rate_limited", "REMOTE: too many attempts, wait a minute");
+      if (!this.pairing.isEnabled) return refusal(409, "remote_off", "Remote control is off on the desktop.");
+      const body = await bodyOf(request);
+      const pendingId = typeof body?.pending_id === "string" ? body.pending_id : "";
+      // The commit: applies the operator's confirmation exactly once, after checking the request is still the one
+      // the operator saw. Only this writes an active controller, and only after that check.
+      return this.serial(() => this.completeEnrolment(pendingId, now));
     }
 
     if (request.method === "POST" && path === "/m/api/auth/options") {
@@ -430,8 +616,72 @@ export class RemoteController {
     if (session === null) return refusal(401, "not_signed_in", "Use your passkey to continue.");
     if (request.method === "GET" && path === "/m/api/state") return json(200, await this.snapshot(session));
     if (request.method === "GET" && path === "/m/api/events") return this.events(request, session);
+    if (request.method === "GET" && path === "/m/api/pair/pending") return this.pendingEnrolment(now);
+    if (request.method === "POST" && path === "/m/api/pair/authorize") return this.authorizeEnrolment(request, now);
     if (request.method === "POST" && path === "/m/api/command") return this.command(request, session, now);
     return refusal(404, "not_found", "REMOTE: no such route");
+  }
+
+  /** The enrolment waiting for this controller's authorization, and the challenge its passkey must sign. */
+  private async pendingEnrolment(now: number): Promise<Response> {
+    const controller = await this.liveDevice();
+    if (controller === null) return refusal(409, "no_controller", "No phone is an active controller.");
+    const waiting = await this.deps.enrollment.waiting(this.deps.tenant, now);
+    if (waiting === null) return json(200, { pending: null });
+    const options = assertionOptions({ challenge: waiting.challenge, rpId: this.rpId, credentialIds: [controller.credential_id] });
+    return json(200, {
+      pending: { pending_id: waiting.pendingId, label: waiting.label, replaces: waiting.replaces, expires_at: waiting.expiresAt },
+      options,
+    });
+  }
+
+  /**
+   * The authorization. The active controller's own user-verified passkey signs the enrolment's operation digest,
+   * which covers the new credential, its key, its label and the controllers it replaces. Verification uses the
+   * identity service's stored key and sign count and issues no session. Only a verified proof confirms the
+   * enrolment, and it confirms it once.
+   */
+  private async authorizeEnrolment(request: Request, now: number): Promise<Response> {
+    if (!this.limiter.allow("authorize", 10, 60_000, now)) return refusal(429, "rate_limited", "REMOTE: too many attempts, wait a minute");
+    const body = await bodyOf(request);
+    const pendingId = typeof body?.pending_id === "string" ? body.pending_id : "";
+    const credential = body?.credential as Parameters<typeof verifyAssertion>[0] | undefined;
+    const controller = await this.liveDevice();
+    if (controller === null || credential === undefined || (credential as { id?: unknown }).id !== controller.credential_id) {
+      return refusal(401, "passkey_refused", "The passkey was not recognised as this desktop's controller.");
+    }
+    const identityDevice = (await this.deps.identity.listDevices(this.deps.identityTenant, this.deps.operator)).find(
+      (device) => device.credentialId === controller.credential_id && device.revokedAt === null,
+    );
+    if (identityDevice === undefined) return refusal(401, "passkey_refused", "The controller's passkey is not enrolled with the identity service.");
+    return this.serial(async () => {
+      const outcome = await this.deps.enrollment.authorize({
+        tenant: this.deps.tenant,
+        pendingId,
+        now: new Date(now),
+        generation: this.pairing.generation,
+        currentControllers: await this.activeDeviceIds(),
+        authorizer: { deviceId: controller.device_id, credentialId: controller.credential_id },
+        verify: async (challenge) => {
+          const verified = await verifyAssertion(credential, {
+            challenge,
+            origin: this.origin,
+            rpId: this.rpId,
+            publicKey: identityDevice.publicKey,
+            signCount: Math.max(identityDevice.signCount, controller.sign_count),
+          });
+          return verified.signCount;
+        },
+      });
+      if (!outcome.ok) {
+        if (outcome.code === "unverified") return refusal(401, "passkey_refused", outcome.message);
+        if (outcome.code === "stale") return refusal(409, "controller_changed", outcome.message);
+        return refusal(410, `authorization_${outcome.code}`, outcome.message);
+      }
+      await updateDevice(this.deps.store, controller.device_id, { sign_count: outcome.signCount, last_seen: new Date(now).toISOString() });
+      await auditRemote(this.deps.store, { tenant: this.deps.tenant, operator: this.deps.operator, device_id: controller.device_id, action: "pair", outcome: `authorized_by_controller ${pendingId}`, at: new Date(now).toISOString() });
+      return json(200, { status: "authorized" });
+    });
   }
 
   /** The phone's home: the same canonical reads the cockpit makes, shaped for a narrow screen. */
@@ -515,9 +765,8 @@ export class RemoteController {
     if (!COMMAND_ID.test(commandId)) return refusal(400, "invalid_argument", "REMOTE: command_id must be a UUID");
     // The actor is the session's, from the durable operator record and the configured mapping. A request that
     // names one is refused outright rather than quietly ignored.
-    for (const field of FORBIDDEN_FIELDS) {
-      if (body !== null && field in body) return refusal(400, "forbidden_field", `REMOTE: a request cannot name its own actor (${field}); the actor comes from the signed-in session`);
-    }
+    const named = reservedActorField(body);
+    if (body !== null && named !== null) return refusal(400, "forbidden_field", `REMOTE: a request cannot name its own actor (${named}); the actor comes from the signed-in session`);
     const perSession = this.commands.get(sid) ?? new Map<string, Promise<{ readonly status: number; readonly body: unknown }>>();
     this.commands.set(sid, perSession);
     const seen = perSession.get(commandId);
@@ -544,14 +793,65 @@ export class RemoteController {
   private async execute(body: Record<string, unknown> | null, session: ResolvedSession, now: number, reply: (status: number, accepted: boolean, outcome: Outcome) => Promise<Response>): Promise<Response> {
     const who = this.callerOf(session);
     const kind = body?.kind;
-    if (kind === "open_case") {
+    const namedKind = typeof kind === "string" ? kind : "";
+    // The command route is a dispatcher: the phone names a kind, and the catalog says which
+    // operation that kind performs. A kind or a pair the catalog does not list is Px and is
+    // refused before any effect runs (R3-01, R3-02).
+    const phase = typeof body?.phase === "string" ? body.phase : null;
+    let resolved: { readonly operation: string; readonly class: string; readonly fields: readonly string[]; readonly refusal: FrozenRefusal | null } | null;
+    try {
+      resolved = this.deps.resolveCommand(namedKind, phase);
+    } catch (error) {
+      return reply(503, false, { state: "refused", code: "unavailable", message: `REMOTE: the identity catalog could not be loaded, so nothing was done (${error instanceof Error ? error.message : String(error)}).` });
+    }
+    if (resolved === null) {
+      const message = namedKind === "settle" ? "REMOTE: that settlement is not one Horizon knows. Nothing was done." : "REMOTE: that command is not one Horizon knows. Nothing was done.";
+      return reply(400, false, { state: "refused", code: "px", message });
+    }
+    const operation = resolved.operation;
+    // Containment: a device credential may not reach a governed row. A governed row needs the
+    // operation-bound pending record, the protected confirmation and its own A3-UV evidence, and
+    // the remote path has none of them: the phone's credential proves which enrolled device is
+    // at the route, never which person is holding it. The command is refused rather than
+    // downgraded to something the device's session can do on its own (R3-01, R4-02).
+    //
+    // The refusal the catalog states is the refusal the command answers with (R5-01). The class
+    // check below stays as a backstop for a catalog that stopped refusing a governed row: a row
+    // this route cannot support is refused, never run.
+    if (resolved.refusal !== null) {
+      // A governed row is refused because the protected confirmation cannot exist on the phone. A
+      // P0/P1 row is refused for its own stated reason — the commit row's is the missing
+      // device-attributed delegation — and answers in the catalog's own words (R5-03).
+      const governed = resolved.class === "P2" || resolved.class === "P3";
+      await this.audit(session, namedKind, governed ? "refused:no_protected_confirmation_path" : `refused:catalog:${resolved.operation}`, now);
+      return reply(
+        403,
+        false,
+        governed
+          ? { state: "refused", code: "no_protected_confirmation_path", message: "REMOTE: that action can only be taken on the desktop, where the confirmation is protected. Nothing was done." }
+          : { state: "refused", code: "refused", message: refusalWords(resolved.refusal) },
+      );
+    }
+    if (resolved.class === "P2" || resolved.class === "P3") {
+      await this.audit(session, namedKind, "refused:no_protected_confirmation_path", now);
+      return reply(403, false, { state: "refused", code: "no_protected_confirmation_path", message: "REMOTE: that action can only be taken on the desktop, where the confirmation is protected. Nothing was done." });
+    }
+    // The body has a closed vocabulary: the dispatch envelope plus the fields the resolved
+    // operation's schema names. A field nothing names is refused rather than ignored, so a
+    // caller never believes an unnamed field was read (R4-07).
+    const extra = unknownField(body, ["command_id", "kind", "phase", ...resolved.fields]);
+    if (extra !== null) {
+      await this.audit(session, namedKind, `refused:unknown_field:${extra}`, now);
+      return reply(400, false, { state: "refused", code: "unknown_field", message: `REMOTE: that command does not take ${extra}. Nothing was done.` });
+    }
+    if (operation === "device.case.open") {
       const check = checkPurpose(body?.purpose);
       if (!check.ok) return reply(400, false, { state: "refused", code: check.code, message: check.code === "empty" ? "Write the purpose in one line." : "The purpose is longer than 200 characters." });
-      await this.deps.openCase(check.purpose, who);
+      await this.deps.openCase(check.purpose, who, this.attributionOf(session));
       await this.audit(session, "open_case", "accepted", now);
       return reply(200, true, { state: "done", receipt: null });
     }
-    if (kind === "commit") {
+    if (operation === "device.surface.intent.commit") {
       return this.serial(async () => {
         const data = await this.deps.workspace();
         if (body?.frame_id !== data.frame.frame_id || String(body?.frame_revision) !== String(data.frame.revision)) {
@@ -562,7 +862,7 @@ export class RemoteController {
           return reply(409, false, { state: "refused", code: "not_available", message: "That move is no longer available." });
         }
         const intentId = randomUUID();
-        const result = await this.deps.commitAction(action.action_id, intentId, who);
+        const result = await this.deps.commitAction(action.action_id, intentId, who, this.attributionOf(session));
         if (!result.ok && result.code !== "awaiting_authority") {
           await this.audit(session, "commit", `refused:${result.code}`, now);
           return reply(409, false, { state: "refused", code: result.code, message: result.message });
@@ -572,40 +872,14 @@ export class RemoteController {
         return reply(200, true, { state: result.ok ? "done" : "waiting", intent_id: intentId, receipt });
       });
     }
-    if (kind === "approve" || kind === "reject") {
-      return this.serial(async () => {
-        const approvalId = typeof body?.approval_id === "string" ? body.approval_id : "";
-        const intentId = approvalId === "" ? null : await this.deps.approvalIntent(approvalId);
-        if (intentId === null) return reply(404, false, { state: "refused", code: "not_found", message: "No escalated commit waits on this approval." });
-        try {
-          await this.deps.resolveApproval(approvalId, kind === "approve" ? "approved" : "rejected", who);
-        } catch (error) {
-          // A rejected commit fails by design and is audited; its receipt says so. Anything else is refused.
-          if (!(error instanceof Error && error.message.startsWith("INTENT: governed commit refused"))) {
-            const own = error instanceof Error && error.message.startsWith("APPROVAL: the requester");
-            await this.audit(session, kind, own ? "refused:own_escalation" : "refused", now);
-            return reply(409, false, { state: "refused", code: own ? "own_escalation" : "approval_refused", message: own ? "You started this move, so someone else must decide it." : "SEA-Forge did not accept this decision. Check the desktop." });
-          }
-        }
-        await this.audit(session, kind, "decided", now);
-        return reply(200, true, { state: "done", intent_id: intentId, receipt: (await this.deps.chrome(intentId)).receipt });
-      });
+    if (operation === "device.settlement.observe" || operation === "device.settlement.rule" || operation === "horizon.settlement.observe" || operation === "horizon.settlement.rule") {
+      // Unreachable while the catalog holds: the settlement rows the phone's command selects are
+      // device-credential rows, and a device credential may not reach a governed row. The branch
+      // is kept as a backstop so a catalog that drifted back to the shared rows still refuses the
+      // settlement rather than calling SEA-Forge's final settlement from a device session.
+      return reply(403, false, { state: "refused", code: "no_protected_confirmation_path", message: "REMOTE: that action can only be taken on the desktop, where the confirmation is protected. Nothing was done." });
     }
-    if (kind === "settle") {
-      const intentId = typeof body?.intent_id === "string" ? body.intent_id : "";
-      if (intentId === "") return reply(400, false, { state: "refused", code: "invalid_argument", message: "intent_id is required" });
-      // Observation and the SEA-Forge ruling are separate requests, as on the desktop: a combined settle is not offered.
-      const phase = body?.phase;
-      if (phase !== "observe" && phase !== "rule") return reply(400, false, { state: "refused", code: "invalid_argument", message: "phase must be observe or rule" });
-      try {
-        await this.deps.settle(intentId, phase, who);
-      } catch {
-        return reply(409, false, { state: "refused", code: "settlement_refused", message: "Settlement was refused. The receipt on the desktop says why." });
-      }
-      await this.audit(session, "settle", "requested", now);
-      return reply(200, true, { state: "done", intent_id: intentId, receipt: (await this.deps.chrome(intentId)).receipt });
-    }
-    return reply(400, false, { state: "refused", code: "invalid_argument", message: "REMOTE: kind must be open_case, commit, approve, reject or settle" });
+    return reply(400, false, { state: "refused", code: "px", message: "REMOTE: that command is not one Horizon knows. Nothing was done." });
   }
 
   private async audit(session: ResolvedSession, action: string, outcome: string, now: number): Promise<void> {

@@ -71,7 +71,7 @@ describe("waiting moves", () => {
     expect((html.match(/data-confirm-move/g) ?? []).length).toBe(2);
     expect((html.match(/data-discard-move/g) ?? []).length).toBe(2);
     expect(text(html)).toContain("An agent suggests");
-    expect(text(html)).toContain("Nothing is sent until you confirm there");
+    expect(text(html)).toContain("Nothing is sent until you press the button there");
   });
   test("Confirm asks the composer for the draft when there is one, and for the words alone when there is not", () => {
     expect(requestFor(row(1, { words: "Fix it", refs: { draft_id: "d1" } }))).toEqual({ words: "Fix it", draftId: "d1" });

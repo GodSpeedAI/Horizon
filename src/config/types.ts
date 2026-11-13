@@ -147,12 +147,16 @@ export interface LoadedConfig {
   readonly operator: {
     readonly principal: { readonly id: string; readonly kind: "user" };
     readonly tenant: string;
+    /** The operator ref the configuration file names, before HORIZON_OPERATOR_REF overrides it (the one operator the config names). */
+    readonly configuredRef: string;
   };
   readonly launchSecret: string;
   readonly secretPath: string;
   /** The agent door's key: stable across starts, read from `agentKeyPath`. */
   readonly agentKey: string;
   readonly agentKeyPath: string;
+  /** The agents' registry, beside agent.key: each agent's key id, name and the hash of its key. Never a key. */
+  readonly agentRegistryPath: string;
   /** `HORIZON_SETUP`; undefined when unset (Horizon behaves as before). */
   readonly setup?: SetupName;
 }

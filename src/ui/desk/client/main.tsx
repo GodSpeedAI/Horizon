@@ -3,7 +3,7 @@
  * Browser entry. It polls `/desk/state.json` every 2000 ms and hands the result to the reducer, which (rule 2) lets an
  * outside update change only the numbers, list ends and inspector. Drafts and pins are kept in this browser only.
  */
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import type { NoteView } from "../../../capabilities/notes.ts";
 import { START, deskReducer, type FirstMove, type Pin, type UiState } from "../attention.ts";
@@ -14,14 +14,77 @@ import type { InspectionAnswer, NextState } from "../model.ts";
 import { resolveKey } from "../keys.ts";
 import type { ConversationRow } from "../conversation-model.ts";
 import { startDeskTools } from "../webmcp.ts";
-import type { DeskAgentInvoker } from "../webmcp-tools.ts";
+import { inspectForAgent, type DeskAgentInvoker } from "../webmcp-tools.ts";
 import { POLL_MS, itemsOf, shiftDay, withDetails, type DeskState, type SearchResult } from "../model.ts";
+import { requestIdFor, settleRequest } from "./request-ids.ts";
+import { PAIR_BODY, PAIR_BUTTON, PAIR_FAILED, PAIR_HEADING, PAIR_LIMIT, PAIR_NO_ANSWER } from "../pair-words.ts";
 
 const DRAFT_KEY = "horizon.desk.draft";
 const PINS_KEY = "horizon.desk.pins";
 /** The conversation is refetched this often while the tab is visible, so rows from agents appear. */
 const ROWS_POLL_MS = 5000;
 const AGENT_HEADERS = { "x-horizon-source": "page-agent", "x-horizon-agent-name": "Agent on this page" } as const;
+
+/** The desk waits for a pairing: a browser with no session sees the pairing screen, and the desk loads once it has paired. */
+function PairScreen({ onPaired }: { readonly onPaired: () => void }) {
+  const [code, setCode] = useState("");
+  const [words, setWords] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const response = await fetch("/desk/pair", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code }) });
+      const body = (await response.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
+      if (response.ok && body?.ok === true) {
+        onPaired();
+        return;
+      }
+      setWords(body?.message ?? PAIR_FAILED);
+    } catch {
+      setWords(PAIR_NO_ANSWER);
+    }
+    setBusy(false);
+  };
+  return (
+    <main className="pair">
+      <h1>{PAIR_HEADING}</h1>
+      <p>{PAIR_BODY}</p>
+      <p className="muted">{PAIR_LIMIT}</p>
+      <form onSubmit={submit}>
+        <label htmlFor="pairing-code">Pairing code</label>
+        <input id="pairing-code" name="code" autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="XXXX-XXXX" value={code} onChange={(event) => setCode(event.target.value)} />
+        <button type="submit" disabled={busy || code.trim() === ""}>{PAIR_BUTTON}</button>
+      </form>
+      {words === "" ? null : <p role="alert">{words}</p>}
+    </main>
+  );
+}
+
+/** Asks the server whether this browser is paired, then shows the desk or the pairing screen. */
+function Gate() {
+  const [paired, setPaired] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch("/desk/session", { headers: { accept: "application/json" } })
+      .then((response) => response.json() as Promise<{ paired?: boolean }>)
+      .then((body) => {
+        if (live) setPaired(body.paired === true);
+      })
+      .catch(() => {
+        if (live) setPaired(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (paired === null) return null;
+  if (!paired) return <PairScreen onPaired={() => setPaired(true)} />;
+  return <App />;
+}
+
+/** A move that was done but not recorded says so after its own words. */
+const withRecordNote = (message: string, body: { recorded?: boolean; recorded_words?: string }): string => (body.recorded === false && body.recorded_words ? `${message} ${body.recorded_words}` : message);
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -123,14 +186,12 @@ function App() {
     };
     const invoker: DeskAgentInvoker = {
       state: () => call("/desk/state.json"),
-      find: (q) => call(`/desk/search?${new URLSearchParams({ q, record: "1" })}`).finally(() => void loadRows()),
+      find: (q) => call("/desk/search", { method: "POST", body: JSON.stringify({ q, record: "1" }) }).finally(() => void loadRows()),
       inspect: async (rowId) => {
         const listed = (await call("/desk/conversation")) as { rows?: ConversationRow[] };
         const row = listed.rows?.find((r) => r.row_id === rowId);
         if (row === undefined) throw new Error("No such item in the conversation.");
-        const intent = row.refs.intent_id;
-        const move = intent === undefined ? null : (latest.current.data?.home.moves.find((m) => m.intent_id === intent) ?? null);
-        return { row, decided: move?.decided ?? null, recorded: move?.recorded ?? null, observed: move?.observed ?? null };
+        return inspectForAgent(row);
       },
       proposeHandoff: (words, caseId) =>
         call("/desk/handoff/preview", { method: "POST", body: JSON.stringify({ draft_id: crypto.randomUUID(), text: words, ...(caseId === undefined ? {} : { case_id: caseId }) }) })
@@ -319,11 +380,11 @@ function App() {
     decide: async (input) => {
       try {
         const response = await fetch("/desk/decide", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
-        const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string };
+        const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string; recorded?: boolean; recorded_words?: string };
         rev.current = "";
         void poll();
           void loadRows();
-        return { ok: response.ok && body.ok === true, message: withDetails(body.message ?? (response.ok ? "Done." : "Horizon could not send that decision. Nothing was done."), body.details) };
+        return { ok: response.ok && body.ok === true, message: withRecordNote(withDetails(body.message ?? (response.ok ? "Done." : "Horizon could not send that decision. Nothing was done."), body.details), body) };
       } catch {
         return { ok: false, message: "Horizon did not answer, so the decision may not have been sent. Check Decide before trying again." };
       }
@@ -338,9 +399,9 @@ function App() {
         return { ok: false, message: "Horizon did not answer, so the label was not saved." };
       }
     },
-    startCase: async (caseId) => {
+    startCase: async (caseId, previewed) => {
       try {
-        const response = await fetch("/desk/start", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ case_id: caseId }) });
+        const response = await fetch("/desk/start", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ case_id: caseId, also_starts: previewed }) });
         const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
         void loadWork();
         return { ok: response.ok && body.ok === true, message: body.message ?? (response.ok ? "Started." : "It did not start.") };
@@ -349,6 +410,19 @@ function App() {
       }
     },
     conversation: {
+      // Try again re-previews: it reads the steps waiting now and shows them. It does not start anything; the person starts from Work.
+      retryStart: async (caseId) => {
+        try {
+          const work = (await (await fetch("/desk/work.json", { headers: { accept: "application/json" } })).json()) as { cases?: { items?: { case_id: string; waiting?: { name: string }[] }[] } };
+          void loadRows();
+          void loadWork();
+          const waiting = work.cases?.items?.find((c) => c.case_id === caseId)?.waiting ?? [];
+          if (waiting.length === 0) return { ok: false, message: "Nothing is waiting to start in that case now." };
+          return { ok: false, message: `Waiting to start now: ${waiting.map((w) => w.name).join(", ")}. Look again, then start it from Work.` };
+        } catch {
+          return { ok: false, message: "Horizon did not answer, so the steps could not be read again." };
+        }
+      },
       discard: async (rowId) => {
         try {
           const response = await fetch("/desk/conversation/discard", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ row_id: rowId }) });
@@ -363,31 +437,39 @@ function App() {
     panels: {
       answer: async (input) => {
         try {
-          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", ...input }) });
-          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+          // A retry of the same answer sends the same id; a reply that is not a server error is final for it.
+          const key = `answer:${JSON.stringify(input)}`;
+          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.answer", ...input, request_id: requestIdFor(key) }) });
+          if (response.status < 500) settleRequest(key);
+          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; recorded?: boolean; recorded_words?: string };
           rev.current = "";
           void poll();
           void loadRows();
-          return { ok: response.ok && body.ok === true, message: body.message ?? (response.ok ? "Sent." : "The answer was not sent.") };
+          return { ok: response.ok && body.ok === true, message: withRecordNote(body.message ?? (response.ok ? "Sent." : "The answer was not sent."), body) };
         } catch {
           return { ok: false, message: "Horizon did not answer, so your answer may not have been sent." };
         }
       },
       pin: async (id, pinned) => {
-        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.pin", id, pinned }) }).catch(() => undefined);
+        const key = `pin:${id}:${pinned}`;
+        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.pin", id, pinned, request_id: requestIdFor(key) }) }).then((r) => { if (r.status < 500) settleRequest(key); }, () => undefined);
         rev.current = "";
         void poll();
           void loadRows();
       },
       close: async (id) => {
-        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.close", id }) }).catch(() => undefined);
+        const key = `close:${id}`;
+        await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.close", id, request_id: requestIdFor(key) }) }).then((r) => { if (r.status < 500) settleRequest(key); }, () => undefined);
         rev.current = "";
         void poll();
           void loadRows();
       },
       stopWaiting: async (step) => {
         try {
-          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.stop_waiting", step }) });
+          // A retry of the same stop (the same step) sends the same id; a reply that is not a server error is final for it.
+          const key = `stop:${step}`;
+          const response = await fetch("/desk/panels/op", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "human.stop_waiting", step, request_id: requestIdFor(key) }) });
+          if (response.status < 500) settleRequest(key);
           const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
           rev.current = "";
           void poll();
@@ -423,11 +505,11 @@ function App() {
       send: async (input) => {
         try {
           const response = await fetch("/desk/handoff", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
-          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string; outcome?: string; draft_id?: string };
+          const body = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; details?: string; outcome?: string; draft_id?: string; recorded?: boolean; recorded_words?: string };
           rev.current = "";
           void poll();
           void loadRows();
-          return response.ok && body.ok === true ? { ok: true, message: body.message ?? "Handed off.", draft_id: body.draft_id ?? "" } : { ok: false, outcome: body.outcome ?? "failed", message: withDetails(body.message ?? "The hand off was not sent. Nothing was done.", body.details) };
+          return response.ok && body.ok === true ? { ok: true, message: withRecordNote(body.message ?? "Handed off.", body), draft_id: body.draft_id ?? "" } : { ok: false, outcome: body.outcome ?? "failed", message: withDetails(body.message ?? "The hand off was not sent. Nothing was done.", body.details) };
         } catch {
           return { ok: false, outcome: "unreachable", message: "Horizon did not answer, so the hand off may not have been sent. Press Confirm again: the same request is never applied twice." };
         }
@@ -445,7 +527,7 @@ function App() {
     saveNote: async (input) => {
       try {
         const response = await fetch("/desk/note", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
-        const body = (await response.json()) as { ok: true; note: NoteView } | { ok: false; message?: string };
+        const body = (await response.json()) as { ok: true; note: NoteView; recorded?: boolean; recorded_words?: string } | { ok: false; message?: string };
         if (response.ok && body.ok) {
           rev.current = "";
           void poll();
@@ -469,4 +551,4 @@ function App() {
 }
 
 const root = document.getElementById("root");
-if (root) createRoot(root).render(<App />);
+if (root) createRoot(root).render(<Gate />);

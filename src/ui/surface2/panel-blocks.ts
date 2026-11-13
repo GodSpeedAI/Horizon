@@ -49,10 +49,26 @@ export interface QuestionItem extends Validated {
   readonly question: string;
   readonly why_needed: string;
   readonly options: readonly QuestionOption[];
+  /** A short fingerprint of the question text, options, consequences and input kind, made when the agent put it up. */
+  readonly version?: string;
   /** The step or decision this answer settles, as the agent named it, or null. */
   readonly resolves?: string | null;
+  /** The step this question is about: the panel's step when the question was put up. Part of its version, so a question cannot be moved to another step under the same id. */
+  readonly target?: string | null;
   readonly answered: { readonly outcome: string; readonly value: unknown; readonly note: string | null; readonly routed_as?: string | null } | null;
   readonly withdrawn?: { readonly reason: string } | null;
+  /** The agent that first put this question up (the agent door's name for it). Set once and never changed by a later put. */
+  readonly asked_by?: string | null;
+  /** The key id of the agent that put the question up. Only that key reads its answers or routes or withdraws the question. */
+  readonly asked_by_key?: string | null;
+  /** The key id of the agent that answers for the question now. Set when the question is put up, and moved by a reassignment (the author fields stay). */
+  readonly owner_key?: string | null;
+  /** The name of the agent that answers for the question now, for display. */
+  readonly owner_name?: string | null;
+  /** Counts the owner changes of the question (each reassignment adds one). An answer carries the revision it was given under; a different one is refused. */
+  readonly owner_rev?: number;
+  /** Earlier answers the person put off ("Not yet") before the agent asked again. Oldest first. */
+  readonly earlier?: readonly { readonly outcome: string; readonly value: unknown; readonly note: string | null }[];
 }
 export interface UnavailableItem extends Validated {
   readonly kind: "unavailable";
@@ -67,6 +83,27 @@ const ID = /^[a-z][a-z0-9_-]{0,63}$/;
 const isRec = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 export const clip = (v: unknown, max: number): string => (typeof v === "string" ? v.slice(0, max) : v === null || v === undefined ? "" : String(v).slice(0, max));
 
+/**
+ * A short, steady fingerprint (53 bits, 14 hex characters) of what the person is asked to agree to: the words, the options, what each one
+ * does, how they answer, and the step the answer settles (`target`, when there is one). A question with no target has the fingerprint it
+ * always had.
+ */
+export function questionVersion(q: { readonly question: string; readonly input?: string; readonly options: readonly QuestionOption[]; readonly target?: string | null }): string {
+  const parts: unknown[] = [q.question, q.input ?? "select", q.options.map((o) => [o.option_id, o.label, o.consequence ?? null])];
+  if (q.target !== undefined && q.target !== null) parts.push(q.target);
+  const text = JSON.stringify(parts);
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, "0");
+}
+
 /** A question needs its words. Select and multiselect need 2 to 8 options; confirm and text take none. The person can always put it off or cancel it instead. */
 export function questionOf(raw: Record<string, unknown>, id: string): QuestionItem | null {
   const input: AskInput = raw.input === undefined ? "select" : (ASK_INPUTS.find((k) => k === raw.input) ?? "select");
@@ -77,7 +114,8 @@ export function questionOf(raw: Record<string, unknown>, id: string): QuestionIt
     : [];
   if (typeof raw.question !== "string" || raw.question.trim() === "" || (listed && options.length < 2)) return null;
   const resolves = typeof raw.resolves === "string" && raw.resolves.trim() !== "" ? clip(raw.resolves, 128) : null;
-  return { kind: "question", id, input, question: clip(raw.question, 2048), why_needed: clip(raw.why_needed, 2048), options, resolves, answered: null, withdrawn: null };
+  const question = clip(raw.question, 2048);
+  return { kind: "question", id, input, question, why_needed: clip(raw.why_needed, 2048), options, version: questionVersion({ question, input, options }), resolves, answered: null, withdrawn: null };
 }
 
 /** How a block a panel can draw is shown. The keys are checked against the grammar's own list below. */

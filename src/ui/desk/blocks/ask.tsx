@@ -14,6 +14,14 @@ function echoValue(item: QuestionItem, value: unknown): string {
   return typeof value === "string" && item.input === "select" ? label(value) : String(value ?? "");
 }
 
+/** One plain sentence beside each control, saying what it does. */
+export const CONTROL_WORDS = {
+  answer: "Your answer goes to the agent.",
+  notYet: "The agent will ask again later. Nothing is decided.",
+  skip: "The question is closed without an answer. Nothing is decided.",
+  withdrawn: "The agent took back its question. Your answers so far stay on record.",
+} as const;
+
 export function Question({ item, state }: { readonly item: QuestionItem; readonly state?: AskState | undefined }): ReactNode {
   const ctx = useCtx();
   const shown = useShown();
@@ -33,6 +41,7 @@ export function Question({ item, state }: { readonly item: QuestionItem; readonl
       <div className="hb-ask" data-state="withdrawn">
         {title}
         <p role="status">The agent withdrew this question: {shown(withdrawn.reason)}</p>
+        <p className="hb-muted" data-control-words="withdrawn">{CONTROL_WORDS.withdrawn}</p>
       </div>
     );
   }
@@ -43,7 +52,7 @@ export function Question({ item, state }: { readonly item: QuestionItem; readonl
       <div className="hb-ask" data-state={routed !== null ? "routed" : "waiting"}>
         {title}
         <p>{how}</p>
-        {answered.outcome === "answered" || routed !== null ? <p className="hb-muted" role="status">{routed !== null ? `The agent took it to: ${shown(routed)}` : "Waiting for the agent to say where it went"}</p> : null}
+        {answered.outcome === "answered" || routed !== null ? <p className="hb-muted" role="status">{routed !== null ? `The agent says it took it to: ${shown(routed)}` : "Waiting for the agent to say where it went"}</p> : null}
       </div>
     );
   }
@@ -89,10 +98,19 @@ export function Question({ item, state }: { readonly item: QuestionItem; readonl
         A note for the agent (optional)
         <textarea rows={2} value={note} maxLength={600} onChange={(e) => setNote(e.target.value)} />
       </label>
-      <div className="hb-row">
-        <button type="button" className="primary" disabled={!ready} onClick={() => send("answered")} data-answer>Answer</button>
-        <button type="button" onClick={() => send("deferred")}>Not yet</button>
-        <button type="button" onClick={() => send("cancelled")}>Skip</button>
+      <div className="hb-row hb-controls">
+        <span className="hb-control">
+          <button type="button" className="primary" disabled={!ready} onClick={() => send("answered")} data-answer>Answer</button>
+          <span className="hb-hint" data-control-words="answer">{CONTROL_WORDS.answer}</span>
+        </span>
+        <span className="hb-control">
+          <button type="button" onClick={() => send("deferred")}>Not yet</button>
+          <span className="hb-hint" data-control-words="not-yet">{CONTROL_WORDS.notYet}</span>
+        </span>
+        <span className="hb-control">
+          <button type="button" onClick={() => send("cancelled")}>Skip</button>
+          <span className="hb-hint" data-control-words="skip">{CONTROL_WORDS.skip}</span>
+        </span>
       </div>
       {!ready ? <p className="hb-muted">{input === "text" ? "Write your answer to send it" : input === "multiselect" ? "Pick at least one to send your answer" : "Pick one to send your answer"}, or choose Not yet or Skip.</p> : null}
     </fieldset>

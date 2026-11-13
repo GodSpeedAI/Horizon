@@ -1,0 +1,247 @@
+preregistration:
+  id: HORIZON-PREREG-T23-0A
+  task: T23
+  title: "Unified human and agent identity, delegation and authority — task preregistration"
+  recorded_at: "2026-11-09"
+  recorded_before_artifacts: true
+
+  claim: >-
+    One closed operation catalog and one frozen record schema set make the caller, the operation's
+    class and the authority behind it decidable before any effect, and no path lowers a governed
+    operation or hands a human session a fabricated grant. Horizon stays a consumer of Cognate
+    identity and SEA-Forge authority; it does not become a second issuer, policy engine or
+    approval system.
+
+  upstream_pins:
+    spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+    plan: { id: "HORIZON-PLAN-001", file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23" }
+    design: { file: design_draft.md, sha256: "2c4a41825d86dc3a8aca951f2e673449b217a8b3e10e06a8ceea2b239073e330", sections: "2, 4, 6, 7, 11, 12, 13, Appendix A" }
+    authority_report: { file: .agents/reports/2026-11-08-unified-human-agent-identity-authority.md, sha256: "d302b5ae3133fbd4bc79a7113fb4c8332fefdd2caa3218f2901f5240790246e1" }
+    stage_preregistrations:
+      - { file: .agents/prereg/horizon/STAGE-0A.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-1, note: "Stage 0A unit 1: the catalog, policy constants, parameter schemas and platform-claim matrix as first frozen." }
+    zod: { version: "3.25.76", provenance: "already a direct dependency of this repository" }
+    yaml_parser: { name: "Bun.YAML", version: "runtime-provided (Bun 1.4.0)" }
+    python: { version: "3.12", provenance: "stdlib only; research/pyproject.toml declares no dependencies" }
+
+  # T23 settles REQ-SEC-006 as a task. The Stage 0A expectations below settle no requirement on
+  # their own: they freeze and check the contracts the later stages lean on. No status entry may
+  # claim REQ-SEC-006 as settled because this file exists.
+  settles: []
+
+  settlement_targets:
+    task: "T23"
+    requirements:
+      - id: "REQ-SEC-006"
+        status: "open"
+        note: >-
+          The requirement is in scope for T23 and is settled only by the Stage 4 vertical slice and
+          its independent confirmation. The Stage 0A contracts are evidence toward it, not its
+          settlement.
+
+  positive_expectations:
+    - id: PE-01
+      stage: "0A"
+      expectation: >-
+        The catalog resolves to exactly 73 operations in five class groups (P0 17, P1 26, P2 23,
+        P3 5, PX 2), each row carrying a class, a binding state, and the fields a gate needs.
+    - id: PE-02
+      stage: "0A"
+      expectation: >-
+        A route that carries several semantic actions dispatches by the action the handler
+        performs, and every action the router accepts on that route has a reviewed catalog row.
+    - id: PE-03
+      stage: "0A"
+      expectation: >-
+        Every governed operation names a parameter schema that exists in the frozen parameter
+        file, names an authority writer from the closed writer set, and demands human evidence
+        stronger than A0 or A1.
+    - id: PE-04
+      stage: "0A"
+      expectation: >-
+        The record contract declares eight signed record schemas plus the unsigned refusal, with
+        the envelope required on every record and the properties one record cannot prove named
+        rather than implied.
+    - id: PE-14
+      stage: "0A"
+      expectation: >-
+        Every case in the cross-language fixture set produces the exact violation set it names in
+        TypeScript and in an independent Python implementation, and every constraint the
+        descriptor declares is exercised by at least one case.
+    - id: PE-05
+      stage: "0A"
+      expectation: >-
+        A human-session descriptor with no grant is well formed, and the same descriptor with a
+        delegation head, an execution, or a grant smuggled into its parameters is refused rather
+        than ignored.
+    - id: PE-06
+      stage: "0A"
+      expectation: >-
+        The caller kind cannot be substituted: a human cannot present an execution, an agent
+        cannot omit one, a console cannot claim one, and a caller cannot claim to be the
+        execution a record targets.
+    - id: PE-07
+      stage: "0A"
+      expectation: >-
+        An operation's class cannot be lowered through an alias, a weaker parameter schema, or a
+        dispatch target that is not a listed catalog row.
+    - id: PE-08
+      stage: "0A"
+      expectation: >-
+        Every POST route in src/app.ts is accounted for exactly once as a mapped operation route,
+        a dispatching route, a declared route alias, or a declared non-operation route, and no
+        catalog gap is left open.
+    - id: PE-09
+      stage: "0A"
+      expectation: >-
+        The policy file carries the owner-frozen constants: credential 15m, offline 5m, A3
+        challenge 2m, pairing 5m, pending approval 10m, P2/P1 grant 8h, P3 grant 1h, delegation
+        depth 2, clock tolerance 60s, and P3 grants require an explicit numeric budget.
+    - id: PE-13
+      stage: "0A"
+      expectation: >-
+        The platform-claim matrix states the measured Jetson limits as unsupported Isolated
+        rather than as an aspiration, and refuses to claim S2 on a single-host desktop.
+    - id: PE-10
+      stage: "0B"
+      expectation: >-
+        Every reserved Horizon operation without an exact local confirmation refuses with no
+        write, low-risk collaboration stays available, and a local A3-T confirmation succeeds for
+        Cognate-owned local P2 operations only.
+    - id: PE-11
+      stage: "4"
+      expectation: >-
+        The minimum vertical slice runs with no mocked or simulated boundary: one issuer
+        execution, Cognate propagation, one SEA-Forge grant, one Horizon operation, a real
+        effect, a revocation, and evidence a separate verifier can check.
+    - id: PE-12
+      stage: "6"
+      expectation: >-
+        Every advertised platform claim has a recorded native result and every unsupported mode
+        is disabled rather than qualified in prose.
+
+  negative_expectations:
+    - id: NE-01
+      stage: "0A"
+      expectation: >-
+        An unlisted operation ID must never resolve to a row with a writer, an expiry, or a
+        writable flag. A fallback that treats an unknown ID as a local read fails the check.
+    - id: NE-02
+      stage: "0A"
+      expectation: >-
+        A governed operation must never be satisfiable by local_read_policy or
+        cognate_local_policy, nor by A0/A1 evidence. Introducing such a row fails the check.
+    - id: NE-03
+      stage: "0A"
+      expectation: >-
+        An unrecognized semantic action on a dispatching route must be Px, whatever the route is
+        called, whatever the HTTP method is, and whatever class the request claims for itself.
+    - id: NE-04
+      stage: "0A"
+      expectation: >-
+        A person's reserved operation must never be reachable from the agent door at a weaker
+        class, and the door must refuse it outright.
+    - id: NE-05
+      stage: "0A"
+      expectation: >-
+        A human-session record must never carry a grant, a delegation head, or a credential, and
+        a grant supplied in the parameters must be refused rather than ignored.
+    - id: NE-06
+      stage: "0A"
+      expectation: >-
+        The caller kind must not be substitutable, and a record must not be able to claim to be
+        the execution it targets.
+    - id: NE-07
+      stage: "0A"
+      expectation: >-
+        An operation's class must not be lowerable through an alias, a weaker parameter schema,
+        or a dispatch target that is not a listed catalog row.
+    - id: NE-08
+      stage: "0A"
+      expectation: >-
+        P0/P1 must never be offline-denied and P2/P3 must never be offline-allowed.
+    - id: NE-09
+      stage: "0A"
+      expectation: >-
+        A malformed or stale catalog or record contract must fail loudly at load. A duplicate
+        operation ID, an unknown class group, an unrecognized key, or a fixture naming an
+        undefined rule is a hard error, never a silent drop.
+    - id: NE-10
+      stage: "0B"
+      expectation: >-
+        A reserved operation without an exact local confirmation must write nothing and preserve
+        any entered draft, and a governed or P3 operation must refuse even when a valid interim
+        receipt exists.
+    - id: NE-11
+      stage: "2"
+      expectation: >-
+        Session-only grant creation must produce zero grants, and the human-only gateway must be
+        restricted to a distinct non-agent principal so an agent key can never use it.
+    - id: NE-12
+      stage: "5"
+      expectation: >-
+        Altered or substituted evidence must be rejected, and no builder identity may reach the
+        critic envelope.
+
+  falsifier: >-
+    Any of the negative expectations above reproducing on the committed files, an unlisted
+    operation or an unmapped write route reaching an effect, a governed operation satisfied by a
+    local-policy writer or A0/A1 evidence, or a human-session record accepted with a grant
+    falsifies this claim.
+
+  known_confounds:
+    - >-
+      The Stage 0A fixtures are contract-level. They prove the catalog bindings, the schemas and
+      the refusal rules; they do not prove a live issuer, a live grant, a real external effect or
+      a settled evidence chain, which the later stages measure.
+    - >-
+      The route scan reads literal `pathname === "..." && request.method === "POST"` comparisons
+      in src/app.ts only. A route registered through a table, a variable, or a second server file
+      is invisible to this check and would need its own inventory.
+    - >-
+      The catalog's class assignment is a review statement about the effect each handler performs.
+      A handler whose effect changes without its row changing would silently misclassify; the
+      dispatch and ownership checks are what catch that.
+    - >-
+      The independent Python checker shares the fixture file and the rule text, not the
+      TypeScript implementation. It can still share a misreading of the rule, so the expectations
+      are also checked against the design text by a reader.
+    - >-
+      The design draft these contracts derive from carries post-review corrections that were
+      never independently reviewed; the corrections are assigned to these fixtures instead.
+
+  evidence_plan:
+    command: "just gate-t23"
+    typecheck: "./node_modules/.bin/tsc --noEmit"
+    artifacts:
+      - contracts/identity/v1/operations.yaml
+      - contracts/identity/v1/params.yaml
+      - contracts/identity/v1/policy.yaml
+      - contracts/identity/v1/platform-claims.yaml
+      - contracts/identity/v1/records.json
+      - contracts/identity/v1/fixtures/record-cases.json
+      - src/contracts/identity/manifest.ts
+      - src/contracts/identity/records.ts
+      - test/identity-contract.test.ts
+      - test/identity-records.test.ts
+      - research/tests/identity_records.py
+      - research/tests/test_identity_fixtures.py
+      - scripts/check-t23-prereg-coverage.ts
+
+  redesign_trigger: >-
+    If accounting for the true write surface requires changing the catalog's class taxonomy, or
+    if a reserved decision cannot be bound to an operation without inventing evidence a single
+    host cannot produce, stop and revise the design rather than extending the manifest.
+
+  confirmation_condition: >-
+    A fresh reader who has not seen this work runs the recorded command and the typecheck, sees
+    them pass, and independently confirms that every write route in the router is accounted for,
+    that no governed row is a downgrade, and that the fixture violation sets are reproduced by
+    both implementations. Self-attestation is not confirmation.
+
+  notes: >-
+    T23 is a staged task. This preregistration covers the whole task; the Stage 0A expectations
+    are the ones a test names today, and the later-stage expectations are registered now and
+    reported open until their stage is built. A later stage adds its own preregistration with
+    its own expectations rather than editing a recorded one. The Stage 0A unit preregistration
+    (STAGE-0A.prereg.yaml) is preserved as recorded; the reconciliation that followed it is
+    recorded in the Stage 0A evidence, not by rewriting that file's expectations.

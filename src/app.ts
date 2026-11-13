@@ -14,7 +14,7 @@ import { observeResearch, requireResearch, type ResearchStatus } from "./adapter
 import { economicsFromEnv, loadConfig } from "./config/load.ts";
 import { ECONOMICS_SCHEMA } from "./economics/model.ts";
 import type { LoadedConfig, OperatorsConfig } from "./config/types.ts";
-import { createHorizonRuntime, type HorizonRuntime } from "./runtime/create.ts";
+import { assertStoreBoundary, createHorizonRuntime, openReadOnlyStore, type HorizonRuntime } from "./runtime/create.ts";
 import { appendIntentAttempt, appendIntentRecord, createFrameRegister, NAVIGATION_INTENT_COMMIT, navigationIntentComponent, readIntentAttempts, readIntentRecords, type FrameRegister, type IntentAttempt } from "./capabilities/navigation-intent.ts";
 import { checkPurpose, latestCase, onboardingSkipped, openCase, setOnboardingSkipped } from "./capabilities/workspace-records.ts";
 import { CONTRACT_VERSION, contractVersionOf } from "./capabilities/capacity-ledger.ts";
@@ -36,9 +36,22 @@ import { approvalAuthorityFromEnv, type ApprovalAuthority } from "./adapters/sea
 import { buildInbox, type InboxReadout } from "./domain/approval-inbox.ts";
 import { authorityOf, defaultRealityTraceRepo, observationOutbox, realityTraceFromEnv, RealityTraceEvidence, type GovernedInvocation, type RealityTraceConfig, type SettlementAuthority } from "./adapters/settlement.ts";
 import { appendSettlement, latestSettlement, type ExecutionRecord, type NavigationSettlement, type RealityTraceObservation, type SettlementReference } from "./capabilities/navigation-settlement.ts";
-import type { Json } from "@godspeedai/cognate-events";
+import type { DurableStore, Json } from "@godspeedai/cognate-events";
+import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
 import type { RunView } from "@godspeedai/cognate-runtime-api";
 import { buildStructuralFrame, type NavigationFrameV1, type NavigationIntentRecord } from "./domain/frame.ts";
+import {
+  actionFieldFor,
+  classify,
+  classifyReference,
+  loadOperationManifest,
+  refusedPrefixesFor,
+  resolveDispatchedOperation,
+  type LoadedManifest,
+} from "./contracts/identity/manifest.ts";
+import { RESERVED_ACTOR_FIELDS, reservedActorField, schemaFieldNames, unknownField } from "./contracts/identity/reserved-fields.ts";
+import { frozenRefusal, refusalWords, type FrozenRefusal } from "./contracts/identity/enforcement.ts";
+import { loadParamSchemas, wireName, type ParamSchemaSpec } from "./contracts/identity/params.ts";
 import { buildCommitIntent, IntentError, type CommitIntentInput, type CommitIntentOutput } from "./domain/intent.ts";
 import type { NavigationFrame as NavigationFrameV2 } from "./domain/navigation.ts";
 import type { SemanticRef } from "./domain/operational.ts";
@@ -81,36 +94,54 @@ import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type Debugger
 import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare.tsx";
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
 import { applyStandIns, namesOfRepos } from "./ui/workspace/presenting.ts";
-import { answerRowOf, appendRow, discardRow, listConversation, panelRowOf, settleDraftRow, updateRow } from "./capabilities/conversation.ts";
-import { answerEcho, cleanAgentName, WAITING_FOR_AGENT, type RowSource } from "./ui/desk/conversation-model.ts";
+import { acquireDeskLock, acquireStoreLockFile, releaseDeskLock, releaseStoreLockFile, type StoreLockFile } from "./capabilities/desk-lock.ts";
+import { appliedVersion, DESK_MIGRATIONS, MIGRATING_WORDS, MIGRATION_FAILED_WORDS, runDeskMigrations } from "./capabilities/desk-migrations.ts";
+import { BAD_REQUEST_ID_WORDS, REQUEST_ID_REQUIRED_WORDS, REUSED_REQUEST_WORDS, requestFingerprint, requestRecord, seenRequest, validRequestId } from "./capabilities/desk-requests.ts";
+import { answerRowOf, appendRow, discardRow, listConversation, newRowRecord, panelRowOf, planAppend, planUpdate, settleDraftRow } from "./capabilities/conversation.ts";
+import { answerEcho, cleanAgentName, MAX_WAITING_PROPOSALS, TOO_MANY_PROPOSALS, WAITING_FOR_AGENT, type ConversationRow, type RowSource, type RowStage } from "./ui/desk/conversation-model.ts";
 import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
 import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
 import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
-import { acceptanceBlocked, answerFor, listAnswers, recordAnswer, routeAnswer, stopWaiting, checkValue, OUTCOMES, WAITING_WORDS, type PanelAnswer } from "./capabilities/panel-answers.ts";
+import { checkReassign } from "./capabilities/question-rules.ts";
+import { acceptanceBlocked, AGREED_COLLECTION, agreedFingerprint, agreedFingerprintOf, agreedId, answerFor, guardIdOf, PANEL_ANSWERS_COLLECTION, answerState, listAnswers, listConflicts, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
 import { CATALOGUE, vocabulary } from "./ui/surface2/catalog.ts";
-import { NO_PANELS, reduceAgent, reduceHuman, type AgentOp, type HumanOp, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
+import { ANSWER_NEEDS_REVISION, ANSWERED_CANNOT_CHANGE, NO_PANELS, UNNAMED_AGENT, checkAgentOp, moveQuestion, openPanelId, reduceAgent, reduceHuman, type AgentOp, type AskBlock, type HumanOp, type Panel, type Panels as PanelsBoard } from "./ui/desk/panels-model.ts";
+import { boardWrites, deskScopeOf, loadBoard, movedStoredQuestion, PANEL_LOAD_WORDS, PANEL_UNREADABLE_WORDS, readsBack, stateWrites, withStored, type CommitRecord } from "./capabilities/panel-records.ts";
 import { currentDraft, handoffItem, handoffRequestId, handoffStepId, nextDraft, saveDraft, stepNameOf, validDraftId, DRAFT_TEXT_MAX } from "./capabilities/handoff.ts";
 import { readableTitle } from "./ui/desk/banned-words.ts";
+import { agentRowsOf, agentSearchOf, agentStateOf, WITHHELD_WORDS } from "./ui/desk/agent-view.ts";
 import { caseTitle, matches, partsOf, plainWords, sourcesOf, type DeskCase, type DecideState, type DecisionCardData, type PanelsData, type DeskState, type HomeState, type SearchResult } from "./ui/desk/model.ts";
 import { confirmedDecision, failedDecision } from "./ui/desk/decision-words.ts";
 import { buildDecide, waitingCount, type CaseApprovals, type HumanStepInput } from "./ui/desk/decide-build.ts";
+import { conflictLogLines } from "./ui/desk/conflict-model.ts";
 import { addItem, advance as caseAdvance, detailsOf, entryOptions, approvalList, caseDigest, caseSteps, decide as caseKeeperDecide, humanTaskComplete, listCases, type CaseKeeper, type CaseLine } from "./adapters/sea-forge-case.ts";
 import { activeHolds, checkReason, putHold, recordDecision } from "./capabilities/decisions.ts";
+import { recordRefusal } from "./capabilities/refusals.ts";
 import { caseItems, costSource, orderWork, sessionItems, type AcceptedKnowledge, type WorkData } from "./ui/desk/work-build.ts";
 import { readLedgerDay } from "./adapters/ledger-day.ts";
 import { recordReader, type RecordReader } from "./adapters/realitytrace-economics.ts";
 import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
+import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, PAIR_FIRST_WORDS, PairingNeedsTerminal, printPairingCode } from "./desk/pairing.ts";
+import { gate as confirmationGate, type ConsumeResult } from "./capabilities/pending-confirmations.ts";
+import { runConfirm, type ConfirmIO, type ConfirmOutcome } from "./capabilities/confirm-command.ts";
+import { AUTHORITY_DECISION_INTERFACE, interfacePublicationStatus } from "./contracts/identity/interface-status.ts";
+import { terminalOutput as confirmationTerminal } from "./desk/pairing.ts";
+import { DEFAULT_AGENT_KEY_ID, DEFAULT_AGENT_NAME, ownerOfKey, readRegistry } from "./desk/agent-keys.ts";
+import { checkWithdraw, questionFingerprint } from "./capabilities/question-rules.ts";
+import { notRecordedWarnings } from "./capabilities/reconciliation.ts";
 import { setupMapping } from "./config/setup.ts";
 import type { RecordSource } from "./config/types.ts";
 import { existsSync as fileExists, mkdirSync as makeDir, readFileSync as readFileText, writeFileSync as writeFileText } from "node:fs";
 import { dirname as dirOf, join as joinPath } from "node:path";
 import { tmpdir as tmpDir } from "node:os";
 import type { Server } from "bun";
-import { RemoteController, type RemoteStatus } from "./remote/server.ts";
+import { EnrollmentAuthority, type P3Authority } from "./remote/enrollment.ts";
+import { DEVICE_ACTOR_PREFIX, RemoteController, type RemoteStatus } from "./remote/server.ts";
 import { remoteSettings } from "./remote/settings.ts";
 import { qrSvg, remotePanelPage } from "./remote/panel.ts";
+import { itemOf, questionOf } from "./ui/surface2/panel-blocks.ts";
 
 type HttpServer = Server<unknown>;
 
@@ -123,6 +154,9 @@ export class ApprovalFollowUpError extends Error {
 }
 
 /** Run the steps that follow a decision SEA-Forge has already recorded; any failure but a refused commit becomes an ApprovalFollowUpError. */
+/** The decision state as the lookup read it, with the step each card decides (a card with no step has none). */
+type DecideLookup = DecideState & { readonly stepOf: ReadonlyMap<string, string> };
+
 export async function afterRecordedDecision<T>(steps: () => Promise<T>): Promise<T> {
   try {
     return await steps();
@@ -164,9 +198,25 @@ export interface FrameView {
   readonly frame: NavigationFrameV1;
 }
 
+/**
+ * Request fields that would name the caller. The caller is never taken from a request: the actor
+ * comes from the authenticated session or the agent key, and the role comes from the same place.
+ * A request that carries one of these is refused outright rather than quietly ignored, so no
+ * caller can ask to be read as somebody else.
+ *
+ * The list itself lives with the contract, in `contracts/identity/reserved-fields.ts`, because
+ * every write boundary answers the same question with the same names. The phone used to keep a
+ * shorter list of its own, and a field the desktop refused was an ordinary unknown field on the
+ * phone (R4-07).
+ */
+export const ACTOR_NAMING_FIELDS = RESERVED_ACTOR_FIELDS;
+
 export interface SurfaceIntentRequestBody {
   readonly transport: "gui" | "cli" | "mcp";
-  readonly role?: unknown;
+  /**
+   * The role is deliberately absent. It selects which projection the surface is reduced for, and
+   * it comes from the authenticated caller, never from the body (DEF-ROLE-FROM-REQUEST).
+   */
   /** GUI: the action the operator activated. */
   readonly node_id?: unknown;
   /** CLI/MCP: the operation the caller named. */
@@ -233,7 +283,7 @@ export interface HorizonApplication {
   readonly operatorActors: OperatorActors;
   /** The commit the phone makes, run as a session's Caller with its mapped SEA-Forge actor. Refuses any Caller that is not a mapped operator session. */
   /** Stage 4: an agent's panel tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`). */
-  applyAgentOp(op: AgentOp): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }>;
+  applyAgentOp(op: AgentOp & { readonly request_id?: unknown }, agentName?: string, keyId?: string): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }>;
   commitForSession(actionId: string, intentId: string, who: Caller): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }>;
   /** Healthy, or a typed degraded observation; never a startup prerequisite. */
   readonly research: ResearchStatus;
@@ -287,14 +337,120 @@ export interface HorizonApplication {
   surface(role?: SurfaceRole): ReturnType<typeof projectForRole>;
   /** The published `horizon.surface/2` vocabulary, for discovery (PE-01). */
   surfaceSchema(): ReturnType<typeof publishSurfaceSchema>;
-  commitSurfaceIntent(submission: SurfaceIntentRequestBody): Promise<
+  /**
+   * Commit one surface intent for the role the caller's context gives it. The role is never read
+   * from the submission: at an HTTP boundary it comes from the signed-in session, and in process
+   * it comes from the local console (DEF-ROLE-FROM-REQUEST).
+   */
+  commitSurfaceIntent(submission: SurfaceIntentRequestBody, role: SurfaceRole): Promise<
     | { readonly ok: true; readonly result: IntentCommit; readonly bound: EquivalenceResult }
     | { readonly ok: false; readonly code: string; readonly message: string }
   >;
   startObservation(commit: IntentCommit): Promise<RunView>;
   researchContract(): ReturnType<typeof requireResearch>;
   startServer(port?: number): HttpServer;
+  /** Stage 0B: the local terminal side of a waiting reserved operation (`horizon confirm --pending <id>`). */
+  confirmPending(pendingId: string, io: ConfirmIO): Promise<ConfirmOutcome>;
+  /** Resolves when the saved records are migrated. Until then every change is refused with words saying so (design v3, step 4). */
+  readonly migrated: Promise<void>;
   close(): Promise<void>;
+}
+
+/**
+ * The identity catalog, read once and kept.
+ *
+ * A catalog that cannot be loaded is a refusal, never a default. The gate below would otherwise
+ * see every reference as unknown, and an unknown reference that the deployment happens to bind
+ * would be allowed — the opposite of failing closed.
+ */
+let identityCatalog: LoadedManifest | null = null;
+function identityCatalogOf(): LoadedManifest {
+  if (identityCatalog !== null) return identityCatalog;
+  identityCatalog = loadOperationManifest();
+  return identityCatalog;
+}
+
+/**
+ * What the catalog says the runtime does with the operation a request is about to perform.
+ *
+ * The answer comes from the catalog's own live-enforcement table, so the contract and the runtime
+ * cannot drift: a contract that says a row is refused is a row the route refuses, and a contract
+ * that says a row runs is a row the route runs. A catalog that cannot be loaded is a refusal, not
+ * a default: the route answers 503 and changes nothing (R5-01).
+ */
+type RefusalCheck = { readonly ok: true; readonly refusal: FrozenRefusal | null } | { readonly ok: false; readonly message: string };
+function checkFrozenRefusal(
+  operationId: string,
+  selector: { readonly route?: string; readonly codeOp?: string },
+): RefusalCheck {
+  try {
+    return { ok: true, refusal: frozenRefusal(identityCatalogOf(), operationId, selector) };
+  } catch (error) {
+    return {
+      ok: false,
+      message: `The identity catalog could not be loaded, so nothing was changed (${error instanceof Error ? error.message : String(error)}).`,
+    };
+  }
+}
+
+/**
+ * Whether the catalog lets a route perform the operation it is about to perform.
+ *
+ * `run` means the catalog has no refusal for the row, so the route's own checks decide.
+ * `refused` means the row is refused at this freeze: the refusal audit is written now, before the
+ * route returns, and the caller answers with the catalog's own words. `unavailable` means the
+ * catalog could not be read, which is a refusal too — never a default (R5-01).
+ */
+type FrozenGate = { readonly state: "run" } | { readonly state: "refused"; readonly refusal: FrozenRefusal } | { readonly state: "unavailable"; readonly message: string };
+async function frozenGate(
+  store: DurableStore,
+  tenant: string,
+  operationId: string,
+  selector: { readonly route?: string; readonly codeOp?: string },
+  caller: string | null,
+): Promise<FrozenGate> {
+  const check = checkFrozenRefusal(operationId, selector);
+  if (!check.ok) return { state: "unavailable", message: check.message };
+  if (check.refusal === null) return { state: "run" };
+  try {
+    await recordRefusal(store, {
+      tenant,
+      operation: check.refusal.operationId,
+      code_op: check.refusal.codeOp,
+      route: selector.route ?? null,
+      caller,
+      reason: check.refusal.reason,
+      now: new Date(),
+    });
+  } catch {
+    // The refusal stands whether or not its audit could be kept: nothing was changed either way.
+  }
+  return { state: "refused", refusal: check.refusal };
+}
+
+/**
+ * The qualifier the identity catalog dispatches a desk decision on.
+ *
+ * The card kind is never read from the request: the person names a card, and the server looks
+ * that card up. The settlement card is one kind with two halves, so its phase is read from the
+ * card's own id — the same id the settlement handler parses. A kind the catalog does not know
+ * resolves to nothing, and the pair is then refused rather than guessed (R3-02).
+ */
+function deskCardKind(card: { readonly kind: string; readonly id: string }): string | null {
+  switch (card.kind) {
+    case "escalation":
+    case "lesson":
+    case "case_task":
+    case "human_step":
+      return card.kind;
+    case "acceptance": {
+      const cut = card.id.lastIndexOf(":");
+      const phase = card.id.slice(cut + 1);
+      return phase === "observe" || phase === "rule" ? `acceptance_${phase}` : null;
+    }
+    default:
+      return null;
+  }
 }
 
 /**
@@ -310,6 +466,8 @@ export interface HorizonApplication {
 export async function createApplication(
   options: {
     readonly storePath?: string;
+    /** The SEA-Forge P3 authority for device enrolment. Omitted in production, where enrolment is refused. Tests wire a double. */
+    readonly remoteP3Authority?: P3Authority;
     readonly configPath?: string;
     /**
      * The Context Kernel adapter to bind, instead of building one from `context_kernel.command`.
@@ -355,15 +513,29 @@ export async function createApplication(
     readonly delegationClient?: Pick<SeaForgeAuthority, "decide">;
     /** Stage 4: how work is handed to a workshop agent. Injected by tests; defaults to the workshop named in the config and its key file. */
     readonly workshop?: () => Access;
+    /** Test seam: a promise the desk's record migration waits for before it runs, so a test can hold a migration pending. */
+    readonly migrationHold?: Promise<unknown>;
+    /**
+     * Read-only open for the CLI `surface` path, which may run while a desk holds the store. It takes no desk lock, writes nothing
+     * at startup (no operator registration, contract activation, reconciliation, migration or Obligation snapshot), and refuses to
+     * start when the desk's records are not migrated yet. Every store write it attempts is refused.
+     */
+    readonly readOnly?: boolean;
+    /** Test seam only: lets an in-process test drive governed mode with a scripted wire while the owner has not published the authority decision. */
+    readonly unpublishedAuthorityForTests?: boolean;
   } = {},
 ): Promise<HorizonApplication> {
-  const loaded = loadConfig(options.configPath);
+  const loaded = loadConfig(options.configPath, { readOnly: options.readOnly === true });
   const economics = options.economics ?? realityTraceEconomics(economicsFromEnv(process.env, loaded.config.economics));
   const world = loadWorld(loaded.config.world_ref);
   const research = await observeResearch(loaded.config.research_command);
   const caller: Caller = { actor: loaded.operator.principal, tenant: loaded.operator.tenant };
   const frames = createFrameRegister();
   const configured = options.governance ?? governanceFromEnv(process.env);
+  // Fail closed: governed mode consumes SEA-Forge's authority decision, which the owner has not published (external-interfaces.json).
+  if (configured.mode === "sea-forge" && !options.unpublishedAuthorityForTests && interfacePublicationStatus(AUTHORITY_DECISION_INTERFACE) !== "published") {
+    throw new Error("SEA-Forge governance is refused: sea_forge.authority_decision is specified_not_published, so Horizon cannot read a committed decision. Governance stays off until SEA-Forge publishes it.");
+  }
   // Poll SEA-Forge for decided escalations, so a commit approved or rejected at SEA-Forge directly
   // (not through resolveNavigationApproval) still resumes or fails on its own.
   const approvals = options.approvals ?? approvalAuthorityFromEnv(process.env, caller.actor.id);
@@ -381,7 +553,7 @@ export async function createApplication(
     configured.mode === "sea-forge"
       ? {
           ...configured,
-          approvalPollMs: configured.approvalPollMs ?? 2_000,
+          approvalPollMs: options.readOnly ? 0 : (configured.approvalPollMs ?? 2_000),
           ...(configured.authority === undefined
             ? {}
             : {
@@ -403,11 +575,38 @@ export async function createApplication(
       : options.realityTrace === null
         ? undefined
         : (options.realityTrace ?? realityTraceFromEnv(process.env, defaultRealityTraceRepo(options.storePath ?? process.env.HORIZON_STORE ?? loaded.config.runtime_store)));
+  // Design v3, section 2: one local writer per desk database. The store is opened and the writer lock taken before any runtime, recovery
+  // worker, projection runner or poller is built, so a second desk on the same store is refused before it touches the outbox. A read-only
+  // open reads through a guard that refuses writes, and takes no lock and gives none up.
+  const storeFile = assertStoreBoundary(loaded.config, options.storePath ?? loaded.config.runtime_store);
+  // The process-level lock file comes before any open of the store: opening a store at an older schema migrates it, so a second desk
+  // must be refused before that open (R3-4). The store's own record lock below stays as a second check.
+  let storeLock: StoreLockFile | undefined;
+  if (!options.readOnly) storeLock = await acquireStoreLockFile(storeFile);
+  let deskStore: DurableStore;
+  try {
+    deskStore = options.readOnly ? openReadOnlyStore(storeFile) : openSqliteStore({ path: storeFile });
+  } catch (error) {
+    if (storeLock !== undefined) await releaseStoreLockFile(storeLock);
+    throw error;
+  }
+  let deskLockToken: string | undefined;
+  if (!options.readOnly) {
+    try {
+      deskLockToken = await acquireDeskLock(deskStore);
+    } catch (error) {
+      await deskStore.close();
+      if (storeLock !== undefined) await releaseStoreLockFile(storeLock);
+      throw error;
+    }
+  }
   // HORIZON-001 1.1.0: bound operations, capacity and the obligation flow (SPEC-CR-002).
   const bindingFor = (operationRef: string) => loaded.config.operations.find((binding) => binding.operation_ref === operationRef);
+  /** The operations this deployment binds. A reference outside the catalog and outside this set is Px. */
+  const deploymentBoundRefs = new Set(loaded.config.operations.map((binding) => binding.operation_ref));
   // The rulebook is Horizon's DomainForge model; RealityTrace snapshots it so records carry its edition.
   const obligationRt = realityTrace ? new RealityTraceObligation({ bin: realityTrace.bin, dataHome: realityTrace.dataHome, stateHome: realityTrace.stateHome, repoDir: `${realityTrace.repoDir}-obligations`, rulebookEntry: resolve("domain", "interaction-model.sea") }) : null;
-  void obligationRt?.snapshot();
+  if (!options.readOnly) void obligationRt?.snapshot();
   const obligationDeps: ObligationDeps = {
     store: () => runtime.runtime.store,
     tenant: caller.tenant,
@@ -422,25 +621,40 @@ export async function createApplication(
     settlementConfigured: governance.mode === "sea-forge" && realityTrace !== undefined,
     now: () => new Date(),
   };
+  // The runtime uses the store opened above (and locked, when writable) instead of opening its own.
   const runtime: HorizonRuntime = await createHorizonRuntime(loaded.config, world, {
     caller,
     ...(options.storePath ? { storePath: options.storePath } : {}),
+    store: deskStore,
     components: [navigationIntentComponent(frames)],
     agents: [structuralObservationAgent(frames), navigationCommitAgent(() => runtime.runtime.store, { bindingFor, deps: obligationDeps })],
     ...(options.contextAdapter === undefined ? {} : { contextAdapter: options.contextAdapter }),
     governance,
     // The observation commits with the governed invocation itself (the outbox), so it cannot be lost.
     ...(realityTrace ? { outboxFor: observationOutbox(NAVIGATION_INTENT_COMMIT.id) } : {}),
+  }).catch(async (error: unknown): Promise<never> => {
+    if (deskLockToken !== undefined) await releaseDeskLock(deskStore, deskLockToken);
+    await deskStore.close();
+    if (storeLock !== undefined) await releaseStoreLockFile(storeLock);
+    throw error;
   });
+  // A read-only open never migrates: until the desk has run every migration, its records cannot be surfaced read-only.
+  if (options.readOnly && (await appliedVersion(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))) < Math.max(...DESK_MIGRATIONS.map((migration) => migration.version))) {
+    await runtime.runtime.close();
+    await deskStore.close();
+    throw new Error("horizon: the desk's records are not migrated yet, so the store cannot be surfaced read-only. Start the desk once to finish the migration, then surface again.");
+  }
   if (loaded.config.settlement) assertSnapshotDir(snapshotDirOf(loaded.config.settlement, runtime.storePath), runtime.storePath);
   // HORIZON-001 1.1.0: suspend pending v1 commit runs and mark the store before anything is served.
-  await activateContract(runtime.runtime.store, new Date());
+  if (!options.readOnly) await activateContract(runtime.runtime.store, new Date());
   // Durable operators, sessions and devices live in the same store. Operators named in configuration are
   // provisioned here (the host's administrative act); the mapping is then validated, never trusted blindly.
   const identity = createIdentityService(identityStoreOf(runtime.runtime.store));
   const identityTenant = identityTenantOf(caller.tenant);
   const operatorsConfig = resolveOperatorsConfig(options.operators ?? loaded.config.operators);
-  for (const operatorId of Object.keys(operatorsConfig.actors)) await identity.registerOperator({ tenant: identityTenant, operatorId, label: "configured operator" });
+  // The operator the configuration names (before any HORIZON_OPERATOR_REF override): the only operator legacy panel records can be proven to belong to (migration 7).
+  const soleOperator = loaded.operator.configuredRef;
+  if (!options.readOnly) for (const operatorId of Object.keys(operatorsConfig.actors)) await identity.registerOperator({ tenant: identityTenant, operatorId, label: "configured operator" });
   operatorActors = await validateOperatorActors(operatorsConfig, { identity, tenant: identityTenant, serviceActorId: serviceActor.actor_id });
   const mappedActors: OperatorActors = operatorActors;
   /** Why a session Caller may not commit, or null when it may. */
@@ -451,8 +665,10 @@ export async function createApplication(
     return null;
   }
   // Complete accounting for terminal intents that still hold; awaiting-authority holds are only reported.
-  const stranded = await reconcilePending(runtime.runtime.store, caller.tenant);
-  if (stranded.blockers.length > 0) console.error(`horizon: ${stranded.blockers.length} intent(s) hold capacity awaiting authority`);
+  if (!options.readOnly) {
+    const stranded = await reconcilePending(runtime.runtime.store, caller.tenant);
+    if (stranded.blockers.length > 0) console.error(`horizon: ${stranded.blockers.length} intent(s) hold capacity awaiting authority`);
+  }
   const evidence = realityTrace ? new RealityTraceEvidence(runtime.runtime.store, realityTrace) : undefined;
   let issued: FrameView | null = null;
   let boundChoices: readonly StructuralChoice[] = [];
@@ -489,7 +705,7 @@ export async function createApplication(
   // Resume stored windows. A restart mid-window resumes the same window; a window that closed while Horizon was
   // down is closed late, which SEA-Forge settles unresolved (C cannot be proven on time), never from late evidence.
   for (const pending of await listPending(runtime.runtime.store, caller.tenant)) {
-    if (!pending.terminal && pending.stage === "executed") scheduleClose(pending);
+    if (!options.readOnly && !pending.terminal && pending.stage === "executed") scheduleClose(pending);
   }
 
   /** Issue a frame for the current request and register it as the one an intent may name. */
@@ -732,6 +948,29 @@ export async function createApplication(
 
   /** Submit an already-built intent: refused intents are audited and write no record. */
   async function submitIntent(intent: CommitIntentInput): Promise<IntentCommit> {
+    // The gate is here as well as at the request boundary: this is the last place before a
+    // capability runs and a record is appended, so an unclassified reference cannot reach it by
+    // any other route into the application (R2-03).
+    // A classification refusal (unknown, governed, deployment-bound) appends nothing: the contract says no record is appended before refusal (NE-16).
+    let classificationRefusal: IntentError | null = null;
+    try {
+      const classification = classifyReference(identityCatalogOf(), intent.operation_ref, deploymentBoundRefs);
+      if (!classification.allowed) {
+        const governed = classification.reason === "governed_operation_needs_confirmation";
+        const bound = classification.reason === "deployment_bound_operation_needs_its_own_path";
+        classificationRefusal = new IntentError(
+          governed || bound ? "failed_precondition" : "invalid_argument",
+          governed
+            ? `${intent.operation_ref} is a ${classification.class} row: it needs its pending record, its confirmation and its authority writer, not a plain intent`
+            : bound
+              ? `${intent.operation_ref} is bound by this deployment: its authority, its evidence and its expiry are its binding contract's, and a plain intent carries none of them`
+              : `${intent.operation_ref} is not a classified operation: it is neither in the identity catalog nor bound by this deployment`,
+        );
+      }
+    } catch (error) {
+      throw new IntentError("failed_precondition", `the identity catalog could not be loaded, so nothing was committed (${error instanceof Error ? error.message : String(error)})`);
+    }
+    if (classificationRefusal !== null) throw classificationRefusal;
     if (governance.mode === "sea-forge") return governedSubmit(intent);
     let result: CommitIntentOutput;
     try {
@@ -771,6 +1010,27 @@ export async function createApplication(
 
   /** Source → frame → typed intent → commit. The route never supplies an observer. */
   async function commitNavigationIntent(request: { readonly operationRef: string; readonly intentId?: string; readonly expectation?: unknown }): Promise<IntentCommit> {
+    // The operation reference is classified before anything runs. An operation the identity
+    // catalog does not know is not a local write by default: it is Px unless the deployment binds
+    // it, and a governed row never travels the plain intent path (R2-03).
+    let classification;
+    try {
+      classification = classifyReference(identityCatalogOf(), request.operationRef, deploymentBoundRefs);
+    } catch (error) {
+      throw new IntentError("failed_precondition", `the identity catalog could not be loaded, so nothing was committed (${error instanceof Error ? error.message : String(error)})`);
+    }
+    if (!classification.allowed) {
+      const governed = classification.reason === "governed_operation_needs_confirmation";
+      const bound = classification.reason === "deployment_bound_operation_needs_its_own_path";
+      throw new IntentError(
+        governed || bound ? "failed_precondition" : "invalid_argument",
+        governed
+          ? `${request.operationRef} is a ${classification.class} row: it needs its pending record, its confirmation and its authority writer, not a plain intent`
+          : bound
+            ? `${request.operationRef} is bound by this deployment: its authority, its evidence and its expiry are its binding contract's, and a plain intent carries none of them`
+            : `${request.operationRef} is not a classified operation: it is neither in the identity catalog nor bound by this deployment`,
+      );
+    }
     const binding = bindingFor(request.operationRef);
     if (binding) await refreshBoundChoices();
     const { frame } = issueFrame();
@@ -936,9 +1196,15 @@ export async function createApplication(
    * Commit an intent a transport expressed in its own vocabulary, after checking that the
    * canonical intent is the one the surface offered. A divergent submission (another
    * operation, frame or actor) is refused rather than "closest-matched" (PE-04/NE-09).
+   *
+   * The role is an argument, not a field of the request: it selects the projection the surface
+   * is reduced for, and every caller passes the role its authenticated context gives it. The
+   * role never establishes identity or authority — the intent's actor is the frame's observer
+   * (DEF-ROLE-FROM-REQUEST).
    */
   async function commitSurfaceIntent(
     submission: SurfaceIntentRequestBody,
+    role: SurfaceRole,
   ): Promise<
     | { readonly ok: true; readonly result: IntentCommit; readonly bound: EquivalenceResult }
     | { readonly ok: false; readonly code: string; readonly message: string }
@@ -948,7 +1214,6 @@ export async function createApplication(
     if (typeof submission.frame_id === "string" && submission.frame_id !== frame.frame_id) {
       return { ok: false, code: "stale_surface", message: `SURFACE: frame ${submission.frame_id} is not the current frame` };
     }
-    const role: SurfaceRole = submission.role === "agent" || submission.role === "system" ? submission.role : "human";
     const offered = projectForRole(composeSurface(frame), role, frame, bindingContextOf(routeContext()));
     if (!offered.ok) return { ok: false, code: offered.code, message: JSON.stringify(offered.issues) };
     const view: GuiView = offered.view;
@@ -1305,12 +1570,22 @@ export async function createApplication(
   /** The cockpit's commit of one offered action, run as a session's Caller; refused when that Caller is not a mapped operator session. */
   async function commitForSession(actionId: string, intentId: string, who: Caller): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly message: string }> {
     const refusal = sessionRefusal(who);
-    if (refusal !== null) return { ok: false, code: "no_actor_mapping", message: refusal };
+    if (refusal !== null) {
+      // A device credential is never turned into the operator. The phone's move would have to run
+      // under the device's own principal, and the commit path is the person's: the two are not
+      // interchangeable, so the commit is refused rather than run under a borrowed identity
+      // (R5-03). The row the phone's command resolves is refused by the catalog before this
+      // branch; this is the backstop that keeps a drifted catalog from succeeding here.
+      if (who.actor.id.startsWith(DEVICE_ACTOR_PREFIX)) {
+        return { ok: false, code: "no_device_delegation", message: "A phone cannot make this move as the person: there is no delegation from the device to the operator at this release. Make the move on the desktop." };
+      }
+      return { ok: false, code: "no_actor_mapping", message: refusal };
+    }
     // The same commit the desktop's /workspace/intent makes, run as the session's Caller.
     let outcome: Awaited<ReturnType<typeof commitSurfaceIntent>> | null = null;
     let failure: unknown = null;
     try {
-      outcome = await acting.run(who, () => commitSurfaceIntent({ transport: "gui", role: "human", node_id: actionId, intent_id: intentId }));
+      outcome = await acting.run(who, () => commitSurfaceIntent({ transport: "gui", node_id: actionId, intent_id: intentId }, "human"));
     } catch (error) {
       failure = error;
     }
@@ -1515,6 +1790,7 @@ export async function createApplication(
         parts: health.parts,
         keyWarning: health.keyWarning,
         presenting,
+        reconciliation: await notRecordedWarnings(store, caller.tenant),
         rulebookWarning: obligationRt !== null && obligationRt.rulebookConnected() === false ? "Rulebook not connected for records: new records are made without a rulebook edition." : null,
       },
       days: await listDays(store, deskWho),
@@ -1536,13 +1812,14 @@ export async function createApplication(
     return { ...shown, rev: createHash("sha256").update(JSON.stringify(shown)).digest("hex").slice(0, 16) };
   }
 
-  async function deskSearch(params: URLSearchParams): Promise<SearchResult> {
+  /** `forAgent`: only notes marked "Let agents read this note" take part, and days and tags (which are made from every note) are not given. */
+  async function deskSearch(params: URLSearchParams, forAgent = false): Promise<SearchResult> {
     const store = runtime.runtime.store;
     const q = (params.get("q") ?? "").trim();
     const day = params.get("day") || null;
     const tag = params.get("tag") || null;
     const filtered = day !== null || tag !== null;
-    const notes = await searchNotes(store, deskWho, { q, ...(day ? { day } : {}), ...(tag ? { tag } : {}) });
+    const notes = (await searchNotes(store, deskWho, { q, ...(day ? { day } : {}), ...(tag ? { tag } : {}) })).filter((n) => !forAgent || n.shared_with_agents === true);
     const records = sourcesOf({ cases: true, agentWork: false, records: recordSources.length > 0 || cockpitStatus().realitytrace })[2]!;
     const result: SearchResult = {
       q,
@@ -1550,15 +1827,15 @@ export async function createApplication(
       tag,
       notes,
       cases: filtered ? [] : (await deskCases()).filter((c) => matches(c.purpose, q)),
-      days: filtered ? [] : (await listDays(store, deskWho)).filter((d) => matches(d.day, q)),
-      tags: filtered ? [] : (await listTags(store, deskWho)).filter((t) => matches(t.name, q)),
+      days: filtered || forAgent ? [] : (await listDays(store, deskWho)).filter((d) => matches(d.day, q)),
+      tags: filtered || forAgent ? [] : (await listTags(store, deskWho)).filter((t) => matches(t.name, q)),
       records,
     };
     return (await presentingOn(store, caller.tenant, caller.actor.id)) ? applyStandIns(result, presentingKey(), deskRepoNames()) : result;
   }
 
   // ---- Stage 3: Decide, Work, and the home panels that used to live on the old workspace page ----
-  async function decideState(moves: readonly WorkspaceMove[]): Promise<DecideState> {
+  async function decideState(moves: readonly WorkspaceMove[]): Promise<DecideLookup> {
     const inbox = await approvalInbox(clock());
     let caseApprovals: CaseApprovals = { kind: "none" };
     if (caseKeeper !== null && approvals !== undefined) {
@@ -1570,17 +1847,19 @@ export async function createApplication(
     const proposedLessons = await listLessons(runtime.runtime.store, caller.tenant, "proposed");
     const built = buildDecide({ inbox, moves, caseApprovals, holds, humanSteps: human.steps, extraNotices: human.notices, lessons: proposedLessons });
     // Accepting a step is blocked while an answer the operator gave an agent about it has had no reply.
-    const answers = (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied && a.step !== null);
-    if (answers.length === 0) return built;
-    const stepOf = (card: DecisionCardData): string | null => {
-      if (card.kind === "human_step") return /^human:[^:]+:(.+)$/.exec(card.id)?.[1] ?? null;
-      if (card.kind === "case_task" && caseApprovals.kind === "listed") return caseApprovals.approvals.find((row) => `case-task:${row.approval_id}` === card.id)?.plan_item_id ?? null;
-      return null;
-    };
+    const stepOf = new Map<string, string>();
+    for (const card of built.cards) {
+      const step = card.kind === "human_step" ? /^human:[^:]+:(.+)$/.exec(card.id)?.[1] ?? null : card.kind === "case_task" && caseApprovals.kind === "listed" ? caseApprovals.approvals.find((row) => `case-task:${row.approval_id}` === card.id)?.plan_item_id ?? null : null;
+      if (step !== null) stepOf.set(card.id, step);
+    }
+    // Accepting a step is blocked while an answer the operator gave an agent about it has had no reply.
+    const answers = (await listAnswers(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))).filter((a) => waitsForAgent(a) && a.step !== null);
+    if (answers.length === 0) return { ...built, stepOf };
     return {
       ...built,
+      stepOf,
       cards: built.cards.map((card) => {
-        const step = stepOf(card);
+        const step = stepOf.get(card.id) ?? null;
         return step !== null && acceptanceBlocked(answers, step) ? { ...card, blocked: card.blocked ?? WAITING_WORDS, preview: { ...card.preview, accept: null } } : card;
       }),
     };
@@ -1626,6 +1905,8 @@ export async function createApplication(
   }
 
   const REFUSED_OLD = "That decision changed or is no longer waiting. Look at the new version and decide again.";
+  /** What a decision says when the wait it was looked up with has changed before the decision ran. */
+  const STALE_LOOKUP_WORDS = "The case changed after you looked. Look again, then start.";
 
   /** One decision from a card. The preview code the operator looked at must still be the card's, or nothing is done. */
   /** A finding from a review, proposed as a lesson. It waits in Decide; only a person's accept makes it active. */
@@ -1639,7 +1920,18 @@ export async function createApplication(
     } catch {
       return Response.json({ ok: false, message: "That lesson could not be read. Nothing was recorded." }, { status: 400, headers });
     }
-    const proposed = await proposeLesson(runtime.runtime.store, { tenant: caller.tenant, text: typeof body.text === "string" ? body.text : "", source: typeof body.source === "string" && body.source !== "" ? body.source.slice(0, 200) : null, proposed_by: typeof body.proposed_by === "string" && body.proposed_by.trim() !== "" ? body.proposed_by.trim().slice(0, 100) : "a review", now: clock() });
+    // The proposer is the caller, never a string in the request. A body that names one is
+    // refused rather than believed: a lesson displayed as "Proposed by ..." is a claim about who
+    // said it, and the only source for that claim is the session that asked (R4-07).
+    const named = reservedActorField(body);
+    if (named !== null) {
+      return Response.json({ ok: false, message: `This request does not take an actor from the body (${named}). The signed-in session is who you are. Nothing was recorded.` }, { status: 400, headers });
+    }
+    const extra = unknownField(body, schemaFieldNames("params.horizon_lesson_propose"));
+    if (extra !== null) {
+      return Response.json({ ok: false, message: `This request does not take ${extra}. Nothing was recorded.` }, { status: 400, headers });
+    }
+    const proposed = await proposeLesson(runtime.runtime.store, { tenant: caller.tenant, text: typeof body.text === "string" ? body.text : "", source: typeof body.source === "string" && body.source !== "" ? body.source.slice(0, 200) : null, proposed_by: caller.actor.id, now: clock() });
     if (!proposed.ok) return Response.json({ ok: false, message: proposed.message }, { status: 400, headers });
     return Response.json({ ok: true, message: "Lesson proposed. It waits in Decide until you accept it.", lesson_id: proposed.lesson.lesson_id, status: proposed.lesson.status }, { headers });
   }
@@ -1654,17 +1946,35 @@ export async function createApplication(
       // The core answers an unreadable request in words.
     }
     const cardId = typeof sent.card_id === "string" ? sent.card_id : "";
-    const card = cardId === "" ? undefined : (await decideState(await recentMoves()).catch(() => null))?.cards.find((c) => c.id === cardId);
-    const response = await deskDecideCore(request);
+    // The lookup runs outside the queue: it may wait on the case keeper, and what it finds never authorises a decision. The queued
+    // command re-reads the local waits the card depends on, and refuses if the lookup no longer matches them.
+    const looked = cardId === "" ? null : await decideState(await recentMoves()).catch(() => null);
+    const lookedCard = looked?.cards.find((c) => c.id === cardId);
+    const { card, response } = await panelCommand(async () => {
+      // Revalidated when the command runs, not when it was queued: a session that ended while it waited (logout) refuses it.
+      if (!pairing.paired(request.headers.get("cookie"))) return { card: undefined, response: notPairedRefusal() };
+      // Shared with the panel and agent writes: no decision while the records are migrating or after a failed migration.
+      const paused = migrationBlock();
+      if (paused !== null) return { card: undefined, response: Response.json({ ok: false, outcome: "unavailable", message: paused }, { status: 503, headers: { "cache-control": "no-store" } }) };
+      if (looked !== null && lookedCard !== undefined) {
+        const step = looked.stepOf.get(cardId) ?? null;
+        const answers = await listAnswers(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
+        // A wait that exists now is refused with its own words, as the rule above does.
+        if (step !== null && acceptanceBlocked(answers, step)) return { card: lookedCard, response: Response.json({ ok: false, outcome: "blocked", message: WAITING_WORDS }, { status: 409, headers: { "cache-control": "no-store" } }) };
+        // A wait the lookup saw has gone since: the card the person looked at is no longer the one that would be decided.
+        if (lookedCard.blocked === WAITING_WORDS) return { card: lookedCard, response: Response.json({ ok: false, outcome: "stale", message: STALE_LOOKUP_WORDS }, { status: 409, headers: { "cache-control": "no-store" } }) };
+      }
+      return { card: lookedCard, response: await deskDecideCore(request, looked) };
+    });
     if (card === undefined || (response.status === 400 && !response.ok)) return response;
     const done = (await response.clone().json().catch(() => null)) as { ok?: boolean; message?: string; receipt?: string | null } | null;
     const verb = sent.choice === "hold" ? "Held" : sent.choice === "release" ? "Released" : sent.choice === "reject" ? "Rejected" : card.kind === "human_step" ? "Marked done" : "Accepted";
     const human = /^human:([^:]+):(.+)$/.exec(card.id);
-    await logRow({ source: "you", kind: "decision", words: `${verb}: ${card.title}`, outcome: done?.message ?? "", status: done?.ok === true ? "done" : "refused", refs: { ...(human ? { case_id: human[1]!, step_id: human[2]! } : {}), ...(typeof done?.receipt === "string" ? { intent_id: done.receipt } : {}) } });
-    return response;
+    const recorded = await logRow({ source: "you", kind: "decision", words: `${verb}: ${card.title}`, outcome: done?.message ?? "", status: done?.ok === true ? "done" : "refused", refs: { ...(human ? { case_id: human[1]!, step_id: human[2]! } : {}), ...(typeof done?.receipt === "string" ? { intent_id: done.receipt } : {}) } });
+    return withRecorded(response, recorded);
   }
 
-  async function deskDecideCore(request: Request): Promise<Response> {
+  async function deskDecideCore(request: Request, looked: DecideLookup | null = null): Promise<Response> {
     const fail = (status: number, outcome: string, message: string, details: string | null = null): Response => Response.json({ ok: false, outcome, message, ...(details === null ? {} : { details }) }, { status, headers: { "cache-control": "no-store" } });
     let body: Record<string, unknown>;
     try {
@@ -1680,10 +1990,22 @@ export async function createApplication(
     if (cardId === "" || (choice !== "accept" && choice !== "reject" && choice !== "hold" && choice !== "release")) return fail(400, "unreadable", "Choose accept, reject or hold on a card. Nothing was done.");
     const store = runtime.runtime.store;
     const now = clock();
-    const state = await decideState(await recentMoves());
+    const state = looked ?? (await decideState(await recentMoves()));
     const card = state.cards.find((candidate) => candidate.id === cardId);
     if (card === undefined) return fail(404, "gone", "That decision is no longer waiting. It may have been answered somewhere else. Nothing was done.");
+    // The route is a dispatcher: the server resolves what kind of card this is, and the catalog
+    // says which operation that kind together with the chosen action performs. A pair the catalog
+    // does not list is Px and is refused before any effect runs, so no card is ever downgraded to
+    // a weaker row by taking another path to it (R3-02).
+    let operation: string | null;
+    try {
+      operation = resolveDispatchedOperation(identityCatalogOf(), "POST /desk/decide", choice, deskCardKind(card));
+    } catch (error) {
+      return fail(503, "unavailable", `The identity catalog could not be loaded, so nothing was decided (${error instanceof Error ? error.message : String(error)}).`);
+    }
+    if (operation === null) return fail(400, "px", "That decision is not one Horizon knows. Nothing was done.");
     if (choice === "release") {
+      if (operation !== "decision.release") return fail(400, "px", "That decision is not one Horizon knows. Nothing was done.");
       if (card.held === null) return fail(409, "not_held", "That card is not on hold.");
       await putHold(store, { tenant: caller.tenant, card_id: card.id, reason: card.held.reason, released: true, now });
       return Response.json({ ok: true, message: "Released. The card is back under Needs you." }, { headers: { "cache-control": "no-store" } });
@@ -1705,14 +2027,25 @@ export async function createApplication(
         // The decision itself is already recorded where it counts; a missing audit row is not hidden by failing the answer.
       }
     };
+    // What the catalog says the runtime does with this operation, checked before anything is
+    // changed. A row the catalog refuses performs no target effect here: the approval, the case
+    // decision and the settlement halves are all refused at this freeze, and the refusal is
+    // recorded (R5-01).
+    const refusalCheck = checkFrozenRefusal(operation, { route: "POST /desk/decide" });
+    if (!refusalCheck.ok) return fail(503, "unavailable", refusalCheck.message);
+    if (refusalCheck.refusal !== null) {
+      await audit("refused");
+      return fail(403, "refused", refusalWords(refusalCheck.refusal));
+    }
     if (choice === "hold") {
+      if (operation !== "decision.hold") return fail(400, "px", "That decision is not one Horizon knows. Nothing was done.");
       await putHold(store, { tenant: caller.tenant, card_id: card.id, reason: reason as string, released: false, now });
       await audit("held");
       return Response.json({ ok: true, message: "On hold. Nothing changed; the step keeps waiting. Release the hold to bring it back." }, { headers: { "cache-control": "no-store" } });
     }
     if (card.blocked !== null) return fail(409, "blocked", card.blocked);
 
-    if (card.kind === "escalation") {
+    if (operation === "approval.approve" || operation === "approval.reject") {
       const approvalId = card.id.slice("approval:".length);
       let failure: unknown = null;
       try {
@@ -1737,7 +2070,10 @@ export async function createApplication(
       return Response.json({ ok: confirmed.ok, ...(confirmed.ok ? {} : { outcome: "unconfirmed" }), message: confirmed.message, receipt: intentId }, { headers: { "cache-control": "no-store" } });
     }
 
-    if (card.kind === "lesson") {
+    if (operation === "lesson.decide") {
+      // Stage 0B: a lesson decision is a reserved person change; it waits for the local terminal.
+      const lessonWaiting = await confirmationGate(store, { tenant: caller.tenant, operator: caller.actor.id, operationId: "lesson.decide", params: { lesson_id: card.id, choice }, now }, confirmationTerminal());
+      if (!lessonWaiting.ok) return awaitingDeskConfirmation(lessonWaiting);
       const decided = await decideLesson(store, { lesson_id: card.id, choice: choice === "accept" ? "accept" : "reject", person: caller.actor.id, now });
       if (!decided.ok) {
         await audit("refused");
@@ -1747,7 +2083,7 @@ export async function createApplication(
       return Response.json({ ok: true, message: choice === "accept" ? "Lesson accepted. It is now active, recorded with your name and the time." : "Lesson rejected. It will not become active." }, { headers: { "cache-control": "no-store" } });
     }
 
-    if (card.kind === "case_task") {
+    if (operation === "case.task.decide") {
       if (caseKeeper === null) return fail(503, "unreachable", "The case keeper is not set up, so this cannot be decided.");
       const approvalId = card.id.slice("case-task:".length);
       const listed = await approvalList(caseKeeper);
@@ -1775,7 +2111,7 @@ export async function createApplication(
       return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words, detailsOf(result));
     }
 
-    if (card.kind === "human_step") {
+    if (operation === "case.task.complete") {
       if (caseKeeper === null) return fail(503, "unreachable", "The case keeper is not set up, so this cannot be done.");
       const [, caseId, itemId] = /^human:([^:]+):(.+)$/.exec(card.id) ?? [];
       if (caseId === undefined || itemId === undefined) return fail(400, "unreadable", "That step is not one Horizon knows. Nothing was done.");
@@ -1799,11 +2135,17 @@ export async function createApplication(
       return fail(result.kind === "refused" ? 409 : 502, result.kind, result.words, detailsOf(result));
     }
 
-    // acceptance: the observe and rule steps of a committed move
+    // The settlement halves: the observation and the ruling of a committed move. The card's own
+    // phase and the operation the catalog resolved must agree, so a card that names one half
+    // cannot run the other.
+    if (operation !== "horizon.settlement.observe" && operation !== "horizon.settlement.rule") {
+      return fail(400, "px", "That decision is not one Horizon knows. Nothing was done.");
+    }
     const cut = card.id.lastIndexOf(":");
     const phase = card.id.slice(cut + 1);
     const intentId = card.id.slice("settle:".length, cut);
-    if (phase !== "observe" && phase !== "rule") return fail(400, "unreadable", "That check is not one Horizon knows. Nothing was done.");
+    const expectedPhase = operation === "horizon.settlement.observe" ? "observe" : "rule";
+    if (phase !== expectedPhase) return fail(400, "px", "That decision is not one Horizon knows. Nothing was done.");
     try {
       await settleNavigationIntent(intentId, phase);
     } catch (error) {
@@ -1840,6 +2182,9 @@ export async function createApplication(
     return presenting ? applyStandIns(work, presentingKey(), data.repoNames) : work;
   }
 
+  /** The desk page holds no secret. A browser pairs with the code the terminal printed at start; the session cookie it gets then goes with every write. */
+  const { code: pairingCode, pairing, refuseWithoutTerminal } = createDeskPairing(clock);
+  let pairingPrinted = false;
   const DESK_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon desk</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/desk/app.css"></head><body><div id="root"></div><noscript>The desk needs JavaScript to show live updates. Turn it on for this page.</noscript><script type="module" src="/desk/app.js"></script></body></html>`;
   const SETUP_GUIDE_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Horizon setup guide</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:1rem auto;padding:0 1rem}code{overflow-wrap:anywhere}</style></head><body><p><a href="/workspace">Back to the desk</a></p><h1>Setup guide</h1><h2>Start Horizon with the case keeper and record keeper</h2><p>Start the whole set with <code>bun run ignite</code> (see docs/IGNITION.md).</p><h2>Record what agent work costs</h2><ol><li>Install the agent tap with the record keeper: <code>te-agents install --with-realitytrace</code></li><li>Enroll each repository you want measured: <code>te-agents rt enroll &lt;repo&gt;</code></li><li>Point Horizon at the record keeper and the tap's store: set <code>HORIZON_ECONOMICS_REALITYTRACE_BIN</code> (and, if the tap does not use the default location, <code>HORIZON_ECONOMICS_DATA_HOME</code> and <code>HORIZON_ECONOMICS_STATE_HOME</code>), or add an <code>[economics]</code> table with <code>realitytrace_bin</code> to the Horizon config.</li></ol></body></html>`;
   const deskPage = (): Response => new Response(DESK_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": DESK_CSP, "x-content-type-options": "nosniff" } });
@@ -1852,133 +2197,675 @@ export async function createApplication(
   }
 
   // ---- Stage 4: panels from agents. The open panels are held here; the person's answers are kept in `horizon-panel-answers`. ----
+  // Design v3, step 1: every panel command (put, remove, annotate, withdraw, answer, route, reassign, stop waiting, and the acceptance
+  // check) runs through this one FIFO. One command runs at a time, in arrival order. A command that fails does not stop the next.
+  let panelTail: Promise<unknown> = Promise.resolve();
+  const panelCommand = <T>(command: () => Promise<T>): Promise<T> => {
+    const run = panelTail.then(command);
+    panelTail = run.catch(() => undefined);
+    return run;
+  };
+  // Design v3 step 2: the board is read from the durable records. A read that fails is kept as words the desk shows instead of the
+  // board; it never becomes an empty board, and panel changes are refused. A desk that migrates does not read the board here: it reads
+  // it once every migration has run (answersMigrated below), so the board holds the records the migrations moved.
   let panelBoard: PanelsBoard = NO_PANELS;
+  let storedPanels: ReadonlyMap<string, Panel> = new Map();
+  let boardRefused: string | null = null;
+  if (options.readOnly) {
+    try {
+      const view = await loadBoard(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
+      panelBoard = view.board;
+      storedPanels = view.stored;
+    } catch (error) {
+      boardRefused = PANEL_LOAD_WORDS;
+      console.error("panels: the saved panels could not be read, so panel changes are refused", error instanceof Error ? error.name : "unknown");
+    }
+  }
+  /** Rebuilds the board from the records the store now holds. A record that cannot be read refuses panel changes from here on. */
+  async function rebuildBoard(): Promise<void> {
+    try {
+      const view = await loadBoard(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
+      panelBoard = view.board;
+      storedPanels = view.stored;
+    } catch {
+      boardRefused = PANEL_LOAD_WORDS;
+    }
+  }
+  /**
+   * Commits the change the board made, with the question states it implies and any records that go with it (such as a conversation
+   * row), as one commit, then rebuilds the board from them. A failed commit changes nothing and leaves the board as it was.
+   */
+  async function commitBoard(before: PanelsBoard, after: PanelsBoard, alongside: readonly CommitRecord[] = []): Promise<void> {
+    const store = runtime.runtime.store;
+    const records = [...(await boardWrites(store, deskScopeOf(caller.tenant, caller.actor.id), before, after)), ...(await stateWrites(store, deskScopeOf(caller.tenant, caller.actor.id), after)), ...alongside];
+    if (records.length > 0) await store.commit({ appends: [], records });
+    await rebuildBoard();
+  }
+  // Answers from before the upgrade with no owner are closed once, at start. Panel reads wait for that to finish.
+  // The question states are written first (once per record); the pre-upgrade closing reads them.
+  // Design v3, step 4 (item 4): the records are migrated under a versioned marker. Until that run finishes, every change is refused with
+  // words saying so (503); a run that fails pauses changes for good until the desk restarts with the store fixed.
+  let migrationState: "running" | "done" | "failed" = options.readOnly ? "done" : "running";
+  // The startup listing of conflicts reads the store. A caller that closes the application first (the `mcp` command does) must not
+  // leave that read running against a closed store: close() skips a listing that has not started and waits for one that has.
+  let closing = false;
+  let conflictsListed: Promise<void> = Promise.resolve();
+  const answersMigrated: Promise<void> = options.readOnly ? Promise.resolve() : runDeskMigrations(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id), clock(), panelCommand, DESK_MIGRATIONS, options.migrationHold, soleOperator).then(
+    async () => {
+      // Every migration has run, so the records are where the desk reads them. The board is read from the store now, with the
+      // operator-scope records migration 7 moved. Changes stay refused until that read holds; a read that fails keeps them refused.
+      // A desk closed before its migrations finish has closed its store: nothing is served, so the board is not read (and nothing logs).
+      if (!closing) {
+        try {
+          const view = await loadBoard(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
+          panelBoard = view.board;
+          storedPanels = view.stored;
+          migrationState = "done";
+        } catch (error) {
+          migrationState = "failed";
+          boardRefused = PANEL_LOAD_WORDS;
+          console.error("desk: the saved panels could not be read after the migration, so changes are paused", error instanceof Error ? error.name : "unknown");
+        }
+      }
+      // One line per conflicted question, with ids only: the answers' words are never logged (R2-10).
+      if (!options.readOnly && !closing) {
+        conflictsListed = (async (): Promise<void> => {
+          try {
+            for (const line of conflictLogLines((await listConflicts(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))).map((c) => ({ panel: c.panel_id, ask: c.ask })))) console.error(line);
+          } catch (error) {
+            // The error's class and message only: the log never carries answer text.
+            console.error("desk: the conflicted answers could not be listed", error instanceof Error ? error.name : "unknown", error instanceof Error ? error.message : "");
+          }
+        })();
+        await conflictsListed;
+      }
+    },
+    (error: unknown) => {
+      migrationState = "failed";
+      // The board was never read after the migrations, so it is shown as words, not as an empty board.
+      boardRefused = PANEL_LOAD_WORDS;
+      console.error("desk: the saved records could not be migrated, so changes are paused", error instanceof Error ? error.name : "unknown");
+    },
+  );
+  const migrationRefusal = (): Response => Response.json({ ok: false, message: migrationState === "failed" ? MIGRATION_FAILED_WORDS : MIGRATING_WORDS }, { status: 503, headers: { "cache-control": "no-store" } });
+  /** The words every panel change gets while the records are not migrated (pending or failed). Null once the desk may change records. */
+  const migrationBlock = (): string | null => (migrationState === "done" ? null : migrationState === "failed" ? MIGRATION_FAILED_WORDS : MIGRATING_WORDS);
 
   /** The question's own words and the open-question test for one panel, from the board. */
   const askOf = (panelId: string, askId: string): { readonly question: string } | null => {
     const q = panelBoard.open.find((p) => p.id === panelId)?.blocks.find((b) => b.kind === "question" && b.id === askId) as { question?: string } | undefined;
     return q === undefined ? null : { question: q.question ?? "" };
   };
-  const stillAsking = (panelId: string): boolean => (panelBoard.open.find((p) => p.id === panelId)?.blocks ?? []).some((b) => { const q = b as unknown as { kind?: string; answered?: unknown; withdrawn?: unknown }; return q.kind === "question" && q.answered == null && q.withdrawn == null; });
-  /** The panel's own conversation entry follows the panel: "Waiting for you" only while a question is open. */
-  async function settlePanelRow(panelId: string, outcome: string): Promise<void> {
+  /** Whether a panel on `board` still has a question open for the person. `except` leaves one question out (the one just routed). */
+  const stillAskingIn = (board: PanelsBoard, panelId: string, except?: string): boolean => (board.open.find((p) => p.id === panelId)?.blocks ?? []).some((b) => { const q = b as unknown as { kind?: string; id?: string; answered?: unknown; withdrawn?: unknown }; return q.kind === "question" && q.id !== except && q.answered == null && q.withdrawn == null; });
+  const stillAsking = (panelId: string): boolean => stillAskingIn(panelBoard, panelId);
+  /**
+   * The panel's own conversation row as a record for a commit: "Waiting for you" only while a question is open. Null when the panel has no row.
+   * It joins the commit that changes the panel, so the row and the change are both there or neither is.
+   */
+  async function panelRowWrite(board: PanelsBoard, panelId: string, outcome: string, except?: string): Promise<CommitRecord | null> {
+    const row = await panelRowOf(runtime.runtime.store, deskWho, panelId);
+    if (row === undefined) return null;
+    const planned = await planUpdate(runtime.runtime.store, deskWho, row.row_id, stillAskingIn(board, panelId, except) ? { status: "waiting", outcome: "An agent asks you a question." } : { status: "done", outcome });
+    return planned === null ? null : planned.record;
+  }
+  /** A route claim's step lookup, run before the command is queued (R3-10). `resolves` is the step it was run for. */
+  type RouteLookup = { readonly resolves: string | null; readonly found: { step_id: string; name: string; case_id: string; case_title: string } | null };
+  /** The lookup a route claim needs, or null for any other op. Reads the board and the case keeper only; nothing is written. */
+  async function routeLookupFor(op: AgentOp): Promise<RouteLookup | null> {
+    if (op.tool !== "answer.route" || typeof op.routed_as !== "string") return null;
+    const resolves = (panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.find((b) => b.kind === "question" && b.id === op.ask_id) as { resolves?: string | null } | undefined)?.resolves ?? null;
+    return { resolves, found: await findRoutedStep(op.routed_as.trim(), resolves) };
+  }
+  async function routeLookupForText(text: string): Promise<RouteLookup | null> {
+    let parsed: unknown;
     try {
-      const row = await panelRowOf(runtime.runtime.store, deskWho, panelId);
-      if (row === undefined) return;
-      await updateRow(runtime.runtime.store, deskWho, row.row_id, stillAsking(panelId) ? { status: "waiting", outcome: "An agent asks you a question." } : { status: "done", outcome });
+      parsed = JSON.parse(text);
     } catch {
-      // The record is a read model.
+      return null;
     }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return routeLookupFor(parsed as AgentOp);
+  }
+  /** A keeper lookup that does not answer within the limit counts as not found: the claim is shown as not checked. */
+  const ROUTE_LOOKUP_MS = 2_000;
+  async function findRoutedStep(said: string, resolves: string | null): Promise<RouteLookup["found"]> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), ROUTE_LOOKUP_MS);
+    });
+    try {
+      return await Promise.race([findRoutedStepNow(said, resolves).catch(() => null), late]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  /**
+   * The step a route claim is checked against. The claim is checked only when the agent names the step the question resolves, and that
+   * step is waiting in an open case now. Any other step the words name leaves the claim as the agent's word. Null otherwise.
+   */
+  async function findRoutedStepNow(said: string, resolves: string | null): Promise<{ step_id: string; name: string; case_id: string; case_title: string } | null> {
+    if (caseKeeper === null || resolves === null || resolves.length < 4 || !said.split(/[^A-Za-z0-9_.:-]+/).includes(resolves)) return null;
+    try {
+      const listed = await listCases(caseKeeper);
+      if (listed.kind !== "ok") return null;
+      for (const c of listed.value.cases.slice(0, 20).filter(isOpenCase)) {
+        const horizon = await caseSteps(caseKeeper, c.case_id);
+        if (horizon.kind !== "ok") continue;
+        const hit = horizon.value.steps.find((st) => st.plan_item_id === resolves && st.execution === "pending");
+        if (hit !== undefined) return { step_id: hit.plan_item_id, name: hit.name, case_id: c.case_id, case_title: await titleOf(c) };
+      }
+    } catch {
+      // A case keeper that cannot answer leaves the claim unchecked.
+    }
+    return null;
+  }
+
+  /** The words a withdrawal of an answered or cancelled question gets. Same meaning as the rule's own refusal for that case. */
+  const SEALED_WITHDRAW_WORDS = "That question was already answered, so it cannot be withdrawn.";
+  /** Whether a question is sealed as answered or cancelled in the store: its guard, a legacy agreement, or a committed answer. Reads only. */
+  async function questionSealed(panelId: string, askId: string): Promise<boolean> {
+    const store = runtime.runtime.store;
+    const scope = deskScopeOf(caller.tenant, caller.actor.id);
+    const guard = await store.getRecord(PANEL_ANSWERS_COLLECTION, guardIdOf(scope, panelId, askId));
+    if (guard !== null && guard !== undefined && ["answered", "cancelled"].includes(String((guard.value as { readonly outcome?: unknown }).outcome))) return true;
+    if ((await store.getRecord(AGREED_COLLECTION, agreedId(scope, panelId, askId))) != null) return true;
+    return (await listAnswers(store, scope, panelId)).some((a) => a.ask === askId && (a.outcome === "answered" || a.outcome === "cancelled"));
   }
 
   /** An agent's tool call (`show_surface`, `ask_human`, `arrange`, `annotate`, `read_responses`, `ask.withdraw`, `answer.route`). To choose parts well an agent reads `GET /desk/panels/catalogue`. A reply on a panel clears the wait on the answers given there. */
-  async function applyAgentOp(op: AgentOp, agentName?: string): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
-    if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, caller.tenant)).filter((a) => !a.replied) };
-    // Only the agent saying where an answer went closes it; nothing else counts as a reply.
-    if (op.tool === "answer.route") {
-      const routed = await routeAnswer(runtime.runtime.store, caller.tenant, op.panel_id, op.ask_id, op.routed_as);
-      if (!routed.ok) return { ok: false, code: "SCHEMA", message: routed.message };
+  type AgentReply = { readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string };
+  /** The one entry point for an agent's change, from the agent door and from inside the desk. Every caller goes through agentCommandNow. */
+  async function applyAgentOp(op: AgentOp & { readonly request_id?: unknown }, agentName?: string, keyId: string = UNKEYED_AGENT): Promise<AgentReply> {
+    // The optional step lookup runs before the command is queued (R3-10). The queued command checks the rest again.
+    const lookup = await routeLookupFor(op);
+    return panelCommand(() => agentCommandNow(op, agentName, keyId, lookup));
+  }
+
+  /**
+   * The checks every agent change gets, whoever sent it: its types, its request id, and the id's stored receipt. A retry with the same
+   * id and the same contents returns the stored response and writes nothing; the same id with other contents is refused. Runs only
+   * inside panelCommand (applyAgentOp, or the door, which is queued already).
+   */
+  async function agentCommandNow(op: AgentOp & { readonly request_id?: unknown }, agentName: string | undefined, keyId: string, lookup: RouteLookup | null = null): Promise<AgentReply> {
+    const typing = checkAgentOp(op);
+    if (typing !== null) return { ok: false, code: "SCHEMA", message: typing };
+    const requestId = (op as { readonly request_id?: unknown }).request_id;
+    if (requestId !== undefined && !validRequestId(requestId)) return { ok: false, code: "SCHEMA", message: BAD_REQUEST_ID_WORDS };
+    if (typeof requestId !== "string") return applyAgentOpNow(op, agentName, keyId, null, lookup);
+    const fingerprint = requestFingerprint(op as unknown as { readonly [key: string]: unknown });
+    const seen = await seenRequest(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id), requestId, fingerprint);
+    if (seen.kind === "reused") return { ok: false, code: "REUSED", message: REUSED_REQUEST_WORDS };
+    if (seen.kind === "replay") return seen.response as unknown as AgentReply;
+    return applyAgentOpNow(op, agentName, keyId, { requestId, fingerprint }, lookup);
+  }
+
+  /** The body of applyAgentOp. Runs only inside panelCommand. `dedupe` is the request id and fingerprint of a retried call, if it has one. */
+  async function applyAgentOpNow(op: AgentOp, agentName: string | undefined, keyId: string, dedupe: { readonly requestId: string; readonly fingerprint: string } | null, lookup: RouteLookup | null = null): Promise<{ readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] } | { readonly ok: false; readonly code: string; readonly message: string }> {
+    await answersMigrated;
+    // The request's record, kept with the change it made: a retry with the same id returns this response and writes nothing.
+    const agentKeep = (response: { readonly ok: true; readonly panel: string | null; readonly responses?: readonly PanelAnswer[] }): CommitRecord[] => (dedupe === null ? [] : [requestRecord(deskScopeOf(caller.tenant, caller.actor.id), dedupe.requestId, dedupe.fingerprint, JSON.parse(JSON.stringify(response)) as Json)]);
+    const who = agentName ?? UNNAMED_AGENT;
+    // An agent reads only the answers to the questions it asked itself.
+    // Ownership is the key id that put the question up, never the display name: a name is a label any caller can send.
+    if (op.tool === "read_responses") return { ok: true, panel: null, responses: (await listAnswers(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))).filter((a) => !a.replied && a.owner_key === keyId) };
+    // Shared with the person's writes: no panel changes while the records are migrating or after a failed migration, whoever calls.
+    const paused = migrationBlock();
+    if (paused !== null) return { ok: false, code: "UNAVAILABLE", message: paused };
+    if (boardRefused !== null) return { ok: false, code: "UNAVAILABLE", message: boardRefused };
+    if (op.tool === "ask.withdraw") {
+      // A question sealed as answered or cancelled cannot be withdrawn, whether the board shows it as open or not. The seal is read from
+      // the store (the question's guard, its agreement, or its committed answer), never from the board, which a republish can show as unanswered.
+      if (await questionSealed(op.panel_id, op.ask_id)) return { ok: false, code: "SCHEMA", message: SEALED_WITHDRAW_WORDS };
+      // A question still on the board is checked by the rule inside the board's withdraw (reduceAgent). One that is only on record
+      // (its panel is closed) is checked here, with the same rule, before the board says it is not open.
+      const onBoard = panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.some((b) => b.kind === "question" && b.id === op.ask_id) ?? false;
+      const record = onBoard ? undefined : (await listAnswers(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id), op.panel_id)).find((a) => a.ask === op.ask_id);
+      if (record !== undefined) {
+        const verdict = checkWithdraw({ state: answerState(record), callerKey: keyId, resolvesRequiredStep: false });
+        if (!verdict.ok) return { ok: false, code: "SCHEMA", message: verdict.message };
+      }
     }
+    // A question the person agreed to cannot be recreated with other words, even after its panel was removed or the desk restarted.
+    if (await agreedAltered(op)) return { ok: false, code: "SCHEMA", message: ANSWERED_CANNOT_CHANGE };
+    const movedStep = await stepAltered(op);
+    if (movedStep !== null) return { ok: false, code: "SCHEMA", message: movedStep };
+    // Only the agent saying where an answer went closes it; nothing else counts as a reply. The owner, the words and the waiting
+    // state are checked by the rule inside planRoute, for this key. Nothing is written until the commit below.
+    const routePlan = op.tool === "answer.route" ? await planRoute(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id), op.panel_id, op.ask_id, op.routed_as, keyId) : null;
+    if (routePlan !== null && !routePlan.ok) return { ok: false, code: "SCHEMA", message: routePlan.message };
     const question = op.tool === "answer.route" || op.tool === "ask.withdraw" ? askOf(op.panel_id, op.ask_id)?.question ?? null : null;
-    const { state, result } = reduceAgent(panelBoard, op);
+    // What the question settles, as the board has it now: the only step a route claim may be checked against.
+    const resolves = op.tool === "answer.route" ? ((panelBoard.open.find((p) => p.id === op.panel_id)?.blocks.find((b) => b.kind === "question" && b.id === op.ask_id) as { resolves?: string | null } | undefined)?.resolves ?? null) : null;
+    // A panel that was closed or evicted comes back with its stored questions, so the put merges with them.
+    const target = op.tool === "show_surface" ? op.surface.id : op.tool === "ask_human" ? op.panel : null;
+    const base = target === null ? panelBoard : withStored(panelBoard, storedPanels, target);
+    const { state, result } = reduceAgent(base, op, who, keyId);
     if (!result.ok) return result;
-    panelBoard = state;
-    const by = agentName === undefined ? {} : { agent_name: agentName };
-    if (op.tool === "answer.route") {
-      const where = `The agent took it to: ${op.routed_as.trim()}`;
-      // One entry per answer: the one made when you answered is finished in place.
-      const mine = await answerRowOf(runtime.runtime.store, deskWho, op.panel_id, op.ask_id);
-      await logRow({ source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id } });
-      await settlePanelRow(op.panel_id, "You answered. The agent has taken it on.");
+    const store = runtime.runtime.store;
+    // A panel this change would leave unreadable is refused here, so nothing is stored that the load would refuse (and then every change).
+    if (result.panel !== null && (op.tool === "show_surface" || op.tool === "ask_human" || op.tool === "annotate" || op.tool === "ask.withdraw")) {
+      const changed = state.open.find((p) => p.id === result.panel);
+      if (changed !== undefined && !(await readsBack(store, deskScopeOf(caller.tenant, caller.actor.id), changed))) return { ok: false, code: "SCHEMA", message: PANEL_UNREADABLE_WORDS };
+    }
+    if (op.tool === "answer.route" && routePlan !== null && routePlan.ok) {
+      // The agent's words are kept as its claim. A step the case keeper holds is shown as found, but it is not delivery: the row stays
+      // claimed, and nothing marks it done without independent evidence that the step was delivered.
+      const said = op.routed_as.trim();
+      // The lookup ran before the queue for the same step; if the step changed since, the claim is shown as not checked.
+      const found = lookup !== null && lookup.resolves === resolves ? lookup.found : null;
+      const where = found === null ? `The agent says it took it to: ${said}. Not checked: Horizon found no step with that name.` : `The agent says it took it to: ${said}. Step found: the step "${found.name}" is in the case "${found.case_title}".`;
+      // One entry per answer: the one made when you answered is finished in place. The route, the row and the panel's row are one commit.
+      // The row keeps the person's words, so it stays the person's row; the agent that made the claim is named by its
+      // authenticated key in the row's references, never by a label the request chose (DEF-ASK-ROUTE-EXECUTOR).
+      const mine = await answerRowOf(store, deskWho, op.panel_id, op.ask_id);
+      const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: mine?.words ?? (question ? `Your answer to: ${question}` : "Your answer to the agent's question"), outcome: where, status: "claimed", refs: { panel_id: op.panel_id, ask_id: op.ask_id, executor_key: keyId, ...(found === null ? {} : { step_id: found.step_id, case_id: found.case_id }) } }, clock());
+      const panelRow = await panelRowWrite(state, op.panel_id, "You answered. The agent says it has taken it on.", op.ask_id);
+      try {
+        await store.commit({ appends: [], records: [...routePlan.records, row.record, ...(panelRow === null ? [] : [panelRow]), ...agentKeep(result)] });
+      } catch {
+        return { ok: false, code: "UNAVAILABLE", message: NOTHING_SENT };
+      }
+      await rebuildBoard();
+      return result;
     }
     if (op.tool === "ask.withdraw") {
+      // The withdrawal, its question state, the conversation row and the panel's row are one commit.
       const why = `The agent withdrew this question: ${op.reason.trim()}`;
-      const mine = await answerRowOf(runtime.runtime.store, deskWho, op.panel_id, op.ask_id);
-      if (mine !== undefined) await logRow({ source: "you", kind: "answer", words: mine.words, outcome: why, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id } });
-      await settlePanelRow(op.panel_id, why);
+      const mine = await answerRowOf(store, deskWho, op.panel_id, op.ask_id);
+      const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: mine?.words ?? (question ? `The agent's question: ${question}` : "The agent's question"), outcome: why, status: "done", refs: { panel_id: op.panel_id, ask_id: op.ask_id, executor_key: keyId } }, clock());
+      const panelRow = await panelRowWrite(state, op.panel_id, why);
+      try {
+        await commitBoard(panelBoard, state, [row.record, ...(panelRow === null ? [] : [panelRow]), ...agentKeep(result)]);
+      } catch {
+        return { ok: false, code: "UNAVAILABLE", message: NOTHING_SENT };
+      }
+      return result;
     }
-    if (result.panel !== null && (op.tool === "show_surface" || op.tool === "ask_human")) {
-      const panel = panelBoard.open.find((p) => p.id === result.panel);
-      const asking = stillAsking(result.panel);
-      await logRow({ source: "agent", ...by, kind: "panel", words: panel?.title ?? result.panel, outcome: asking ? "An agent asks you a question." : "An agent put this up.", status: asking ? "waiting" : "done", refs: { panel_id: result.panel, ...(panel?.step ? { step_id: panel.step } : {}) } });
+    // The panel and its conversation row are one commit: both are there or neither is, and a failed row write fails the put.
+    const by = agentName === undefined ? {} : { agent_name: agentName };
+    try {
+      const alongside: CommitRecord[] = [...agentKeep(result)];
+      if (result.panel !== null && (op.tool === "show_surface" || op.tool === "ask_human")) {
+        const panel = state.open.find((p) => p.id === result.panel);
+        const asking = stillAskingIn(state, result.panel);
+        alongside.push((await planAppend(store, deskWho, { source: "agent", ...by, kind: "panel", words: panel?.title ?? result.panel, outcome: asking ? "An agent asks you a question." : "An agent put this up.", status: asking ? "waiting" : "done", refs: { panel_id: result.panel, ...(panel?.step ? { step_id: panel.step } : {}) } }, clock())).record);
+      }
+      await commitBoard(panelBoard, state, alongside);
+    } catch {
+      return { ok: false, code: "UNAVAILABLE", message: "The desk could not save the panel. Nothing was changed. Try again." };
     }
     return result;
   }
 
+  /** A request body as it was read before the queue: the text, or why it was not read (too large, or not in time). */
+  type BodyRead = { readonly kind: "ok"; readonly text: string } | { readonly kind: "large" } | { readonly kind: "late" };
+  const BODY_LIMIT_BYTES = 500_000;
+  const BODY_READ_MS = 10_000;
+  /**
+   * Reads a request body outside the command queue (R3-10). A body declared or sent past the limit is not read in full, and a body that
+   * does not finish within the time limit is given up (its stream is cancelled), so neither holds the queue or waits forever.
+   */
+  async function readBodyBounded(request: Request): Promise<BodyRead> {
+    const declared = Number(request.headers.get("content-length") ?? "0");
+    if (declared > BODY_LIMIT_BYTES) return { kind: "large" };
+    const reader = request.body?.getReader();
+    if (reader === undefined) return { kind: "ok", text: "" };
+    const decoder = new TextDecoder();
+    const read = (async (): Promise<BodyRead> => {
+      let text = "";
+      let total = 0;
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        total += chunk.value.byteLength;
+        if (total > BODY_LIMIT_BYTES) {
+          await reader.cancel().catch(() => undefined);
+          return { kind: "large" };
+        }
+        text += decoder.decode(chunk.value, { stream: true });
+      }
+      return { kind: "ok", text: text + decoder.decode() };
+    })().catch((): BodyRead => ({ kind: "late" }));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<BodyRead>((resolve) => {
+      timer = setTimeout(() => {
+        void reader.cancel().catch(() => undefined);
+        resolve({ kind: "late" });
+      }, BODY_READ_MS);
+    });
+    try {
+      return await Promise.race([read, late]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /**
    * The agents' door for panels: `POST /agent/panels` (one AgentOp), `GET /agent/panels/answers`, `GET /agent/panels/catalogue`.
-   * It needs `Authorization: Bearer <the agent key>`: a key Horizon keeps (mode 0600) in the setup's secrets folder as agent.key, the same across restarts.
-   * The page-agent header is not a key and is refused here. Only agent tools pass; the person's operations never do.
+   * It needs `Authorization: Bearer <an agent key>`. The setup's agent.key is the default agent; every other agent has its own key in the
+   * registry (agents.json, hashes only; `scripts/agent-key.ts add <name>` makes one). The key decides the owner of each question the
+   * agent puts up. The page-agent header is not a key and is refused here. Only agent tools pass; the person's operations never do.
    */
   const AGENT_TOOLS = ["show_surface", "ask_human", "arrange", "annotate", "read_responses", "ask.withdraw", "answer.route"] as const;
   async function agentDoor(request: Request, pathname: string): Promise<Response> {
+    // The request body is read before the command is queued, with a size and a time limit, so a slow client never holds the queue (R3-10).
+    const read = pathname === "/agent/panels" && request.method === "POST" ? await readBodyBounded(request) : null;
+    // A route claim's keeper lookup also runs here, for a key that is valid now. The queued command checks the key again.
+    const bearer = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
+    const lookup = read !== null && read.kind === "ok" && ownerOfKey(bearer, loaded.agentKey, loaded.agentRegistryPath) !== null ? await routeLookupForText(read.text) : null;
+    // Authentication runs inside the queued command, so the key is checked when the command runs, not when it was queued.
+    return panelCommand(() => agentDoorNow(request, pathname, read, lookup));
+  }
+
+  async function agentDoorNow(request: Request, pathname: string, read: BodyRead | null, lookup: RouteLookup | null): Promise<Response> {
     const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
     const refuse = (status: number, message: string): Response => Response.json({ ok: false, message }, { status, headers });
     const given = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
-    const a = Buffer.from(given);
-    const b = Buffer.from(loaded.agentKey);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return refuse(401, "This door needs the agent key. Send it as: Authorization: Bearer <key>. The key is in the setup's secrets folder, in agent.key.");
+    const owner = ownerOfKey(given, loaded.agentKey, loaded.agentRegistryPath);
+    if (owner === null) return refuse(401, "This door needs an agent key. Send it as: Authorization: Bearer <key>. The setup's default key is in the secrets folder, in agent.key; other agents' keys are shown once, when they are added.");
     if (pageAgentOf(request) !== null) return refuse(403, "An agent on the page cannot use this door.");
     const name = cleanAgentName(request.headers.get("x-horizon-agent-name"));
     if (pathname === "/agent/panels/catalogue" && request.method === "GET") return Response.json({ schema: SURFACE_SCHEMA, vocabulary: vocabulary(), blocks: CATALOGUE }, { headers });
     if (pathname === "/agent/panels/answers" && request.method === "GET") {
-      const done = await applyAgentOp({ tool: "read_responses" }, name);
+      const done = await applyAgentOpNow({ tool: "read_responses" }, name, owner.key_id, null);
       return Response.json({ ok: true, responses: done.ok ? done.responses ?? [] : [] }, { headers });
     }
     if (pathname !== "/agent/panels" || request.method !== "POST") return refuse(404, "There is nothing at this address. Use POST /agent/panels, GET /agent/panels/answers or GET /agent/panels/catalogue.");
-    const text = await request.text();
-    if (text.length > 500_000) return refuse(413, "That is too large. Send a smaller panel.");
+    if (read === null || read.kind === "large") return refuse(413, "That is too large. Send a smaller panel.");
+    if (read.kind === "late") return refuse(408, "The request body did not arrive in time. Nothing was changed.");
     let body: unknown;
     try {
-      body = JSON.parse(text);
+      body = JSON.parse(read.text);
     } catch {
       return refuse(400, "That could not be read as JSON. Nothing was changed.");
     }
     const op = body as Record<string, unknown> | null;
     if (op === null || typeof op !== "object" || Array.isArray(op)) return refuse(400, "Send one object with a \"tool\" field. Nothing was changed.");
-    if (typeof op.op === "string" && op.op.startsWith("human.")) return refuse(403, "Only the person can do that. An agent cannot answer, pin, close or open a panel for them.");
+    // The door takes no identity from the body: the key in the Authorization header is the caller.
+    // A body that names an executor, a role or an actor is refused, not quietly ignored
+    // (DEF-ASK-ROUTE-EXECUTOR: the executor is the authenticated key, never a label in the request).
+    for (const field of ACTOR_NAMING_FIELDS) {
+      if (field in op) return refuse(400, `This door does not take an actor from the body (${field}). The agent key in the Authorization header is who you are. Nothing was changed.`);
+    }
+    // The refused prefixes are the route's own: the catalog says which field carries the semantic
+    // action, and the refusal is checked against that field. A refusal read from another field
+    // would let a reserved operation through under a different name (R2-10).
+    const agentDoorRoute = "POST /agent/panels";
+    let actionField: string;
+    let refusedPrefixes: readonly string[];
+    try {
+      const catalog = identityCatalogOf();
+      actionField = actionFieldFor(catalog, agentDoorRoute) ?? "tool";
+      refusedPrefixes = refusedPrefixesFor(catalog, agentDoorRoute);
+    } catch {
+      return refuse(503, "The identity catalog could not be loaded, so nothing was changed.");
+    }
+    const action = op[actionField];
+    if (typeof action === "string" && refusedPrefixes.some((prefix) => action.startsWith(prefix))) return refuse(403, "Only the person can do that. An agent cannot answer, pin, close or open a panel for them.");
     if (typeof op.tool !== "string" || !(AGENT_TOOLS as readonly string[]).includes(op.tool)) return refuse(400, `Say which tool: ${AGENT_TOOLS.join(", ")}. Nothing was changed.`);
-    const done = await applyAgentOp(op as unknown as AgentOp, name);
-    return done.ok ? Response.json(done, { headers }) : Response.json(done, { status: done.code === "NOT_FOUND" ? 404 : 400, headers });
+    // The catalog says which operation the named action performs, and whether the runtime refuses
+    // it at this freeze. The answer comes from the catalog, not from a list kept beside it, so a
+    // row the catalog refuses is a row this door refuses (R5-01, R5-02): asking a person to route
+    // an answer, and withdrawing one that was asked, both need a grant and a pending record the
+    // agent key alone does not carry.
+    let dispatched: string | null;
+    try {
+      dispatched = resolveDispatchedOperation(identityCatalogOf(), agentDoorRoute, typeof action === "string" ? action : op.tool);
+    } catch {
+      return refuse(503, "The identity catalog could not be loaded, so nothing was changed.");
+    }
+    if (dispatched !== null) {
+      const gate = await frozenGate(runtime.runtime.store, caller.tenant, dispatched, { route: agentDoorRoute }, owner.key_id);
+      if (gate.state === "unavailable") return refuse(503, gate.message);
+      if (gate.state === "refused") return Response.json({ ok: false, outcome: "refused", code: "refused", message: refusalWords(gate.refusal) }, { status: 403, headers });
+    }
+    // Every change an agent makes carries its id (R2-11). Reading the answers changes nothing and needs none. The id's checks, its stored
+    // receipt and the change itself are one path, agentCommandNow, which the desk's own callers use too.
+    const requestId = op.request_id;
+    if (op.tool !== "read_responses" && typeof requestId !== "string") return refuse(400, REQUEST_ID_REQUIRED_WORDS);
+    const done = await agentCommandNow(op as unknown as AgentOp, name, owner.key_id, lookup);
+    const status = done.ok ? 200 : done.code === "NOT_FOUND" ? 404 : done.code === "REUSED" || done.code === "DECISION" ? 409 : done.code === "UNAVAILABLE" ? 503 : 400;
+    return Response.json(done, { status, headers });
+  }
+
+  /**
+   * Whether a put would move a question to another step than the one its stored answers bear on (finding R3-5). The answers are read
+   * from the durable record, so a panel that is gone still counts. An answer whose step is unknown (not a string) is preserved as unknown
+   * and does not block the put; nothing here writes the submitted step into an answer. Returns the refusal words, or null.
+   */
+  async function stepAltered(op: AgentOp): Promise<string | null> {
+    const store = runtime.runtime.store;
+    const incoming: { readonly panel: string; readonly ask: string; readonly step: string | null | undefined }[] = [];
+    // An omitted step means the panel's step. When the panel is not known (neither open nor stored), that step is unknown, so it is
+    // not compared: undefined is left out of the check below.
+    const panelStepNow = (panel: string): string | null | undefined => {
+      const known = panelBoard.open.find((p) => p.id === panel) ?? storedPanels.get(panel);
+      return known === undefined ? undefined : (known.step ?? null);
+    };
+    if (op.tool === "ask_human") {
+      const raw = op.ask as Record<string, unknown>;
+      if (typeof raw.id === "string") incoming.push({ panel: op.panel, ask: raw.id, step: op.step === undefined ? panelStepNow(op.panel) : (op.step ?? null) });
+    } else if (op.tool === "show_surface") {
+      const surface = op.surface as unknown as { id?: unknown; step?: unknown; blocks?: unknown };
+      if (typeof surface.id === "string" && Array.isArray(surface.blocks)) {
+        const step = surface.step === undefined ? panelStepNow(surface.id) : (typeof surface.step === "string" ? surface.step : null);
+        for (const item of surface.blocks.slice(0, 64).map((b, i) => itemOf(b, i))) if (item.kind === "question") incoming.push({ panel: surface.id, ask: item.id, step });
+      }
+    }
+    for (const { panel, ask, step } of incoming) {
+      for (const a of (await listAnswers(store, deskScopeOf(caller.tenant, caller.actor.id), panel)).filter((x) => x.ask === ask)) {
+        if (step === undefined || typeof a.step !== "string" || a.step === step) continue;
+        return `That question was answered for the step "${a.step}", so it cannot be put up for ${step === null ? "no step" : `the step "${step}"`}. Use a new question id. Nothing was changed.`;
+      }
+    }
+    return null;
+  }
+
+  /** Whether a put would change a question the person agreed to, judged against the durable record (not the panel, which may be gone). */
+  async function agreedAltered(op: AgentOp): Promise<boolean> {
+    const store = runtime.runtime.store;
+    const incoming: { readonly panel: string; readonly question: AgreedQuestion }[] = [];
+    if (op.tool === "ask_human") {
+      const raw = op.ask as Record<string, unknown>;
+      const block = typeof raw.id === "string" ? questionOf(raw, raw.id) : null;
+      if (block !== null) incoming.push({ panel: op.panel, question: block });
+    } else if (op.tool === "show_surface") {
+      const surface = op.surface as unknown as { id?: unknown; blocks?: unknown };
+      if (typeof surface.id === "string" && Array.isArray(surface.blocks)) {
+        for (const item of surface.blocks.slice(0, 64).map((b, i) => itemOf(b, i))) if (item.kind === "question") incoming.push({ panel: surface.id, question: item });
+      }
+    }
+    for (const { panel, question } of incoming) {
+      // A question an answer or cancel sealed keeps its first wording. Its own fingerprint decides when it has one. Without one (written
+      // before fingerprints) the wording is unknown, so only the agreement store, read here, can say the new words are the same.
+      const sealed = (await listAnswers(store, deskScopeOf(caller.tenant, caller.actor.id), panel)).filter((a) => a.ask === question.id && (a.outcome === "answered" || a.outcome === "cancelled"));
+      if (sealed.some((a) => a.fingerprint != null)) {
+        if (sealed.some((a) => a.fingerprint != null && a.fingerprint !== questionFingerprint(question))) return true;
+        continue;
+      }
+      const agreed = await agreedFingerprintOf(store, deskScopeOf(caller.tenant, caller.actor.id), panel, question.id);
+      if (agreed !== null && agreed !== agreedFingerprint(panel, question)) return true;
+      // A sealed question whose wording is unknown is refused unless the agreement store says the words are the same.
+      if (sealed.length > 0 && agreed !== agreedFingerprint(panel, question)) return true;
+    }
+    return false;
   }
 
   /** The person's operations on panels: answer, pin, close, open, and stop waiting for an agent's reply. */
   async function deskPanelOp(request: Request): Promise<Response> {
+    // The body is read before the command is queued, with a size and a time limit (R3-10).
+    const read = await readBodyBounded(request);
+    return panelCommand(() => deskPanelOpNow(request, read));
+  }
+
+  /** The body of deskPanelOp. Runs only inside panelCommand. */
+  async function deskPanelOpNow(request: Request, read: BodyRead): Promise<Response> {
     const headers = { "cache-control": "no-store" };
     const fail = (status: number, message: string): Response => Response.json({ ok: false, message }, { status, headers });
-    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    if (read.kind === "large") return fail(413, "That is too large. Nothing was changed.");
+    if (read.kind === "late") return fail(408, "The request body did not arrive in time. Nothing was changed.");
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(read.text);
+    } catch {
+      parsed = null;
+    }
+    const body = parsed as Record<string, unknown> | null;
     if (body === null || typeof body !== "object" || typeof body.op !== "string") return fail(400, "That could not be read. Nothing was changed.");
     const store = runtime.runtime.store;
+    await answersMigrated;
+    // Revalidated when the command runs, not when it was queued: a session that ended while it waited (logout) refuses it.
+    if (!pairing.paired(request.headers.get("cookie"))) return notPairedRefusal();
+    // Shared with the agent's writes: a person's change is refused while the records are migrating or after a failed migration.
+    const paused = migrationBlock();
+    if (paused !== null) return fail(503, paused);
+    // What the catalog says the runtime does with the operation this command names. Every person
+    // operation on this route runs at this freeze; the gate is here so that a row the catalog
+    // starts refusing is refused here too, rather than settling nothing and answering as if it had
+    // (R5-01). A route that cannot read the catalog answers 503, never a default.
+    let panelOperation: string | null;
+    try {
+      panelOperation = resolveDispatchedOperation(identityCatalogOf(), "POST /desk/panels/op", body.op);
+    } catch (error) {
+      return fail(503, `The identity catalog could not be loaded, so nothing was changed (${error instanceof Error ? error.message : String(error)}).`);
+    }
+    if (panelOperation !== null) {
+      const gate = await frozenGate(store, caller.tenant, panelOperation, { route: "POST /desk/panels/op" }, caller.actor.id);
+      if (gate.state === "unavailable") return fail(503, gate.message);
+      if (gate.state === "refused") return fail(403, refusalWords(gate.refusal));
+    }
+    // Design v3, section 2: every person operation takes a request id. The same id with the same body returns the response it got and
+    // writes nothing, so a retry never repeats a change (a retry after a new wait exists does not close it). The same id with other
+    // contents is refused. The id's record joins the operation's commit, so the change and its record are stored together or not at all.
+    const requestId = body.request_id;
+    if (requestId !== undefined && !validRequestId(requestId)) return fail(400, BAD_REQUEST_ID_WORDS);
+    // Every person change carries its id, so a retry of one command can be told from a new command (R2-11).
+    if (typeof requestId !== "string") return fail(400, REQUEST_ID_REQUIRED_WORDS);
+    const fingerprint = requestFingerprint(body);
+    if (typeof requestId === "string") {
+      const seen = await seenRequest(store, deskScopeOf(caller.tenant, caller.actor.id), requestId, fingerprint);
+      if (seen.kind === "reused") return fail(409, REUSED_REQUEST_WORDS);
+      if (seen.kind === "replay") return Response.json(seen.response, { headers });
+    }
+    // Stage 0B: a person's reserved (P2) change runs only after an exact local confirmation on the
+    // terminal. Low-risk collaboration (P1) is not gated. The request id is not part of the operation,
+    // so a new attempt at the same change matches the descriptor it was confirmed under.
+    if (panelOperation !== null && classify(identityCatalogOf(), panelOperation).class === "P2") {
+      const { request_id: _requestId, ...operationParams } = body;
+      const waiting = await confirmationGate(store, { tenant: caller.tenant, operator: caller.actor.id, operationId: panelOperation, params: operationParams, now: clock() }, confirmationTerminal());
+      if (!waiting.ok) return awaitingDeskConfirmation(waiting);
+    }
+    const requestKeep = (response: { readonly ok: true; readonly message: string }): CommitRecord[] => (typeof requestId === "string" ? [requestRecord(deskScopeOf(caller.tenant, caller.actor.id), requestId, fingerprint, response)] : []);
     if (body.op === "human.stop_waiting") {
       if (typeof body.step !== "string" || body.step === "") return fail(400, "Say which step to stop waiting for.");
-      const n = await stopWaiting(store, caller.tenant, body.step);
-      return Response.json({ ok: true, message: n === 0 ? "Nothing was waiting." : "Stopped waiting. The step can be accepted now." }, { headers });
+      // The answers' stop, their conversation rows and the request's record are one commit: all are there or none is.
+      const plan = await planStopWaiting(store, deskScopeOf(caller.tenant, caller.actor.id), body.step, deskWho, clock());
+      const response = plan.count === 0 ? { ok: true as const, message: "Nothing was waiting." } : { ok: true as const, message: "Stopped waiting. The step can be accepted now." };
+      const records = [...plan.records, ...requestKeep(response)];
+      if (records.length > 0) {
+        try {
+          await store.commit({ appends: [], records });
+        } catch {
+          return fail(500, NOTHING_SENT);
+        }
+        await rebuildBoard();
+      }
+      return Response.json(response, { headers });
+    }
+    if (boardRefused !== null) return fail(503, boardRefused);
+    if (body.op === "human.reassign_owner") {
+      // The person moves a waiting question to another registered agent. Paired only (the route is paired), a recent pairing, a
+      // registered target, and an explicit second confirm that echoes the owner the person saw.
+      if (typeof body.panel !== "string" || typeof body.ask !== "string" || (typeof body.from_key_id !== "string" && body.from_key_id !== null) || typeof body.to_key_id !== "string") return fail(400, "That change could not be read. Nothing was changed.");
+      let registry: ReturnType<typeof readRegistry>;
+      try {
+        registry = readRegistry(loaded.agentRegistryPath);
+      } catch {
+        return fail(500, "The agent list could not be read. Nothing was changed.");
+      }
+      const toEntry = body.to_key_id === DEFAULT_AGENT_KEY_ID ? { key_id: DEFAULT_AGENT_KEY_ID, name: DEFAULT_AGENT_NAME } : registry.find((e) => e.key_id === body.to_key_id);
+      // A null previous owner is an answer that has no owner recorded (a legacy answer from before the upgrade). It names no agent.
+      const fromName = body.from_key_id === null ? "no one" : body.from_key_id === DEFAULT_AGENT_KEY_ID ? DEFAULT_AGENT_NAME :registry.find((e) => e.key_id === body.from_key_id)?.name ?? "an agent no longer listed";
+      // Design v3, step 4 (item 6): a question nobody has answered yet moves the same way. Its owner is the panel block's asked_by_key,
+      // and the move and its conversation row are one commit. A question with a waiting answer moves its answers (below).
+      // A closed panel is still a durable panel: its own record holds the question, so its owner moves with the answers (R2-4).
+      const hiddenPanel = !panelBoard.open.some((p) => p.id === body.panel);
+      const openQuestion = (panelBoard.open.find((p) => p.id === body.panel) ?? storedPanels.get(body.panel))?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { readonly question?: string; readonly answered?: unknown; readonly withdrawn?: unknown; readonly asked_by_key?: string | null; readonly owner_key?: string | null } | undefined;
+      const waitingAnswers = (await listAnswers(store, deskScopeOf(caller.tenant, caller.actor.id), body.panel)).filter((a) => a.ask === body.ask && waitsForAgent(a));
+      if (openQuestion !== undefined && openQuestion.answered == null && openQuestion.withdrawn == null && waitingAnswers.length === 0) {
+        const toName = toEntry?.name ?? "";
+        const ownerNow = openQuestion.owner_key ?? openQuestion.asked_by_key ?? null;
+        if (ownerNow !== body.from_key_id) return fail(409, "The owner changed while you were looking. Look again, then try. Nothing was changed.");
+        const verdict = checkReassign({ state: { owner_key: ownerNow, fingerprint: null, outcome: null, replied: true, waiting_on: "none", history: [], routed_as: null, version: null }, paired: true, pairedAgeMs: pairing.pairedAgeMs(request.headers.get("cookie")) ?? Number.POSITIVE_INFINITY, newOwnerKey: body.to_key_id, targetRegistered: toEntry !== undefined, confirmed: body.confirmed === true });
+        if (!verdict.ok) return fail(409, verdict.message);
+        const when = clock().toISOString();
+        const moveRow = newRowRecord(deskWho, { source: "you", kind: "note", words: `Moved the question "${openQuestion.question ?? "the agent's question"}" from ${fromName} to ${toName}.`, outcome: `${toName} now answers for it, since ${when}. Nothing has been answered yet.`, status: "done", refs: { panel_id: body.panel, ask_id: body.ask } }, clock());
+        const movedOpen = moveQuestion(panelBoard, body.panel, body.ask, body.to_key_id, toName);
+        const hiddenMove = hiddenPanel ? await movedStoredQuestion(store, deskScopeOf(caller.tenant, caller.actor.id), body.panel, body.ask, body.to_key_id, toName) : null;
+        const response = { ok: true as const, message: `Moved to ${toName}. The question waits for them to answer.` };
+        try {
+          await commitBoard(panelBoard, movedOpen, [moveRow, ...(hiddenMove === null ? [] : [hiddenMove]), ...requestKeep(response)]);
+        } catch {
+          return fail(500, NOTHING_SENT);
+        }
+        return Response.json(response, { headers });
+      }
+      const planned = await planReassign(store, { tenant: deskScopeOf(caller.tenant, caller.actor.id), panel_id: body.panel, ask: body.ask, question: askOf(body.panel, body.ask)?.question ?? "the agent's question", from_key: body.from_key_id, to_key: body.to_key_id, from_name: fromName, to_name: toEntry?.name ?? "", paired: true, pairedAgeMs: pairing.pairedAgeMs(request.headers.get("cookie")), targetRegistered: toEntry !== undefined, confirmed: body.confirmed === true, who: deskWho, now: clock() });
+      if (!planned.ok) return fail(planned.message.startsWith("Nothing was sent") ? 500 : 409, planned.message);
+      // The owner on the answers, the owner on the panel and the conversation row are one commit. The panel follows the stored
+      // owner, so a route by the old key is refused from now on.
+      const toName = toEntry?.name ?? "";
+      const moved = moveQuestion(panelBoard, body.panel, body.ask, body.to_key_id, toName);
+      const hiddenMove = hiddenPanel ? await movedStoredQuestion(store, deskScopeOf(caller.tenant, caller.actor.id), body.panel, body.ask, body.to_key_id, toName) : null;
+      const response = { ok: true as const, message: `Moved to ${toName}. Its answer waits for them to say where it went.` };
+      try {
+        await commitBoard(panelBoard, moved, [...planned.records, ...(hiddenMove === null ? [] : [hiddenMove]), ...requestKeep(response)]);
+      } catch {
+        return fail(500, NOTHING_SENT);
+      }
+      return Response.json(response, { headers });
     }
     if (body.op === "human.answer") {
       const outcome = body.outcome;
       const value = checkValue(body.value);
       if (typeof body.panel !== "string" || typeof body.ask !== "string" || !(OUTCOMES as readonly unknown[]).includes(outcome) || !value.ok) return fail(400, "That answer could not be read. Nothing was sent.");
       if (outcome === "answered" && (value.value === null || value.value === "")) return fail(400, "Pick an answer first, or choose Not now.");
+      // Every answer, deferral and cancellation says which question version and owner revision it was given under.
+      if (typeof body.version !== "string" || !/^[0-9a-f]{14}$/.test(body.version) || typeof body.owner_rev !== "number" || !Number.isInteger(body.owner_rev) || body.owner_rev < 0) return fail(400, ANSWER_NEEDS_REVISION);
       const note = typeof body.note === "string" && body.note.trim() !== "" ? body.note.trim().slice(0, 600) : null;
       const before = panelBoard;
-      const step = before.open.find((p) => p.id === body.panel)?.step ?? null;
-      const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note });
+      // The answer settles the step the question is about (its target), which is the panel's step for a question stored before targets.
+      const askBefore = before.open.find((p) => p.id === body.panel)?.blocks.find((b): b is AskBlock => b.kind === "question" && b.id === body.ask);
+      const step = askBefore !== undefined && askBefore.target !== undefined ? askBefore.target : (before.open.find((p) => p.id === body.panel)?.step ?? null);
+      const { state, result } = reduceHuman(before, { op: "human.answer", panel: body.panel, ask: body.ask, outcome: outcome as "answered", value: value.value, note, version: body.version, owner_rev: body.owner_rev });
       if (!result.ok) return fail(409, result.message);
       // Store what the question accepted (a text answer is trimmed), not the raw body.
-      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string }[] } | undefined;
+      const askBlock = before.open.find((p) => p.id === body.panel)?.blocks.find((b) => b.kind === "question" && b.id === body.ask) as { id: string; question: string; resolves?: string | null; version?: string; asked_by?: string | null; asked_by_key?: string | null; owner_key?: string | null; input?: "select" | "confirm" | "multiselect" | "text"; options: readonly { option_id: string; label: string; consequence?: string | null }[] } | undefined;
       const checked = outcome === "answered" && askBlock !== undefined ? answerFor({ input: askBlock.input ?? "select", options: askBlock.options }, value.value) : null;
       if (checked !== null && !checked.ok) return fail(400, checked.message);
       const stored = checked !== null && checked.ok ? checked.value : value.value;
-      try {
-        await recordAnswer(store, { tenant: caller.tenant, panel_id: body.panel, ask: body.ask, outcome: outcome as "answered", value: stored, note, step, now: clock() });
-      } catch {
-        return fail(500, "Your answer was not saved. Nothing was sent. Try again.");
-      }
-      panelBoard = state;
+      // Design v3: the answer, its question state, the panel's presentation and the conversation row are one commit. Either all are
+      // stored or none is, and a failed commit says so in plain words.
       const sentWords = outcome === "answered" ? "Sent. Waiting for the agent to say where it went." : outcome === "deferred" ? "Put off. Waiting for the agent to say where it went." : "Cancelled. Waiting for the agent to say where it went.";
-      await logRow({ source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: WAITING_FOR_AGENT, status: "waiting", refs: { panel_id: body.panel, ask_id: body.ask, ...(step ? { step_id: step } : {}) } });
-      await settlePanelRow(body.panel, "You answered. Waiting for the agent to say where it went.");
-      return Response.json({ ok: true, message: sentWords }, { headers });
+      // "Not yet" is not an answer: nothing is sent to the agent, and the row says so.
+      const deferredOnly = outcome === "deferred";
+      const panelId: string = body.panel;
+      const askId: string = body.ask;
+      const answerResponse = { ok: true as const, message: sentWords };
+      try {
+        // The answer carries the question's fingerprint, so the same question cannot come back with other words (see agreedAltered).
+        await recordAnswer(store, { tenant: deskScopeOf(caller.tenant, caller.actor.id), panel_id: panelId, ask: askId, outcome: outcome as "answered", value: stored, note, step, version: askBlock?.version ?? null, asked_by: askBlock?.asked_by ?? null, asked_by_key: askBlock?.asked_by_key ?? null, owner_key: askBlock?.owner_key ?? askBlock?.asked_by_key ?? null, fingerprint: askBlock === undefined ? null : questionFingerprint(askBlock), now: clock(), alsoRecords: async () => {
+          const row = await planAppend(store, deskWho, { source: "you", kind: "answer", words: answerEcho({ ...(askBlock?.input === undefined ? {} : { input: askBlock.input }), options: askBlock?.options ?? [] }, outcome as "answered", stored), outcome: deferredOnly ? "Not yet. Nothing was sent to the agent." : WAITING_FOR_AGENT, status: deferredOnly ? "done" : "waiting", refs: { panel_id: panelId, ask_id: askId, ...(step ? { step_id: step } : {}) } }, clock());
+          const panelRow = await panelRowWrite(state, panelId, deferredOnly ? "Not yet. You can answer it later." : "You answered. Waiting for the agent to say where it went.");
+          return [...(await boardWrites(store, deskScopeOf(caller.tenant, caller.actor.id), before, state, { panel: panelId, ask: askId })), row.record, ...(panelRow === null ? [] : [panelRow]), ...requestKeep(answerResponse)];
+        } });
+      } catch (error) {
+        if (error instanceof QuestionAlreadyAnswered) return fail(409, error.message);
+        return fail(500, NOTHING_SENT);
+      }
+      await rebuildBoard();
+      return Response.json(answerResponse, { headers });
     }
     const op: HumanOp | null =
       body.op === "human.pin" && typeof body.id === "string" && typeof body.pinned === "boolean" ? { op: "human.pin", id: body.id, pinned: body.pinned }
@@ -1986,16 +2873,33 @@ export async function createApplication(
       : body.op === "human.open" && typeof body.template === "string" ? { op: "human.open", template: body.template, ...(typeof body.title === "string" ? { title: body.title } : {}) }
       : null;
     if (op === null) return fail(400, "That is not something a panel can do. Nothing was changed.");
-    const { state, result } = reduceHuman(panelBoard, op);
+    // An opened panel comes back with its stored questions when it had been opened before.
+    const base = op.op === "human.open" ? withStored(panelBoard, storedPanels, openPanelId(op.template)) : panelBoard;
+    const { state, result } = reduceHuman(base, op);
     if (!result.ok) return fail(409, result.message);
-    panelBoard = state;
-    return Response.json({ ok: true, message: "Done." }, { headers });
+    const response = { ok: true as const, message: "Done." };
+    try {
+      await commitBoard(panelBoard, state, requestKeep(response));
+    } catch {
+      return fail(500, "The desk could not save the panel. Nothing was changed. Try again.");
+    }
+    return Response.json(response, { headers });
   }
 
   async function panelsData(): Promise<PanelsData> {
+    await answersMigrated;
+    if (boardRefused !== null) {
+      // The board is not shown as empty: the words say why it is missing.
+      const unread = new Map<string, string>();
+      for (const a of await listAnswers(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))) if (waitsForAgent(a) && a.step !== null && !unread.has(a.step)) unread.set(a.step, a.panel_id);
+      return { open: [], max: panelBoard.max, waiting: [...unread].map(([step, panel]) => ({ step, panel })), refused: boardRefused };
+    }
     const waiting = new Map<string, string>();
-    for (const a of await listAnswers(runtime.runtime.store, caller.tenant)) if (!a.replied && a.step !== null && !waiting.has(a.step)) waiting.set(a.step, a.panel_id);
-    return { ...panelBoard, waiting: [...waiting].map(([step, panel]) => ({ step, panel })) };
+    const allAnswers = await listAnswers(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id));
+    for (const a of allAnswers) if (waitsForAgent(a) && a.step !== null && !waiting.has(a.step)) waiting.set(a.step, a.panel_id);
+    // A question whose stored answers disagree is listed until the person decides (R2-10). Its step is the one its answers bear on.
+    const conflicts = (await listConflicts(runtime.runtime.store, deskScopeOf(caller.tenant, caller.actor.id))).map((c) => ({ panel: c.panel_id, ask: c.ask, question: askOf(c.panel_id, c.ask)?.question ?? null, step: allAnswers.find((a) => a.panel_id === c.panel_id && a.ask === c.ask && a.step !== null)?.step ?? null }));
+    return { ...panelBoard, waiting: [...waiting].map(([step, panel]) => ({ step, panel })), conflicts };
   }
 
   /** Starts the waiting steps of a case (`case_advance`). The id names one attempt; a refusal moves it on, a timeout keeps it. */
@@ -2024,7 +2928,14 @@ export async function createApplication(
 
   async function deskStart(request: Request): Promise<Response> {
     const headers = { "cache-control": "no-store" };
-    const body = (await request.json().catch(() => null)) as { case_id?: unknown } | null;
+    // The catalog refuses this row at this freeze: the dispatcher's targets are not resolved, so
+    // the route cannot know the class or the authority of what it starts. Nothing is started and
+    // the refusal is recorded (R5-02).
+    const gate = await frozenGate(runtime.runtime.store, caller.tenant, "run.start", { route: "POST /desk/start" }, caller.actor.id);
+    if (gate.state === "unavailable") return Response.json({ ok: false, message: gate.message }, { status: 503, headers });
+    if (gate.state === "refused") return Response.json({ ok: false, outcome: "refused", code: "refused", message: refusalWords(gate.refusal) }, { status: 403, headers });
+    // The start is bound to what the person previewed: the steps listed as waiting, sent back as `also_starts`. A different set is refused.
+    const body = (await request.json().catch(() => null)) as { case_id?: unknown; also_starts?: unknown } | null;
     if (caseKeeper === null) return Response.json({ ok: false, message: "Cases are not connected, so nothing can be started." }, { status: 503, headers });
     const caseId = typeof body?.case_id === "string" ? body.case_id.replace(/^case:/, "") : "";
     const listed = await listCases(caseKeeper);
@@ -2033,6 +2944,9 @@ export async function createApplication(
     if (target === undefined) return Response.json({ ok: false, message: "That case is not running, so nothing can be started." }, { status: 409, headers });
     const waiting = (await waitingToStart([target])).get(caseId) ?? [];
     if (waiting.length === 0) return Response.json({ ok: false, message: "Nothing is waiting to start in that case." }, { status: 409, headers });
+    const previewed = Array.isArray(body?.also_starts) && body.also_starts.every((id) => typeof id === "string") ? (body.also_starts as string[]) : null;
+    if (previewed === null) return Response.json({ ok: false, message: "Look at the steps waiting to start, then start them." }, { status: 400, headers });
+    if (!sameSet(previewed, waiting.map((w) => w.plan_item_id))) return Response.json({ ok: false, message: "The case changed after you looked. Look again, then start." }, { status: 409, headers });
     // The id names this set of waiting steps: a later, different set is a different request.
     const digest = createHash("sha256").update(waiting.map((w) => w.plan_item_id).sort().join("\n")).digest("hex").slice(0, 12);
     const result = await startCase(caseId, `advance:start:${caseId}:${digest}`);
@@ -2040,10 +2954,59 @@ export async function createApplication(
     return Response.json(result.ok ? { ok: true, message: "Started. The waiting steps are under way." } : { ok: false, message: `It did not start: ${result.words}` }, { status: result.ok ? 200 : 502, headers });
   }
 
+  /** Step names for the cases an agent may see, from the case keeper. Names only. */
+  async function agentSteps(cases: readonly DeskCase[]): Promise<Map<string, string[]>> {
+    const out = new Map<string, string[]>();
+    if (caseKeeper === null) return out;
+    for (const c of cases.filter((x) => x.source === "case keeper").slice(0, 10)) {
+      try {
+        const horizon = await caseSteps(caseKeeper, c.case_ref.replace(/^case:/, ""));
+        if (horizon.kind === "ok") out.set(c.case_ref, horizon.value.steps.map((st) => st.name));
+      } catch {
+        // No step names for this case.
+      }
+    }
+    return out;
+  }
+
+  /** What an agent reads goes out with stand-ins too, while Presenting is on. */
+  async function agentJson(body: unknown, headers: Record<string, string>): Promise<Response> {
+    return presentedJson(body, headers);
+  }
+
   /** A hand off answer that shows case and step names: while Presenting is on, repository names in it get their stand-ins. */
   async function presentedJson(body: unknown, headers: Record<string, string>): Promise<Response> {
     const on = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
     return Response.json(on ? applyStandIns(body, presentingKey(), deskRepoNames()) : body, { headers });
+  }
+
+  /** What came of each stage of a hand off that was sent. A stage that was not tried is not shown; the result is "Not seen yet" until it is observed. */
+  function handoffStages(body: Record<string, any> | null): RowStage[] {
+    const stages: RowStage[] = [{ name: "Sent", status: "done", words: "The step was added to the case." }];
+    const started = body?.started as { ok?: boolean; words?: string } | undefined;
+    if (started !== undefined) stages.push(started.ok === true ? { name: "Started", status: "done", words: "The step is under way." } : { name: "Started", status: "refused", words: `It did not start: ${started.words ?? "No reason was given."}`, recovery: "Try again" });
+    const assigned = body?.assigned as { done?: boolean; words?: string } | null | undefined;
+    if (assigned !== null && assigned !== undefined) stages.push(assigned.done === true ? { name: "Given to an agent", status: "done", words: "An agent has the step." } : { name: "Given to an agent", status: "refused", words: `No agent has it: ${assigned.words ?? "No reason was given."}`, recovery: "Open the step" });
+    stages.push({ name: "Result seen", status: "unseen", words: "Not seen yet." });
+    return stages;
+  }
+
+  /** The "Result seen" stage turns to done only when the case keeper shows the step finished. Nothing is stored for it. */
+  async function observeResults(rows: ConversationRow[]): Promise<ConversationRow[]> {
+    if (caseKeeper === null) return rows;
+    const wanted = rows.filter((r) => r.stages?.some((g) => g.name === "Result seen" && g.status === "unseen") && r.refs.case_id !== undefined && r.refs.step_id !== undefined);
+    const finished = new Set<string>();
+    for (const caseId of [...new Set(wanted.map((r) => r.refs.case_id!))].slice(0, 20)) {
+      try {
+        const horizon = await caseSteps(caseKeeper, caseId);
+        if (horizon.kind === "ok") for (const st of horizon.value.steps) if (st.execution === "completed") finished.add(`${caseId}/${st.plan_item_id}`);
+      } catch {
+        // Not seen stays not seen.
+      }
+    }
+    return rows.map((r) => (r.refs.case_id !== undefined && r.refs.step_id !== undefined && finished.has(`${r.refs.case_id}/${r.refs.step_id}`) && r.stages !== undefined
+      ? { ...r, stages: r.stages.map((g) => (g.name === "Result seen" ? { ...g, status: "done" as const, words: "The step finished." } : g)) }
+      : r));
   }
 
   /** Hand off (stage 4): `POST /desk/handoff/preview` shows the step that would be added; `POST /desk/handoff` adds it. */
@@ -2060,21 +3023,36 @@ export async function createApplication(
     const source: RowSource = page ? "page-agent" : "you";
     const named = page?.name === undefined ? {} : { agent_name: page.name };
     const response = await deskHandoffCore(request, phase, true);
+    // An agent may leave at most 20 suggestions waiting on one case; asking again about the same draft changes the same row.
+    if (page && phase === "preview" && response.ok) {
+      const made = (await response.clone().json().catch(() => null)) as Record<string, any> | null;
+      const caseOf = made?.preview?.case_id;
+      if (typeof caseOf === "string") {
+        const rows = await listConversation(runtime.runtime.store, deskWho);
+        const same = rows.some((r) => r.kind === "handoff-proposal" && r.status === "waiting" && r.refs.draft_id === draftId);
+        const waiting = rows.filter((r) => r.kind === "handoff-proposal" && r.status === "waiting" && r.refs.case_id === caseOf).length;
+        if (!same && waiting >= MAX_WAITING_PROPOSALS) return Response.json({ ok: false, outcome: "too_many_waiting", message: TOO_MANY_PROPOSALS }, { status: 409, headers: { "cache-control": "no-store" } });
+      }
+    }
     // The answer goes out with stand-ins when Presenting is on; the row keeps the real words and shows them the same way.
     const body = (await response.clone().json().catch(() => null)) as Record<string, any> | null;
     const outcomeWords = typeof body?.message === "string" ? body.message : "That did not work.";
+    let recorded = true;
     if (phase === "preview") {
-      if (response.ok && body?.preview) await logRow({ source, ...named, kind: page ? "handoff-proposal" : "handoff", words, outcome: page ? "An agent suggests this. Nothing is sent until you confirm." : "Preview ready. Nothing is sent until you confirm.", status: "waiting", refs: { case_id: String(body.preview.case_id), step_id: String(body.preview.step_id), draft_id: draftId } });
+      if (response.ok && body?.preview) recorded = await logRow({ source, ...named, kind: page ? "handoff-proposal" : "handoff", words, outcome: page ? "An agent suggests this. Nothing is sent until you confirm." : "Preview ready. Nothing is sent until you confirm.", status: "waiting", refs: { case_id: String(body.preview.case_id), step_id: String(body.preview.step_id), draft_id: draftId } });
       else if (!page && words !== "" && response.status !== 400) await logRow({ source, kind: "handoff", words, outcome: outcomeWords, status: "refused", refs: { draft_id: draftId } });
     } else if (words !== "" && draftId !== "" && !(response.status === 400)) {
       const ok = response.ok;
+      const stages = ok ? handoffStages(body) : undefined;
+      const status = !ok ? "refused" : stages?.some((g) => g.status === "refused") ? "partial" : "done";
       try {
-        await settleDraftRow(runtime.runtime.store, deskWho, draftId, ok ? "done" : "refused", outcomeWords, { source: "you", kind: "handoff", words, outcome: outcomeWords, status: ok ? "done" : "refused", refs: { ...(ok && typeof body?.step_id === "string" ? { step_id: body.step_id } : {}) } }, clock());
+        await settleDraftRow(runtime.runtime.store, deskWho, draftId, status, outcomeWords, { source: "you", kind: "handoff", words, outcome: outcomeWords, status, refs: { ...(ok && typeof body?.step_id === "string" ? { step_id: body.step_id } : {}), ...(ok && typeof body?.case_id === "string" ? { case_id: body.case_id } : {}) } }, clock(), stages);
       } catch {
-        // The hand off already happened; a missing row is not hidden by failing the answer.
+        // The hand off already happened; the answer says the row is missing instead of failing.
+        recorded = false;
       }
     }
-    return response.ok && body !== null ? presentedJson(body, { "cache-control": "no-store" }) : response;
+    return response.ok && body !== null ? presentedJson(recorded ? body : { ...body, recorded: false, recorded_words: NOT_RECORDED_WORDS }, { "cache-control": "no-store" }) : response;
   }
 
   async function deskHandoffCore(request: Request, phase: "preview" | "send", raw = false): Promise<Response> {
@@ -2117,12 +3095,19 @@ export async function createApplication(
     }
     const item = handoffItem(draftId, text, reviewAsked);
     const agent = deskAgent();
+    // The case keeper can only start a whole case, so sending starts every step that is waiting in it, not just this one.
+    const waitingNow = await caseSteps(caseKeeper, target.case_id);
+    if (waitingNow.kind !== "ok") return fail(waitingNow.kind === "refused" || waitingNow.kind === "stale" ? 409 : 502, waitingNow.kind, waitingNow.kind === "stale" ? REFUSED_OLD : waitingNow.words, detailsOf(waitingNow));
+    const alsoStarts = waitingNow.value.steps.filter((st) => st.execution === "pending" && st.plan_item_id !== item.plan_item_id).map((st) => ({ step_id: st.plan_item_id, name: st.name }));
+    if (phase === "send" && Array.isArray(body.also_starts) && !sameSet(body.also_starts, alsoStarts.map((st) => st.step_id))) {
+      return fail(409, "preview_out_of_date", "Preview out of date. The steps waiting to start in this case changed after you looked at it. Nothing was sent. Look at the new preview and decide again.");
+    }
     if (phase === "preview") {
       await saveDraft(store, caller.tenant, caller.actor.id, { draftId, text, mode: "handoff" });
       const dry = await addItem(caseKeeper, { case_id: target.case_id, item, dry_run: true });
       if (dry.kind !== "ok") return fail(dry.kind === "refused" ? 409 : dry.kind === "stale" ? 409 : 502, dry.kind, dry.kind === "stale" ? REFUSED_OLD : dry.words, detailsOf(dry));
       if (dry.value.plan_precondition === null) return fail(502, "unreadable", "The case keeper did not give a version code for this case, so the hand off cannot be tied to what you see. Try again in a moment.");
-      return out({ ok: true, preview: { draft_id: draftId, case_id: target.case_id, case_title: caseTitleNow, step_name: item.name, step_id: dry.value.plan_item_id, check: "The case keeper checked this step against the case and it fits.", plan_precondition: dry.value.plan_precondition, agent, review: reviewAsked ? { reviewable } : null } }, headers);
+      return out({ ok: true, preview: { draft_id: draftId, case_id: target.case_id, case_title: caseTitleNow, step_name: item.name, step_id: dry.value.plan_item_id, check: "The case keeper checked this step against the case and it fits.", plan_precondition: dry.value.plan_precondition, also_starts: alsoStarts, agent, review: reviewAsked ? { reviewable } : null } }, headers);
     }
     const pre = body.plan_precondition;
     if (typeof pre !== "object" || pre === null || typeof (pre as { ref?: unknown }).ref !== "string" || typeof (pre as { expected_digest?: unknown }).expected_digest !== "string") {
@@ -2130,6 +3115,15 @@ export async function createApplication(
     }
     const wantsAgent = body.assign === true;
     if (wantsAgent && !agent.offered) return fail(409, "not_connected", `${agent.words} Nothing was sent.`);
+    // The catalog refuses this row at this freeze: sending a hand off adds a step to a case and
+    // starts it, and the row has no pending record, no protected confirmation and no authority for
+    // either. The checks above refuse what a person could not have meant; this gate refuses the
+    // effect itself, after them and before anything is added, and records the refusal (R5-01).
+    {
+      const gate = await frozenGate(store, caller.tenant, "handoff.send", { route: "POST /desk/handoff" }, caller.actor.id);
+      if (gate.state === "unavailable") return fail(503, "unavailable", gate.message);
+      if (gate.state === "refused") return fail(403, "refused", refusalWords(gate.refusal));
+    }
     const sentId = await requestIdFor(store, caller.tenant, handoffRequestId(draftId));
     const sent = await addItem(caseKeeper, {
       case_id: target.case_id,
@@ -2151,7 +3145,7 @@ export async function createApplication(
       assigned = result.kind === "ok" ? { done: true, words: "Given to an agent." } : { done: false, words: result.words };
     }
     const next = await nextDraft(store, caller.tenant, caller.actor.id, draftId);
-    return out({ ok: true, message: `Handed off: "${item.name}" is now a step in "${caseTitleNow}".${started.ok ? " It has started." : ` It has not started yet: ${started.words} Use Start it under Work.`}${assigned === null ? "" : assigned.done ? " It was given to an agent." : ` It was not given to an agent: ${assigned.words}`}`, step_id: sent.value.plan_item_id, started, assigned, draft_id: next.draftId }, headers);
+    return out({ ok: true, message: `Handed off: "${item.name}" is now a step in "${caseTitleNow}".${started.ok ? " It has started." : ` It has not started yet: ${started.words} Use Start it under Work.`}${assigned === null ? "" : assigned.done ? " It was given to an agent." : ` It was not given to an agent: ${assigned.words}`}`, step_id: sent.value.plan_item_id, case_id: target.case_id, started, assigned, draft_id: next.draftId }, headers);
   }
 
   /** Whether a step can be given to an agent right now, in words. Nothing is offered that would fail silently. */
@@ -2163,14 +3157,32 @@ export async function createApplication(
   }
 
   /** One conversation row. Never fails the move it describes: a row that could not be kept is only missing from the record. */
-  async function logRow(input: Parameters<typeof appendRow>[2]): Promise<void> {
+  async function logRow(input: Parameters<typeof appendRow>[2]): Promise<boolean> {
     try {
       await appendRow(runtime.runtime.store, deskWho, input, clock());
+      return true;
     } catch (error) {
       // The operation itself is already done or refused; the record is a read model. A failed
       // write is logged by its kind only, so the gap is visible to whoever runs the desk.
       console.error(`conversation: a row could not be recorded (${error instanceof Error ? error.name : "unknown error"})`);
+      return false;
     }
+  }
+
+  /** When the move was done but its row was not kept, the answer says so (`recorded: false`) in plain words, for the status line. */
+  async function withRecorded(response: Response, recorded: boolean): Promise<Response> {
+    if (recorded || !response.ok) return response;
+    const body = (await response.clone().json().catch(() => null)) as Record<string, unknown> | null;
+    if (body === null) return response;
+    return Response.json({ ...body, recorded: false, recorded_words: NOT_RECORDED_WORDS }, { status: response.status, headers: { "cache-control": "no-store" } });
+  }
+
+  /** Pairing: a typed code that matches gives this browser a session cookie. Only the code is checked here; see desk/pairing.ts. */
+  async function pairDesk(request: Request): Promise<Response> {
+    const body = (await request.json().catch(() => null)) as { code?: unknown } | null;
+    const outcome = pairing.pair(typeof body?.code === "string" ? body.code : "");
+    if (!outcome.ok) return Response.json({ ok: false, paired: false, message: outcome.words }, { status: outcome.status, headers: { "cache-control": "no-store" } });
+    return Response.json({ ok: true, paired: true }, { headers: { "cache-control": "no-store", "set-cookie": outcome.cookie } });
   }
 
   async function deskSaveNote(request: Request): Promise<Response> {
@@ -2184,8 +3196,8 @@ export async function createApplication(
     }
     try {
       const note = await saveNote(runtime.runtime.store, { ...deskWho, input: body, now: clock(), timeZone: deskTimeZone });
-      await logRow({ source: "you", kind: "note", words: note.body, outcome: `Saved to ${note.day}.`, status: "done", refs: note.case_ref ? { case_id: note.case_ref } : {} });
-      return Response.json({ ok: true, note }, { headers: { "cache-control": "no-store" } });
+      const recorded = await logRow({ source: "you", kind: "note", words: note.body, outcome: `Saved to ${note.day}.`, status: "done", refs: note.case_ref ? { case_id: note.case_ref } : {} });
+      return Response.json({ ok: true, note, ...(recorded ? {} : { recorded: false, recorded_words: NOT_RECORDED_WORDS }) }, { headers: { "cache-control": "no-store" } });
     } catch (error) {
       if (error instanceof NoteRefused) await logRow({ source: "you", kind: "note", words: typeof (body as { body?: unknown } | null)?.body === "string" ? (body as { body: string }).body : "", outcome: error.message, status: "refused" });
       if (error instanceof NoteRefused) return Response.json({ ok: false, message: error.message }, { status: 400 });
@@ -2200,19 +3212,36 @@ export async function createApplication(
     identity,
     identityTenant,
     operator: mappedActors.desktopOperator,
+    // The P3 authority for device enrolment. Production wires none, so enrolment is refused (see UNAVAILABLE_P3_AUTHORITY).
+    enrollment: new EnrollmentAuthority(runtime.runtime.store, undefined, options.remoteP3Authority),
     workspace: () => workspace(),
     chrome: (receipt) => cockpitChrome({ receipt: receipt ?? null }),
     position: () => lastPosition(runtime),
-    approvalIntent: (approvalId) => intentIdForApproval(approvalId),
-    resolveApproval: async (approvalId, resolution, who) => {
-      await resolveNavigationApproval({ approvalId, resolution }, who);
+    // The phone's credential is a device credential: it proves which enrolled device is at the
+    // route and never which person is holding it. The catalog's dispatch table resolves the
+    // kind to a device-credential row, and the row's class comes back with it so the remote can
+    // refuse a governed row rather than downgrading it (R3-01, R4-02).
+    resolveCommand: (kind, phase) => {
+      const catalog = identityCatalogOf();
+      const operation = resolveDispatchedOperation(catalog, "POST /m/api/command", kind, phase);
+      if (operation === null) return null;
+      const row = catalog.byId.get(operation);
+      // The phone's body is closed: the dispatch envelope plus the fields the resolved row's own
+      // schema names. The schema is the contract's, so the phone cannot carry a field the
+      // operation does not have (R4-07).
+      const fields = row?.paramsSchema === null || row?.paramsSchema === undefined
+        ? []
+        : schemaFieldNames(row.paramsSchema);
+      // The catalog's own refusal, not a second list kept here: the row the contract refuses is
+      // the row the phone's command refuses (R5-01).
+      const refusal = frozenRefusal(catalog, operation, { route: "POST /m/api/command", codeOp: kind });
+      return { operation, class: row?.class ?? "PX", fields, refusal };
     },
     commitAction: (actionId, intentId, who) => commitForSession(actionId, intentId, who),
-    settle: async (intentId, phase) => {
-      await settleNavigationIntent(intentId, phase);
-    },
-    openCase: async (purpose, who) => {
-      await openCase(runtime.runtime.store, { tenant: caller.tenant, operator: who.actor.id, purpose, now: new Date() });
+    // The device acts; the operator its enrolment belongs to is recorded beside it as
+    // attribution. The two are never collapsed into one field (R5-03).
+    openCase: async (purpose, who, attribution) => {
+      await openCase(runtime.runtime.store, { tenant: caller.tenant, operator: who.actor.id, attributed_operator: attribution.operator, purpose, now: new Date() });
     },
   });
 
@@ -2241,24 +3270,52 @@ export async function createApplication(
     surfaceSchema: publishSurfaceSchema,
     commitSurfaceIntent,
     researchContract: () => requireResearch(research),
+    confirmPending: (pendingId: string, io: ConfirmIO) => runConfirm(runtime.runtime.store, pendingId, io, clock()),
     startServer(port = loaded.config.port): HttpServer {
-      const server: HttpServer = Bun.serve({
-        hostname: loaded.config.bind_host,
-        port,
-        async fetch(request) {
+      const route = async (request: Request): Promise<Response> => {
           const url = new URL(request.url);
           // Every request checks Host (DNS rebinding: the remote panel's GET carries the pairing link);
           // state-changing routes also check Origin and Sec-Fetch-Site (cross-site POSTs).
           const refused = crossSiteRefusal(request, server.port ?? port, request.method !== "POST");
           if (refused !== null) return refused;
+          // Reads are served while records are migrated; a change is refused until the migration has finished. Pairing writes no
+          // record, so a browser can still pair and read the words that say why the board is not shown.
+          if (!READ_METHODS.has(request.method) && migrationState !== "done" && url.pathname !== "/desk/pair") return migrationRefusal();
           if (url.pathname.startsWith("/agent/panels")) return agentDoor(request, url.pathname);
+          // Every read needs the pairing session, except the page itself, its session check and the static client bundle that pairs.
+          // The page-agent header is a label, never a grant: an unpaired caller is refused whatever the header says.
+          const paired = pairing.paired(request.headers.get("cookie"));
+          if (READ_METHODS.has(request.method) && !OPEN_READS.has(url.pathname) && !paired) return notPairedRead();
           // An agent on the page may read, find, inspect and preview a hand off. Every other write is the person's alone.
           const page = pageAgentOf(request);
           if (page !== null) {
             const blocked = pageAgentRefusal(request.method, url.pathname);
             if (blocked !== null) return blocked;
           }
-          if (url.pathname === "/health") {
+          // Central rule: every route that is not a read needs a paired session cookie. /agent/panels returned above and keeps
+          // its own key; /desk/pair is how a browser gets the cookie. Adding a route cannot skip this check.
+          if (!READ_METHODS.has(request.method) && url.pathname !== "/desk/pair" && !paired) return notPairedRefusal();
+          if (url.pathname === "/desk/session" && request.method === "GET") return Response.json({ paired }, { headers: { "cache-control": "no-store" } });
+          if (url.pathname === "/desk/pair" && request.method === "POST") return pairDesk(request);
+          if (url.pathname === "/desk/pair/logout" && request.method === "POST") {
+            pairing.end(request.headers.get("cookie"));
+            return Response.json({ ok: true, paired: false }, { headers: { "cache-control": "no-store", "set-cookie": clearedSessionCookie() } });
+          }
+          if (url.pathname === "/health" && request.method === "GET") {
+            // The liveness probe is public and says one thing: the process is up. It answers the
+            // same to a paired caller as to an unpaired one, so it never becomes a second way in
+            // to the deployment profile, the operator reference, the semantic world, the research
+            // state or the transports (R3-10).
+            try {
+              await runtime.runtime.service.invoke(caller, { capability: "horizon.semantics.world", input: {} });
+              return Response.json({ ok: true }, { headers: { "cache-control": "no-store" } });
+            } catch {
+              return Response.json({ ok: false }, { status: 503, headers: { "cache-control": "no-store" } });
+            }
+          }
+          if (url.pathname === "/diagnostics" && request.method === "GET") {
+            // The diagnostics read is a separate operation from the probe: it is paired, it writes
+            // nothing, and it is the only route that reports the deployment in detail.
             const semantic = await runtime.runtime.service.invoke(caller, {
               capability: "horizon.semantics.world",
               input: {},
@@ -2272,7 +3329,7 @@ export async function createApplication(
               transports: loaded.config.transports,
             });
           }
-          if (url.pathname === "/frame") {
+          if (url.pathname === "/frame" && request.method === "GET") {
             return Response.json({ ...issueFrame(), research });
           }
           if (url.pathname === "/intent" && request.method === "POST") {
@@ -2289,12 +3346,17 @@ export async function createApplication(
             try {
               return Response.json(await commitNavigationIntent({ operationRef: record.operation_ref, ...(record.expected_outcome === undefined ? {} : { expectation: record.expected_outcome }) }));
             } catch (error) {
-              if (!(error instanceof AwaitingAuthorityError)) throw error;
+              if (!(error instanceof AwaitingAuthorityError)) {
+                if (error instanceof IntentError) {
+                  return Response.json({ code: error.code, message: error.message }, { status: error.code === "already_exists" ? 409 : error.code === "failed_precondition" ? 412 : 400 });
+                }
+                throw error;
+              }
               // Accepted for a decision, not committed: the operator answers it at SEA-Forge.
               return Response.json({ code: error.code, intent_id: error.intent.intent_id, approval_id: error.approvalId, run_id: error.runId }, { status: 202 });
             }
           }
-          if (url.pathname === "/surface") {
+          if (url.pathname === "/surface" && request.method === "GET") {
             const role = url.searchParams.get("role");
             if (role !== null && role !== "human" && role !== "agent" && role !== "system") {
               return Response.json({ code: "invalid_argument", message: `SURFACE: unknown role '${role}'` }, { status: 400 });
@@ -2314,7 +3376,7 @@ export async function createApplication(
             }
             return Response.json({ schema: SURFACE_SCHEMA, frame: frames.current()?.frame_id, view: projection.view });
           }
-          if (url.pathname === "/surface/schema") {
+          if (url.pathname === "/surface/schema" && request.method === "GET") {
             return Response.json(publishSurfaceSchema());
           }
           if (url.pathname === "/surface/intent" && request.method === "POST") {
@@ -2325,14 +3387,26 @@ export async function createApplication(
               return Response.json({ code: "invalid_argument", message: "SURFACE: body is not JSON" }, { status: 400 });
             }
             const record = (body ?? {}) as Record<string, unknown>;
+            // The role comes from the signed-in session, never from the body. A request that names
+            // its own actor is refused outright rather than quietly ignored (DEF-ROLE-FROM-REQUEST).
+            for (const field of ACTOR_NAMING_FIELDS) {
+              if (field in record) {
+                return Response.json({ code: "forbidden_field", message: `SURFACE: a request cannot name its own role (${field}); the role comes from the signed-in session` }, { status: 400 });
+              }
+            }
+            // The body has a closed vocabulary: a field the operation's schema does not name is
+            // refused rather than ignored, so no caller believes an unnamed field was read.
+            const extra = unknownField(record, schemaFieldNames("params.horizon_surface_intent_commit"));
+            if (extra !== null) {
+              return Response.json({ code: "unknown_field", message: `SURFACE: this request does not take ${extra}` }, { status: 400 });
+            }
             const transport = record.transport === "gui" || record.transport === "cli" || record.transport === "mcp" ? record.transport : "mcp";
             const outcome = await commitSurfaceIntent({
               transport,
-              role: record.role,
               operation: record.operation,
               node_id: record.node_id,
               frame_id: record.frame_id,
-            });
+            }, "human");
             return outcome.ok
               ? Response.json({ ok: true, intent: outcome.bound, committed: outcome.result })
               : Response.json({ ok: false, code: outcome.code, message: outcome.message }, { status: 409 });
@@ -2343,20 +3417,39 @@ export async function createApplication(
           if (url.pathname === "/desk/state.json" && request.method === "GET") {
             const state = await deskState(url.searchParams);
             const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
+            // An agent on the page reads a summary only: titles, step names, open items, counts and its own suggestions.
+            if (page !== null) return agentJson(agentStateOf(state, await listConversation(runtime.runtime.store, deskWho), await agentSteps(state.cases)), headers);
             if (url.searchParams.get("since") === state.rev) return Response.json({ unchanged: true, rev: state.rev }, { headers });
             return Response.json(state, { headers });
           }
           if (url.pathname === "/desk/search" && request.method === "GET") {
-            const found = await deskSearch(url.searchParams);
-            const asked = (url.searchParams.get("q") ?? "").trim();
-            // Find as you type is not a move. A find is recorded when the page asks for it (`record=1`) or an agent on the page runs it.
-            if (asked !== "" && (url.searchParams.get("record") === "1" || page !== null)) {
-              await logRow({ source: page ? "page-agent" : "you", ...(page?.name === undefined ? {} : { agent_name: page.name }), kind: "find", words: `Find: ${asked}`, outcome: `${found.notes.length} notes, ${found.cases.length} cases, ${found.days.length} days, ${found.tags.length} tags.`, status: "done" });
-            }
+            // Read-only. Find as you type is not a move, and a GET never records one.
+            const found = await deskSearch(url.searchParams, page !== null);
+            if (page !== null) return agentJson(agentSearchOf(found), { "cache-control": "no-store", "x-content-type-options": "nosniff" });
             return Response.json(found, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
           }
+          if (url.pathname === "/desk/search" && request.method === "POST") {
+            // The Find action. It is recorded in the conversation only when the body asks for it (`record`), so a find is a move only when the person makes one.
+            const noStore = { "cache-control": "no-store", "x-content-type-options": "nosniff" };
+            const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+            if (body === null || typeof body !== "object" || Array.isArray(body)) return Response.json({ ok: false, message: "That find could not be read." }, { status: 400, headers: noStore });
+            const params = new URLSearchParams();
+            for (const key of ["q", "day", "tag"]) if (typeof body[key] === "string") params.set(key, body[key] as string);
+            const asked = (params.get("q") ?? "").trim();
+            // The closed catalog names two actions for this route and nothing else: a read that
+            // records nothing, and a recorded find. Any other `record` value is Px, and it is
+            // refused before the search runs, so an unlisted action can never execute a read.
+            const action = deskSearchAction(body.record, asked);
+            if (action === null) return Response.json({ ok: false, code: "unknown_action", message: "That find asked for something this desk does not do. Nothing was searched and nothing was recorded." }, { status: 400, headers: noStore });
+            const found = await deskSearch(params, page !== null);
+            if (action === "true_with_non_empty_q") {
+              await logRow({ source: "you", kind: "find", words: `Find: ${asked}`, outcome: `${found.notes.length} notes, ${found.cases.length} cases, ${found.days.length} days, ${found.tags.length} tags.`, status: "done" });
+            }
+            return Response.json(found, { headers: noStore });
+          }
           if (url.pathname === "/desk/conversation" && request.method === "GET") {
-            return presentedJson({ rows: await listConversation(runtime.runtime.store, deskWho) }, { "cache-control": "no-store", "x-content-type-options": "nosniff" });
+            if (page !== null) return agentJson({ rows: agentRowsOf(await listConversation(runtime.runtime.store, deskWho)), withheld: WITHHELD_WORDS }, { "cache-control": "no-store", "x-content-type-options": "nosniff" });
+            return presentedJson({ rows: await observeResults(await listConversation(runtime.runtime.store, deskWho)) }, { "cache-control": "no-store", "x-content-type-options": "nosniff" });
           }
           if (url.pathname === "/desk/conversation/discard" && request.method === "POST") {
             const asked = (await request.json().catch(() => null)) as { row_id?: unknown } | null;
@@ -2450,6 +3543,10 @@ export async function createApplication(
             const form = await request.formData().catch(() => null);
             if (form === null) return Response.json({ code: "invalid_argument", message: "LABEL: body is not a form" }, { status: 400 });
             const back = safeReturn(form.get("return"));
+            // Stage 0B: a label is a reserved human write. It runs only after an exact local confirmation.
+            const labelParams = { session: String(form.get("session") ?? ""), event: String(form.get("event") ?? ""), record_seq: String(form.get("record_seq") ?? ""), verdict: String(form.get("verdict") ?? ""), first_failure: String(form.get("first_failure") ?? "") };
+            const labelWaiting = await confirmationGate(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, operationId: "workspace.label", params: labelParams, now: clock() }, confirmationTerminal());
+            if (!labelWaiting.ok) return awaitingLocalConfirmation(request, labelWaiting, back ? `/workspace/compare?${back}` : "/workspace/compare");
             try {
               await putLabel(runtime.runtime.store, {
                 tenant: caller.tenant,
@@ -2475,13 +3572,25 @@ export async function createApplication(
             await setPresenting(runtime.runtime.store, { tenant: caller.tenant, operator: caller.actor.id, on: form.get("on") === "1" });
             return Response.redirect(`/workspace/compare?${safeReturn(form.get("return"))}`, 303);
           }
-          if (url.pathname === "/workspace/export" && request.method === "GET") {
-            const kind = url.searchParams.get("kind");
+          if (url.pathname === "/workspace/export" && request.method === "POST") {
+            // The catalog refuses the export at this freeze: writing a labelled copy of the record
+            // is a P3 effect, and the row has no pending record, no A3-UV confirmation, no
+            // authority decision and no separation-of-duty check. Nothing is written and the
+            // refusal is recorded (R5-01).
+            const gate = await frozenGate(runtime.runtime.store, caller.tenant, "workspace.export", { route: "POST /workspace/export" }, caller.actor.id);
+            if (gate.state === "unavailable") return Response.json({ code: "unavailable", message: gate.message }, { status: 503 });
+            if (gate.state === "refused") return Response.json({ code: "refused", message: refusalWords(gate.refusal) }, { status: 403 });
+            // The export writes a file, so it is a POST from a form the person pressed, with the session. A GET is never served.
+            const form = await request.formData().catch(() => null);
+            if (form === null) return Response.json({ code: "invalid_argument", message: "EXPORT: body is not a form" }, { status: 400 });
+            const fields = new URLSearchParams();
+            for (const [key, value] of form.entries()) if (typeof value === "string") fields.set(key, value);
+            const kind = fields.get("kind");
             if (kind !== "labels" && kind !== "comparison") return Response.json({ code: "invalid_argument", message: "EXPORT: kind must be labels or comparison" }, { status: 400 });
             const presenting = await presentingOn(runtime.runtime.store, caller.tenant, caller.actor.id);
-            const choice = chooseStandIns(presenting, url.searchParams.get("standins"));
+            const choice = chooseStandIns(presenting, fields.get("standins"));
             if (!choice.ok) return Response.json({ code: "invalid_argument", message: choice.message }, { status: choice.status });
-            const data = await compareData(url.searchParams);
+            const data = await compareData(fields);
             if (kind === "comparison" && data.view === null) return Response.json({ code: "not_found", message: "EXPORT: no such session in the record" }, { status: 404 });
             const built = buildExport({ kind, labels: data.labels, comparison: data.view, standins: choice.standins, key: presentingKey(), names: data.repoNames, now: clock() });
             writeExport(exportsDir, built);
@@ -2551,7 +3660,7 @@ export async function createApplication(
             let outcome: Awaited<ReturnType<typeof commitSurfaceIntent>> | null = null;
             let failure: unknown = null;
             try {
-              outcome = await commitSurfaceIntent({ transport: "gui", role: "human", node_id: actionId, intent_id: intentId });
+              outcome = await commitSurfaceIntent({ transport: "gui", node_id: actionId, intent_id: intentId }, "human");
             } catch (error) {
               failure = error;
             }
@@ -2635,19 +3744,45 @@ export async function createApplication(
             await remote.stop();
             return Response.redirect("/workspace/remote", 303);
           }
-          if (url.pathname === "/") {
+          if (url.pathname === "/" && request.method === "GET") {
             return Response.redirect("/workspace", 303);
           }
           return new Response("not found\n", { status: 404 });
+      };
+      const server: HttpServer = Bun.serve({
+        hostname: loaded.config.bind_host,
+        port,
+        async fetch(request) {
+          return route(request);
         },
       });
+      if (!pairingPrinted) {
+        // No terminal: the code is written nowhere, and the server still listens. Every human route stays refused until a browser
+        // pairs, and pairing is refused with words that say to run Horizon from an interactive terminal (R3-3).
+        try {
+          printPairingCode(server.url.origin, pairingCode);
+        } catch (error) {
+          if (!(error instanceof PairingNeedsTerminal)) {
+            server.stop(true);
+            throw error;
+          }
+          refuseWithoutTerminal();
+        }
+        pairingPrinted = true;
+      }
       return server;
     },
+    migrated: answersMigrated,
     async close() {
+      closing = true;
+      await conflictsListed;
       if (remote.listening) await remote.stop();
       for (const timer of windowTimers.values()) clearTimeout(timer);
       windowTimers.clear();
+      if (deskLockToken !== undefined) await releaseDeskLock(runtime.runtime.store, deskLockToken);
       await runtime.runtime.close();
+      await deskStore.close();
+      if (storeLock !== undefined) await releaseStoreLockFile(storeLock);
     },
   };
 }
@@ -2659,6 +3794,33 @@ function remoteRailOf(status: RemoteStatus): { readonly state: string; readonly 
 }
 
 /** A `return` field is a query string for our own compare page, never a URL: no open redirect. */
+/** The desk's JSON answer while a reserved change waits for the local terminal. Nothing was written. */
+function awaitingDeskConfirmation(waiting: Extract<ConsumeResult, { ok: false }>): Response {
+  const pending = waiting.code === "awaiting_local_confirmation" ? waiting.pending_id : null;
+  const message =
+    pending !== null
+      ? `Confirm this on the Horizon terminal with: horizon confirm --pending ${pending}. Nothing was changed yet.`
+      : "Horizon has no terminal to confirm on, so nothing was changed.";
+  return Response.json({ ok: false, code: waiting.code, pending_id: pending, message }, { status: 409, headers: { "cache-control": "no-store" } });
+}
+
+/**
+ * The answer a reserved route gives while its operation waits for the local terminal (Stage 0B).
+ * Nothing was written: the route returns this instead of performing its write.
+ */
+function awaitingLocalConfirmation(request: Request, waiting: Extract<ConsumeResult, { ok: false }>, target: string): Response {
+  const pending = waiting.code === "awaiting_local_confirmation" ? waiting.pending_id : null;
+  const message =
+    pending !== null
+      ? `Confirm this on the Horizon terminal with: horizon confirm --pending ${pending}. Nothing was changed yet.`
+      : "Horizon has no terminal to confirm on, so nothing was changed.";
+  if ((request.headers.get("accept") ?? "").includes("application/json")) {
+    return Response.json({ ok: false, code: waiting.code, pending_id: pending, message }, { status: 409 });
+  }
+  const separator = target.includes("?") ? "&" : "?";
+  return Response.redirect(`${target}${separator}confirm=${encodeURIComponent(pending ?? "none")}`, 303);
+}
+
 function safeReturn(value: FormDataEntryValue | null): string {
   const text = typeof value === "string" ? value : "";
   return /^[A-Za-z0-9_=&%.:\-+]*$/.test(text) ? text : "";
@@ -2685,12 +3847,53 @@ export function pageAgentOf(request: Request): PageAgent | null {
   return name === undefined ? {} : { name };
 }
 
+/** Whether a list the page sent holds exactly these ids. */
+const sameSet = (given: readonly unknown[], ids: readonly string[]): boolean => given.length === ids.length && given.every((g) => typeof g === "string" && ids.includes(g)) && new Set(given).size === given.length;
+
+export const NOT_RECORDED_WORDS = "This was done, but it could not be added to the conversation. Check the desk log.";
+
+/** Methods that only read. Every other method needs a paired session cookie. */
+export const READ_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/** A write from a browser that has not paired (or whose session has ended). Nothing is changed. */
+export function notPairedRefusal(): Response {
+  return Response.json({ ok: false, outcome: "not_paired", code: "forbidden_write", message: NOT_PAIRED_WORDS }, { status: 403, headers: { "cache-control": "no-store" } });
+}
+
+/** The only GET routes an unpaired browser may open: the page, its session check, its pairing route (POST) and the static client bundle that does the pairing. */
+export const OPEN_READS: ReadonlySet<string> = new Set(["/desk", "/desk/session", "/desk/pair", "/desk/app.js", "/desk/app.css", "/health"]);
+
+/** A read from a browser that has not paired. Nothing is shown. */
+export function notPairedRead(): Response {
+  return Response.json({ ok: false, outcome: "not_paired", code: "unauthorized", message: PAIR_FIRST_WORDS }, { status: 401, headers: { "cache-control": "no-store" } });
+}
+
+/** The owner of a call that carries no agent key. No question is ever owned by it, so such a call reads and routes nothing. */
+export const UNKEYED_AGENT = "unkeyed";
+/**
+ * Which closed-catalog action a `POST /desk/search` body performs. The catalog's dispatch table
+ * for that route names exactly two actions — `false_or_absent` (the read, which records nothing)
+ * and `true_with_non_empty_q` (the recorded find) — and every other `record` value is Px.
+ *
+ * Null means "refuse": the caller asked for an action the closed catalog does not list, so the
+ * desk searches nothing and writes nothing. A `record` of true with an empty question is refused
+ * for the same reason: there is no find to bind the record to.
+ */
+export function deskSearchAction(record: unknown, query: string): "false_or_absent" | "true_with_non_empty_q" | null {
+  if (record === undefined || record === false || record === "0") return "false_or_absent";
+  if (record === true || record === "1") return query.trim() === "" ? null : "true_with_non_empty_q";
+  return null;
+}
+
 export const AGENT_NOTE_WORDS = "An agent can suggest a note; you save it.";
 export const AGENT_REFUSAL_WORDS = "Only you can confirm this. The agent's suggestion is waiting in the conversation.";
 
 /** Null when an agent on the page may make the call. Reads and the hand off preview pass; every other write is refused with 403. */
+export const AGENT_READS: ReadonlySet<string> = new Set(["/desk", "/workspace", "/desk/app.js", "/desk/app.css", "/desk/state.json", "/desk/search", "/desk/conversation", "/desk/panels/catalogue", "/desk/session"]);
+export const AGENT_READ_WORDS = "An agent on the page can read the summary, a find and the conversation. Other parts of the desk are for you.";
+
 export function pageAgentRefusal(method: string, pathname: string): Response | null {
-  if (method === "GET" || method === "HEAD") return null;
+  if (method === "GET" || method === "HEAD") return AGENT_READS.has(pathname) ? null : Response.json({ ok: false, outcome: "agent_refused", message: AGENT_READ_WORDS }, { status: 403, headers: { "cache-control": "no-store" } });
   if (method === "POST" && pathname === "/desk/handoff/preview") return null;
   const message = pathname === "/desk/note" ? AGENT_NOTE_WORDS : AGENT_REFUSAL_WORDS;
   return Response.json({ ok: false, outcome: "agent_refused", message }, { status: 403, headers: { "cache-control": "no-store" } });

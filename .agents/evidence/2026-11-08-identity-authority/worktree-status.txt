@@ -1,0 +1,36 @@
+## Horizon-gaps
+branch: horizon-desk-gaps
+head: 0eca3ed0fa438f8fa7e11fba56dee1a6e12a04f0
+tracked modifications:
+
+## cognate
+branch: security/repo-hygiene-2026-10-31
+head: 87333bce08f449e4664b01936832d2a72034d405
+tracked modifications:
+
+## cognate-identity-wt
+branch: horizon/shared-identity
+head: f4d4db6402485e1d6f0de4e11e7172af3bdeb49d
+tracked modifications:
+
+## cognate-workbench
+branch: feat/desktop-terminal-browser
+head: 65510bbfce73bf08dd9463e4213eef47cb74e5bf
+tracked modifications:
+   M .agents/reports/ui-production-readiness/evidence/after/t4/t4-config-dirty.png
+   M .agents/reports/ui-production-readiness/evidence/after/t4/t4-config-saved.png
+   M .agents/reports/ui-production-readiness/evidence/after/t4/t4-delete-confirm.png
+   M .agents/reports/ui-production-readiness/evidence/after/t4/t4-delete-done.png
+   M .agents/reports/ui-production-readiness/evidence/after/t4/t4-failure-block.png
+   M .agents/reports/ui-production-readiness/evidence/after/t4/t4-retry-card.png
+
+## sea-rs
+branch: docs/egm-bootstrap-readmes
+head: b072ec50b1e50df75c45ddf1709caa6877d5c2f1
+tracked modifications:
+
+## gauntlet
+branch: release/native-distribution
+head: 584277796ff73cb00ffd4c5f60b0e4a2cec429a6
+tracked modifications:
+

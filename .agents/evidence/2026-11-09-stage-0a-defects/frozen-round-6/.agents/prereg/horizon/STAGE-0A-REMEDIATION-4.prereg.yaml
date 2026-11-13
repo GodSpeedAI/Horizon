@@ -1,0 +1,113 @@
+preregistration:
+  id: HORIZON-PREREG-STAGE-0A-REMEDIATION-4
+  task: STAGE-0A-REMEDIATION-4
+  title: "Close the fifth independent review's nine findings, and pin the design the sixth review reads"
+  recorded_at: "2026-11-11"
+  recorded_before_artifacts: false
+  claim: >-
+    The contract set, the live handlers and the normative design now say one thing about the
+    paths the fifth review found unsafe. Every reachable desk P3 row (case decision, settlement
+    ruling, both approval decisions, export) is refused before any target effect at this freeze,
+    and so is the shared run start, which sends an unclassified case advance. A device credential
+    is a service principal and never a human: the phone's surface-intent commit is refused with
+    no device-attributed delegation, and the operator is recorded as attribution only. The
+    agent-execution executor is mapped to the registered-agent key it can actually authenticate
+    with, and no executor is mapped to a credential it does not hold. The caller kinds the
+    schemas accept are the same set the catalog names, and a record whose caller kind its
+    operation does not permit is refused. The external-interface contract names, for each fact,
+    the owner component and struct it is read from, the disposition-dependent facts say when they
+    apply, every fact binds to a Horizon record field or a closed envelope check, and the Merkle
+    inclusion fields are present. The anonymous and code-holder rows state no human evidence, and
+    separation of duty is required per row rather than by class. This file pins the SHA-256 of the
+    design the sixth independent review will read, so the verdict binds a known set of bytes.
+  upstream_pins:
+    spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+    plan: { id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23" }
+    design: { file: design_draft.md, sha256: "f65aed3ce333a11a8aa12b81b526aaa3793860ea856e2796ce555003c9112583", lines: 959, sections: "2, 6, 7, 9.1, 11, 12, Appendix A, Review Record" }
+    task_preregistration: { file: .agents/prereg/horizon/T23.prereg.yaml, id: HORIZON-PREREG-T23-0A, relationship: "the task-level preregistration that registers the Stage 0A expectations; this unit is one of its Stage 0A units" }
+    prior_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-REMEDIATION-3.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-REMEDIATION-3, relationship: "the unit that closed the fourth independent review's findings" }
+    prior_review: { file: .agents/evidence/2026-11-09-stage-0a-defects/independent-review-round-5.md, verdict: "REJECT", findings: 9, disposition: .agents/evidence/2026-11-09-stage-0a-defects/review-round-5-disposition.md }
+  # This unit settles no specification requirement. It closes the fifth independent review's
+  # findings against the Stage 0A contract set. No status entry may claim a Stage 0A requirement
+  # as settled because this file exists; the sixth independent review, not this unit, is what can
+  # settle Stage 0A.
+  settles: []
+  falsifier: >-
+    Any of the negative expectations reproducing on the committed files falsifies this claim: a
+    desk P3 row or the run start that performs an effect before its refusal, a phone commit that
+    reaches the human commit path as the operator, an external-interface fact that binds to
+    nothing or is verified against joined source, or a design whose hash this file does not pin.
+  known_confounds:
+    - >-
+      The external-interface facts are checked against a local checkout of the owner at the pinned
+      commit. A later owner publication would supersede this file rather than contradict it.
+    - >-
+      The refusals are containments, not downgrades. The phone's commit and the desk's P3 rows
+      remain refused until Stage 0B confirmation and a device-attributed delegation exist, and
+      this unit does not claim either.
+  positive_expectations:
+    - id: PE-44
+      expectation: >-
+        Every fact the external-interface contract requires of a published owner artifact is
+        verified in the owner struct that carries it at the pinned commit, not merely somewhere in
+        the owner's files. The authority decision's facts are read per component: envelope fields
+        from the envelope source, ledger entry fields from the committed entry, checkpoint fields
+        from the signed checkpoint, and inclusion fields from the Merkle proof. A fact the owner's
+        named struct does not carry fails the check.
+    - id: PE-45
+      expectation: >-
+        The Merkle inclusion fields the verifier needs are present and bound. The contract names
+        the proof's leaf index and sibling hashes, and the entry's MMR leaf index, each with its
+        owner struct, and each binds to the envelope check that consumes it.
+    - id: PE-46
+      expectation: >-
+        Every fact binds to exactly one target: a field of a Horizon record kind the records
+        contract declares, or one of the closed envelope checks. The local record kinds that
+        carry Horizon's own delegation and decision are named HorizonDelegationGrant and
+        HorizonAuthorityDecision, so they no longer read as the owner's artifacts.
+    - id: PE-47
+      expectation: >-
+        The reachable desk P3 rows — case decision, settlement ruling, both approval decisions
+        and export — are refused on every path at this freeze. The refusal is a containment: the
+        row keeps its class and its authority writer, the catalog records that it performs
+        nothing, and the live handler reaches the refusal before any target effect.
+    - id: PE-48
+      expectation: >-
+        The shared run start is refused before the case advance it would send. Its target
+        resolution is named as missing, so the catalog refuses it rather than dispatching through
+        a handler that calls an unclassified mutation.
+    - id: PE-49
+      expectation: >-
+        A device credential is a service principal. The phone's surface-intent commit is refused
+        with the reason that no device-attributed delegation from the operator exists, and the
+        operator is recorded only as attribution, never as the caller of the human commit path.
+    - id: PE-50
+      expectation: >-
+        The agent-execution executor is mapped to the registered-agent key the agent door actually
+        authenticates with, and the record vocabulary keeps agent_execution as an issuer-issued
+        execution. No executor is mapped to a credential it does not hold.
+    - id: PE-51
+      expectation: >-
+        The caller kinds the record schema accepts are the caller kinds the catalog names, and a
+        record whose caller kind its operation does not permit is refused by the validator.
+    - id: PE-52
+      expectation: >-
+        The anonymous and code-holder rows state no human evidence explicitly, and never inherit
+        an assurance predicate their class would give them. Separation of duty is set per row: a
+        P3 row sets it, and the P3 class rule makes no universal claim.
+  negative_expectations:
+    - id: NE-38
+      expectation: >-
+        An external-interface fact that names no owner component, or a struct the owner does not
+        declare, fails the check rather than being verified against the joined source. A fact
+        that binds to nothing, or to a record field records.json does not declare, or to an
+        envelope check the contract does not list, also fails the check.
+    - id: NE-39
+      expectation: >-
+        A refused desk P3 row or the refused run start performs no target effect and appends
+        exactly one refusal audit. Refusal audits are permitted and stated; they are not silent
+        and they are not counted as effects.
+    - id: NE-40
+      expectation: >-
+        A device credential never reaches the human commit path as the human, and a phone commit
+        with no device-attributed delegation is never answered as if it had committed a move.

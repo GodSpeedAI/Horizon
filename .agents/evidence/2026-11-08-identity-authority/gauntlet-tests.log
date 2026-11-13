@@ -1,0 +1,18 @@
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized] target(s) in 0.95s
+     Running unittests src/lib.rs (target/debug/deps/gauntlet_domain-00f77790e0d2c5d2)
+
+running 4 tests
+test role_invocation::tests::admission_records_the_dispatch_facts ... ok
+test role_invocation::tests::above_contained_tier_a_sandbox_policy_is_required ... ok
+test role_invocation::tests::payments_add_up ... ok
+test role_invocation::tests::the_state_machine_has_no_shortcuts_or_resurrections ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 81 filtered out; finished in 0.00s
+
+     Running tests/settle_public_api.rs (target/debug/deps/settle_public_api-05af28310e490e60)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+

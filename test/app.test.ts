@@ -266,7 +266,7 @@ describe("structural walking skeleton", () => {
 
     const server = application.startServer(0);
     try {
-      const response = await fetch(new URL("/health", server.url));
+      const response = await fetch(new URL("/diagnostics", server.url));
       expect(response.status).toBe(200);
       const body = (await response.json()) as Record<string, unknown>;
       expect(body.status).toBe("ok");
@@ -482,7 +482,7 @@ describe("structural walking skeleton", () => {
 
     const server = app.startServer(0);
     try {
-      const body = (await (await fetch(new URL("/health", server.url))).json()) as Record<string, unknown>;
+      const body = (await (await fetch(new URL("/diagnostics", server.url))).json()) as Record<string, unknown>;
       expect(body.status).toBe("ok");
       expect(body.research).toMatchObject({
         kind: "research_unavailable",

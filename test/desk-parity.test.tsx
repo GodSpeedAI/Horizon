@@ -245,15 +245,17 @@ describe("desk parity with the old workspace", () => {
     expect((await stateAt()).home.moves.some((m) => m.intent_id === intentId)).toBe(true);
   });
 
-  test("approval confirm works from the card", async () => {
+  test("approval confirm from the card is refused at this freeze, and nothing is sent", async () => {
     const card = (await stateAt()).decide.cards.find((c) => c.id === "case-task:ap1")!;
     const sent = await app_post("/desk/decide", { card_id: card.id, choice: "accept", preview_code: card.preview.code, records: card.preview.records });
-    expect(sent.status).toBe(200);
-    expect(decisions).toHaveLength(1);
-    expect(decisions[0]).toMatchObject({ verb: "approval_decide", decision: "approve", case_id: "case_1", approval_id: "ap1", preconditions: { records: [{ ref: "approval:ap1", expected_digest: "sha256:d1" }] } });
-    // The old form posts nowhere: an approval is answered from the card, after its preview.
+    // The card is still the only way to decide an approval; the decision itself is refused until
+    // the pending record, the protected confirmation and the authority exist (R5-01).
+    expect(sent.status).toBe(403);
+    expect(((await sent.json()) as { outcome?: string }).outcome).toBe("refused");
+    expect(decisions).toHaveLength(0);
+    // The old form posts nowhere either.
     expect((await post("/workspace/approval", { approval_id: "approval:none", decision: "approve" })).status).toBe(404);
-    expect((await stateAt()).decide.cards.find((c) => c.id === "case-task:ap1")).toBeUndefined();
+    expect((await stateAt()).decide.cards.find((c) => c.id === "case-task:ap1")).toBeDefined();
   });
 
   test("settle needs preview and typed reason", async () => {

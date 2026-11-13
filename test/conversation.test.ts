@@ -2,6 +2,7 @@
  * The desk conversation (stage 8, steps 1 and 2): the pure reducer, the stored rows written by each desk operation, Presenting on
  * read, discard, the newest 200, and the agent caller that may suggest but never confirm.
  */
+import { revisionOf, withRevision } from "./support/answer-revision.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createMemoryStore } from "@godspeedai/cognate-store-memory";
 import { appendRow, listConversation } from "../src/capabilities/conversation.ts";
@@ -27,7 +28,7 @@ describe("the conversation reducer", () => {
     expect(next).toHaveLength(1);
     expect(next[0]).toMatchObject({ row_id: first[0]!.row_id, words: "Plan v2", status: "done" });
   });
-  test("the window keeps the newest 200, oldest first", () => {
+  test("the window keeps the newest 200 when nothing is waiting, oldest first", () => {
     const rows = Array.from({ length: 250 }, (_, i) => row(i));
     const w = windowOf([...rows].reverse());
     expect(w).toHaveLength(CONVERSATION_WINDOW);
@@ -73,6 +74,8 @@ beforeAll(async () => {
         return { json: { approvals: [] } };
       case "case_list":
         return { json: { cases: [{ case_id: CASE, case_state: "active", summary: "Ship the checkout fix", created_at: "2026-11-07T06:13:12.793Z" }], unreadable: [] } };
+      case "case_get_horizon":
+        return { json: { case_id: CASE, case_state: "active", items: [] } };
       case "case_add_item": {
         const item = r.item as { plan_item_id: string };
         if (r.dry_run === true) return { json: { ok: true, dry_run: true, outcome: "would_add", case_id: r.case_id, plan_item_id: item.plan_item_id, proposed_by: "operator_local", item, plan_precondition: { ref: `plan:${CASE}`, expected_digest: planDigest(r, item.plan_item_id) } } };
@@ -106,7 +109,7 @@ const rows = async (): Promise<ConversationRow[]> => (await app.get("/desk/conve
 const draftId = async (): Promise<string> => (await app.get("/desk/draft")).draftId;
 const asAgent = (path: string, body: unknown): Promise<Response> => fetch(`${app.base}${path}`, { method: "POST", headers: { "content-type": "application/json", ...AGENT }, body: JSON.stringify(body) });
 const post = async (path: string, body: unknown) => {
-  const r = await app.post(path, body);
+  const r = await app.post(path, await withRevision(app, body));
   return { status: r.status, body: (await r.json()) as Record<string, any> };
 };
 
@@ -114,7 +117,7 @@ describe("rows from each desk operation", () => {
   test("a note, a find and a hand off leave rows with the right source, kind and status", async () => {
     const before = (await rows()).length;
     expect((await app.post("/desk/note", { body: "Check the checkout wording" })).status).toBe(200);
-    await fetch(`${app.base}/desk/search?q=checkout&record=1`);
+    await fetch(`${app.base}/desk/search`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ q: "checkout", record: "1" }) });
     await fetch(`${app.base}/desk/search?q=typing`); // find as you type is not recorded
     const id = await draftId();
     const p = await post("/desk/handoff/preview", { draft_id: id, text: "Fix the checkout total" });
@@ -126,21 +129,22 @@ describe("rows from each desk operation", () => {
     await post("/desk/handoff/preview", { draft_id: id, text: "Fix the checkout total" });
     expect((await rows()).length).toBe(now.length);
     const sent = await post("/desk/handoff", { draft_id: id, text: "Fix the checkout total", plan_precondition: p.body.preview.plan_precondition });
-    expect(sent.status).toBe(200);
+    // The send is refused at this freeze (R5-01), and the row the desk keeps says so.
+    expect(sent.status).toBe(403);
     now = await rows();
     expect(now.length).toBe(before + 3);
-    expect(now.at(-1)).toMatchObject({ kind: "handoff", status: "done", source: "you" });
-    expect(now.at(-1)!.outcome).toContain("Handed off");
+    expect(now.at(-1)).toMatchObject({ kind: "handoff", status: "refused", source: "you" });
+    expect(now.at(-1)!.outcome).toContain("refused at this release");
     expect(JSON.stringify(now)).not.toContain("Error");
   });
 
   test("a refused hand off turns its row refused with plain words", async () => {
     const id = await draftId();
     await post("/desk/handoff/preview", { draft_id: id, text: "Another step" });
-    const stale = await post("/desk/handoff", { draft_id: id, text: "Another step", plan_precondition: { ref: "plan:x", expected_digest: "sha256:old" } });
-    expect(stale.status).toBe(409);
+    const refused = await post("/desk/handoff", { draft_id: id, text: "Another step", plan_precondition: { ref: "plan:x", expected_digest: "sha256:old" } });
+    expect(refused.status).toBe(403);
     expect((await rows()).at(-1)).toMatchObject({ status: "refused", kind: "handoff" });
-    expect((await rows()).at(-1)!.outcome).toContain("Preview out of date");
+    expect((await rows()).at(-1)!.outcome).toContain("refused at this release");
   });
 
   test("a refused note appends a refused row", async () => {
@@ -168,7 +172,9 @@ describe("rows from each desk operation", () => {
     expect(routed.ok).toBe(true);
     const answerRows = (await rows()).filter((r) => r.kind === "answer");
     expect(answerRows).toHaveLength(1);
-    expect(answerRows[0]).toMatchObject({ words: "You answered: X", status: "done", outcome: "The agent took it to: step handoff_0a49 in Seed: triage inbox" });
+    expect(answerRows[0]).toMatchObject({ words: "You answered: X", status: "claimed" });
+    expect(answerRows[0]!.outcome).toContain("The agent says it took it to: step handoff_0a49 in Seed: triage inbox");
+    expect(answerRows[0]!.outcome).toContain("Not checked");
     expect((await rows()).find((r) => r.kind === "panel")!.status).toBe("done");
   });
 });
@@ -183,7 +189,8 @@ describe("the agent caller", () => {
     expect(r.status).toBe(200);
     const all = await rows();
     expect(all.at(-1)).toMatchObject({ kind: "handoff-proposal", source: "page-agent", agent_name: "Helper", status: "waiting" });
-    expect(all.at(-2)).toMatchObject({ kind: "find", source: "page-agent", agent_name: "Helper" });
+    // A find is a read: an agent's find is not written into the conversation (only the person's Find records one).
+    expect(all.some((row) => row.kind === "find" && row.source === "page-agent")).toBe(false);
   });
 
   test("it cannot send, decide, save a note, discard, answer or do any human panel op, and nothing is appended", async () => {
@@ -192,7 +199,7 @@ describe("the agent caller", () => {
       ["/desk/handoff", { draft_id: "d", text: "x", plan_precondition: { ref: "r", expected_digest: "d" } }],
       ["/desk/decide", { card_id: "c", choice: "accept" }],
       ["/desk/conversation/discard", { row_id: (await rows()).at(-1)!.row_id }],
-      ["/desk/panels/op", { op: "human.answer", panel: "plan", ask: "a1", outcome: "answered", value: "x" }],
+      ["/desk/panels/op", { op: "human.answer", panel: "plan", ask: "a1", ...(await revisionOf(app, "plan", "a1")), outcome: "answered", value: "x" }],
       ["/desk/panels/op", { op: "human.pin", id: "plan", pinned: true }],
       ["/desk/start", {}],
       ["/desk/lesson", { text: "x" }],
@@ -216,9 +223,10 @@ describe("the agent caller", () => {
     const p = await post("/desk/handoff/preview", { draft_id: id, text: "Agent suggested step" });
     expect((await rows()).filter((r) => r.kind === "handoff-proposal" || (r.refs.draft_id === id && r.status === "waiting"))).toHaveLength(1); // the person's own preview of the same draft settles the same row
     const sent = await post("/desk/handoff", { draft_id: id, text: "Agent suggested step", plan_precondition: p.body.preview.plan_precondition });
-    expect(sent.status).toBe(200);
-    const done = (await rows()).find((r) => r.row_id === proposal.row_id)!;
-    expect(done).toMatchObject({ status: "done", source: "page-agent", kind: "handoff-proposal" });
+    // The send is refused, so the proposal keeps waiting instead of turning done (R5-01).
+    expect(sent.status).toBe(403);
+    const still = (await rows()).find((r) => r.row_id === proposal.row_id)!;
+    expect(still).toMatchObject({ status: "refused", source: "page-agent", kind: "handoff-proposal" });
 
     const next = await asAgent("/desk/handoff/preview", { draft_id: await draftId(), text: "Second suggestion" });
     expect(next.status).toBe(200);
