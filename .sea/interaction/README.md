@@ -18,7 +18,7 @@ Derived in T01 (topology P1) from the frozen spec
 `interaction-model.sea` imports the other modules via relative path imports, so
 a single-file validate resolves the whole closure.
 
-## Commands (pinned DomainForge 0.21.2)
+## Commands (pinned DomainForge 0.22.0)
 
 ```sh
 export DOMAINFORGE_BIN=/home/sprime01/projects/domainforge/target/release/domainforge

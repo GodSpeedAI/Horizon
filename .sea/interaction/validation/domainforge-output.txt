@@ -1,24 +1,24 @@
-# DomainForge 0.21.2 — T01 IDM validation output (verbatim)
+# DomainForge 0.22.0 — T01 IDM validation output (verbatim)
 # Re-captured at T04 after the INV-08 requirement_ref correction
 # (REQ-NAV-001 -> REQ-INT-003); no entity or invariant semantics changed.
 
 ## validate --application
-# T01 gate-01 validate --application (pinned 0.21.2)
+# T01 gate-01 validate --application (pinned 0.22.0)
 $ $DOMAINFORGE_BIN --version
-domainforge 0.21.2
-$ /home/sprime01/.local/share/mise/shims/domainforge validate .sea/interaction/interaction-model.sea --application --format human
+domainforge 0.22.0
+$ /home/sprime01/projects/_wt/tmp/df022-cli/domainforge-0.22.0-x86_64-unknown-linux-gnu/domainforge validate .sea/interaction/interaction-model.sea --application --format human
 Validation succeeded: 0 violations total
 Application contract valid: 4 operation(s), 8 record(s), 21 enum(s), 29 entities
 exit=0
 
 ## contract
 # T01 gate-03 contract identity (DomainForge-owned)
-$ /home/sprime01/.local/share/mise/shims/domainforge contract .sea/interaction/interaction-model.sea
+$ /home/sprime01/projects/_wt/tmp/df022-cli/domainforge-0.22.0-x86_64-unknown-linux-gnu/domainforge contract .sea/interaction/interaction-model.sea
 {
   "schema_version": "domainforge-application-contract/v1",
   "producer": {
     "name": "domainforge-core",
-    "version": "0.21.2"
+    "version": "0.22.0"
   },
   "inputs": {
     "source_set_hash": "sha256:cf48dd9ea8e3ab0edaae54d26eefe7e5ed9e0998a2c1b9b51d6dcc6276b6eb3b",
@@ -26,7 +26,7 @@ $ /home/sprime01/.local/share/mise/shims/domainforge contract .sea/interaction/i
     "language_schema_version": "domainforge-ast/v3",
     "interpretation_version": "domainforge-interpretation/v1"
   },
-  "self_hash": "sha256:27fd5f0389989bbf5873c35eb5757b1c69ed64389828eb701560725cc12617d5",
+  "self_hash": "sha256:2d384753a20bea52f912ad61b98321b5771c425abc43d02f7b74dc2f8337926c",
   "semantic_closure_hash": "sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
   "contract": {
     "enums": [
