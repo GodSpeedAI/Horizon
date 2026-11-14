@@ -7,20 +7,23 @@
  * Three-valued results stay three-valued (and more): `confirmed` / `contradicted` are decided,
  * `insufficient` is "not decided", and an unverified tail is its own marked state.
  */
-import { NOT_CONNECTED, readCaseRecords, readRealityTrace, readWorldPin, type CaseEpisodeRecord, type RealityTraceStructure, type SourceRead, type WorldPin } from "./fde-read.ts";
+import { NOT_CONNECTED, type CaseEpisodeRecord, type RealityTraceStructure, type SourceRead, type WorldPin } from "./fde-types.ts";
 import type { DebuggerValue } from "../domain/debugger.ts";
 
 export type Tone = "affirmed" | "denied" | "undecided" | "undeclared" | "unrecognised";
 
-/** The adapter's classification mapping (the NT-09 attack surface): source class word -> visual tone and gloss. */
-export const CLASS_DISPLAY: Readonly<Record<string, { readonly tone: Tone; readonly gloss: string }>> = {
-  confirmed: { tone: "affirmed", gloss: "decided: the declared expectation holds" },
-  contradicted: { tone: "denied", gloss: "decided: the declared expectation is violated" },
-  observed_undeclared: { tone: "undeclared", gloss: "observed behaviour the world does not declare" },
-  declared_unobserved: { tone: "undeclared", gloss: "declared behaviour that was not observed" },
-  insufficient: { tone: "undecided", gloss: "NOT decided: evidence is insufficient" },
+/**
+ * The adapter's classification mapping (the NT-09 attack surface): source class word -> displayed label, tone and gloss.
+ * The label of every known class is the source's own word; the parity test fails if any label stops equalling the ledger value.
+ */
+export const CLASS_DISPLAY: Readonly<Record<string, { readonly label: string; readonly tone: Tone; readonly gloss: string }>> = {
+  confirmed: { label: "confirmed", tone: "affirmed", gloss: "decided: the declared expectation holds" },
+  contradicted: { label: "contradicted", tone: "denied", gloss: "decided: the declared expectation is violated" },
+  observed_undeclared: { label: "observed_undeclared", tone: "undeclared", gloss: "observed behaviour the world does not declare" },
+  declared_unobserved: { label: "declared_unobserved", tone: "undeclared", gloss: "declared behaviour that was not observed" },
+  insufficient: { label: "insufficient", tone: "undecided", gloss: "NOT decided: evidence is insufficient" },
 };
-export const toneOf = (cls: string): { tone: Tone; gloss: string } => CLASS_DISPLAY[cls] ?? { tone: "unrecognised", gloss: "unrecognised class: shown as recorded" };
+export const toneOf = (cls: string): { label: string; tone: Tone; gloss: string } => CLASS_DISPLAY[cls] ?? { label: cls, tone: "unrecognised", gloss: "unrecognised class: shown as recorded" };
 
 export const RESULT_GLOSS: Readonly<Record<string, string>> = {
   S: "established success", F: "established failure", U: "unresolved (not decided)", C: "contradictory",
@@ -69,25 +72,3 @@ export function fdeDebuggerValues(sources: FdeSources, episodeRef: string): read
   return out;
 }
 
-/** Where each source lives. An unset path is a source that is not connected. */
-export interface FdeSourcePaths {
-  readonly caseDir?: string;
-  readonly comparePath?: string;
-  readonly derivePath?: string;
-  readonly pinPath?: string;
-}
-
-export function fdePathsFromEnv(env: Readonly<Record<string, string | undefined>>): FdeSourcePaths {
-  const pick = (name: string): string | undefined => (env[name] !== undefined && env[name] !== "" ? env[name] : undefined);
-  const paths = { caseDir: pick("HORIZON_FDE_CASE_DIR"), comparePath: pick("HORIZON_FDE_COMPARE"), derivePath: pick("HORIZON_FDE_DERIVE"), pinPath: pick("HORIZON_FDE_PIN") };
-  return Object.fromEntries(Object.entries(paths).filter(([, v]) => v !== undefined)) as FdeSourcePaths;
-}
-
-export function readFdeSources(paths: FdeSourcePaths): FdeSources {
-  const absent = <T,>(what: string): SourceRead<T> => ({ state: "not_connected", detail: `${what} is not configured` });
-  return {
-    case: paths.caseDir === undefined ? absent("the case directory") : readCaseRecords(paths.caseDir),
-    realitytrace: paths.comparePath === undefined ? absent("the compare result") : readRealityTrace(paths.comparePath, paths.derivePath),
-    pin: paths.pinPath === undefined ? absent("the world pin") : readWorldPin(paths.pinPath),
-  };
-}

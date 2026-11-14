@@ -14,6 +14,8 @@ Two shapes are used consistently. Read adapters return a closed, typed observati
 
 ## Interface
 
+- `fde-read.ts` / `fde-types.ts` / `fde-schema.ts` / `fde-sources.ts` / `fde-view.ts` (WP-19): read-only adapters for SEA-Forge case records, the RealityTrace `observed compare` result and the world pin; absent source is `not_connected`, a schema failure is `invalid`; see `docs/fde-read-path.md`.
+
 - `semantic.ts`: `loadWorld(pinnedWorldRef, root = "domain", worldName = "horizon"): LoadedWorld`
   reads every `.sea` file under `root`, calls `loadSemanticWorld({ entry: "interaction-model.sea", … })`
   and returns `{ worldRef, cognateWorldRef, projection, objectCount, relationCount, unmapped }`

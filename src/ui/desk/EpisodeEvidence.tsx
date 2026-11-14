@@ -7,7 +7,7 @@
  * source that fails its schema says "invalid source" and shows no partial data.
  */
 import type { ReactNode } from "react";
-import { NOT_CONNECTED, type SourceRead } from "../../adapters/fde-read.ts";
+import { NOT_CONNECTED, type SourceRead } from "../../adapters/fde-types.ts";
 import { RESULT_GLOSS, selectEpisode, toneOf, type FdeSources } from "../../adapters/fde-view.ts";
 
 function Row({ field, label, value, gloss, tone }: { readonly field: string; readonly label: string; readonly value: string; readonly gloss?: string; readonly tone?: string }): ReactNode {
@@ -80,7 +80,7 @@ export function EpisodeEvidence({ sources, episodeRef }: { readonly sources: Fde
                     <li key={r.residual_id} data-tone={display.tone} data-list={r.list}>
                       <table><tbody>
                         <Row field={`residual.${i}.id`} label="Residual" value={r.residual_id} />
-                        <Row field={`residual.${i}.class`} label="Class" value={r.class} gloss={display.gloss} tone={display.tone} />
+                        <Row field={`residual.${i}.class`} label="Class" value={display.label} gloss={display.gloss} tone={display.tone} />
                         <Row field={`residual.${i}.basis`} label="Basis" value={r.basis} />
                         <Row field={`residual.${i}.rule`} label="Rule" value={`${r.rule.kind}:${r.rule.ref}`} />
                         <Row field={`residual.${i}.occurrences`} label="Occurrences" value={r.occurrence_ids.join(",")} />

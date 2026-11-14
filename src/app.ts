@@ -90,7 +90,8 @@ import {
 import { debuggerView, inspect, missingRetrieval } from "./ui/workspace/inspect.ts";
 import type { ContextKernelAdapter, ContextReferenceAnswer } from "./adapters/context-kernel.ts";
 import { CONTEXT_REFERENCE } from "./capabilities/context.ts";
-import { fdeDebuggerValues, fdePathsFromEnv, readFdeSources, type FdeSourcePaths } from "./adapters/fde-view.ts";
+import { fdeDebuggerValues } from "./adapters/fde-view.ts";
+import { fdePathsFromEnv, readFdeSources, type FdeSourcePaths } from "./adapters/fde-sources.ts";
 import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type DebuggerOperation, type DebuggerSources } from "./domain/debugger.ts";
 import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare.tsx";
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
