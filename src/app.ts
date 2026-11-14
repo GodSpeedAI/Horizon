@@ -90,6 +90,7 @@ import {
 import { debuggerView, inspect, missingRetrieval } from "./ui/workspace/inspect.ts";
 import type { ContextKernelAdapter, ContextReferenceAnswer } from "./adapters/context-kernel.ts";
 import { CONTEXT_REFERENCE } from "./capabilities/context.ts";
+import { fdeDebuggerValues, fdePathsFromEnv, readFdeSources, type FdeSourcePaths } from "./adapters/fde-view.ts";
 import { runDebugger, DEBUGGER_OPERATIONS, type DebuggerArguments, type DebuggerOperation, type DebuggerSources } from "./domain/debugger.ts";
 import { renderComparePage, type ComparePageProps } from "./ui/workspace/compare.tsx";
 import { compareSession, listSessions, onlyContradicted, type CompareView } from "./ui/workspace/compare-model.ts";
@@ -496,6 +497,11 @@ export async function createApplication(
      * `[economics]` config table / `HORIZON_ECONOMICS_REALITYTRACE_BIN`; unset, the view says it is not configured.
      */
     readonly economics?: EconomicsSource;
+    /**
+     * WP-19: where the read-only FDE evidence adapters read from (case dir, RealityTrace compare/derive output, world pin).
+     * Defaults to `HORIZON_FDE_CASE_DIR` / `_COMPARE` / `_DERIVE` / `_PIN`; each unset path reads as "not connected".
+     */
+    readonly fdeSources?: FdeSourcePaths;
     /** Stage 1: how a `[[records.sources]]` entry is read for the comparison view. Tests inject a fake; default runs `realitytrace`. */
     readonly recordReader?: (source: RecordSource) => RecordReader;
     /** Stage 1: folder for the comparison cache, exports and the Presenting key. Defaults to the setup root, else beside the store. */
@@ -526,6 +532,7 @@ export async function createApplication(
   } = {},
 ): Promise<HorizonApplication> {
   const loaded = loadConfig(options.configPath, { readOnly: options.readOnly === true });
+  const fdePaths: FdeSourcePaths = options.fdeSources ?? fdePathsFromEnv(process.env);
   const economics = options.economics ?? realityTraceEconomics(economicsFromEnv(process.env, loaded.config.economics));
   const world = loadWorld(loaded.config.world_ref);
   const research = await observeResearch(loaded.config.research_command);
@@ -1410,12 +1417,14 @@ export async function createApplication(
     }
     const { frame, projection } = await readNavigation(options);
     const declared = declaredFor(caller.tenant);
+    const fdeTarget = operation === "why" ? (options.arguments as { readonly target_ref?: string } | undefined)?.target_ref : undefined;
     const sources: DebuggerSources = {
       frame,
       objects: projection.objects,
       links: projection.links,
       lineage: projection.lineage ?? [],
       declared_relations: [...declared.relations],
+      ...(fdeTarget === undefined ? {} : { fde: { episode_ref: fdeTarget, values: fdeDebuggerValues(readFdeSources(fdePaths), fdeTarget) } }),
     };
     const runtimeForInspection = {
       // The capability is invoked, never the adapter: the renderer and debugger hold no client

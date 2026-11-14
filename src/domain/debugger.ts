@@ -187,6 +187,11 @@ export interface DebuggerSources {
   /** The observer's scope: objects outside it are `denied`, not `unknown`. */
   readonly allowed_semantic_refs?: readonly string[];
   readonly denied_refs?: readonly string[];
+  /**
+   * FDE evidence for one episode (WP-19), already read by the read-only adapters (`src/adapters/fde-read.ts`).
+   * `why` about `episode_ref` answers from these rows; absent sources arrive as `unknown` values, never as zero.
+   */
+  readonly fde?: { readonly episode_ref: string; readonly values: readonly DebuggerValue[] };
   /** A checkpoint the caller names, already read by the T06 adapter (diff/timeline). */
   readonly other_checkpoint?: {
     readonly ref: string;
@@ -225,6 +230,11 @@ function why(sources: DebuggerSources, targetRef: string | undefined): DebuggerA
   const ref = targetRef ?? frame.focus_ref;
   const question = `Why is ${ref} true in this world?`;
   const checkpoint = frame.checkpoint_ref;
+  if (sources.fde !== undefined && sources.fde.episode_ref === ref) {
+    return answer(frame, "why", `Why was episode ${ref} classified and settled as recorded?`, sources.fde.values, [
+      "classes, settlement and world are copied from the case records and the RealityTrace result; this answer computes none of them",
+    ]);
+  }
   const values: DebuggerValue[] = [];
   const unknownRemainder: string[] = [];
   const object = focusObject(sources, ref);
