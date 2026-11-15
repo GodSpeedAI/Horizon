@@ -34,10 +34,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Dependency review
+      - name: Dependency review (needs dependency graph + GitHub Advanced Security)
+        if: ${{ !github.event.repository.private }}
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: critical
+
+      - name: Record NOT_RUN on private repository
+        if: ${{ github.event.repository.private }}
+        run: |
+          echo "### dependency-review NOT_RUN" >> "$GITHUB_STEP_SUMMARY"
+          echo "The action requires the dependency graph plus GitHub Advanced Security, which this private free-plan repository does not have. It runs automatically once the repository is public or GHAS is enabled." >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::dependency-review NOT_RUN: unsupported on this private repository"
 
   gitleaks:
     name: gitleaks
