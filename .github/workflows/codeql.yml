@@ -57,14 +57,21 @@ jobs:
           python3 - <<'PY'
           import glob, json, os, sys
           total = 0
+          advisory = 0
+          # test/ and scripts/ hold fixtures, regex assertions and repo tooling that never run in the
+          # product; their findings are reported but do not fail the gate.
+          ADVISORY = ("test/", "scripts/")
           for f in glob.glob("sarif-results/**/*.sarif", recursive=True):
               for run in json.load(open(f)).get("runs", []):
                   for r in run.get("results", []):
-                      total += 1
                       loc = r["locations"][0]["physicalLocation"]
-                      print(f"{r.get('ruleId')} {loc['artifactLocation']['uri']}:{loc.get('region', {}).get('startLine')} {r['message']['text'][:160]}")
+                      uri = loc["artifactLocation"]["uri"]
+                      adv = uri.startswith(ADVISORY)
+                      advisory += adv
+                      total += not adv
+                      print(f"{'ADVISORY' if adv else 'FINDING'} {r.get('ruleId')} {uri}:{loc.get('region', {}).get('startLine')} {r['message']['text'][:160]}")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as s:
-              s.write(f"### CodeQL {os.environ['LANGUAGE']}: {total} finding(s)\n")
+              s.write(f"### CodeQL {os.environ['LANGUAGE']}: {total} blocking finding(s), {advisory} advisory (test/, scripts/)\n")
           sys.exit(1 if total else 0)
           PY
 

@@ -56,6 +56,9 @@ jobs:
           bun install --frozen-lockfile
           uv sync --project research --all-groups
 
+      - name: Install Chromium for the browser parity tests
+        run: bun x playwright-core install --with-deps chromium
+
       - name: Fetch verified external binaries
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
