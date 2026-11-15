@@ -41,7 +41,7 @@ Cognate: https://github.com/GodSpeedAI/Cognate
 License: Apache-2.0
 Source commit: a477933a1ddf1a8bcd64b4e762ccbb56e5fbd7d5 (version 0.6.1)
 Borrowed: the `cognate create` starter was generated with the pinned Cognate
-CLI, and its packages are depended on directly from the registry (0.9.1 pins;
+CLI, and its packages are depended on directly from the registry (0.9.2 pins;
 only `@godspeed/identity` remains vendored under `.cognate/vendor/`). Unlike the other donors, Cognate packages are imported at
 runtime; they are retained in full under their own Apache-2.0 LICENSE files
 inside each package directory. Horizon-owned application code replaces the
