@@ -62,9 +62,9 @@ try {
   step("health 200");
   if ((await call("/workspace")).status !== 401) fail("an unpaired read was not refused");
   step("unpaired read refused");
-  const launched = await call(`/desk/launch?code=${code}`);
+  const launched = await call("/desk/pair", { method: "POST", headers: { origin: url, "content-type": "application/json" }, body: JSON.stringify({ code }) });
   const cookie = /horizon_desk=[A-Za-z0-9_-]+/.exec(launched.headers.get("set-cookie") ?? "")?.[0];
-  if (launched.status !== 303 || cookie === undefined) fail(`launch ${launched.status}`);
+  if (launched.status !== 200 || cookie === undefined) fail(`pair ${launched.status}`);
   step("one-time code opened a session");
   const auth = { cookie: cookie as string };
   for (const path of ["/workspace", "/desk/app.js", "/desk/app.css", "/diagnostics", "/frame"]) {

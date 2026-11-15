@@ -47,8 +47,8 @@ facts, the capability registrations, the settlement flow, the UI compositions an
   (`prepareServe`), the ready line and stdin-close exit for the desktop shell, and `resourcePath()`,
   which finds `contracts/`, `domain/`, `config/` and `dist/desk/` from a checkout or from
   `HORIZON_RESOURCE_ROOT` (a compiled binary has no checkout). `startServer(port, { launch })`
-  hands the one-time pairing code to the shell and serves `GET /desk/launch?code=`, which trades it
-  for the ordinary pairing session cookie. See `docs/desktop.md`.
+  hands the one-time pairing code to the shell instead of a terminal; the shell pairs through the
+  existing `POST /desk/pair` (no added route, so the route census is unchanged). See `docs/desktop.md`.
 - `main.ts`: verbs `frame`, `surface`, `schema`, `act`, `mcp`, `serve`, and the default server branch
   `[main.ts:11]` `[main.ts:61]` `[main.ts:91]` `[main.ts:100]` `[main.ts:103]` `[main.ts:119]`
   `[main.ts:123]`; `roleFlag()` restricted to `human` / `agent` / `system`, default `human`

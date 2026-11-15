@@ -46,7 +46,8 @@ fn port_closed(url: &str) -> bool {
 fn starts_waits_for_health_and_stops_cleanly() {
     let mut sidecar = Sidecar::start(&spec("ok")).expect("start");
     assert!(sidecar.url().starts_with("http://127.0.0.1:"));
-    assert_eq!(sidecar.launch_url(), format!("{}/desk/launch?code=ABCD-2345", sidecar.url()));
+    assert_eq!(sidecar.desk_url(), format!("{}/desk", sidecar.url()));
+    assert_eq!(sidecar.pairing_code(), "ABCD-2345");
     assert_eq!(http_status(sidecar.url(), "/health"), Some(200));
     assert!(sidecar.try_exit().is_none(), "a healthy sidecar has not exited");
     let url = sidecar.url().to_string();

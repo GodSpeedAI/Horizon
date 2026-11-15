@@ -218,9 +218,14 @@ impl Sidecar {
         &self.url
     }
 
-    /// The address that trades the one-time code for a session and lands on the workspace.
-    pub fn launch_url(&self) -> String {
-        format!("{}/desk/launch?code={}", self.url, self.code)
+    /// The desk page. It loads unpaired; the one-time code then pairs it through `POST /desk/pair`.
+    pub fn desk_url(&self) -> String {
+        format!("{}/desk", self.url)
+    }
+
+    /// The single-use pairing code the sidecar handed over. Never log it.
+    pub fn pairing_code(&self) -> &str {
+        &self.code
     }
 
     pub fn pid(&self) -> u32 {

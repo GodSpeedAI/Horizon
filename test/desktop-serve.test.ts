@@ -88,29 +88,33 @@ describe("horizon serve --desktop", () => {
     expect(response.status).toBe(403);
   });
 
-  test("a wrong launch code sets no session", async () => {
-    const response = await raw(`${origin}/desk/launch?code=AAAA-AAAA`);
+  const pair = (given: string) =>
+    raw(`${origin}/desk/pair`, { method: "POST", headers: { "content-type": "application/json", origin }, body: JSON.stringify({ code: given }) });
+
+  test("a wrong code sets no session", async () => {
+    const response = await pair("AAAA-AAAA");
     expect(response.status).toBe(403);
     expect(response.headers.get("set-cookie")).toBeNull();
-    const missing = await raw(`${origin}/desk/launch`);
-    expect(missing.status).toBe(403);
   });
 
-  test("the right code buys a session once; the same code is then spent", async () => {
-    const launched = await raw(`${origin}/desk/launch?code=${code}`);
-    expect(launched.status).toBe(303);
-    expect(launched.headers.get("location")).toBe("/workspace");
-    const cookie = /horizon_desk=[A-Za-z0-9_-]+/.exec(launched.headers.get("set-cookie") ?? "")?.[0];
+  test("there is no second way in: the launch route does not exist", async () => {
+    expect((await raw(`${origin}/desk/launch?code=${code}`)).status).toBe(401);
+  });
+
+  test("the handed-over code buys a session once; the same code is then spent", async () => {
+    const paired = await pair(code);
+    expect(paired.status).toBe(200);
+    const cookie = /horizon_desk=[A-Za-z0-9_-]+/.exec(paired.headers.get("set-cookie") ?? "")?.[0];
     expect(cookie).toBeDefined();
-    expect(launched.headers.get("set-cookie")).toContain("HttpOnly");
-    expect(launched.headers.get("set-cookie")).toContain("SameSite=Strict");
+    expect(paired.headers.get("set-cookie")).toContain("HttpOnly");
+    expect(paired.headers.get("set-cookie")).toContain("SameSite=Strict");
 
     const page = await raw(`${origin}/workspace`, { headers: { cookie: cookie as string } });
     expect(page.status).toBe(200);
     const session = await raw(`${origin}/desk/session`, { headers: { cookie: cookie as string } });
     expect(await session.json()).toEqual({ paired: true });
 
-    const again = await raw(`${origin}/desk/launch?code=${code}`);
+    const again = await pair(code);
     expect(again.status).toBe(403);
     expect(again.headers.get("set-cookie")).toBeNull();
   });

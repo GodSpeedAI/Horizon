@@ -48,8 +48,9 @@ With `--desktop` the server:
 1. listens on `127.0.0.1` on an OS-chosen port;
 2. prints one stdout line, `horizon-desktop-ready {"url":"http://127.0.0.1:PORT","code":"XXXX-XXXX","pid":N}`, to the pipe only the
    shell holds, instead of showing the code on a terminal;
-3. serves `GET /desk/launch?code=...`, which trades that single-use code for the ordinary session cookie (HttpOnly,
-   SameSite=Strict) and redirects to `/workspace`;
+3. adds no route: the shell loads `/desk` in the window and, once it has loaded, makes the request a person would make by typing
+   the code, `POST /desk/pair`. The single-use code buys the ordinary session cookie (HttpOnly, SameSite=Strict) and the page
+   moves on to `/workspace`. If that hand-over fails, the desk's own pairing prompt is still there;
 4. exits when its stdin closes, so a shell that dies for any reason cannot leave it running.
 
 Every route except `/health` and the desk's static bundle refuses a request without that session. Host, Origin and Sec-Fetch-Site are
@@ -78,6 +79,8 @@ just desktop-build        # bun run build:sidecar, then tauri build
 
 Needs Bun 1.4.0, a Rust toolchain (1.90 or newer) and the platform's Tauri prerequisites (on Linux, `libwebkit2gtk-4.1-dev` and the
 packages listed in `.github/workflows/desktop.yml`). `just desktop-supervisor-test` runs the supervisor tests, which need none of them.
+
+Building copies the resource tree (with its `.sea` files) under `src-tauri/target/`, which `just boundaries` rejects as a second semantic model: run `just verify` before a desktop build, or delete `src-tauri/target` first.
 
 CI (`.github/workflows/desktop.yml`) builds, per platform: Windows x64 (NSIS, MSI), Linux x64 and arm64 (`.deb`, AppImage), macOS
 arm64 and Intel (`.app`, `.dmg`), and a headless tarball per target, each with `SHA256SUMS`. Every leg smokes the built server:

@@ -150,8 +150,8 @@ type HttpServer = Server<unknown>;
 
 /**
  * The desktop shell's way in. With `launch`, the pairing code is handed to the process that started this one (the shell reads it
- * from a pipe only it holds) instead of being shown on a terminal, and `GET /desk/launch?code=` trades that same one-time code for
- * the same session cookie `POST /desk/pair` gives. No second credential exists: the pairing model is unchanged.
+ * from a pipe only it holds) instead of being shown on a terminal. The shell's window then pairs through the existing
+ * `POST /desk/pair`, exactly as a person typing the code would. No second credential or route exists.
  */
 export interface StartServerOptions {
   readonly launch?: (handoff: { readonly origin: string; readonly code: string }) => void;
@@ -3208,14 +3208,6 @@ export async function createApplication(
     return Response.json({ ok: true, paired: true }, { headers: { "cache-control": "no-store", "set-cookie": outcome.cookie } });
   }
 
-  /** The shell's one-time hand-over: a correct code sets the session cookie and lands on the workspace. Any other answer sets nothing. */
-  function launchDesk(url: URL): Response {
-    const outcome = pairing.pair(url.searchParams.get("code") ?? "");
-    const headers = { "cache-control": "no-store", "referrer-policy": "no-referrer" };
-    if (!outcome.ok) return new Response(`${outcome.words}\n`, { status: outcome.status, headers: { ...headers, "content-type": "text/plain; charset=utf-8" } });
-    return new Response(null, { status: 303, headers: { ...headers, location: "/workspace", "set-cookie": outcome.cookie } });
-  }
-
   async function deskSaveNote(request: Request): Promise<Response> {
     const text = await request.text();
     if (text.length > 1_000_000) return Response.json({ ok: false, message: "That note is too large to save. Split it into smaller notes." }, { status: 413 });
@@ -3303,7 +3295,6 @@ export async function createApplication(
     researchContract: () => requireResearch(research),
     confirmPending: (pendingId: string, io: ConfirmIO) => runConfirm(runtime.runtime.store, pendingId, io, clock()),
     startServer(port = loaded.config.port, startOptions: StartServerOptions = {}): HttpServer {
-      const startOptionsLaunch = startOptions.launch !== undefined;
       const route = async (request: Request): Promise<Response> => {
           const url = new URL(request.url);
           // Every request checks Host (DNS rebinding: the remote panel's GET carries the pairing link);
@@ -3316,7 +3307,6 @@ export async function createApplication(
           if (url.pathname.startsWith("/agent/panels")) return agentDoor(request, url.pathname);
           // Every read needs the pairing session, except the page itself, its session check and the static client bundle that pairs.
           // The page-agent header is a label, never a grant: an unpaired caller is refused whatever the header says.
-          if (startOptionsLaunch && url.pathname === "/desk/launch" && request.method === "GET") return launchDesk(url);
           const paired = pairing.paired(request.headers.get("cookie"));
           if (READ_METHODS.has(request.method) && !OPEN_READS.has(url.pathname) && !paired) return notPairedRead();
           // An agent on the page may read, find, inspect and preview a hand off. Every other write is the person's alone.

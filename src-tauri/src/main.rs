@@ -10,9 +10,12 @@ use std::thread;
 use std::time::Duration;
 
 use horizon_supervisor::{Sidecar, SidecarSpec};
+use tauri::webview::PageLoadEvent;
 use tauri::{Manager, RunEvent, WebviewWindow};
 
 type Shared = Arc<Mutex<Option<Sidecar>>>;
+/// The desk page's address and the one-time code that pairs it, held until that page has loaded.
+type Handoff = Arc<Mutex<Option<(String, String)>>>;
 
 /// Settings the user may give through their own environment, passed to the sidecar unchanged by inheritance:
 /// DOMAINFORGE_BIN, REALITYTRACE_BIN, SEA_FORGE_SERVER_BIN, SEA_FORGE_SOCKET, HORIZON_* and COGNATE_*.
@@ -23,12 +26,31 @@ const DATA_OVERRIDE: &str = "HORIZON_DATA_DIR";
 
 fn main() {
     let shared: Shared = Arc::new(Mutex::new(None));
+    let handoff: Handoff = Arc::new(Mutex::new(None));
+    let on_load = Arc::clone(&handoff);
     let app = tauri::Builder::default()
         .manage(Arc::clone(&shared))
+        .manage(Arc::clone(&handoff))
+        .on_page_load(move |webview, payload| {
+            if payload.event() != PageLoadEvent::Finished {
+                return;
+            }
+            let mut pending = on_load.lock().unwrap_or_else(|e| e.into_inner());
+            // Pair only the desk page the sidecar served, once: the same request a person makes by typing the code.
+            if pending.as_ref().is_some_and(|(page, _)| payload.url().as_str() == page) {
+                if let Some((_, code)) = pending.take() {
+                    let code = serde_json::to_string(&code).unwrap_or_default();
+                    let _ = webview.eval(format!(
+                        "fetch('/desk/pair',{{method:'POST',headers:{{'content-type':'application/json'}},body:JSON.stringify({{code:{code}}})}}).then(function(r){{if(r.ok)location.replace('/workspace');}});"
+                    ));
+                }
+            }
+        })
         .setup(|app| {
             let handle = app.handle().clone();
             let shared = Arc::clone(app.state::<Shared>().inner());
-            thread::spawn(move || boot(handle, shared));
+            let handoff = Arc::clone(app.state::<Handoff>().inner());
+            thread::spawn(move || boot(handle, shared, handoff));
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -42,7 +64,7 @@ fn main() {
     });
 }
 
-fn boot(app: tauri::AppHandle, shared: Shared) {
+fn boot(app: tauri::AppHandle, shared: Shared, handoff: Handoff) {
     let Some(window) = app.get_webview_window("main") else { return };
     let spec = match spec_for(&app) {
         Ok(spec) => spec,
@@ -50,9 +72,10 @@ fn boot(app: tauri::AppHandle, shared: Shared) {
     };
     match Sidecar::start(&spec) {
         Ok(sidecar) => {
-            let launch = sidecar.launch_url();
+            let desk = sidecar.desk_url();
+            *handoff.lock().unwrap_or_else(|e| e.into_inner()) = Some((desk.clone(), sidecar.pairing_code().to_string()));
             *shared.lock().unwrap_or_else(|e| e.into_inner()) = Some(sidecar);
-            match launch.parse() {
+            match desk.parse() {
                 Ok(url) => {
                     if let Err(error) = window.navigate(url) {
                         show_error(&window, &format!("could not open the Horizon desk: {error}"));
