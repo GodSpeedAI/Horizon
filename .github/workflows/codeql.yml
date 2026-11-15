@@ -1,0 +1,84 @@
+name: CodeQL
+
+# Explicit workflow: default setup is unavailable on this private repository.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '41 5 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, python]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:${{ matrix.language }}
+          # Code scanning upload needs GitHub Advanced Security, unavailable on this private
+          # free-plan repository. Results are kept as an artifact and gated below instead.
+          upload: never
+          output: sarif-results
+
+      - name: Fail on CodeQL findings
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: |
+          python3 - <<'PY'
+          import glob, json, os, sys
+          total = 0
+          advisory = 0
+          # test/ and scripts/ hold fixtures, regex assertions and repo tooling that never run in the
+          # product; their findings are reported but do not fail the gate.
+          ADVISORY = ("test/", "scripts/")
+          for f in glob.glob("sarif-results/**/*.sarif", recursive=True):
+              for run in json.load(open(f)).get("runs", []):
+                  for r in run.get("results", []):
+                      loc = r["locations"][0]["physicalLocation"]
+                      uri = loc["artifactLocation"]["uri"]
+                      adv = uri.startswith(ADVISORY)
+                      advisory += adv
+                      total += not adv
+                      print(f"{'ADVISORY' if adv else 'FINDING'} {r.get('ruleId')} {uri}:{loc.get('region', {}).get('startLine')} {r['message']['text'][:160]}")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as s:
+              s.write(f"### CodeQL {os.environ['LANGUAGE']}: {total} blocking finding(s), {advisory} advisory (test/, scripts/)\n")
+          sys.exit(1 if total else 0)
+          PY
+
+      - name: Upload SARIF
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: sarif-results
+          if-no-files-found: warn

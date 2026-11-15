@@ -34,6 +34,7 @@
         "@types/react-dom": "19.2.2",
         "playwright-core": "1.63.0",
         "typescript": "^5.9.3",
+        "yaml": "2.9.0",
       },
     },
   },
@@ -64,7 +65,7 @@
 
     "@formatjs/icu-skeleton-parser": ["@formatjs/icu-skeleton-parser@2.1.11", "", {}, "sha512-j8cUmOJzVgkHuS0QiQ6ga76UIoLOFSAMWhs7aZJztH3aAdCOAE6vpC8KVvFB4cU10ON0y2/5oOVmPJ43s2lTwA=="],
 
-    "@godspeed/identity": ["@godspeed/identity@./.cognate/vendor/godspeed-identity-0.1.0.tgz", { "dependencies": { "@godspeedai/cognate-events": "^0.8.0", "@godspeedai/cognate-runtime-api": "^0.8.0" } }, "sha512-2NIemS0QEEn4Bhl3Fp3AVx9r1prb+kIj7ewmHh+hRK456/FGyYqBZ+YAwymXS+pl7COenPBFy0wj2gIH6Zx4qA=="],
+    "@godspeed/identity": ["@godspeed/identity@./.cognate/vendor/godspeed-identity-0.1.0.tgz", { "dependencies": { "@godspeedai/cognate-events": "^0.8.0", "@godspeedai/cognate-runtime-api": "^0.8.0" } }, "sha512-ZCjgNp6WjTAS7jAJnCjeoFgsKGwA/GSBGfQNxYmjLCpD09Y+ePkZX8yDaK+n3Z5PIsMNOdMvbF9i5QW3Je1iFg=="],
 
     "@godspeedai/cognate-ag-ui": ["@godspeedai/cognate-ag-ui@0.9.2", "", { "dependencies": { "@ag-ui/core": "1.0.0", "@ag-ui/encoder": "1.0.0", "@godspeedai/cognate-client": "^0.9.2", "@godspeedai/cognate-events": "^0.9.2", "@godspeedai/cognate-runtime-api": "^0.9.2" } }, "sha512-5DZiJjBjfFNpTiH3n8bHOPvdvK3KrHfaDiDtz5K6XE+LUGXl/p7UTKJnOEh2JhB8V53+uOEqHkL3dC3dlbj5rw=="],
 
@@ -227,6 +228,8 @@
     "web-tree-sitter": ["web-tree-sitter@0.25.10", "", { "peerDependencies": { "@types/emscripten": "^1.40.0" }, "optionalPeers": ["@types/emscripten"] }, "sha512-Y09sF44/13XvgVKgO2cNDw5rGk6s26MgoZPXLESvMXeefBf7i6/73eFurre0IsTW6E14Y0ArIzhUMmjoc7xyzA=="],
 
     "ws": ["ws@8.22.1", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-oyL6OPYme/CmiFvNuGzeoxCJ4nOrZE2O1FwM9MWM1AsGri6nLXB2pg+lNA8aLeXMSav0J6eIVS1j6vUPzUtK9g=="],
+
+    "yaml": ["yaml@2.9.0", "", { "bin": { "yaml": "bin.mjs" } }, "sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA=="],
 
     "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
