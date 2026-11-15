@@ -28,9 +28,14 @@ const child = Bun.spawn([binary, "serve", "--desktop", "--port", "0", "--data", 
   stderr: "pipe",
   cwd: tmpdir(),
 });
+let stderrHead = "";
 let stderrTail = "";
 void (async () => {
-  for await (const chunk of child.stderr) stderrTail = (stderrTail + new TextDecoder().decode(chunk)).slice(-2000);
+  for await (const chunk of child.stderr) {
+    const text = new TextDecoder().decode(chunk);
+    if (stderrHead.length < 1500) stderrHead += text;
+    stderrTail = (stderrTail + text).slice(-1500);
+  }
 })();
 
 try {
@@ -46,7 +51,7 @@ try {
     const line = seen.split("\n").find((l) => l.startsWith(`${MARKER} `));
     if (line !== undefined) ready = JSON.parse(line.slice(MARKER.length + 1));
   }
-  if (ready === undefined) fail(`no ready line; stderr: ${stderrTail}`);
+  if (ready === undefined) fail(`no ready line; stderr head: ${stderrHead.slice(0, 1500)} ... tail: ${stderrTail}`);
   const { url, code } = ready as { url: string; code: string };
   step(`ready on ${url}`);
   void (async () => { for (;;) { const { done } = await reader.read(); if (done) return; } })();

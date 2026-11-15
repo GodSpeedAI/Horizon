@@ -34,10 +34,18 @@ fn main() {
     thread::spawn(move || {
         for stream in listener.incoming().flatten() {
             let mut stream = stream;
+            // Read the whole request head before answering: closing with unread bytes can reset the connection.
+            let mut head = Vec::new();
             let mut buffer = [0u8; 512];
-            let _ = stream.read(&mut buffer);
+            while !head.windows(4).any(|w| w == b"\r\n\r\n") {
+                match stream.read(&mut buffer) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => head.extend_from_slice(&buffer[..n]),
+                }
+            }
             let (status, body) = if healthy { ("200 OK", "{\"ok\":true}") } else { ("503 Service Unavailable", "{\"ok\":false}") };
-            let _ = write!(stream, "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+            let response = format!("HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+            let _ = stream.write_all(response.as_bytes());
         }
     });
 
