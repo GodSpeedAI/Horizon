@@ -1,0 +1,166 @@
+name: Desktop
+
+# CI builds of the Tauri desktop app and the headless server, per platform. These are NOT releases:
+# nothing is published, tagged or signed, and every artifact is named `unqualified` because no install
+# qualification (WP-67) has been run on it. macOS bundles are ad-hoc signed only because Apple Silicon
+# refuses to run unsigned code.
+
+on:
+  pull_request:
+    paths:
+      - "src-tauri/**"
+      - "src/main.ts"
+      - "src/desktop.ts"
+      - "src/runtime/resource-root.ts"
+      - "src/ui/desk/**"
+      - "scripts/build-sidecar.ts"
+      - "scripts/smoke-sidecar.ts"
+      - "scripts/build-desk.ts"
+      - "config/**"
+      - "contracts/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  BUN_VERSION: "1.4.0"
+  TAURI_CLI_VERSION: "2.12.4"
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            runner: windows-latest
+            triple: x86_64-pc-windows-msvc
+            bundles: nsis,msi
+          - name: linux-x64
+            runner: ubuntu-22.04
+            triple: x86_64-unknown-linux-gnu
+            bundles: deb,appimage
+          - name: linux-arm64
+            runner: ubuntu-22.04-arm
+            triple: aarch64-unknown-linux-gnu
+            bundles: deb,appimage
+          - name: macos-arm64
+            runner: macos-15
+            triple: aarch64-apple-darwin
+            bundles: app,dmg
+          - name: macos-x64
+            runner: macos-15-intel
+            triple: x86_64-apple-darwin
+            bundles: app,dmg
+    defaults:
+      run:
+        shell: bash
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install repository dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Linux system libraries for Tauri
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential file patchelf libssl-dev libgtk-3-dev librsvg2-dev libxdo-dev libayatana-appindicator3-dev libwebkit2gtk-4.1-dev
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+          rustc --version
+          cargo --version
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: src-tauri
+
+      - name: Build the sidecar (compiled server and its resources)
+        run: bun run build:sidecar --target ${{ matrix.triple }}
+
+      - name: Smoke the sidecar, resources passed explicitly
+        run: bun run scripts/smoke-sidecar.ts .tmp/sidecar/${{ matrix.triple }}/horizon-server .tmp/sidecar/${{ matrix.triple }}/horizon-resources
+
+      - name: Headless tarball
+        run: |
+          set -euo pipefail
+          name="horizon-headless-unqualified-${{ matrix.triple }}"
+          mkdir -p "out" "stage/$name"
+          cp -R .tmp/sidecar/${{ matrix.triple }}/. "stage/$name/"
+          tar -czf "out/$name.tar.gz" -C stage "$name"
+
+      - name: Smoke the headless tarball as a user would run it
+        run: |
+          set -euo pipefail
+          name="horizon-headless-unqualified-${{ matrix.triple }}"
+          mkdir -p unpack
+          tar -xzf "out/$name.tar.gz" -C unpack
+          bin=$(ls unpack/"$name"/horizon-server*)
+          bun run scripts/smoke-sidecar.ts "$bin"
+
+      - name: Supervisor tests (Rust)
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p horizon-supervisor
+
+      - name: Build the Tauri bundles
+        run: bun x @tauri-apps/cli@${{ env.TAURI_CLI_VERSION }} build --bundles ${{ matrix.bundles }} --ci
+
+      - name: Collect bundles and checksums
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          bundle=src-tauri/target/release/bundle
+          find "$bundle" -type f \( -name '*.deb' -o -name '*.AppImage' -o -name '*.exe' -o -name '*.msi' -o -name '*.dmg' \) | while read -r f; do
+            cp "$f" "out/horizon-desktop-unqualified_$(basename "$f")"
+          done
+          # An .app is a directory: archive it so it survives upload with its permissions.
+          if [ -d "$bundle/macos" ]; then
+            for app in "$bundle"/macos/*.app; do
+              [ -d "$app" ] && tar -czf "out/horizon-desktop-unqualified_$(basename "$app").tar.gz" -C "$bundle/macos" "$(basename "$app")"
+            done
+          fi
+          cd out
+          if command -v sha256sum >/dev/null; then sha256sum * > SHA256SUMS; else shasum -a 256 * > SHA256SUMS; fi
+          ls -l
+          cat SHA256SUMS
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### ${{ matrix.name }} (${{ matrix.triple }}) - UNQUALIFIED CI build"
+            echo "Bundles requested: ${{ matrix.bundles }}. Not signed, not published, not install-qualified (WP-67)."
+            echo '```'
+            cat out/SHA256SUMS 2>/dev/null || echo "no artifacts produced"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: horizon-unqualified-${{ matrix.name }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
