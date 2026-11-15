@@ -78,6 +78,8 @@ jobs:
         shell: bash
     env:
       APPIMAGE_EXTRACT_AND_RUN: "1"
+      # linuxdeploy's strip would damage the compiled server, whose JavaScript payload is appended to the executable.
+      NO_STRIP: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -139,7 +141,7 @@ jobs:
         run: cargo test --manifest-path src-tauri/Cargo.toml -p horizon-supervisor
 
       - name: Build the Tauri bundles
-        run: bun x @tauri-apps/cli@${{ env.TAURI_CLI_VERSION }} build --bundles ${{ matrix.bundles }} --ci
+        run: bun x @tauri-apps/cli@${{ env.TAURI_CLI_VERSION }} build --bundles ${{ matrix.bundles }} --ci --verbose
 
       - name: Collect bundles and checksums
         run: |
