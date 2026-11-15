@@ -105,17 +105,7 @@ fn watch(window: &WebviewWindow, shared: &Shared) {
 fn spec_for(app: &tauri::AppHandle) -> Result<SidecarSpec, String> {
     let program = match std::env::var_os(SERVER_OVERRIDE) {
         Some(path) => PathBuf::from(path),
-        None => {
-            // Beside the executable where the bundle puts an externalBin; in the resource folder on Linux.
-            let name = if cfg!(windows) { "horizon-server.exe" } else { "horizon-server" };
-            let exe = std::env::current_exe().map_err(|e| format!("cannot locate this application: {e}"))?;
-            let beside = exe.parent().ok_or("cannot locate this application's folder")?.join(name);
-            let in_resources = app.path().resource_dir().ok().map(|dir| dir.join("server").join(name));
-            match in_resources {
-                Some(path) if !beside.is_file() && path.is_file() => path,
-                _ => beside,
-            }
-        }
+        None => locate_server(app)?,
     };
     if !program.is_file() {
         return Err(format!("the Horizon server is missing: {} does not exist. Reinstall Horizon, or set {SERVER_OVERRIDE}.", program.display()));
@@ -134,6 +124,39 @@ fn spec_for(app: &tauri::AppHandle) -> Result<SidecarSpec, String> {
     }
     spec.args = args;
     Ok(spec)
+}
+
+/// macOS and Windows bundles put the server beside the executable (Tauri's externalBin).
+#[cfg(not(target_os = "linux"))]
+fn locate_server(_app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let exe = std::env::current_exe().map_err(|e| format!("cannot locate this application: {e}"))?;
+    let name = if cfg!(windows) { "horizon-server.exe" } else { "horizon-server" };
+    Ok(exe.parent().ok_or("cannot locate this application's folder")?.join(name))
+}
+
+/// Linux bundles carry the server gzipped in the resource folder: linuxdeploy (AppImage) cannot inspect a compiled Bun
+/// executable, so it must not look like one inside the bundle. It is unpacked once into the app data folder.
+#[cfg(target_os = "linux")]
+fn locate_server(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    use std::os::unix::fs::PermissionsExt;
+    let packed = app.path().resource_dir().map_err(|e| format!("cannot locate Horizon's resources: {e}"))?.join("server").join("horizon-server.gz");
+    let size = std::fs::metadata(&packed).map_err(|e| format!("the Horizon server is missing ({}): {e}", packed.display()))?.len();
+    let dir = app.path().app_data_dir().map_err(|e| format!("cannot locate Horizon's data folder: {e}"))?.join("server");
+    let out = dir.join(format!("horizon-server-{size}"));
+    if out.is_file() {
+        return Ok(out);
+    }
+    std::fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+    let part = dir.join(format!("horizon-server-{size}.part"));
+    let unpack = || -> std::io::Result<()> {
+        let mut decoder = flate2::read::GzDecoder::new(std::fs::File::open(&packed)?);
+        let mut file = std::fs::File::create(&part)?;
+        std::io::copy(&mut decoder, &mut file)?;
+        std::fs::set_permissions(&part, std::fs::Permissions::from_mode(0o755))?;
+        std::fs::rename(&part, &out)
+    };
+    unpack().map_err(|e| format!("could not unpack the Horizon server into {}: {e}", dir.display()))?;
+    Ok(out)
 }
 
 /// Windows paths from the OS may carry the `\\?\` verbatim prefix, which the sidecar's runtime does not need.

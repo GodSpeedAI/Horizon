@@ -17,7 +17,8 @@
  * Builds are native: the target must be the host's. Bun can cross-compile, but a binary nobody ran on its target is not a build
  * this repository will claim.
  */
-import { cpSync, copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { gzipSync } from "node:zlib";
 import { join } from "node:path";
 import { buildDesk } from "./build-desk.ts";
 
@@ -73,9 +74,13 @@ if (import.meta.main) {
     mkdirSync(binaries, { recursive: true });
     copyFileSync(binary, join(binaries, `horizon-server-${triple}${target.exe}`));
     stageResources(join(root, ".tmp", "desktop", "horizon-resources"));
-    // Linux bundles carry the server as a resource: linuxdeploy cannot inspect a compiled Bun executable (see tauri.linux.conf.json).
-    mkdirSync(join(root, ".tmp", "desktop", "server"), { recursive: true });
-    copyFileSync(binary, join(root, ".tmp", "desktop", "server", `horizon-server${target.exe}`));
+    // Linux bundles carry the server gzipped, as a resource: linuxdeploy cannot inspect a compiled Bun executable (tauri.linux.conf.json).
+    if (process.platform === "linux") {
+      const server = join(root, ".tmp", "desktop", "server");
+      rmSync(server, { recursive: true, force: true });
+      mkdirSync(server, { recursive: true });
+      writeFileSync(join(server, "horizon-server.gz"), gzipSync(readFileSync(binary)));
+    }
     console.log(`staged src-tauri/binaries/horizon-server-${triple}${target.exe} and .tmp/desktop/horizon-resources`);
   }
 }

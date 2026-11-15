@@ -18,7 +18,7 @@ stops, and stops it on exit. `src-tauri/supervisor/` is that supervisor, with it
 - `horizon-resources/`: `config/`, `domain/`, `contracts/`, `dist/desk/`. The server only reads it.
 
 It also stages `src-tauri/binaries/horizon-server-<triple>` (Tauri's `externalBin` name) and `.tmp/desktop/horizon-resources`.
-Builds are native: the target must be the machine you build on.
+Builds are native: the target must be the machine you build on. On Linux the desktop bundle carries the server gzipped under its resource folder (linuxdeploy cannot inspect a compiled Bun executable) and the shell unpacks it once into the app data folder.
 
 ### Headless use
 
