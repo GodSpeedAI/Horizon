@@ -140,8 +140,25 @@ jobs:
       - name: Supervisor tests (Rust)
         run: cargo test --manifest-path src-tauri/Cargo.toml -p horizon-supervisor
 
+      - name: Diagnose the server's dynamic dependencies (Linux)
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: |
+          f=.tmp/sidecar/${{ matrix.triple }}/horizon-server
+          ldd --version | head -1
+          file "$f" | cut -c1-200
+          ldd "$f"; echo "ldd exit=$?"
+          readelf -lW "$f" | head -30
+
       - name: Build the Tauri bundles
-        run: bun x @tauri-apps/cli@${{ env.TAURI_CLI_VERSION }} build --bundles ${{ matrix.bundles }} --ci --verbose
+        run: |
+          # hdiutil on hosted macOS runners intermittently reports "Resource busy" while creating the dmg; retry that, nothing else.
+          attempts=1; [ "$RUNNER_OS" = "macOS" ] && attempts=3
+          for i in $(seq 1 "$attempts"); do
+            bun x @tauri-apps/cli@${{ env.TAURI_CLI_VERSION }} build --bundles ${{ matrix.bundles }} --ci --verbose && exit 0
+            echo "bundle attempt $i failed"; sleep 10
+          done
+          exit 1
 
       - name: Collect bundles and checksums
         run: |
