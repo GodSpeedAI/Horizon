@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { resourcePath } from "../../runtime/resource-root.ts";
 import { z } from "zod";
 import { loadParamSchemas, wireName } from "./params.ts";
 
@@ -189,7 +190,7 @@ export const EXECUTORS_WITHOUT_ASSURANCE: readonly Executor[] = [
 let evidenceRequirements: readonly string[] | null = null;
 export function assuranceRequirementIds(): readonly string[] {
   if (evidenceRequirements === null) {
-    const path = new URL("../../../contracts/identity/v1/a3-mechanism.yaml", import.meta.url).pathname;
+    const path = resourcePath("contracts", "identity", "v1", "a3-mechanism.yaml");
     const document = Bun.YAML.parse(readFileSync(path, "utf8")) as { assurance_requirements?: { id?: unknown }[] };
     const ids = (document.assurance_requirements ?? []).map((entry) => entry.id).filter((id): id is string => typeof id === "string");
     if (ids.length === 0) throw new Error("a3-mechanism: the assurance requirement vocabulary is empty");
@@ -495,7 +496,7 @@ export interface LoadedManifest {
 }
 
 function defaultPath(): string {
-  return new URL("../../../contracts/identity/v1/operations.yaml", import.meta.url).pathname;
+  return resourcePath("contracts", "identity", "v1", "operations.yaml");
 }
 
 function resolveRow(raw: RawOperationRow, groupClass: IdentityClass, defaults: Record<string, Partial<RawOperationRow>>): Operation {

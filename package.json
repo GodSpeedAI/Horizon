@@ -9,6 +9,7 @@
     "ignite": "bun run scripts/ignite.ts",
     "check": "bun run scripts/check.ts",
     "build:desk": "bun run scripts/build-desk.ts",
+    "build:sidecar": "bun run scripts/build-sidecar.ts",
     "test": "bun test && uv run --project research pytest -q",
     "parity:fde": "bash scripts/fde-parity.sh",
     "boundaries": "bun run scripts/check-boundaries.ts",

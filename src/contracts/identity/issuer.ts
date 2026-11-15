@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { resourcePath } from "../../runtime/resource-root.ts";
 import { z } from "zod";
 /**
  * The issuer profile and the A3 mechanism contract, frozen at Stage 0A.
@@ -231,7 +232,7 @@ export type IssuerProfile = z.infer<typeof issuerProfileSchema>;
 export type A3Mechanism = z.infer<typeof a3MechanismSchema>;
 
 function root(): string {
-  return new URL("../../../", import.meta.url).pathname;
+  return `${resourcePath()}/`;
 }
 export function parseIssuerProfile(source: string): IssuerProfile {
   return issuerProfileSchema.parse(Bun.YAML.parse(source));

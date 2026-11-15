@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { resourcePath } from "../../runtime/resource-root.ts";
 import { z } from "zod";
 
 /**
@@ -143,7 +144,7 @@ export function loadParamSchemas(path = defaultPath()): Record<string, ParamSche
 }
 
 function defaultPath(): string {
-  return new URL("../../../contracts/identity/v1/params.yaml", import.meta.url).pathname;
+  return resourcePath("contracts", "identity", "v1", "params.yaml");
 }
 
 /** The field's name on the wire. */

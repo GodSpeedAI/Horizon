@@ -125,6 +125,7 @@ import { caseItems, costSource, orderWork, sessionItems, type AcceptedKnowledge,
 import { readLedgerDay } from "./adapters/ledger-day.ts";
 import { recordReader, type RecordReader } from "./adapters/realitytrace-economics.ts";
 import { buildExport, chooseStandIns, writeExport } from "./exports/export.ts";
+import { resourcePath } from "./runtime/resource-root.ts";
 import { clearedSessionCookie, createDeskPairing, NOT_PAIRED_WORDS, PAIR_FIRST_WORDS, PairingNeedsTerminal, printPairingCode } from "./desk/pairing.ts";
 import { gate as confirmationGate, type ConsumeResult } from "./capabilities/pending-confirmations.ts";
 import { runConfirm, type ConfirmIO, type ConfirmOutcome } from "./capabilities/confirm-command.ts";
@@ -146,6 +147,18 @@ import { qrSvg, remotePanelPage } from "./remote/panel.ts";
 import { itemOf, questionOf } from "./ui/surface2/panel-blocks.ts";
 
 type HttpServer = Server<unknown>;
+
+/**
+ * The desktop shell's way in. With `launch`, the pairing code is handed to the process that started this one (the shell reads it
+ * from a pipe only it holds) instead of being shown on a terminal. The shell's window then pairs through the existing
+ * `POST /desk/pair`, exactly as a person typing the code would. No second credential or route exists.
+ */
+export interface StartServerOptions {
+  readonly launch?: (handoff: { readonly origin: string; readonly code: string }) => void;
+}
+
+/** The pairing code in the form the terminal shows it, `XXXX-XXXX`. */
+const shownCode = (code: string): string => `${code.slice(0, 4)}-${code.slice(4)}`;
 
 /** The decision was recorded by SEA-Forge, but a step after it (polling, settling the commit) failed. Same message as the original error. */
 export class ApprovalFollowUpError extends Error {
@@ -350,7 +363,7 @@ export interface HorizonApplication {
   >;
   startObservation(commit: IntentCommit): Promise<RunView>;
   researchContract(): ReturnType<typeof requireResearch>;
-  startServer(port?: number): HttpServer;
+  startServer(port?: number, options?: StartServerOptions): HttpServer;
   /** Stage 0B: the local terminal side of a waiting reserved operation (`horizon confirm --pending <id>`). */
   confirmPending(pendingId: string, io: ConfirmIO): Promise<ConfirmOutcome>;
   /** Resolves when the saved records are migrated. Until then every change is refused with words saying so (design v3, step 4). */
@@ -1705,7 +1718,7 @@ export async function createApplication(
 
   // ---- Stage 2: the notebook and the live desk. Notes are the operator's own writing and are not sent to the record keeper. ----
   const deskWho: Who = { tenant: caller.tenant, operator: caller.actor.id };
-  const deskDist = joinPath(import.meta.dir, "..", "dist", "desk");
+  const deskDist = resourcePath("dist", "desk");
   let repoNameCache: { at: number; names: string[] } = { at: 0, names: [] };
 
   /** Repository names to hide while Presenting is on. The record keeper is asked at most once a minute. */
@@ -3281,7 +3294,7 @@ export async function createApplication(
     commitSurfaceIntent,
     researchContract: () => requireResearch(research),
     confirmPending: (pendingId: string, io: ConfirmIO) => runConfirm(runtime.runtime.store, pendingId, io, clock()),
-    startServer(port = loaded.config.port): HttpServer {
+    startServer(port = loaded.config.port, startOptions: StartServerOptions = {}): HttpServer {
       const route = async (request: Request): Promise<Response> => {
           const url = new URL(request.url);
           // Every request checks Host (DNS rebinding: the remote panel's GET carries the pairing link);
@@ -3766,6 +3779,10 @@ export async function createApplication(
           return route(request);
         },
       });
+      if (!pairingPrinted && startOptions.launch !== undefined) {
+        startOptions.launch({ origin: server.url.origin, code: shownCode(pairingCode) });
+        pairingPrinted = true;
+      }
       if (!pairingPrinted) {
         // No terminal: the code is written nowhere, and the server still listens. Every human route stays refused until a browser
         // pairs, and pairing is refused with words that say to run Horizon from an interactive terminal (R3-3).

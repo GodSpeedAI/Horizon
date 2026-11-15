@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Horizon",
+  "version": "0.1.0",
+  "identifier": "ai.godspeed.horizon",
+  "build": {
+    "frontendDist": "./ui"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Horizon",
+        "url": "index.html",
+        "width": 1280,
+        "height": 840,
+        "minWidth": 800,
+        "minHeight": 560
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "GodSpeed AI",
+    "category": "DeveloperTool",
+    "shortDescription": "Horizon desktop",
+    "longDescription": "Horizon desktop: a native window onto the Horizon server, which runs beside it as a supervised local process.",
+    "copyright": "Apache-2.0",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "externalBin": ["binaries/horizon-server"],
+    "resources": {
+      "../.tmp/desktop/horizon-resources": "horizon-resources"
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": "-"
+    }
+  }
+}

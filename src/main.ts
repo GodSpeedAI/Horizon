@@ -3,6 +3,7 @@ import { mcpTools, renderText } from "./ui/surface2/render.ts";
 import { HORIZON_OPERATIONS, isConsequential, type HorizonOperation, type SurfaceRole } from "./ui/surface2/grammar.ts";
 import { openSequential, renderSequentialText, type SequentialIntent } from "./ui/sequential/controller.ts";
 import { ttyConfirmIO } from "./capabilities/confirm-command.ts";
+import { announceReady, exitWhenStdinCloses, prepareServe } from "./desktop.ts";
 
 /**
  * Three transports, one surface. The CLI and MCP verbs below resolve their target through the
@@ -11,6 +12,8 @@ import { ttyConfirmIO } from "./capabilities/confirm-command.ts";
  */
 const [command, ...rest] = process.argv.slice(2);
 // `surface` only reads, so it opens the store read-only and may run while a desk holds the write lock. Every other command writes.
+// `serve` is the headless server verb (also the desktop sidecar's); it settles resource and data locations before the application opens.
+const serving = command === "serve" ? prepareServe(rest) : undefined;
 const application = await createApplication(command === "surface" ? { readOnly: true } : {});
 
 function flag(name: string): string | undefined {
@@ -139,7 +142,7 @@ if (command === "frame") {
   process.stdout.write(`${JSON.stringify(mcpTools(HORIZON_OPERATIONS, (operation: string) => isConsequential(operation as HorizonOperation)), null, 2)}\n`);
   await application.close();
 } else {
-  const server = application.startServer();
+  const server = serving?.desktop ? application.startServer(serving.port, { launch: announceReady }) : application.startServer(serving?.port);
 
   console.log(`horizon: ${application.loaded.config.deployment_profile} listening on ${server.url}`);
   console.log(`horizon: workspace ${new URL("workspace", server.url).href}`);
@@ -153,7 +156,9 @@ if (command === "frame") {
     closing = true;
     server.stop();
     await application.close();
+    if (serving !== undefined) process.exit(0);
   }
+  if (serving?.desktop) exitWhenStdinCloses(() => void shutdown());
   process.on("SIGINT", () => void shutdown());
   process.on("SIGTERM", () => void shutdown());
 }

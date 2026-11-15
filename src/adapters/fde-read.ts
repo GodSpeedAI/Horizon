@@ -15,8 +15,8 @@
  * document (contracts/README.md section 5), SEA-Forge `authority_pin` JSON (world_pin.rs PinState).
  */
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { resourcePath } from "../runtime/resource-root.ts";
 import { SchemaRegistry } from "./fde-schema.ts";
 import { NOT_CONNECTED, type CaseEpisodeRecord, type RealityTraceResidual, type RealityTraceStructure, type SourceRead, type WorldPin } from "./fde-types.ts";
 export { NOT_CONNECTED, type CaseEpisodeRecord, type RealityTraceResidual, type RealityTraceStructure, type SourceRead, type WorldPin } from "./fde-types.ts";
@@ -24,7 +24,7 @@ export { NOT_CONNECTED, type CaseEpisodeRecord, type RealityTraceResidual, type 
 const notConnected = <T>(detail: string): SourceRead<T> => ({ state: "not_connected", detail });
 const invalid = <T>(detail: string, violations: readonly string[]): SourceRead<T> => ({ state: "invalid", detail, violations });
 
-const CONTRACTS = join(dirname(fileURLToPath(import.meta.url)), "../../contracts/fde");
+const CONTRACTS = resourcePath("contracts", "fde");
 const IDS = {
   request: "urn:sea-forge:fde:case-record-append:v1#/$defs/Request",
   settled: "urn:sea-forge:fde:case-record-append:v1#/$defs/EpisodeSettledPayload",
