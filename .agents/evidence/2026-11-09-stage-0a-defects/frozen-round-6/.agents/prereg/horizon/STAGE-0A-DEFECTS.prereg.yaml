@@ -1,0 +1,96 @@
+preregistration:
+  id: HORIZON-PREREG-STAGE-0A-DEFECTS
+  task: STAGE-0A-DEFECTS
+  title: "Close the two recorded identity defects — the role taken from the request, and the executor of a route claim"
+  recorded_at: "2026-11-09"
+  recorded_before_artifacts: false
+  claim: >-
+    A request can no longer establish who is acting. The role a surface intent is committed against
+    comes from the signed-in session, and the executor of an agent's route claim is the key the
+    agent door authenticated, recorded in the durable record; a request that names its own role or
+    executor is refused with a typed refusal and writes nothing.
+  upstream_pins:
+    spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+    plan: { id: "HORIZON-PLAN-001", file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23" }
+    design: { file: design_draft.md, sha256: "d0fb4a0a487a6c8039af71474573749db417f37fe68773e293f02c9d670ec0ae", sections: "2, 7, 11, Appendix A" }
+    task_preregistration: { file: .agents/prereg/horizon/T23.prereg.yaml, id: "HORIZON-PREREG-T23-0A", relationship: "the task-level preregistration that registers the Stage 0A expectations; this unit is one of its Stage 0A units" }
+    unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A.prereg.yaml, id: "HORIZON-PREREG-STAGE-0A-1", relationship: "the first Stage 0A unit; the catalog rows this unit corrects were frozen by it" }
+  # This unit settles no specification requirement. It closes two recorded defects, which were open
+  # violations of expectations the task preregistration already registered. No status entry may
+  # claim REQ-SEC-006 as settled because this file exists.
+  settles: []
+  positive_expectations:
+    - id: PE-15
+      expectation: >-
+        An operation on the agent door names the executor whose authenticated call acts and the
+        credential that route requires, and the durable record carries that authenticated executor:
+        the answer record holds the key that made the route claim, and the conversation row names
+        it in its references.
+    - id: PE-16
+      expectation: >-
+        The honest path still works after the defects are closed: the surface route commits an
+        intent as the signed-in session with the session's role, and the agent door records the
+        key that acted, without any request naming either.
+  negative_expectations:
+    - id: NE-13
+      expectation: >-
+        A request-supplied role must never select the projection a commit is made against. The
+        surface route must refuse a body that names an actor or a role, with a typed refusal and
+        no write, rather than honouring it or ignoring it silently.
+    - id: NE-14
+      expectation: >-
+        The executor of an agent's route claim must never be a label. The recorded executor is the
+        key the door authenticated, another key cannot take the claim, and a body that names an
+        executor is refused with nothing recorded.
+    - id: NE-15
+      expectation: >-
+        The agent door must never take an identity from the body. A body that names an executor, a
+        role, a caller or a principal is refused before anything is read from it, and the door
+        keeps no such field in any record.
+  falsifier: >-
+    Any of the negative expectations reproducing on the committed files — a request that names its
+    own role and is honoured, a request that names an executor and is honoured, a route claim whose
+    recorded executor is not the authenticated key, or a refusal that still writes — falsifies this
+    claim. So does a catalog row that names an executor the route cannot authenticate.
+  known_confounds:
+    - >-
+      This unit was authorized in session by the owner and its implementation was written under
+      that instruction, so this file is a record of the acceptance criteria, not a claim of
+      prospective registration. The substantive expectations are not new: the task preregistration
+      already forbids a substitutable caller kind, and the two defects were open violations of it.
+    - >-
+      The surface route has one authenticated caller kind today, the paired human session. The
+      per-request principal binding that the operation descriptor needs is Stage 3 work; this unit
+      closes the request-supplied role, not the descriptor.
+    - >-
+      The route refusal proves the request cannot choose the projection. It does not prove that
+      the human session's own authority is right: that is the frame's affordance and the authority
+      behind it, and it is unchanged by this unit.
+  evidence_plan:
+    command: "just gate-t23"
+    typecheck: "./node_modules/.bin/tsc --noEmit"
+    artifacts:
+      - contracts/identity/v1/operations.yaml
+      - src/app.ts
+      - src/capabilities/panel-answers.ts
+      - src/ui/desk/conversation-model.ts
+      - src/contracts/identity/manifest.ts
+      - test/identity-defects.test.ts
+      - test/identity-contract.test.ts
+      - scripts/check-stage0a-defects-prereg-coverage.ts
+      - .agents/evidence/2026-11-09-stage-0a-defects/
+  redesign_trigger: >-
+    If closing the defects needs a caller kind the runtime cannot authenticate, stop and revise the
+    identity contract rather than weakening the refusal or adding a label that names an actor.
+  confirmation_condition: >-
+    A fresh reader runs the recorded command and the typecheck, sees them pass, and independently
+    confirms that no request path names its own role or executor, that the recorded executor is
+    the authenticated key, and that the mutation teeth catch the undoing of each fix. Self-
+    attestation is not confirmation.
+  notes: >-
+    Recorded after the implementation, on purpose: the owner authorized the unit in session, and
+    the expectation ids here continue the task preregistration's series so the two files never
+    claim the same id. The task preregistration is left as recorded; this unit is a separate file
+    because the design's own rule is that a recorded preregistration is not rewritten. The
+    independent Stage 0A manifest review reads a frozen, hash-pinned copy of the whole contract
+    set, this unit included, and is the fresh confirmation this unit's condition asks for.

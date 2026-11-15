@@ -6,11 +6,13 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { conversationWaiting, type Action, type UiState } from "./attention.ts";
-import type { ConversationRow, RowStatus } from "./conversation-model.ts";
+import type { ConversationRow, RowStage, RowStatus } from "./conversation-model.ts";
 import { PanelCard, type PanelsIo } from "./Panels.tsx";
 import type { BlockCtx } from "./blocks/index.tsx";
+import { CommitSummary, type CommitFacts } from "./Commitment.tsx";
+import { conflictViews } from "./conflict-model.ts";
 
-export const STATUS_WORD: Readonly<Record<RowStatus, string>> = { done: "Done", waiting: "Waiting for you", refused: "Refused", unseen: "Not seen yet" };
+export const STATUS_WORD: Readonly<Record<RowStatus, string>> = { done: "Done", waiting: "Waiting for you", refused: "Refused", unseen: "Not seen yet", claimed: "Agent says so", partial: "Partly done" };
 /** An answer you gave waits on the agent, not on you. */
 export function statusWord(row: { readonly status: RowStatus; readonly kind: string }): string {
   return row.status === "waiting" && row.kind === "answer" ? "Waiting for the agent" : STATUS_WORD[row.status];
@@ -34,7 +36,12 @@ export const isWaitingMove = (row: ConversationRow): boolean => row.status === "
 /** What Confirm asks the composer for: the move's words, and its draft when it has one. Without a draft the composer makes one. */
 export const requestFor = (row: ConversationRow): { readonly words: string; readonly draftId?: string } => (row.refs.draft_id === undefined ? { words: row.words } : { words: row.words, draftId: row.refs.draft_id });
 
+/** How a stage reads: its own words, never the word for the whole row. */
+export const STAGE_WORD: Readonly<Record<RowStage["status"], string>> = { done: "Yes", refused: "Failed", unseen: "Not seen yet" };
+
 export interface ConversationIo {
+  /** Starts the waiting steps of a case again, after "Started" failed. */
+  readonly retryStart?: (caseId: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
   readonly discard: (rowId: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
 }
 
@@ -58,7 +65,17 @@ function StatusMark({ status, kind }: { readonly status: RowStatus; readonly kin
   );
 }
 
-function MoveCard({ row, onConfirm, onDiscard, busy }: { readonly row: ConversationRow; readonly onConfirm: () => void; readonly onDiscard: () => void; readonly busy: boolean }): ReactNode {
+/** The four facts above the button of a waiting hand off. The button only opens the preview; nothing is sent from the card. */
+export function moveFacts(row: ConversationRow, caseTitle: string | null): CommitFacts {
+  return {
+    action: `Hand off: ${row.words}`,
+    destination: caseTitle ?? "The case that is running",
+    next: "Opens a preview of the step and where it goes. Nothing is sent until you press the button on the preview.",
+    undo: { can: true, words: "Opening the preview sends nothing. Once a step is sent it cannot be undone." },
+  };
+}
+
+function MoveCard({ row, onConfirm, onDiscard, busy, caseTitle }: { readonly row: ConversationRow; readonly onConfirm: () => void; readonly onDiscard: () => void; readonly busy: boolean; readonly caseTitle: string | null }): ReactNode {
   const fromAgent = row.source !== "you";
   const headId = `${row.row_id}-h`;
   return (
@@ -71,16 +88,40 @@ function MoveCard({ row, onConfirm, onDiscard, busy }: { readonly row: Conversat
         {row.words}
       </p>
       <p className="muted">{row.outcome}</p>
+      <CommitSummary facts={moveFacts(row, caseTitle)} />
       <div className="row cv-actions">
         <button type="button" className="primary" onClick={onConfirm} disabled={busy} data-confirm-move>
-          Confirm
+          Preview this hand off
         </button>
         <button type="button" onClick={onDiscard} disabled={busy} data-discard-move>
           Discard
         </button>
       </div>
-      <p className="cv-note muted">Confirm shows you exactly what will happen first. Nothing is sent until you confirm there.</p>
+      <p className="cv-note muted">The preview shows you exactly what will happen first. Nothing is sent until you press the button there.</p>
     </article>
+  );
+}
+
+function Stages({ row, onRetry, onOpenStep, busy }: { readonly row: ConversationRow; readonly onRetry: () => void; readonly onOpenStep: () => void; readonly busy: boolean }): ReactNode {
+  if (row.stages === undefined) return null;
+  return (
+    <ol className="cv-stages" aria-label="What came of each stage" data-stages>
+      {row.stages.map((g) => (
+        <li key={g.name} className="cv-stage" data-stage={g.name} data-stage-status={g.status}>
+          <span className="cv-stage-name">{g.name}:</span> <span className="cv-stage-word">{STAGE_WORD[g.status]}</span>
+          <span className="muted"> {g.words}</span>
+          {g.recovery === "Try again" ? (
+            <button type="button" onClick={onRetry} disabled={busy || row.refs.case_id === undefined} data-recover="try-again">
+              Try again
+            </button>
+          ) : g.recovery === "Open the step" ? (
+            <button type="button" onClick={onOpenStep} data-recover="open-step">
+              Open the step
+            </button>
+          ) : null}
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -97,6 +138,7 @@ export function ConversationView({ ui, dispatch, panels, conversation, onConfirm
   const open = data?.panels?.open ?? [];
   const needsYou = conversationWaiting(rows, open);
   const stepWaits = data?.panels?.waiting ?? [];
+  const panelsRefused = data?.panels?.refused ?? null;
 
   // Newest at the bottom. The view follows new rows unless you scrolled up; then a button says there is more below.
   useEffect(() => {
@@ -127,6 +169,13 @@ export function ConversationView({ ui, dispatch, panels, conversation, onConfirm
     setBusyRow(null);
     setProblem(result.ok ? null : result.message);
   };
+  const retry = async (row: ConversationRow): Promise<void> => {
+    if (row.refs.case_id === undefined || conversation.retryStart === undefined) return;
+    setBusyRow(row.row_id);
+    const result = await conversation.retryStart(row.refs.case_id);
+    setBusyRow(null);
+    setProblem(result.ok ? null : result.message);
+  };
   const tryOut = (phrase: string): void => {
     dispatch({ type: "typing", text: phrase, selStart: phrase.length, selEnd: phrase.length });
     dispatch({ type: "focus", target: "composer" });
@@ -150,6 +199,11 @@ export function ConversationView({ ui, dispatch, panels, conversation, onConfirm
           </span>
         </p>
       </header>
+      {panelsRefused !== null ? (
+        <p className="cv-refused" role="alert" data-panels-refused>
+          {panelsRefused}
+        </p>
+      ) : null}
       <p className="cv-try" data-try>
         <span className="cv-meta">Try</span>
         {["/find invoice", "/handoff Fix the checkout total", "/note Call the supplier"].map((phrase) => (
@@ -166,6 +220,19 @@ export function ConversationView({ ui, dispatch, panels, conversation, onConfirm
             <button type="button" onClick={() => void panels.stopWaiting(w.step)}>
               Stop waiting
             </button>
+          </p>
+        );
+      })}
+      {conflictViews(data?.panels?.conflicts).map((c) => {
+        const step = c.step;
+        return (
+          <p key={c.key} className="notice" role="status" data-conflict={c.ask} data-conflict-panel={c.panel}>
+            <strong>{c.title}</strong> {c.words}{" "}
+            {step !== null && c.actions.includes("stop_waiting") ? (
+              <button type="button" onClick={() => void panels.stopWaiting(step)}>
+                Stop waiting
+              </button>
+            ) : null}
           </p>
         );
       })}
@@ -197,8 +264,9 @@ export function ConversationView({ ui, dispatch, panels, conversation, onConfirm
                     </time>
                   </button>
                   {panel === undefined ? <p className="cv-outcome" data-unseen={row.status === "unseen" ? "yes" : undefined}>{row.outcome}</p> : null}
+                  <Stages row={row} busy={busyRow === row.row_id} onOpenStep={() => dispatch({ type: "view", view: "work" })} onRetry={() => void retry(row)} />
                   {panel !== undefined ? <PanelCard panel={panel} io={panels} presenting={presenting} {...ctxFor()} /> : null}
-                  {isWaitingMove(row) ? <MoveCard row={row} busy={busyRow === row.row_id} onConfirm={() => onConfirm(row)} onDiscard={() => void discard(row)} /> : null}
+                  {isWaitingMove(row) ? <MoveCard row={row} caseTitle={data?.cases.find((c) => c.case_ref === `case:${row.refs.case_id ?? ""}`)?.purpose ?? null} busy={busyRow === row.row_id} onConfirm={() => onConfirm(row)} onDiscard={() => void discard(row)} /> : null}
                 </li>
               );
             })}

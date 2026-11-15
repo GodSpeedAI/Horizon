@@ -2,14 +2,16 @@ import { createApplication } from "./app.ts";
 import { mcpTools, renderText } from "./ui/surface2/render.ts";
 import { HORIZON_OPERATIONS, isConsequential, type HorizonOperation, type SurfaceRole } from "./ui/surface2/grammar.ts";
 import { openSequential, renderSequentialText, type SequentialIntent } from "./ui/sequential/controller.ts";
+import { ttyConfirmIO } from "./capabilities/confirm-command.ts";
 
 /**
  * Three transports, one surface. The CLI and MCP verbs below resolve their target through the
  * same `application.surface()` seam the GUI route uses and commit through the same
  * `application.commitSurfaceIntent()`, so a verb cannot mean something the GUI does not.
  */
-const application = await createApplication();
 const [command, ...rest] = process.argv.slice(2);
+// `surface` only reads, so it opens the store read-only and may run while a desk holds the write lock. Every other command writes.
+const application = await createApplication(command === "surface" ? { readOnly: true } : {});
 
 function flag(name: string): string | undefined {
   const index = rest.indexOf(`--${name}`);
@@ -51,6 +53,11 @@ async function runSequentialTui(
   });
 }
 
+/**
+ * Which projection the local console reduces the surface for. This is a projection selector, not
+ * an identity: the intent's actor is always the frame's observer, and the CLI is the operator's
+ * own process (DEF-ROLE-FROM-REQUEST).
+ */
 function roleFlag(): SurfaceRole {
   const role = flag("role");
   if (role === "human" || role === "agent" || role === "system") return role;
@@ -108,12 +115,23 @@ if (command === "frame") {
   const frameId = flag("frame");
   const outcome = await application.commitSurfaceIntent({
     transport: "cli",
-    role: roleFlag(),
     ...(operation === undefined ? {} : { operation }),
     ...(nodeId === undefined ? {} : { node_id: nodeId }),
     ...(frameId === undefined ? {} : { frame_id: frameId }),
-  });
+  }, roleFlag());
   process.stdout.write(`${JSON.stringify(outcome, null, 2)}\n`);
+  await application.close();
+  if (!outcome.ok) process.exit(1);
+} else if (command === "confirm") {
+  // Stage 0B: the local terminal names the waiting operation and asks for the code the Horizon terminal showed. It runs on /dev/tty only.
+  const pendingId = flag("pending");
+  if (pendingId === undefined) {
+    process.stderr.write("horizon confirm: name the waiting operation with --pending <id>\n");
+    await application.close();
+    process.exit(2);
+  }
+  const outcome = await application.confirmPending(pendingId, ttyConfirmIO());
+  process.stdout.write(`${outcome.message}\n`);
   await application.close();
   if (!outcome.ok) process.exit(1);
 } else if (command === "mcp") {

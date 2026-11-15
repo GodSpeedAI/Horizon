@@ -9,7 +9,18 @@ export const AGENT_NAME_MAX = 60;
 
 export type RowSource = "you" | "agent" | "page-agent";
 export type RowKind = "note" | "handoff" | "handoff-proposal" | "find" | "decision" | "panel" | "answer";
-export type RowStatus = "done" | "waiting" | "refused" | "unseen";
+/** `claimed`: the agent says it happened and Horizon has not seen it. */
+export type RowStatus = "done" | "waiting" | "refused" | "unseen" | "claimed" | "partial";
+
+/** One stage of a hand off, with its own outcome. `unseen` means Horizon has not observed it. */
+export const STAGE_NAMES = ["Sent", "Started", "Given to an agent", "Result seen"] as const;
+export interface RowStage {
+  readonly name: (typeof STAGE_NAMES)[number];
+  readonly status: "done" | "refused" | "unseen";
+  readonly words: string;
+  /** What the person can do when the stage failed. */
+  readonly recovery?: "Try again" | "Open the step";
+}
 
 export interface RowRefs {
   readonly case_id?: string;
@@ -18,6 +29,8 @@ export interface RowRefs {
   readonly panel_id?: string;
   readonly ask_id?: string;
   readonly draft_id?: string;
+  /** The key of the agent whose authenticated call made this row's claim (DEF-ASK-ROUTE-EXECUTOR). */
+  readonly executor_key?: string;
 }
 
 export interface ConversationRow {
@@ -30,13 +43,15 @@ export interface ConversationRow {
   readonly outcome: string;
   readonly status: RowStatus;
   readonly refs: RowRefs;
+  /** A hand off shows each stage on its own. Other rows have none. */
+  readonly stages?: readonly RowStage[];
 }
 
 export type ConversationAction =
   | { readonly type: "append"; readonly row: ConversationRow }
-  | { readonly type: "update"; readonly row_id: string; readonly status?: RowStatus; readonly outcome?: string };
+  | { readonly type: "update"; readonly row_id: string; readonly status?: RowStatus; readonly outcome?: string; readonly stages?: readonly RowStage[] };
 
-const REF_KEYS = ["case_id", "step_id", "intent_id", "panel_id", "ask_id", "draft_id"] as const;
+const REF_KEYS = ["case_id", "step_id", "intent_id", "panel_id", "ask_id", "draft_id", "executor_key"] as const;
 const clean = (text: string, max: number): string => text.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 
 /** A name an agent gives itself: plain text, no markup or control characters, at most 60 characters. */
@@ -46,6 +61,11 @@ export function cleanAgentName(raw: string | null | undefined): string | undefin
   return name === "" ? undefined : name;
 }
 
+const tidyStages = (stages: readonly RowStage[] | undefined): readonly RowStage[] | undefined =>
+  Array.isArray(stages) && stages.length > 0
+    ? stages.filter((g) => STAGE_NAMES.includes(g.name) && (g.status === "done" || g.status === "refused" || g.status === "unseen")).slice(0, 4).map((g) => ({ name: g.name, status: g.status, words: clean(String(g.words ?? ""), WORDS_MAX), ...(g.recovery === "Try again" || g.recovery === "Open the step" ? { recovery: g.recovery } : {}) }))
+    : undefined;
+
 /** The same row with its words clipped and its references kept to the known ones. */
 export function tidyRow(row: ConversationRow): ConversationRow {
   const refs: Record<string, string> = {};
@@ -54,17 +74,35 @@ export function tidyRow(row: ConversationRow): ConversationRow {
     if (typeof value === "string" && value !== "") refs[key] = value.slice(0, 200);
   }
   const name = row.source === "you" ? undefined : cleanAgentName(row.agent_name);
-  return { row_id: row.row_id, at: row.at, source: row.source, ...(name === undefined ? {} : { agent_name: name }), kind: row.kind, words: clean(row.words, WORDS_MAX), outcome: clean(row.outcome, WORDS_MAX), status: row.status, refs };
+  return { row_id: row.row_id, at: row.at, source: row.source, ...(name === undefined ? {} : { agent_name: name }), kind: row.kind, words: clean(row.words, WORDS_MAX), outcome: clean(row.outcome, WORDS_MAX), status: row.status, refs, ...(tidyStages(row.stages) === undefined ? {} : { stages: tidyStages(row.stages)! }) };
 }
 
 /** Oldest first; the same time keeps the order the rows were made in (their ids carry a counter). */
 export const byTime = (a: ConversationRow, b: ConversationRow): number => (a.at === b.at ? (a.row_id < b.row_id ? -1 : a.row_id > b.row_id ? 1 : 0) : a.at < b.at ? -1 : 1);
 
-/** The newest 200 rows, oldest first. Older ones are reached through Find. */
+/** Whether a row is still waiting for the person (an ask, a suggestion, a preview) or for the agent to say where an answer went. */
+export const isStillWaiting = (row: ConversationRow): boolean => row.status === "waiting";
+
+/** A row the person may still have to act on: it is waiting, or only partly done, or one of its stages offers Try again or Open the step. */
+export const needsAttention = (row: ConversationRow): boolean => isStillWaiting(row) || row.status === "partial" || (row.stages ?? []).some((g) => g.recovery !== undefined);
+
+/**
+ * Every row that is still waiting or can be recovered (partly done, or offering Try again or Open the step), plus the newest of the others, up to 200 rows in all, oldest first. Waiting work never drops out
+ * of the window because newer rows pushed it down. (More than 200 waiting rows are all kept.) Older rows are reached through Find.
+ */
 export function windowOf(rows: readonly ConversationRow[]): ConversationRow[] {
   const sorted = [...rows].sort(byTime);
-  return sorted.slice(Math.max(0, sorted.length - CONVERSATION_WINDOW));
+  if (sorted.length <= CONVERSATION_WINDOW) return sorted;
+  const waiting = sorted.filter(needsAttention);
+  const room = Math.max(0, CONVERSATION_WINDOW - waiting.length);
+  const others = sorted.filter((r) => !needsAttention(r));
+  const keep = new Set([...waiting, ...others.slice(others.length - room)].map((r) => r.row_id));
+  return sorted.filter((r) => keep.has(r.row_id));
 }
+
+/** Suggestions from agents waiting on one case at the same time. A 21st is refused. */
+export const MAX_WAITING_PROPOSALS = 20;
+export const TOO_MANY_PROPOSALS = "This case already has 20 suggestions waiting. Confirm or discard some first.";
 
 /** The row a new panel row replaces: a panel updates in place and adds no second row. */
 export const panelRowFor = (rows: readonly ConversationRow[], row: Pick<ConversationRow, "kind" | "refs">): ConversationRow | undefined =>
@@ -99,7 +137,7 @@ export const waitingForDraft = (rows: readonly ConversationRow[], draftId: strin
  * `update` changes the status and outcome of one row by its id. An unknown id changes nothing.
  */
 export function reduceConversation(rows: readonly ConversationRow[], action: ConversationAction): ConversationRow[] {
-  if (action.type === "update") return rows.map((r) => (r.row_id === action.row_id ? { ...r, ...(action.status === undefined ? {} : { status: action.status }), ...(action.outcome === undefined ? {} : { outcome: clean(action.outcome, WORDS_MAX) }) } : r));
+  if (action.type === "update") return rows.map((r) => (r.row_id === action.row_id ? { ...r, ...(action.status === undefined ? {} : { status: action.status }), ...(action.outcome === undefined ? {} : { outcome: clean(action.outcome, WORDS_MAX) }), ...(tidyStages(action.stages) === undefined ? {} : { stages: tidyStages(action.stages)! }) } : r));
   const row = tidyRow(action.row);
   const same = panelRowFor(rows, row);
   if (same !== undefined) return rows.map((r) => (r.row_id === same.row_id ? { ...r, at: row.at, words: row.words, outcome: row.outcome, status: row.status, refs: { ...r.refs, ...row.refs } } : r));

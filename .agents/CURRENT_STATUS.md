@@ -1,8 +1,116 @@
 # Horizon Current Status
 
-**Revision:** 32 · **Recorded:** 2026-11-01T00:00:00Z · **Stage:** unchanged settlement state — spec HORIZON-001 **1.1.0** frozen (SPEC-CR-002: payment and IS7 settlement); REQ-NAV-008..013 not yet implemented; next ready task **T11**. Two **non-normative** recon reports added.
+**Revision:** 38 · **Recorded:** 2026-11-11 · **Stage:** Stage 0A remediation-4 wave in progress (plan task T23). Checkpoint commit `f88cb20` holds all prior work. Remaining work is the checklist below; nothing in it is claimed complete until its evidence is recorded.
 
-**Spec:** HORIZON-001 v1.1.0, frozen 2026-10-23; SHA-256 `d5ba60b08def01a4f996f6153b654a1e1148c3f2555ea32a61490a114f98a907`.
+## Remaining-work checklist (remediation-4 wave, then Stage 0B containment)
+
+Scope: finish Stage 0A to a blind-critic ACCEPT, then Stage 0B interim containment, then PR and merge.
+
+- [ ] R5-01 desk P3 rows refused on every path — gates wired in `src/app.ts`; prove with tests in `test/identity-remediation-4.test.ts` and record in the evidence table
+- [ ] R5-02 `run.start` refused before `startCase` — gate wired; prove likewise
+- [ ] R5-03 device credential is a service principal; phone commit refused (`no_device_delegation`) — code and tests green; prove in remediation-4 tests
+- [ ] R5-04 `agent_execution` → `registered_agent` executor mapping — catalog done; prove by fixture
+- [ ] R5-05 caller-kind enum and `caller_kind_permitted` constraint — triple (TS/Python/fixtures) done; re-verify
+- [ ] R5-06 split `external-interfaces.json` into exact source components, conditional facts marked, Merkle fields added, every fact bound, local grant/decision kinds renamed; update `scripts/check-external-interface-facts.ts` and design §9.1 — NOT STARTED
+- [ ] R5-07 `human_evidence: null` on the six anonymous/code-holder rows — catalog done; prove
+- [ ] R5-08 refusal audits stated in design prose ("before any target effect plus audited refusal") — prose NOT DONE
+- [ ] R5-09 separation of duty per row, not by class rule — done; prove
+- [ ] Design prose for R5-01/02/03/05/07/08/09 in `design_draft.md` — NOT DONE (generated tables already regenerated)
+- [ ] `.agents/prereg/horizon/STAGE-0A-REMEDIATION-4.prereg.yaml` with PE-44…, NE-38… — NOT STARTED
+- [ ] `scripts/check-stage0a-remediation-4-prereg-coverage.ts` — NOT STARTED
+- [ ] `test/identity-remediation-4.test.ts` — NOT STARTED
+- [ ] Teeth M29+ in `scripts/teeth-t23-mutation.ts`; wire `check-t23` and copy the prereg in `scripts/freeze-stage0a-contract-set.sh` — NOT STARTED
+- [ ] Re-freeze as `frozen-round-6` with MANIFEST; write `review-prompt-round-6.md` — NOT STARTED
+- [ ] Blind critic round 6 (`codex exec` read-only, ephemeral, no builder reasoning); retain verdict, transcript, no-mutation proof — NOT STARTED
+- [ ] Repeat rounds until no blocking findings; disposition each finding — NOT STARTED
+- [ ] Stage 0B: `src/capabilities/pending-confirmations.ts`, `horizon confirm --pending <id>`, reserved-operation routing, `test/pending-confirmations.test.ts`, `test/containment.test.ts`, `test/desk-write-token.test.ts` — NOT STARTED
+- [ ] Evidence table mapping every requirement to CI/script/critic evidence with reproduce commands — NOT STARTED
+- [ ] Final report in `.agents/reports/`; PR to `main`; merge; delete branch and worktree — NOT STARTED
+
+**Previous revision 37 follows.** Stage: unchanged plan settlement state — spec HORIZON-001 **1.2.0** frozen; next dependency-ready plan task **T11**. Stage 0A's contract set has been through five independent manifest reviews and all five returned **REJECT**; the round-5 remediation wave is the open work inside plan task **T23**; no task is settled and no requirement is claimed.
+
+**Spec:** HORIZON-001 v1.2.0, frozen 2026-11-02 (REQ-SEC-006: operator identity is a configured durable actor bound to a WebAuthn credential and mapped to a SEA-Forge actor; the OS account is diagnostic only); SHA-256 `7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435`.
+
+## Identity and authority — Stage 0A: five independent reviews, five rejections (no task settled)
+
+The Stage 0A contract set is frozen, hash-pinned and reviewed by a fresh independent critic each
+round. **All five rounds returned REJECT.** The set is not safe to build against yet, so Stage 0A
+is not complete and Stage 0B containment has not begun.
+
+| Round | Frozen copy | Verdict | Findings |
+|---|---|---|---|
+| 1 | `frozen/` | **REJECT** | 5 blocking, 6 must-fix, 2 advisory |
+| 2 | `frozen-round-2/` | **REJECT** | 5 blocking, 7 must-fix, 4 advisory |
+| 3 | `frozen-round-3/` | **REJECT** | 6 blocking, 4 must-fix |
+| 4 | `frozen-round-4/` | **REJECT** | 5 blocking, 4 must-fix |
+| 5 | `frozen-round-5/` | **REJECT** | 6 blocking, 3 must-fix |
+
+Each frozen copy is mode `0444` with its own `MANIFEST.sha256`, and the reviewer verified the
+manifest itself before reading anything (`sha256sum -c`, exit 0, every file OK). The reviewer was a
+fresh `gpt-5.6-sol` critic at `xhigh`, run read-only and ephemeral, with no access to the builder's
+evidence, status, debt, plans or reports. The round-5 run changed no file: `git status --porcelain`
+before and after is byte-identical (SHA-256 `754d1b116800dbcea38d01048e803c4264cf1ddce224131ddef29f77fb723355`);
+its event transcript is retained (SHA-256 `6da454ba…`, 345 lines, 176 completed items).
+
+**What the round-4 remediation actually closed.** Nine findings, nine corrections in the contract
+set, the enforcing code, the cross-language fixtures and the design together, each with an
+executable check: the external-interface contract names only what SEA-Forge actually publishes
+(one committed decision envelope at the pinned commit, with the thirty-four facts that envelope
+carries, and two interfaces that are specified rather than pinned because the owner publishes
+neither, so both fail closed); the phone's six effects have their own device-credential rows with
+their own parameters, and the phone can neither settle nor approve; the observation half of
+settlement is P2 because its effect leaves the application; the device enrollment's evidence is
+local presence and never A3-UV; a pending operation's state is an append-only chain of signed
+transitions, so the descriptor is immutable, carries no state and never carries a confirmation; a
+caller kind the schema never described is refused by name rather than fitted to the closest variant;
+the actor is derived from the caller and a field the schema does not name is refused at every
+boundary; the route census is exact in both directions; and the frozen fixture set exercises every
+negative tooth the earlier preregistrations promised.
+
+**What the round-5 review found.** The round-5 reviewer's own closure table calls seven of the
+nine round-4 findings **closed** outright — the first wave whose corrections it could close without
+qualification — and two **partially closed**. It then returned **REJECT** with six blocking and
+three must-fix findings of its own:
+
+| Finding | Severity | What it is |
+|---|---|---|
+| R5-01 | blocking | Five reachable **desktop** P3 rows — `case.task.decide`, `horizon.settlement.rule`, both approval decisions and `workspace.export` — are admitted by the live-enforcement table to lack the pending/A3/authority path, and the live handlers perform the effects anyway. |
+| R5-02 | blocking | `run.start` is an authority-free Px dispatcher whose target resolution is named missing and whose route is said to be refused until it exists, but the handler compares the previewed step set and calls `startCase`, which sends an unclassified `case_advance`. |
+| R5-03 | blocking | A device credential is converted into a human actor: the remote server resolves the device session to the durable operator's user actor, and `device.surface.intent.commit` then invokes the human commit path with the literal `"human"`. |
+| R5-04 | blocking | The catalog maps the `agent_execution` executor to `registered_agent_key`, but the live agent door authenticates only the stable key and holds no issuer-bound execution or attempt proof. |
+| R5-05 | blocking | `OperationDescriptor` and `PendingOperation` allow only three caller kinds, while the catalog also has `code_holder`, `device_credential`, anonymous and unauthenticated executors; and live validation never proves a record's `caller_kind` is permitted for its operation. |
+| R5-06 | blocking | The remaining published authority interface is a composite: conditional owner fields are listed as unqualified requirements, the Merkle inclusion-proof fields are omitted, no Horizon reference is bound to an owner field, and local signed `DelegationGrant` and `AuthorityDecision` payloads read like owner artifacts. |
+| R5-07 | must-fix | Class inheritance gives P0 and P1 rows assurance predicates (A0, A0-or-A1) that the public health probe, the sign-in challenge and the pairing routes cannot produce. |
+| R5-08 | must-fix | "Before any record is appended" and `performs: false` are false: the remote governed refusal and the intent-classification refusal both append a durable refusal audit before answering. |
+| R5-09 | must-fix | The P3 class rule asserts separation of duty universally, while only the approval, case-decision and export rows set `separation_of_duty: true`. |
+
+**Verified (round-5 freeze):** `bun test` 1563 pass / 16 skip / 0 fail across 176 files (11 717
+expect() calls) · `bun run tsc --noEmit` exit 0 · `just check-t23` exit 0 · `just gate-t23` ok ·
+`just verify` exit 0 · `just ledger` ok (12 canonical invariant bindings across 11 requirements) ·
+28 mutation teeth caught, each by assertion in its named test · 140 Python fixture checks · the
+round-5 design at SHA-256 `5536acfaa046cb2491fc41c378334a41fa328f78f73fef69b1c0e173e0dccfe8`
+(956 lines), pinned by `.agents/prereg/horizon/STAGE-0A-REMEDIATION-3.prereg.yaml`.
+
+**Limits.** Stage 0A is not complete, and no requirement is claimed by it — `REQ-SEC-006` stays
+open until the Stage 4 vertical slice and its independent confirmation. The contract checks prove
+what the bytes mean, not that a runtime enforces them: there is no issuer, no SEA-Forge bridge,
+no live bounded grant, no A3-UV challenge, no external effect and no settled evidence chain in
+this repository. The delegated grant and the human entitlement are *specified*, not pinned:
+SEA-Forge publishes neither, so both paths fail closed by design. The Python checker shares the
+fixture file and the rule text with the TypeScript validator, not the implementation, so it can
+share a misreading of a rule. Three earlier mutation teeth went stale under the round-4
+remediation; they were repaired rather than left passing (M10 now restates a governed row's class,
+M18 now claims the unpublished entitlement is published, M19 now remaps the phone's `approve`
+command to a row the device may perform), and the class-integrity rule M10 depends on is now
+asserted. All work is uncommitted on branch `horizon-desk-gaps`; nothing was committed or
+published.
+
+**Next.** Remediate the round-5 review's nine findings in the contract set, the enforcing code, the
+cross-language fixtures and the design; re-freeze as `frozen-round-6`; and have a fresh critic read
+it. Stage 0B containment — pending confirmations, `horizon confirm --pending`, reserved-operation
+routing, and the desk's escalation path under a protected confirmation — starts only after a review
+accepts the contract set. The plan's next dependency-ready task remains **T11**.
+
 
 ## Recon deliverable — Palantir Foundry + AI FDE (non-normative, no task settled)
 

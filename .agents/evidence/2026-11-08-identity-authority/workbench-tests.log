@@ -1,0 +1,38 @@
+bun test v1.4.0 (34cbb9a40)
+
+test/remote-webauthn.test.ts:
+(pass) CBOR subset decoder > round-trips the value kinds WebAuthn uses [0.81ms]
+(pass) CBOR subset decoder > reports the end offset of an item inside a larger buffer [0.27ms]
+(pass) CBOR subset decoder > refuses indefinite lengths, tags, floats, duplicate keys and trailing bytes [0.41ms]
+(pass) registration (software authenticator) > a valid attestation none registration verifies and yields a COSE ES256 key [2.51ms]
+(pass) registration (software authenticator) > refuses a wrong origin, a stale challenge, a wrong RP ID and a wrong type [1.11ms]
+(pass) registration (software authenticator) > refuses a passkey that did not verify the user (UV clear) and one without presence (UP clear) [0.60ms]
+(pass) registration (software authenticator) > refuses any attestation format other than none, and a credential id that does not match [0.38ms]
+(pass) assertion (software authenticator) > a valid assertion verifies and advances the sign count [1.99ms]
+(pass) assertion (software authenticator) > refuses a wrong origin, a wrong RP ID hash, a UV-clear assertion and a replayed challenge [3.34ms]
+(pass) assertion (software authenticator) > refuses a bad signature and a sign-count regression (a cloned passkey) [3.22ms]
+(pass) assertion (software authenticator) > options carry the required user verification and the challenge as base64url [0.40ms]
+
+test/J-AUTH-REBIND.test.ts:
+(pass) J-AUTH-REBIND: loopbackRefusal accepts only loopback names [0.23ms]
+[domain] loaded 294 semantic objects (digest sha256:cb85926504c313c6a5bcb30d80089fd8f7f717083d354abd3d0a52a9d9b5a69a) from <projects>/cognate-workbench/.sea/interaction/interaction-model.sea
+(pass) J-AUTH-REBIND: a rebinding origin cannot read the session bundle or use the token [2691.77ms]
+
+test/J-AUTH-TENANT-ISOLATION.test.ts:
+[domain] loaded 294 semantic objects (digest sha256:cb85926504c313c6a5bcb30d80089fd8f7f717083d354abd3d0a52a9d9b5a69a) from <projects>/cognate-workbench/.sea/interaction/interaction-model.sea
+(pass) J-AUTH-TENANT-ISOLATION: a second tenant's session sees only its own partition on one shared store [1493.43ms]
+
+test/J-AUTH-SESSION.test.ts:
+[domain] loaded 294 semantic objects (digest sha256:cb85926504c313c6a5bcb30d80089fd8f7f717083d354abd3d0a52a9d9b5a69a) from <projects>/cognate-workbench/.sea/interaction/interaction-model.sea
+[domain] loaded 294 semantic objects (digest sha256:cb85926504c313c6a5bcb30d80089fd8f7f717083d354abd3d0a52a9d9b5a69a) from <projects>/cognate-workbench/.sea/interaction/interaction-model.sea
+(pass) J-AUTH-SESSION: a revoked session's replayed request is refused with no durable effect [2131.99ms]
+[domain] loaded 294 semantic objects (digest sha256:cb85926504c313c6a5bcb30d80089fd8f7f717083d354abd3d0a52a9d9b5a69a) from <projects>/cognate-workbench/.sea/interaction/interaction-model.sea
+[domain] loaded 294 semantic objects (digest sha256:cb85926504c313c6a5bcb30d80089fd8f7f717083d354abd3d0a52a9d9b5a69a) from <projects>/cognate-workbench/.sea/interaction/interaction-model.sea
+(pass) J-AUTH-SESSION: expired sessions are aged by boot and refused, and only the operator may administer sessions [3183.07ms]
+[domain] loaded 294 semantic objects (digest sha256:cb85926504c313c6a5bcb30d80089fd8f7f717083d354abd3d0a52a9d9b5a69a) from <projects>/cognate-workbench/.sea/interaction/interaction-model.sea
+(pass) J-AUTH-SESSION: deployment hardening headers are present on every response [2118.51ms]
+
+ 17 pass
+ 0 fail
+ 119 expect() calls
+Ran 17 tests across 4 files. [12.20s]

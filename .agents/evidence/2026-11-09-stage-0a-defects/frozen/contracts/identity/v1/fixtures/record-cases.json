@@ -1,0 +1,2804 @@
+{
+  "fixtures_version": "horizon.identity.record-fixtures/1",
+  "contract_id": "horizon.identity.records",
+  "contract_version": "1.0.0",
+  "frozen_at": "2026-11-09",
+  "how_to_use": "Each case is one record plus the facts a single record cannot carry. `violations` is the exact sorted set both implementations must produce; an empty set means the record is well formed. `catalog` facts are checked against the live operation manifest by the TypeScript test, so the Python checker reads the same facts rather than a second copy of the catalog.",
+  "proofs": {
+    "no_fabricated_grant": "A human session is never given a grant, a delegation head, or a credential, and a human-session request carrying grant_ref is refused rather than ignored.",
+    "caller_not_substitutable": "The caller kind cannot be substituted: a human cannot present an execution, an agent cannot omit one, a console cannot claim one, and a caller cannot claim to be the execution it targets.",
+    "no_classification_downgrade": "An operation's class cannot be lowered through an alias, a parameter, or a weaker parameter schema, and a dispatch target that is not a listed catalog row is Px."
+  },
+  "cases": [
+    {
+      "id": "A3-RAW-ASSERTION",
+      "kind": "A3Receipt",
+      "expect": "invalid",
+      "violations": [
+        "unknown:assertion"
+      ],
+      "record": {
+        "verifier_ref": "verifier:local",
+        "key_id": "cred-0001",
+        "device_ref": "device:passkey-1",
+        "principal_ref": "operator:sprime01",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "challenge_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "policy_digest": "sha256:efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "up": true,
+        "uv": true,
+        "sign_count": "12",
+        "assurance_predicate": "A3-UV",
+        "verified_at": "2026-11-09T12:00:05Z",
+        "expires_at": "2026-11-09T12:02:05Z",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "assertion": {
+          "credentialId": "abc",
+          "response": "raw"
+        },
+        "schema_version": "horizon.identity.record/1",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "A3-SIGN-COUNT-NUMBER",
+      "kind": "A3Receipt",
+      "expect": "invalid",
+      "violations": [
+        "type:sign_count:uint64"
+      ],
+      "record": {
+        "verifier_ref": "verifier:local",
+        "key_id": "cred-0001",
+        "device_ref": "device:passkey-1",
+        "principal_ref": "operator:sprime01",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "challenge_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "policy_digest": "sha256:efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "up": true,
+        "uv": true,
+        "sign_count": 12,
+        "assurance_predicate": "A3-UV",
+        "verified_at": "2026-11-09T12:00:05Z",
+        "expires_at": "2026-11-09T12:02:05Z",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "A3-TERMINAL-OK",
+      "kind": "A3Receipt",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "verifier_ref": "verifier:local",
+        "key_id": "cred-0001",
+        "device_ref": "device:passkey-1",
+        "principal_ref": "operator:sprime01",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "challenge_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "policy_digest": "sha256:efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "up": true,
+        "uv": false,
+        "sign_count": "12",
+        "assurance_predicate": "A3-T",
+        "verified_at": "2026-11-09T12:00:05Z",
+        "expires_at": "2026-11-09T12:02:05Z",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "A3-UV-OK",
+      "kind": "A3Receipt",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "verifier_ref": "verifier:local",
+        "key_id": "cred-0001",
+        "device_ref": "device:passkey-1",
+        "principal_ref": "operator:sprime01",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "challenge_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "policy_digest": "sha256:efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "up": true,
+        "uv": true,
+        "sign_count": "12",
+        "assurance_predicate": "A3-UV",
+        "verified_at": "2026-11-09T12:00:05Z",
+        "expires_at": "2026-11-09T12:02:05Z",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "A3-UV-WITHOUT-UV",
+      "kind": "A3Receipt",
+      "expect": "invalid",
+      "violations": [
+        "constraint:a3_uv_requires_uv"
+      ],
+      "record": {
+        "verifier_ref": "verifier:local",
+        "key_id": "cred-0001",
+        "device_ref": "device:passkey-1",
+        "principal_ref": "operator:sprime01",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "challenge_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "policy_digest": "sha256:efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "up": true,
+        "uv": false,
+        "sign_count": "12",
+        "assurance_predicate": "A3-UV",
+        "verified_at": "2026-11-09T12:00:05Z",
+        "expires_at": "2026-11-09T12:02:05Z",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "APPROVAL-APPROVER-IS-EXECUTOR",
+      "kind": "Approval",
+      "expect": "invalid",
+      "violations": [
+        "constraint:separation_of_duty"
+      ],
+      "record": {
+        "approval_ref": "approval-0001",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "requester_ref": "operator:sprime01",
+        "executor_ref": "exec-0001",
+        "approver_ref": "exec-0001",
+        "tenant_ref": "tenant:horizon",
+        "policy_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "expires_at": "2026-11-09T12:10:00Z",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "state": "pending",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "APPROVAL-BAD-STATE",
+      "kind": "Approval",
+      "expect": "invalid",
+      "violations": [
+        "enum:state"
+      ],
+      "record": {
+        "approval_ref": "approval-0001",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "requester_ref": "operator:sprime01",
+        "executor_ref": "exec-0001",
+        "approver_ref": "operator:reviewer",
+        "tenant_ref": "tenant:horizon",
+        "policy_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "expires_at": "2026-11-09T12:10:00Z",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "state": "approved",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "APPROVAL-HUMAN-ONLY-OK",
+      "kind": "Approval",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "approval_ref": "approval-0001",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "requester_ref": "operator:sprime01",
+        "executor_ref": null,
+        "approver_ref": "operator:reviewer",
+        "tenant_ref": "tenant:horizon",
+        "policy_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "expires_at": "2026-11-09T12:10:00Z",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "state": "pending",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "APPROVAL-MISSING-REF",
+      "kind": "Approval",
+      "expect": "invalid",
+      "violations": [
+        "missing:approval_ref"
+      ],
+      "record": {
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "requester_ref": "operator:sprime01",
+        "executor_ref": "exec-0001",
+        "approver_ref": "operator:reviewer",
+        "policy_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "expires_at": "2026-11-09T12:10:00Z",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "state": "pending",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "APPROVAL-NONCE-REUSED",
+      "kind": "Approval",
+      "expect": "invalid",
+      "violations": [
+        "constraint:nonce_not_reused"
+      ],
+      "context": {
+        "previous_nonces": [
+          "bm9uY2UtMDAwMDAwMDAwMDAx"
+        ]
+      },
+      "record": {
+        "approval_ref": "approval-0001",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "requester_ref": "operator:sprime01",
+        "executor_ref": "exec-0001",
+        "approver_ref": "operator:reviewer",
+        "tenant_ref": "tenant:horizon",
+        "policy_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "expires_at": "2026-11-09T12:10:00Z",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "state": "pending",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "APPROVAL-OK",
+      "kind": "Approval",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "approval_ref": "approval-0001",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "requester_ref": "operator:sprime01",
+        "executor_ref": "exec-0001",
+        "approver_ref": "operator:reviewer",
+        "tenant_ref": "tenant:horizon",
+        "policy_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "expires_at": "2026-11-09T12:10:00Z",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "state": "pending",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "APPROVAL-SELF-APPROVE",
+      "kind": "Approval",
+      "expect": "invalid",
+      "violations": [
+        "constraint:separation_of_duty"
+      ],
+      "record": {
+        "approval_ref": "approval-0001",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "requester_ref": "operator:sprime01",
+        "executor_ref": "exec-0001",
+        "approver_ref": "operator:sprime01",
+        "tenant_ref": "tenant:horizon",
+        "policy_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "expires_at": "2026-11-09T12:10:00Z",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "state": "pending",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "DECISION-BAD-VOCABULARY",
+      "kind": "AuthorityDecision",
+      "expect": "invalid",
+      "violations": [
+        "enum:decision"
+      ],
+      "record": {
+        "decision_ref": "decision-0001",
+        "grant_ref": "grant-0001",
+        "entitlement_ref": null,
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "amount": {
+          "amount": "25",
+          "unit": "tokens"
+        },
+        "decision": "approved",
+        "policy_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "authority_epoch": "7",
+        "expires_at": "2026-11-09T12:10:00Z",
+        "approver_ref": null,
+        "reservation_ref": "reservation-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "DECISION-BOTH-AUTHORITIES",
+      "kind": "AuthorityDecision",
+      "expect": "invalid",
+      "violations": [
+        "constraint:fence_authority_exactly_one"
+      ],
+      "record": {
+        "decision_ref": "decision-0001",
+        "grant_ref": "grant-0001",
+        "entitlement_ref": "entitlement-0001",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "amount": {
+          "amount": "25",
+          "unit": "tokens"
+        },
+        "decision": "permitted",
+        "policy_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "authority_epoch": "7",
+        "expires_at": "2026-11-09T12:10:00Z",
+        "approver_ref": null,
+        "reservation_ref": "reservation-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "DECISION-DENIED-OK",
+      "kind": "AuthorityDecision",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "decision_ref": "decision-0001",
+        "grant_ref": "grant-0001",
+        "entitlement_ref": null,
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "amount": {
+          "amount": "25",
+          "unit": "tokens"
+        },
+        "decision": "refused",
+        "policy_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "authority_epoch": "7",
+        "expires_at": "2026-11-09T12:10:00Z",
+        "approver_ref": null,
+        "reservation_ref": "reservation-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "DECISION-HUMAN-ENTITLEMENT-OK",
+      "kind": "AuthorityDecision",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "decision_ref": "decision-0001",
+        "grant_ref": null,
+        "entitlement_ref": "entitlement-0001",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "amount": {
+          "amount": "25",
+          "unit": "tokens"
+        },
+        "decision": "permitted",
+        "policy_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "authority_epoch": "7",
+        "expires_at": "2026-11-09T12:10:00Z",
+        "approver_ref": "operator:sprime01",
+        "reservation_ref": "reservation-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "DECISION-NO-AUTHORITY",
+      "kind": "AuthorityDecision",
+      "expect": "invalid",
+      "violations": [
+        "constraint:fence_authority_exactly_one"
+      ],
+      "record": {
+        "decision_ref": "decision-0001",
+        "grant_ref": null,
+        "entitlement_ref": null,
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "amount": {
+          "amount": "25",
+          "unit": "tokens"
+        },
+        "decision": "permitted",
+        "policy_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "authority_epoch": "7",
+        "expires_at": "2026-11-09T12:10:00Z",
+        "approver_ref": null,
+        "reservation_ref": "reservation-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "DECISION-PERMITTED-OK",
+      "kind": "AuthorityDecision",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "decision_ref": "decision-0001",
+        "grant_ref": "grant-0001",
+        "entitlement_ref": null,
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "amount": {
+          "amount": "25",
+          "unit": "tokens"
+        },
+        "decision": "permitted",
+        "policy_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "authority_epoch": "7",
+        "expires_at": "2026-11-09T12:10:00Z",
+        "approver_ref": null,
+        "reservation_ref": "reservation-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "CRED-EXP-IS-NUMBER",
+      "kind": "Credential",
+      "expect": "invalid",
+      "violations": [
+        "type:exp:uint64"
+      ],
+      "record": {
+        "iss": "issuer:horizon-local",
+        "sub": "agent:researcher",
+        "aud": "horizon.local",
+        "jti": "cred-0001",
+        "iat": "1762692000",
+        "nbf": "1762692000",
+        "exp": 1762692900,
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "holder_jwk": {
+          "kty": "EC",
+          "crv": "P-256",
+          "x": "Zml2ZS1wdWJsaWMta2V5LXg",
+          "y": "Zml2ZS1wdWJsaWMta2V5LXk"
+        },
+        "delegation_ref": "grant-0001",
+        "authority_epoch": "7",
+        "issuer_generation": "3",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "CRED-LOCAL-NO-DELEGATION-OK",
+      "kind": "Credential",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "iss": "issuer:horizon-local",
+        "sub": "agent:researcher",
+        "aud": "horizon.local",
+        "jti": "cred-0001",
+        "iat": "1762692000",
+        "nbf": "1762692000",
+        "exp": "1762692900",
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "holder_jwk": {
+          "kty": "EC",
+          "crv": "P-256",
+          "x": "Zml2ZS1wdWJsaWMta2V5LXg",
+          "y": "Zml2ZS1wdWJsaWMta2V5LXk"
+        },
+        "delegation_ref": null,
+        "authority_epoch": "7",
+        "issuer_generation": "3",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "CRED-MISSING-JTI",
+      "kind": "Credential",
+      "expect": "invalid",
+      "violations": [
+        "missing:jti"
+      ],
+      "record": {
+        "iss": "issuer:horizon-local",
+        "sub": "agent:researcher",
+        "aud": "horizon.local",
+        "iat": "1762692000",
+        "nbf": "1762692000",
+        "exp": "1762692900",
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "holder_jwk": {
+          "kty": "EC",
+          "crv": "P-256",
+          "x": "Zml2ZS1wdWJsaWMta2V5LXg",
+          "y": "Zml2ZS1wdWJsaWMta2V5LXk"
+        },
+        "delegation_ref": "grant-0001",
+        "authority_epoch": "7",
+        "issuer_generation": "3",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "CRED-OK",
+      "kind": "Credential",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "iss": "issuer:horizon-local",
+        "sub": "agent:researcher",
+        "aud": "horizon.local",
+        "jti": "cred-0001",
+        "iat": "1762692000",
+        "nbf": "1762692000",
+        "exp": "1762692900",
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "holder_jwk": {
+          "kty": "EC",
+          "crv": "P-256",
+          "x": "Zml2ZS1wdWJsaWMta2V5LXg",
+          "y": "Zml2ZS1wdWJsaWMta2V5LXk"
+        },
+        "delegation_ref": "grant-0001",
+        "authority_epoch": "7",
+        "issuer_generation": "3",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "CRED-PRIVATE-JWK",
+      "kind": "Credential",
+      "expect": "invalid",
+      "violations": [
+        "type:holder_jwk:jwk"
+      ],
+      "record": {
+        "iss": "issuer:horizon-local",
+        "sub": "agent:researcher",
+        "aud": "horizon.local",
+        "jti": "cred-0001",
+        "iat": "1762692000",
+        "nbf": "1762692000",
+        "exp": "1762692900",
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "holder_jwk": {
+          "kty": "EC",
+          "crv": "P-256",
+          "x": "Zml2ZS1wdWJsaWMta2V5LXg",
+          "y": "Zml2ZS1wdWJsaWMta2V5LXk",
+          "d": "cHJpdmF0ZS1rZXktZA"
+        },
+        "delegation_ref": "grant-0001",
+        "authority_epoch": "7",
+        "issuer_generation": "3",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "CRED-UNKNOWN-FIELD",
+      "kind": "Credential",
+      "expect": "invalid",
+      "violations": [
+        "unknown:principal_class"
+      ],
+      "record": {
+        "iss": "issuer:horizon-local",
+        "sub": "agent:researcher",
+        "aud": "horizon.local",
+        "jti": "cred-0001",
+        "iat": "1762692000",
+        "nbf": "1762692000",
+        "exp": "1762692900",
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "holder_jwk": {
+          "kty": "EC",
+          "crv": "P-256",
+          "x": "Zml2ZS1wdWJsaWMta2V5LXg",
+          "y": "Zml2ZS1wdWJsaWMta2V5LXk"
+        },
+        "delegation_ref": "grant-0001",
+        "authority_epoch": "7",
+        "issuer_generation": "3",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "principal_class": "agent",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "CRED-UNSIGNED",
+      "kind": "Credential",
+      "expect": "invalid",
+      "violations": [
+        "missing:signature"
+      ],
+      "record": {
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local",
+        "iss": "issuer:horizon-local",
+        "sub": "agent:researcher",
+        "aud": "horizon.local",
+        "jti": "cred-0001",
+        "iat": "1762692000",
+        "nbf": "1762692000",
+        "exp": "1762692900",
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "holder_jwk": {
+          "kty": "EC",
+          "crv": "P-256",
+          "x": "Zml2ZS1wdWJsaWMta2V5LXg",
+          "y": "Zml2ZS1wdWJsaWMta2V5LXk"
+        },
+        "delegation_ref": "grant-0001",
+        "authority_epoch": "7",
+        "issuer_generation": "3"
+      }
+    },
+    {
+      "id": "GRANT-BAD-DEPTH-TYPE",
+      "kind": "DelegationGrant",
+      "expect": "invalid",
+      "violations": [
+        "type:depth_remaining:uint64"
+      ],
+      "record": {
+        "grant_ref": "grant-0001",
+        "parent_ref": null,
+        "delegator_ref": "operator:sprime01",
+        "agent_ref": "agent:researcher",
+        "execution_ref": "exec-0001",
+        "audience": "horizon.local",
+        "operations": [
+          "horizon.note.save",
+          "horizon.draft.save"
+        ],
+        "resource_selectors": [
+          "note:desk"
+        ],
+        "data_labels": [
+          "internal"
+        ],
+        "budget": {
+          "amount": "1000",
+          "unit": "tokens",
+          "remaining": "1000"
+        },
+        "not_before": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T20:00:00Z",
+        "depth_remaining": 1,
+        "redelegate": true,
+        "offline": false,
+        "human_evidence": "A3-UV",
+        "authority_epoch": "7",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "GRANT-BUDGET-NO-UNIT",
+      "kind": "DelegationGrant",
+      "expect": "invalid",
+      "violations": [
+        "type:budget:money"
+      ],
+      "record": {
+        "grant_ref": "grant-0001",
+        "parent_ref": null,
+        "delegator_ref": "operator:sprime01",
+        "agent_ref": "agent:researcher",
+        "execution_ref": "exec-0001",
+        "audience": "horizon.local",
+        "operations": [
+          "horizon.note.save",
+          "horizon.draft.save"
+        ],
+        "resource_selectors": [
+          "note:desk"
+        ],
+        "data_labels": [
+          "internal"
+        ],
+        "budget": {
+          "amount": "1000",
+          "remaining": "1000"
+        },
+        "not_before": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T20:00:00Z",
+        "depth_remaining": "1",
+        "redelegate": true,
+        "offline": false,
+        "human_evidence": "A3-UV",
+        "authority_epoch": "7",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "GRANT-CHILD-BROKEN-CHAIN",
+      "kind": "DelegationGrant",
+      "expect": "invalid",
+      "violations": [
+        "constraint:child_subset_of_parent"
+      ],
+      "context": {
+        "parent_grant": {
+          "grant_ref": "grant-0001",
+          "parent_ref": null,
+          "delegator_ref": "operator:sprime01",
+          "agent_ref": "agent:researcher",
+          "execution_ref": "exec-0001",
+          "audience": "horizon.local",
+          "operations": [
+            "horizon.note.save",
+            "horizon.draft.save"
+          ],
+          "resource_selectors": [
+            "note:desk"
+          ],
+          "data_labels": [
+            "internal"
+          ],
+          "budget": {
+            "amount": "1000",
+            "unit": "tokens",
+            "remaining": "1000"
+          },
+          "not_before": "2026-11-09T12:00:00Z",
+          "expires_at": "2026-11-09T20:00:00Z",
+          "depth_remaining": "1",
+          "redelegate": true,
+          "offline": false,
+          "human_evidence": "A3-UV",
+          "authority_epoch": "7"
+        }
+      },
+      "record": {
+        "grant_ref": "grant-0002",
+        "parent_ref": "grant-0001",
+        "delegator_ref": "agent:stranger",
+        "agent_ref": "agent:helper",
+        "execution_ref": "exec-0002",
+        "audience": "horizon.local",
+        "operations": [
+          "horizon.note.save"
+        ],
+        "resource_selectors": [
+          "note:desk"
+        ],
+        "data_labels": [
+          "internal"
+        ],
+        "budget": {
+          "amount": "500",
+          "unit": "tokens",
+          "remaining": "500"
+        },
+        "not_before": "2026-11-09T12:05:00Z",
+        "expires_at": "2026-11-09T18:00:00Z",
+        "depth_remaining": "0",
+        "redelegate": false,
+        "offline": false,
+        "human_evidence": "A3-UV",
+        "authority_epoch": "7",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "GRANT-CHILD-BUDGET",
+      "kind": "DelegationGrant",
+      "expect": "invalid",
+      "violations": [
+        "constraint:child_subset_of_parent"
+      ],
+      "context": {
+        "parent_grant": {
+          "grant_ref": "grant-0001",
+          "parent_ref": null,
+          "delegator_ref": "operator:sprime01",
+          "agent_ref": "agent:researcher",
+          "execution_ref": "exec-0001",
+          "audience": "horizon.local",
+          "operations": [
+            "horizon.note.save",
+            "horizon.draft.save"
+          ],
+          "resource_selectors": [
+            "note:desk"
+          ],
+          "data_labels": [
+            "internal"
+          ],
+          "budget": {
+            "amount": "1000",
+            "unit": "tokens",
+            "remaining": "1000"
+          },
+          "not_before": "2026-11-09T12:00:00Z",
+          "expires_at": "2026-11-09T20:00:00Z",
+          "depth_remaining": "1",
+          "redelegate": true,
+          "offline": false,
+          "human_evidence": "A3-UV",
+          "authority_epoch": "7"
+        }
+      },
+      "record": {
+        "grant_ref": "grant-0002",
+        "parent_ref": "grant-0001",
+        "delegator_ref": "agent:researcher",
+        "agent_ref": "agent:helper",
+        "execution_ref": "exec-0002",
+        "audience": "horizon.local",
+        "operations": [
+          "horizon.note.save"
+        ],
+        "resource_selectors": [
+          "note:desk"
+        ],
+        "data_labels": [
+          "internal"
+        ],
+        "budget": {
+          "amount": "5000",
+          "unit": "tokens",
+          "remaining": "5000"
+        },
+        "not_before": "2026-11-09T12:05:00Z",
+        "expires_at": "2026-11-09T18:00:00Z",
+        "depth_remaining": "0",
+        "redelegate": false,
+        "offline": false,
+        "human_evidence": "A3-UV",
+        "authority_epoch": "7",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "GRANT-CHILD-DEEPER",
+      "kind": "DelegationGrant",
+      "expect": "invalid",
+      "violations": [
+        "constraint:child_subset_of_parent"
+      ],
+      "context": {
+        "parent_grant": {
+          "grant_ref": "grant-0001",
+          "parent_ref": null,
+          "delegator_ref": "operator:sprime01",
+          "agent_ref": "agent:researcher",
+          "execution_ref": "exec-0001",
+          "audience": "horizon.local",
+          "operations": [
+            "horizon.note.save",
+            "horizon.draft.save"
+          ],
+          "resource_selectors": [
+            "note:desk"
+          ],
+          "data_labels": [
+            "internal"
+          ],
+          "budget": {
+            "amount": "1000",
+            "unit": "tokens",
+            "remaining": "1000"
+          },
+          "not_before": "2026-11-09T12:00:00Z",
+          "expires_at": "2026-11-09T20:00:00Z",
+          "depth_remaining": "1",
+          "redelegate": true,
+          "offline": false,
+          "human_evidence": "A3-UV",
+          "authority_epoch": "7"
+        }
+      },
+      "record": {
+        "grant_ref": "grant-0002",
+        "parent_ref": "grant-0001",
+        "delegator_ref": "agent:researcher",
+        "agent_ref": "agent:helper",
+        "execution_ref": "exec-0002",
+        "audience": "horizon.local",
+        "operations": [
+          "horizon.note.save"
+        ],
+        "resource_selectors": [
+          "note:desk"
+        ],
+        "data_labels": [
+          "internal"
+        ],
+        "budget": {
+          "amount": "500",
+          "unit": "tokens",
+          "remaining": "500"
+        },
+        "not_before": "2026-11-09T12:05:00Z",
+        "expires_at": "2026-11-09T18:00:00Z",
+        "depth_remaining": "2",
+        "redelegate": false,
+        "offline": false,
+        "human_evidence": "A3-UV",
+        "authority_epoch": "7",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "GRANT-CHILD-LONGER-EXPIRY",
+      "kind": "DelegationGrant",
+      "expect": "invalid",
+      "violations": [
+        "constraint:child_subset_of_parent"
+      ],
+      "context": {
+        "parent_grant": {
+          "grant_ref": "grant-0001",
+          "parent_ref": null,
+          "delegator_ref": "operator:sprime01",
+          "agent_ref": "agent:researcher",
+          "execution_ref": "exec-0001",
+          "audience": "horizon.local",
+          "operations": [
+            "horizon.note.save",
+            "horizon.draft.save"
+          ],
+          "resource_selectors": [
+            "note:desk"
+          ],
+          "data_labels": [
+            "internal"
+          ],
+          "budget": {
+            "amount": "1000",
+            "unit": "tokens",
+            "remaining": "1000"
+          },
+          "not_before": "2026-11-09T12:00:00Z",
+          "expires_at": "2026-11-09T20:00:00Z",
+          "depth_remaining": "1",
+          "redelegate": true,
+          "offline": false,
+          "human_evidence": "A3-UV",
+          "authority_epoch": "7"
+        }
+      },
+      "record": {
+        "grant_ref": "grant-0002",
+        "parent_ref": "grant-0001",
+        "delegator_ref": "agent:researcher",
+        "agent_ref": "agent:helper",
+        "execution_ref": "exec-0002",
+        "audience": "horizon.local",
+        "operations": [
+          "horizon.note.save"
+        ],
+        "resource_selectors": [
+          "note:desk"
+        ],
+        "data_labels": [
+          "internal"
+        ],
+        "budget": {
+          "amount": "500",
+          "unit": "tokens",
+          "remaining": "500"
+        },
+        "not_before": "2026-11-09T12:05:00Z",
+        "expires_at": "2026-11-10T00:00:00Z",
+        "depth_remaining": "0",
+        "redelegate": false,
+        "offline": false,
+        "human_evidence": "A3-UV",
+        "authority_epoch": "7",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "GRANT-CHILD-OK",
+      "kind": "DelegationGrant",
+      "expect": "valid",
+      "violations": [],
+      "context": {
+        "parent_grant": {
+          "grant_ref": "grant-0001",
+          "parent_ref": null,
+          "delegator_ref": "operator:sprime01",
+          "agent_ref": "agent:researcher",
+          "execution_ref": "exec-0001",
+          "audience": "horizon.local",
+          "operations": [
+            "horizon.note.save",
+            "horizon.draft.save"
+          ],
+          "resource_selectors": [
+            "note:desk"
+          ],
+          "data_labels": [
+            "internal"
+          ],
+          "budget": {
+            "amount": "1000",
+            "unit": "tokens",
+            "remaining": "1000"
+          },
+          "not_before": "2026-11-09T12:00:00Z",
+          "expires_at": "2026-11-09T20:00:00Z",
+          "depth_remaining": "1",
+          "redelegate": true,
+          "offline": false,
+          "human_evidence": "A3-UV",
+          "authority_epoch": "7"
+        }
+      },
+      "record": {
+        "grant_ref": "grant-0002",
+        "parent_ref": "grant-0001",
+        "delegator_ref": "agent:researcher",
+        "agent_ref": "agent:helper",
+        "execution_ref": "exec-0002",
+        "audience": "horizon.local",
+        "operations": [
+          "horizon.note.save"
+        ],
+        "resource_selectors": [
+          "note:desk"
+        ],
+        "data_labels": [
+          "internal"
+        ],
+        "budget": {
+          "amount": "500",
+          "unit": "tokens",
+          "remaining": "500"
+        },
+        "not_before": "2026-11-09T12:05:00Z",
+        "expires_at": "2026-11-09T18:00:00Z",
+        "depth_remaining": "0",
+        "redelegate": false,
+        "offline": false,
+        "human_evidence": "A3-UV",
+        "authority_epoch": "7",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "GRANT-CHILD-REDELEGATE",
+      "kind": "DelegationGrant",
+      "expect": "invalid",
+      "violations": [
+        "constraint:child_subset_of_parent"
+      ],
+      "context": {
+        "parent_grant": {
+          "grant_ref": "grant-0001",
+          "parent_ref": null,
+          "delegator_ref": "operator:sprime01",
+          "agent_ref": "agent:researcher",
+          "execution_ref": "exec-0001",
+          "audience": "horizon.local",
+          "operations": [
+            "horizon.note.save",
+            "horizon.draft.save"
+          ],
+          "resource_selectors": [
+            "note:desk"
+          ],
+          "data_labels": [
+            "internal"
+          ],
+          "budget": {
+            "amount": "1000",
+            "unit": "tokens",
+            "remaining": "1000"
+          },
+          "not_before": "2026-11-09T12:00:00Z",
+          "expires_at": "2026-11-09T20:00:00Z",
+          "depth_remaining": "1",
+          "redelegate": false,
+          "offline": false,
+          "human_evidence": "A3-UV",
+          "authority_epoch": "7"
+        }
+      },
+      "record": {
+        "grant_ref": "grant-0002",
+        "parent_ref": "grant-0001",
+        "delegator_ref": "agent:researcher",
+        "agent_ref": "agent:helper",
+        "execution_ref": "exec-0002",
+        "audience": "horizon.local",
+        "operations": [
+          "horizon.note.save"
+        ],
+        "resource_selectors": [
+          "note:desk"
+        ],
+        "data_labels": [
+          "internal"
+        ],
+        "budget": {
+          "amount": "500",
+          "unit": "tokens",
+          "remaining": "500"
+        },
+        "not_before": "2026-11-09T12:05:00Z",
+        "expires_at": "2026-11-09T18:00:00Z",
+        "depth_remaining": "0",
+        "redelegate": true,
+        "offline": false,
+        "human_evidence": "A3-UV",
+        "authority_epoch": "7",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "GRANT-CHILD-WIDER-OPERATIONS",
+      "kind": "DelegationGrant",
+      "expect": "invalid",
+      "violations": [
+        "constraint:child_subset_of_parent"
+      ],
+      "context": {
+        "parent_grant": {
+          "grant_ref": "grant-0001",
+          "parent_ref": null,
+          "delegator_ref": "operator:sprime01",
+          "agent_ref": "agent:researcher",
+          "execution_ref": "exec-0001",
+          "audience": "horizon.local",
+          "operations": [
+            "horizon.note.save",
+            "horizon.draft.save"
+          ],
+          "resource_selectors": [
+            "note:desk"
+          ],
+          "data_labels": [
+            "internal"
+          ],
+          "budget": {
+            "amount": "1000",
+            "unit": "tokens",
+            "remaining": "1000"
+          },
+          "not_before": "2026-11-09T12:00:00Z",
+          "expires_at": "2026-11-09T20:00:00Z",
+          "depth_remaining": "1",
+          "redelegate": true,
+          "offline": false,
+          "human_evidence": "A3-UV",
+          "authority_epoch": "7"
+        }
+      },
+      "record": {
+        "grant_ref": "grant-0002",
+        "parent_ref": "grant-0001",
+        "delegator_ref": "agent:researcher",
+        "agent_ref": "agent:helper",
+        "execution_ref": "exec-0002",
+        "audience": "horizon.local",
+        "operations": [
+          "horizon.note.save",
+          "workspace.export"
+        ],
+        "resource_selectors": [
+          "note:desk"
+        ],
+        "data_labels": [
+          "internal"
+        ],
+        "budget": {
+          "amount": "500",
+          "unit": "tokens",
+          "remaining": "500"
+        },
+        "not_before": "2026-11-09T12:05:00Z",
+        "expires_at": "2026-11-09T18:00:00Z",
+        "depth_remaining": "0",
+        "redelegate": false,
+        "offline": false,
+        "human_evidence": "A3-UV",
+        "authority_epoch": "7",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "GRANT-MISSING-HUMAN-EVIDENCE",
+      "kind": "DelegationGrant",
+      "expect": "invalid",
+      "violations": [
+        "missing:human_evidence"
+      ],
+      "record": {
+        "grant_ref": "grant-0001",
+        "parent_ref": null,
+        "delegator_ref": "operator:sprime01",
+        "agent_ref": "agent:researcher",
+        "execution_ref": "exec-0001",
+        "audience": "horizon.local",
+        "operations": [
+          "horizon.note.save",
+          "horizon.draft.save"
+        ],
+        "resource_selectors": [
+          "note:desk"
+        ],
+        "data_labels": [
+          "internal"
+        ],
+        "budget": {
+          "amount": "1000",
+          "unit": "tokens",
+          "remaining": "1000"
+        },
+        "not_before": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T20:00:00Z",
+        "depth_remaining": "1",
+        "redelegate": true,
+        "offline": false,
+        "authority_epoch": "7",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "GRANT-ROOT-OK",
+      "kind": "DelegationGrant",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "grant_ref": "grant-0001",
+        "parent_ref": null,
+        "delegator_ref": "operator:sprime01",
+        "agent_ref": "agent:researcher",
+        "execution_ref": "exec-0001",
+        "audience": "horizon.local",
+        "operations": [
+          "horizon.note.save",
+          "horizon.draft.save"
+        ],
+        "resource_selectors": [
+          "note:desk"
+        ],
+        "data_labels": [
+          "internal"
+        ],
+        "budget": {
+          "amount": "1000",
+          "unit": "tokens",
+          "remaining": "1000"
+        },
+        "not_before": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T20:00:00Z",
+        "depth_remaining": "1",
+        "redelegate": true,
+        "offline": false,
+        "human_evidence": "A3-UV",
+        "authority_epoch": "7",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "FENCE-BOTH-AUTHORITIES",
+      "kind": "EffectFence",
+      "expect": "invalid",
+      "violations": [
+        "constraint:fence_authority_exactly_one"
+      ],
+      "record": {
+        "fence_ref": "fence-0001",
+        "caller_ref": "agent:researcher",
+        "decision_ref": "decision-0001",
+        "grant_ref": "grant-0001",
+        "entitlement_ref": "entitlement-0001",
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "amount": {
+          "amount": "25",
+          "unit": "tokens"
+        },
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "expires_at": "2026-11-09T12:05:00Z",
+        "authority_epoch": "7",
+        "dispatch_epoch": "7",
+        "supersedes_ref": null,
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "FENCE-CALLER-IS-TARGET",
+      "kind": "EffectFence",
+      "expect": "invalid",
+      "violations": [
+        "constraint:caller_is_not_target"
+      ],
+      "record": {
+        "fence_ref": "fence-0001",
+        "caller_ref": "exec-0001",
+        "decision_ref": "decision-0001",
+        "grant_ref": "grant-0001",
+        "entitlement_ref": null,
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "amount": {
+          "amount": "25",
+          "unit": "tokens"
+        },
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "expires_at": "2026-11-09T12:05:00Z",
+        "authority_epoch": "7",
+        "dispatch_epoch": "7",
+        "supersedes_ref": null,
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "FENCE-HUMAN-ENTITLEMENT-OK",
+      "kind": "EffectFence",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "fence_ref": "fence-0001",
+        "caller_ref": "operator:sprime01",
+        "decision_ref": "decision-0001",
+        "grant_ref": null,
+        "entitlement_ref": "entitlement-0001",
+        "execution_ref": null,
+        "attempt_ref": null,
+        "resource_refs": [
+          "note:desk"
+        ],
+        "amount": {
+          "amount": "25",
+          "unit": "tokens"
+        },
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "expires_at": "2026-11-09T12:05:00Z",
+        "authority_epoch": "7",
+        "dispatch_epoch": "7",
+        "supersedes_ref": null,
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "FENCE-MISSING-AMOUNT",
+      "kind": "EffectFence",
+      "expect": "invalid",
+      "violations": [
+        "missing:amount"
+      ],
+      "record": {
+        "fence_ref": "fence-0001",
+        "caller_ref": "agent:researcher",
+        "decision_ref": "decision-0001",
+        "grant_ref": "grant-0001",
+        "entitlement_ref": null,
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "expires_at": "2026-11-09T12:05:00Z",
+        "authority_epoch": "7",
+        "dispatch_epoch": "7",
+        "supersedes_ref": null,
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "FENCE-NO-AUTHORITY",
+      "kind": "EffectFence",
+      "expect": "invalid",
+      "violations": [
+        "constraint:fence_authority_exactly_one"
+      ],
+      "record": {
+        "fence_ref": "fence-0001",
+        "caller_ref": "agent:researcher",
+        "decision_ref": "decision-0001",
+        "grant_ref": null,
+        "entitlement_ref": null,
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "amount": {
+          "amount": "25",
+          "unit": "tokens"
+        },
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "expires_at": "2026-11-09T12:05:00Z",
+        "authority_epoch": "7",
+        "dispatch_epoch": "7",
+        "supersedes_ref": null,
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "FENCE-OK",
+      "kind": "EffectFence",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "fence_ref": "fence-0001",
+        "caller_ref": "agent:researcher",
+        "decision_ref": "decision-0001",
+        "grant_ref": "grant-0001",
+        "entitlement_ref": null,
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "amount": {
+          "amount": "25",
+          "unit": "tokens"
+        },
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "expires_at": "2026-11-09T12:05:00Z",
+        "authority_epoch": "7",
+        "dispatch_epoch": "7",
+        "supersedes_ref": null,
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "FENCE-SUPERSEDES-FIRST",
+      "kind": "EffectFence",
+      "expect": "invalid",
+      "violations": [
+        "constraint:supersedes_chain"
+      ],
+      "context": {
+        "previous_ref": null
+      },
+      "record": {
+        "fence_ref": "fence-0001",
+        "caller_ref": "agent:researcher",
+        "decision_ref": "decision-0001",
+        "grant_ref": "grant-0001",
+        "entitlement_ref": null,
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "amount": {
+          "amount": "25",
+          "unit": "tokens"
+        },
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "expires_at": "2026-11-09T12:05:00Z",
+        "authority_epoch": "7",
+        "dispatch_epoch": "7",
+        "supersedes_ref": "fence-0000",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "FENCE-SUPERSEDES-OK",
+      "kind": "EffectFence",
+      "expect": "valid",
+      "violations": [],
+      "context": {
+        "previous_ref": "fence-0000"
+      },
+      "record": {
+        "fence_ref": "fence-0001",
+        "caller_ref": "agent:researcher",
+        "decision_ref": "decision-0001",
+        "grant_ref": "grant-0001",
+        "entitlement_ref": null,
+        "execution_ref": "exec-0001",
+        "attempt_ref": "attempt-0001",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "amount": {
+          "amount": "25",
+          "unit": "tokens"
+        },
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "expires_at": "2026-11-09T12:05:00Z",
+        "authority_epoch": "7",
+        "dispatch_epoch": "7",
+        "supersedes_ref": "fence-0000",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "EVIDENCE-BAD-OUTCOME",
+      "kind": "EvidenceRecord",
+      "expect": "invalid",
+      "violations": [
+        "enum:outcome"
+      ],
+      "record": {
+        "producer": "realitytrace",
+        "producer_record_id": "rt-0001",
+        "trace_id": "trace-0001",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "refs": [
+          "step:1"
+        ],
+        "assurance_predicate": "observed",
+        "authority_epoch": "7",
+        "issuer_generation": "3",
+        "outcome": "succeeded",
+        "content_hash": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "supersedes_ref": null,
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "EVIDENCE-CREDENTIAL-LEAK",
+      "kind": "EvidenceRecord",
+      "expect": "invalid",
+      "violations": [
+        "unknown:credential"
+      ],
+      "record": {
+        "producer": "realitytrace",
+        "producer_record_id": "rt-0001",
+        "trace_id": "trace-0001",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "refs": [
+          "step:1"
+        ],
+        "assurance_predicate": "observed",
+        "authority_epoch": "7",
+        "issuer_generation": "3",
+        "outcome": "observed",
+        "content_hash": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "supersedes_ref": null,
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "credential": {
+          "sub": "agent:researcher",
+          "jti": "cred-0001"
+        },
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "EVIDENCE-OK",
+      "kind": "EvidenceRecord",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "producer": "realitytrace",
+        "producer_record_id": "rt-0001",
+        "trace_id": "trace-0001",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "refs": [
+          "step:1"
+        ],
+        "assurance_predicate": "observed",
+        "authority_epoch": "7",
+        "issuer_generation": "3",
+        "outcome": "observed",
+        "content_hash": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "supersedes_ref": null,
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "EVIDENCE-SUPERSEDES-MISMATCH",
+      "kind": "EvidenceRecord",
+      "expect": "invalid",
+      "violations": [
+        "constraint:supersedes_chain"
+      ],
+      "context": {
+        "previous_ref": "ev-0000"
+      },
+      "record": {
+        "producer": "realitytrace",
+        "producer_record_id": "rt-0001",
+        "trace_id": "trace-0001",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "refs": [
+          "step:1"
+        ],
+        "assurance_predicate": "observed",
+        "authority_epoch": "7",
+        "issuer_generation": "3",
+        "outcome": "observed",
+        "content_hash": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "supersedes_ref": "ev-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "EVIDENCE-SUPERSEDES-OK",
+      "kind": "EvidenceRecord",
+      "expect": "valid",
+      "violations": [],
+      "context": {
+        "previous_ref": "ev-0000"
+      },
+      "record": {
+        "producer": "realitytrace",
+        "producer_record_id": "rt-0001",
+        "trace_id": "trace-0001",
+        "operation_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "refs": [
+          "step:1"
+        ],
+        "assurance_predicate": "observed",
+        "authority_epoch": "7",
+        "issuer_generation": "3",
+        "outcome": "observed",
+        "content_hash": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "supersedes_ref": "ev-0000",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-AGENT-GOVERNED-NO-DELEGATION",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "constraint:governed_agent_needs_delegation"
+      ],
+      "proof": "no_classification_downgrade",
+      "catalog": {
+        "operation_id": "workspace.label",
+        "class": "P2",
+        "params_schema": "params.workspace_label"
+      },
+      "record": {
+        "operation_id": "workspace.label",
+        "caller_kind": "agent_execution",
+        "caller_ref": "agent:researcher",
+        "parameters": {
+          "target_ref": "case:1",
+          "label": "urgent",
+          "expected_revision": "2"
+        },
+        "params_schema_ref": "params.workspace_label",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": "exec-0001",
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-AGENT-GOVERNED-OK",
+      "kind": "OperationDescriptor",
+      "expect": "valid",
+      "violations": [],
+      "proof": "no_fabricated_grant",
+      "catalog": {
+        "operation_id": "workspace.label",
+        "class": "P2",
+        "params_schema": "params.workspace_label"
+      },
+      "record": {
+        "operation_id": "workspace.label",
+        "caller_kind": "agent_execution",
+        "caller_ref": "agent:researcher",
+        "parameters": {
+          "target_ref": "case:1",
+          "label": "urgent",
+          "expected_revision": "2"
+        },
+        "params_schema_ref": "params.workspace_label",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": "exec-0001",
+        "delegation_ref": "grant-0001",
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-AGENT-NO-EXECUTION",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "constraint:agent_needs_execution"
+      ],
+      "proof": "caller_not_substitutable",
+      "catalog": {
+        "operation_id": "horizon.note.save",
+        "class": "P1",
+        "params_schema": "params.local_write"
+      },
+      "record": {
+        "operation_id": "horizon.note.save",
+        "caller_kind": "agent_execution",
+        "caller_ref": "agent:researcher",
+        "parameters": {
+          "target_ref": "note:desk",
+          "expected_revision": "4",
+          "value": {
+            "text": "hi"
+          }
+        },
+        "params_schema_ref": "params.local_write",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": null,
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-AGENT-P1-NO-DELEGATION-OK",
+      "kind": "OperationDescriptor",
+      "expect": "valid",
+      "violations": [],
+      "proof": "caller_not_substitutable",
+      "catalog": {
+        "operation_id": "horizon.note.save",
+        "class": "P1",
+        "params_schema": "params.local_write"
+      },
+      "record": {
+        "operation_id": "horizon.note.save",
+        "caller_kind": "agent_execution",
+        "caller_ref": "exec-0001",
+        "parameters": {
+          "target_ref": "note:desk",
+          "expected_revision": "4",
+          "value": {
+            "text": "hi"
+          }
+        },
+        "params_schema_ref": "params.local_write",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": "exec-0001",
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-ALIAS-ACTION-MISMATCH",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "constraint:alias_fixes_action"
+      ],
+      "proof": "no_classification_downgrade",
+      "catalog": {
+        "operation_id": "remote.stop",
+        "class": "P2",
+        "params_schema": "params.remote_control",
+        "alias_fixed": {
+          "field": "action",
+          "value": "stop"
+        }
+      },
+      "record": {
+        "operation_id": "remote.stop",
+        "caller_kind": "human_session",
+        "caller_ref": "operator:sprime01",
+        "parameters": {
+          "action": "start"
+        },
+        "params_schema_ref": "params.remote_control",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": null,
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-ALIAS-ACTION-OK",
+      "kind": "OperationDescriptor",
+      "expect": "valid",
+      "violations": [],
+      "proof": "no_classification_downgrade",
+      "catalog": {
+        "operation_id": "remote.stop",
+        "class": "P2",
+        "params_schema": "params.remote_control",
+        "alias_fixed": {
+          "field": "action",
+          "value": "stop"
+        }
+      },
+      "record": {
+        "operation_id": "remote.stop",
+        "caller_kind": "human_session",
+        "caller_ref": "operator:sprime01",
+        "parameters": {
+          "action": "stop"
+        },
+        "params_schema_ref": "params.remote_control",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": null,
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-BAD-TIMESTAMP",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "type:issued_at:timestamp"
+      ],
+      "catalog": {
+        "operation_id": "horizon.note.save",
+        "class": "P1",
+        "params_schema": "params.local_write"
+      },
+      "record": {
+        "operation_id": "horizon.note.save",
+        "caller_kind": "human_session",
+        "caller_ref": "operator:sprime01",
+        "parameters": {
+          "target_ref": "note:desk",
+          "expected_revision": "4",
+          "value": {
+            "text": "hi"
+          }
+        },
+        "params_schema_ref": "params.local_write",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00+00:00",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": null,
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-CALLER-KIND-ENUM",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "enum:caller_kind"
+      ],
+      "proof": "caller_not_substitutable",
+      "catalog": {
+        "operation_id": "horizon.note.save",
+        "class": "P1",
+        "params_schema": "params.local_write"
+      },
+      "record": {
+        "operation_id": "horizon.note.save",
+        "caller_kind": "human",
+        "caller_ref": "operator:sprime01",
+        "parameters": {
+          "target_ref": "note:desk",
+          "expected_revision": "4",
+          "value": {
+            "text": "hi"
+          }
+        },
+        "params_schema_ref": "params.local_write",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": null,
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-CONSOLE-WITH-EXECUTION",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "constraint:console_has_no_execution"
+      ],
+      "proof": "caller_not_substitutable",
+      "catalog": {
+        "operation_id": "device.pair",
+        "class": "P2",
+        "params_schema": "params.device_pair"
+      },
+      "record": {
+        "operation_id": "device.pair",
+        "caller_kind": "local_console",
+        "caller_ref": "console:local",
+        "parameters": {
+          "device_label": "console",
+          "credential_id": "cred-0002",
+          "public_key": {
+            "kty": "EC",
+            "crv": "P-256",
+            "x": "Zml2ZS1wdWJsaWMta2V5LXg",
+            "y": "Zml2ZS1wdWJsaWMta2V5LXk"
+          }
+        },
+        "params_schema_ref": "params.device_pair",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": "exec-0001",
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-DISPATCH-NO-TARGET",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "constraint:dispatcher_target_listed"
+      ],
+      "proof": "no_classification_downgrade",
+      "catalog": {
+        "operation_id": "capability.invoke",
+        "class": "PX",
+        "params_schema": "params.capability_invoke",
+        "listed_targets": [
+          "horizon.note.save",
+          "horizon.draft.save"
+        ]
+      },
+      "record": {
+        "operation_id": "capability.invoke",
+        "caller_kind": "agent_execution",
+        "caller_ref": "agent:researcher",
+        "parameters": {
+          "parameters": {},
+          "resource_refs": [
+            "note:desk"
+          ],
+          "amount": {
+            "value": "1",
+            "unit": "calls"
+          },
+          "idempotency_key": "idem-0003"
+        },
+        "params_schema_ref": "params.capability_invoke",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": "exec-0001",
+        "delegation_ref": "grant-0001",
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-DISPATCH-UNLISTED-TARGET",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "constraint:dispatcher_target_listed"
+      ],
+      "proof": "no_classification_downgrade",
+      "catalog": {
+        "operation_id": "capability.invoke",
+        "class": "PX",
+        "params_schema": "params.capability_invoke",
+        "listed_targets": [
+          "horizon.note.save",
+          "horizon.draft.save"
+        ]
+      },
+      "record": {
+        "operation_id": "capability.invoke",
+        "caller_kind": "agent_execution",
+        "caller_ref": "agent:researcher",
+        "parameters": {
+          "target_operation": "agent.surface.publish.hidden",
+          "parameters": {},
+          "resource_refs": [
+            "note:desk"
+          ],
+          "amount": {
+            "value": "1",
+            "unit": "calls"
+          },
+          "idempotency_key": "idem-0002"
+        },
+        "params_schema_ref": "params.capability_invoke",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": "exec-0001",
+        "delegation_ref": "grant-0001",
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-HUMAN-OK",
+      "kind": "OperationDescriptor",
+      "expect": "valid",
+      "violations": [],
+      "proof": "no_fabricated_grant",
+      "catalog": {
+        "operation_id": "horizon.note.save",
+        "class": "P1",
+        "params_schema": "params.local_write"
+      },
+      "record": {
+        "operation_id": "horizon.note.save",
+        "caller_kind": "human_session",
+        "caller_ref": "operator:sprime01",
+        "parameters": {
+          "target_ref": "note:desk",
+          "expected_revision": "4",
+          "value": {
+            "text": "hi"
+          }
+        },
+        "params_schema_ref": "params.local_write",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": null,
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-HUMAN-RUN-START-GRANT",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "constraint:human_has_no_grant"
+      ],
+      "proof": "no_fabricated_grant",
+      "catalog": {
+        "operation_id": "run.start",
+        "class": "PX",
+        "params_schema": "params.run_start",
+        "listed_targets": [
+          "horizon.note.save"
+        ]
+      },
+      "record": {
+        "operation_id": "run.start",
+        "caller_kind": "human_session",
+        "caller_ref": "operator:sprime01",
+        "parameters": {
+          "plan_ref": "plan:local",
+          "resolved_operations": [
+            "horizon.note.save"
+          ],
+          "resolved_predicates": {},
+          "expected_revision": "4",
+          "grant_ref": "grant-0009"
+        },
+        "params_schema_ref": "params.run_start",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": null,
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-HUMAN-WITH-CREDENTIAL",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "constraint:human_has_no_credential"
+      ],
+      "proof": "caller_not_substitutable",
+      "catalog": {
+        "operation_id": "horizon.note.save",
+        "class": "P1",
+        "params_schema": "params.local_write"
+      },
+      "record": {
+        "operation_id": "horizon.note.save",
+        "caller_kind": "human_session",
+        "caller_ref": "operator:sprime01",
+        "parameters": {
+          "target_ref": "note:desk",
+          "expected_revision": "4",
+          "value": {
+            "text": "hi"
+          }
+        },
+        "params_schema_ref": "params.local_write",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": "exec-0001",
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-HUMAN-WITH-DELEGATION",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "constraint:human_has_no_grant"
+      ],
+      "proof": "no_fabricated_grant",
+      "catalog": {
+        "operation_id": "horizon.note.save",
+        "class": "P1",
+        "params_schema": "params.local_write"
+      },
+      "record": {
+        "operation_id": "horizon.note.save",
+        "caller_kind": "human_session",
+        "caller_ref": "operator:sprime01",
+        "parameters": {
+          "target_ref": "note:desk",
+          "expected_revision": "4",
+          "value": {
+            "text": "hi"
+          }
+        },
+        "params_schema_ref": "params.local_write",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": null,
+        "delegation_ref": "grant-0001",
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-MISSING-IDEMPOTENCY",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "missing:idempotency_key"
+      ],
+      "catalog": {
+        "operation_id": "horizon.note.save",
+        "class": "P1",
+        "params_schema": "params.local_write"
+      },
+      "record": {
+        "operation_id": "horizon.note.save",
+        "caller_kind": "human_session",
+        "caller_ref": "operator:sprime01",
+        "parameters": {
+          "target_ref": "note:desk",
+          "expected_revision": "4",
+          "value": {
+            "text": "hi"
+          }
+        },
+        "params_schema_ref": "params.local_write",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": null,
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-NONCE-REUSED",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "constraint:nonce_not_reused"
+      ],
+      "catalog": {
+        "operation_id": "horizon.note.save",
+        "class": "P1",
+        "params_schema": "params.local_write"
+      },
+      "context": {
+        "previous_nonces": [
+          "bm9uY2UtMDAwMDAwMDAwMDAx"
+        ]
+      },
+      "record": {
+        "operation_id": "horizon.note.save",
+        "caller_kind": "human_session",
+        "caller_ref": "operator:sprime01",
+        "parameters": {
+          "target_ref": "note:desk",
+          "expected_revision": "4",
+          "value": {
+            "text": "hi"
+          }
+        },
+        "params_schema_ref": "params.local_write",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": null,
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "OD-P2-WEAK-PARAMS",
+      "kind": "OperationDescriptor",
+      "expect": "invalid",
+      "violations": [
+        "constraint:params_schema_mismatch"
+      ],
+      "proof": "no_classification_downgrade",
+      "catalog": {
+        "operation_id": "workspace.label",
+        "class": "P2",
+        "params_schema": "params.workspace_label"
+      },
+      "record": {
+        "operation_id": "workspace.label",
+        "caller_kind": "human_session",
+        "caller_ref": "operator:sprime01",
+        "parameters": {
+          "target_ref": "case:1",
+          "query": null,
+          "expected_revision": "2"
+        },
+        "params_schema_ref": "params.read",
+        "nonce": "bm9uY2UtMDAwMDAwMDAwMDAx",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "expires_at": "2026-11-09T12:15:00Z",
+        "resource_refs": [
+          "note:desk"
+        ],
+        "expected_revision": "4",
+        "world_ref": "world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b",
+        "case_ref": null,
+        "frame_ref": null,
+        "execution_ref": null,
+        "delegation_ref": null,
+        "policy_digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "idempotency_key": "idem-0001",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy",
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issuer_ref": "issuer:horizon-local"
+      }
+    },
+    {
+      "id": "REFUSAL-BAD-EFFECT",
+      "kind": "Refusal",
+      "expect": "invalid",
+      "violations": [
+        "enum:effect"
+      ],
+      "record": {
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local",
+        "code": "insufficient_evidence",
+        "boundary": "sea-forge",
+        "operation_id": "handoff.send",
+        "effect": "maybe",
+        "missing_or_expired": "A3-UV",
+        "repair": "Complete the passkey verification and retry."
+      }
+    },
+    {
+      "id": "REFUSAL-NO-REPAIR-OK",
+      "kind": "Refusal",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local",
+        "code": "insufficient_evidence",
+        "boundary": "sea-forge",
+        "operation_id": "handoff.send",
+        "effect": "none",
+        "missing_or_expired": "A3-UV",
+        "repair": null
+      }
+    },
+    {
+      "id": "REFUSAL-OK",
+      "kind": "Refusal",
+      "expect": "valid",
+      "violations": [],
+      "record": {
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local",
+        "code": "insufficient_evidence",
+        "boundary": "sea-forge",
+        "operation_id": "handoff.send",
+        "effect": "none",
+        "missing_or_expired": "A3-UV",
+        "repair": "Complete the passkey verification and retry."
+      }
+    },
+    {
+      "id": "REFUSAL-SIGNED",
+      "kind": "Refusal",
+      "expect": "invalid",
+      "violations": [
+        "unknown:signature"
+      ],
+      "record": {
+        "schema_version": "horizon.identity.record/1",
+        "tenant_ref": "tenant:horizon",
+        "trust_domain_ref": "td:local:horizon",
+        "issued_at": "2026-11-09T12:00:00Z",
+        "issuer_ref": "issuer:horizon-local",
+        "code": "insufficient_evidence",
+        "boundary": "sea-forge",
+        "operation_id": "handoff.send",
+        "effect": "none",
+        "missing_or_expired": "A3-UV",
+        "repair": "Complete the passkey verification and retry.",
+        "signature": "c2lnbmF0dXJlLWNvbnRyYWN0LXBsYWNlaG9sZGVy"
+      }
+    }
+  ]
+}

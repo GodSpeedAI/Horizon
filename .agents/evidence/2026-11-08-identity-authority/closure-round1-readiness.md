@@ -1,0 +1,21 @@
+1. **Blocker — [design_draft.md:132](/design_draft.md:132), 332, 407 — F01/F06 remain incomplete.** Wire rules and grouped operation names do not specify typed schemas, nullability, per-operation parameters, permitted executors, ownership predicates, or budget units. **Correction:** supply the versioned record and effect-interface schemas plus individual operation rows, including numeric representation, units, and clock-tolerance semantics. Stage 0A must validate these contracts rather than require implementers to design them.
+
+2. **Blocker — [design_draft.md:174](/design_draft.md:174), 177, 336 — F04 remains contradictory.** The local path permits only P0/P1; all P2 apparently require issuer proof and SEA-Forge, yet local P2 continuations remain Cognate-owned. Human callers also lack the required agent execution proof. **Correction:** enumerate local-human, local-agent, and governed branches; assign each operation one pending-record writer and explicit human/execution proof requirements.
+
+3. **Blocker — [design_draft.md:337](/design_draft.md:337) — F05 leaves approval policy implicit.** `approval.approve`/`reject` inherit a P3 row permitting no human evidence; separation-of-duty subjects are unspecified. **Correction:** give these operations dedicated rows preserving required independent human confirmation and naming the requester, executor, and approver comparisons. Autonomous P3 execution must not authorize self-approval.
+
+4. **Major — [design_draft.md:260](/design_draft.md:260), 343, 405 — Recovery rules conflict.** Recovery requires a code or second device, while the bootstrap exception permits physical-presence recovery without explicitly requiring either. **Correction:** distinguish initial pairing, anchored replacement, and trust rotation; state each ceremony’s mandatory credentials and whether an existing paired device can authorize replacement.
+
+5. **Blocker — [design_draft.md:360](/design_draft.md:360), 367 — F08 is not independently executable.** “Local store” and “one-time code” leave the pending-record owner, terminal entry point, human authentication, code delivery, and atomic consumption unspecified. Pairing also conflicts with the physical-presence exception. **Correction:** name exact files, command/API, existing record adapter, binding/consumption procedure, allowed interim operations, and standalone positive/refusal/replay tests.
+
+6. **Major — [design_draft.md:351](/design_draft.md:351), 402, 405 — Gate categories remain mixed.** Stage 1 may precede containment; U3.A requires successful phone implementation at Stage 0A. **Correction:** require 0B release before identity cutover; keep 0A acceptance to frozen contracts/fixtures, move runtime phone success to Stage 3, and identify preimplementation investigation probes separately from production qualification.
+
+7. **Blocker — [design_draft.md:352](/design_draft.md:352), 358, 448 — F09 is only partly closed.** Stage 1 marks legacy work, but enforcement and rollback tests remain at Stage 7. **Correction:** install and test effect barriers before each subsystem’s cutover; specify rebind authorization, session conversion/invalidation, preserved revocation generations, mixed-version refusal, and rollback behavior before enabling effects.
+
+8. **Major — [design_draft.md:369](/design_draft.md:369) — F10’s slice is insufficient.** No observation explicitly requires a successful real commitment; A3-T remains allowed despite mandatory Stage 3 retirement. **Correction:** require autonomous committed success, A3-UV reserved success, denied/no-effect behavior, crash reconciliation, and independently verified evidence before rollout; remove the A3-T alternative.
+
+9. **Major — [design_draft.md:319](/design_draft.md:319) — F07 leaves evidence freshness undecided.** “Policy freshness limit” has no value; reader permissions are unspecified. **Correction:** freeze producer-specific access and cache-freshness rules, distinguishing historical verification from current authority.
+
+10. **Major — [design_draft.md:433](/design_draft.md:433) — S2 failure permits an unsafe downgrade.** **Correction:** permit continued S1 claims only where S1 threat assumptions hold; otherwise refuse affected protected operations.
+
+**CHANGES REQUIRED**

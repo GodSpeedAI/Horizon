@@ -1,12 +1,12 @@
 # Horizon requirement ledger (generated) — see scripts/gen-requirement-ledger.py
 ledger_version: 1
 project: Horizon
-freeze_hash: sha256:114c118afee0f88708977c6065186f5ae3c99bfb0f43596e507a9cbfbc636e18
+freeze_hash: sha256:ad8f0bb5411e3e81e53cb5c8ab81b6a25c7d8b0e5b58213845c37fff7c11e5d6
 generated_from:
   spec: .agents/specs/horizon.agent.spec.yaml
   spec_sha256: 7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435
   plan: .agents/plans/horizon.plan.yaml
-  plan_sha256: 62e85f4cddc5144a7939cd4515627fe6d307a3976b286e40ff8263e193a4cce3
+  plan_sha256: a03331ce6ccd34eaf4345d9cce256d566c0aa517871dfcd1f4f55bfd61bf8596
   semantic_sources:
   - .sea/interaction/interaction-model.sea
   - .sea/interaction/research-artifacts.sea
@@ -29,6 +29,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'a Case stays a derived view: it references world_ref and does not mint identity'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-CASE-001-01
   proof: &id003
@@ -85,6 +86,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'a Case stays a derived view: it references world_ref and does not mint identity'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-CASE-002-01
   proof: &id004
@@ -127,6 +129,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'a Case stays a derived view: it references world_ref and does not mint identity'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-CASE-003-01
   proof: &id005
@@ -182,6 +185,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: Hypothetical comparison never changes world state and never grants authority.
     invariant_source: sea:INV-10
+    additional_invariants: []
   acceptance:
   - AC-CMP-001-01
   proof: &id006
@@ -224,6 +228,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-CONFIG-001-01
   proof: &id007
@@ -250,6 +255,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-CONFIG-002-01
   proof: &id008
@@ -276,6 +282,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-CONFIG-003-01
   proof: &id009
@@ -302,6 +309,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-CONFIG-004-01
   proof: &id010
@@ -328,6 +336,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-CONFIG-010-01
   proof: &id011
@@ -354,6 +363,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-CONFIG-011-01
   proof: &id012
@@ -400,6 +410,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: startup configuration is pinned (world_ref, observer, capabilities) before use
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-CONFIG-012-01
   proof: &id013
@@ -446,6 +457,9 @@ requirements:
     entity_source: .sea/interaction/research-artifacts.sea
     invariant: Observed evidence, operational settlement and developmental capability assessment remain distinct; a receipt is not settlement.
     invariant_source: sea:INV-07
+    additional_invariants:
+    - invariant: A settlement advances unobserved, then observed, then ruled, and never skips a stage. SEA-Forge rules only on evidence that RealityTrace has observed, and an observed stage is not a ruling.
+      invariant_source: sea:INV-12
   acceptance:
   - AC-DEV-001-01
   proof: &id014
@@ -496,6 +510,7 @@ requirements:
     entity_source: .sea/interaction/research-artifacts.sea
     invariant: a developmental claim is scored separately from the operational outcome
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-DEV-002-01
   proof: &id015
@@ -546,6 +561,7 @@ requirements:
     entity_source: .sea/interaction/research-artifacts.sea
     invariant: Developmental interpretation is evaluated separately from operational settlement.
     invariant_source: sea:INV-11
+    additional_invariants: []
   acceptance:
   - AC-DEV-003-01
   proof: &id016
@@ -596,6 +612,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: purpose is carried by context, not inferred from presentation
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-GOAL-001-01
   proof: &id017
@@ -651,6 +668,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: purpose is carried by context, not inferred from presentation
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-GOAL-002-01
   proof: &id018
@@ -677,6 +695,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: purpose is carried by context, not inferred from presentation
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-GOAL-003-01
   proof: &id019
@@ -721,6 +740,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: purpose is carried by context, not inferred from presentation
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-GOAL-004-01
   proof: &id020
@@ -799,6 +819,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: purpose is carried by context, not inferred from presentation
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-GOAL-005-01
   proof: &id021
@@ -852,6 +873,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an intent is a typed choice committed against a frame revision, not an API call
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-INT-001-01
   proof: &id022
@@ -878,6 +900,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an intent is a typed choice committed against a frame revision, not an API call
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-INT-002-01
   proof: &id023
@@ -922,6 +945,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: Duplicate navigation intent ids must not duplicate external side effects.
     invariant_source: sea:INV-08
+    additional_invariants: []
   acceptance:
   - AC-INT-003-01
   proof: &id024
@@ -987,6 +1011,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an intent is a typed choice committed against a frame revision, not an API call
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-INT-004-01
   proof: &id025
@@ -1033,6 +1058,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: A represented possibility is not an affordance until a reachable, payable, governable, settleable path is visible.
     invariant_source: sea:INV-01
+    additional_invariants: []
   acceptance:
   - AC-NAV-001-01
   proof: &id026
@@ -1075,6 +1101,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: Affordance gates use exactly the canonical keys visibility, reach, payment, authority, capability, recovery and settlement_access.
     invariant_source: sea:INV-02
+    additional_invariants: []
   acceptance:
   - AC-NAV-002-01
   proof: &id027
@@ -1117,6 +1144,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an affordance is assessed on its gates before any commitment, never on possibility
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-NAV-003-01
   proof: &id028
@@ -1159,6 +1187,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an affordance is assessed on its gates before any commitment, never on possibility
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-NAV-004-01
   proof: &id029
@@ -1208,6 +1237,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an affordance is assessed on its gates before any commitment, never on possibility
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-NAV-005-01
   proof: &id030
@@ -1250,6 +1280,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: No authority gate value grants authority; likely_allow requires a non-granting evaluation.
     invariant_source: sea:INV-03
+    additional_invariants: []
   acceptance:
   - AC-NAV-006-01
   proof: &id031
@@ -1302,6 +1333,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: Before a consequential commitment the observer sees reversibility, payment, expected evidence and escalation behaviour.
     invariant_source: sea:INV-04
+    additional_invariants: []
   acceptance:
   - AC-NAV-007-01
   proof: &id032
@@ -1346,6 +1378,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an affordance is assessed on its gates before any commitment, never on possibility
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-NAV-008-01
   proof: &id033
@@ -1388,6 +1421,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an affordance is assessed on its gates before any commitment, never on possibility
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-NAV-009-01
   proof: &id034
@@ -1430,6 +1464,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an affordance is assessed on its gates before any commitment, never on possibility
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-NAV-010-01
   proof: &id035
@@ -1486,6 +1521,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an affordance is assessed on its gates before any commitment, never on possibility
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-NAV-011-01
   proof: &id036
@@ -1539,6 +1575,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an affordance is assessed on its gates before any commitment, never on possibility
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-NAV-012-01
   proof: &id037
@@ -1575,6 +1612,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an affordance is assessed on its gates before any commitment, never on possibility
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-NAV-013-01
   proof: &id038
@@ -1630,6 +1668,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an operation's outcome is recorded with its settlement reference, not inferred from intent
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-OUT-001-01
   proof: &id039
@@ -1672,6 +1711,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an operation's outcome is recorded with its settlement reference, not inferred from intent
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-OUT-002-01
   proof: &id040
@@ -1714,6 +1754,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an operation's outcome is recorded with its settlement reference, not inferred from intent
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-OUT-003-01
   proof: &id041
@@ -1769,6 +1810,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: an operation's outcome is recorded with its settlement reference, not inferred from intent
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-OUT-004-01
   proof: &id042
@@ -1829,6 +1871,7 @@ requirements:
     entity_source: .sea/interaction/research-artifacts.sea
     invariant: a run's claim is scoped to its preregistered hypothesis and dataset
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-RES-001-01
   proof: &id043
@@ -1889,6 +1932,7 @@ requirements:
     entity_source: .sea/interaction/research-artifacts.sea
     invariant: a run's claim is scoped to its preregistered hypothesis and dataset
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-RES-002-01
   proof: &id044
@@ -1949,6 +1993,7 @@ requirements:
     entity_source: .sea/interaction/research-artifacts.sea
     invariant: a run's claim is scoped to its preregistered hypothesis and dataset
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-RES-003-01
   proof: &id045
@@ -2009,6 +2054,7 @@ requirements:
     entity_source: .sea/interaction/research-artifacts.sea
     invariant: a run's claim is scoped to its preregistered hypothesis and dataset
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-RES-004-01
   proof: &id046
@@ -2069,6 +2115,7 @@ requirements:
     entity_source: .sea/interaction/research-artifacts.sea
     invariant: a run's claim is scoped to its preregistered hypothesis and dataset
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-RES-005-01
   proof: &id047
@@ -2141,6 +2188,7 @@ requirements:
     entity_source: .sea/interaction/research-artifacts.sea
     invariant: a run's claim is scoped to its preregistered hypothesis and dataset
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-RES-006-01
   proof: &id048
@@ -2201,6 +2249,7 @@ requirements:
     entity_source: .sea/interaction/research-artifacts.sea
     invariant: a run's claim is scoped to its preregistered hypothesis and dataset
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-RES-007-01
   proof: &id049
@@ -2261,6 +2310,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: safety limits act on the committed intent record and its reversibility class
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-SAFE-001-01
   proof: &id050
@@ -2322,6 +2372,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: safety limits act on the committed intent record and its reversibility class
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-SAFE-002-01
   proof: &id051
@@ -2358,6 +2409,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: safety limits act on the committed intent record and its reversibility class
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-SAFE-003-01
   proof: &id052
@@ -2392,6 +2444,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: safety limits act on the committed intent record and its reversibility class
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-SAFE-004-01
   proof: &id053
@@ -2481,6 +2534,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: safety limits act on the committed intent record and its reversibility class
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-SAFE-005-01
   proof: &id054
@@ -2534,6 +2588,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: trust decisions resolve to the actor reference, not to payload fields
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-SEC-001-01
   proof: &id055
@@ -2580,6 +2635,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: trust decisions resolve to the actor reference, not to payload fields
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-SEC-002-01
   proof: &id056
@@ -2611,6 +2667,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: trust decisions resolve to the actor reference, not to payload fields
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-SEC-003-01
   proof: &id057
@@ -2642,6 +2699,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: trust decisions resolve to the actor reference, not to payload fields
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-SEC-004-01
   proof: &id058
@@ -2719,6 +2777,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: trust decisions resolve to the actor reference, not to payload fields
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-SEC-005-01
   proof: &id059
@@ -2765,14 +2824,17 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: trust decisions resolve to the actor reference, not to payload fields
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-SEC-006-01
   proof: &id060
   - just gate-t04
   - just gate-t19
+  - just gate-t23
   settling_tasks:
   - T04
   - T19
+  - T23
   mutable_surfaces: *id001
   frozen_surfaces: *id002
   dependencies:
@@ -2839,6 +2901,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: DomainForge alone owns canonical semantic compilation and world_ref identity.
     invariant_source: sea:INV-06
+    additional_invariants: []
   acceptance:
   - AC-STACK-001-01
   proof: &id061
@@ -2894,6 +2957,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-STACK-002-01
   proof: &id062
@@ -2920,6 +2984,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-STACK-003-01
   proof: &id063
@@ -2966,6 +3031,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-STACK-004-01
   proof: &id064
@@ -3003,6 +3069,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-STACK-005-01
   proof: &id065
@@ -3050,6 +3117,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-STACK-006-01
   proof: &id066
@@ -3086,6 +3154,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-STACK-007-01
   proof: &id067
@@ -3142,6 +3211,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-STACK-008-01
   proof: &id068
@@ -3212,6 +3282,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-STACK-009-01
   proof: &id069
@@ -3258,6 +3329,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-STACK-010-01
   proof: &id070
@@ -3344,6 +3416,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-STACK-011-01
   proof: &id071
@@ -3402,6 +3475,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-STACK-012-01
   proof: &id072
@@ -3460,6 +3534,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-STACK-013-01
   proof: &id073
@@ -3518,6 +3593,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: 'ownership is one-way: Horizon consumes each owner''s public surface'
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-STACK-014-01
   proof: &id074
@@ -3612,6 +3688,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: A surface specification is closed declarative presentation, never an authority or business record; no raw executable UI code is allowed.
     invariant_source: sea:INV-09
+    additional_invariants: []
   acceptance:
   - AC-UI-001-01
   proof: &id075
@@ -3643,6 +3720,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: presentation is declarative and sourced from behavioural availability
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UI-002-01
   proof: &id076
@@ -3674,6 +3752,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: presentation is declarative and sourced from behavioural availability
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UI-003-01
   proof: &id077
@@ -3705,6 +3784,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: presentation is declarative and sourced from behavioural availability
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UI-004-01
   proof: &id078
@@ -3768,6 +3848,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: presentation is declarative and sourced from behavioural availability
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UI-005-01
   proof: &id079
@@ -3811,6 +3892,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: presentation is declarative and sourced from behavioural availability
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UI-006-01
   proof: &id080
@@ -3862,6 +3944,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: presentation is declarative and sourced from behavioural availability
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UI-007-01
   proof: &id081
@@ -3919,6 +4002,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: presentation is declarative and sourced from behavioural availability
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UI-008-01
   proof: &id082
@@ -3950,6 +4034,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UX-001-01
   proof: &id083
@@ -4017,6 +4102,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UX-002-01
   proof: &id084
@@ -4084,6 +4170,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UX-003-01
   proof: &id085
@@ -4151,6 +4238,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UX-004-01
   proof: &id086
@@ -4218,6 +4306,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UX-005-01
   proof: &id087
@@ -4259,6 +4348,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UX-006-01
   proof: &id088
@@ -4310,6 +4400,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UX-007-01
   proof: &id089
@@ -4374,6 +4465,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UX-008-01
   proof: &id090
@@ -4415,6 +4507,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UX-009-01
   proof: &id091
@@ -4508,6 +4601,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UX-010-01
   proof: &id092
@@ -4575,6 +4669,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UX-011-01
   proof: &id093
@@ -4616,6 +4711,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: a frame is a versioned snapshot a reader can reason over, never live mutable state
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-UX-012-01
   proof: &id094
@@ -4690,6 +4786,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: every claim carries a proof level and its evidence reference
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-VERIFY-001-01
   proof: &id095
@@ -4741,6 +4838,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: every claim carries a proof level and its evidence reference
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-VERIFY-002-01
   proof: &id096
@@ -4827,6 +4925,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: every claim carries a proof level and its evidence reference
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-VERIFY-003-01
   proof: &id097
@@ -4878,6 +4977,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: every claim carries a proof level and its evidence reference
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-VERIFY-004-01
   proof: &id098
@@ -4934,6 +5034,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: every claim carries a proof level and its evidence reference
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-VERIFY-005-01
   proof: &id099
@@ -5004,6 +5105,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: world_ref identity is immutable and owned by DomainForge
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-WORLD-001-01
   proof: &id100
@@ -5038,6 +5140,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: world_ref identity is immutable and owned by DomainForge
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-WORLD-002-01
   proof: &id101
@@ -5072,6 +5175,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: world_ref identity is immutable and owned by DomainForge
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-WORLD-003-01
   proof: &id102
@@ -5106,6 +5210,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: Historical, current and candidate worlds stay visibly distinguished by immutable references; flaws become candidate revisions for a higher observer.
     invariant_source: sea:INV-05
+    additional_invariants: []
   acceptance:
   - AC-WORLD-004-01
   proof: &id103
@@ -5161,6 +5266,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: world_ref identity is immutable and owned by DomainForge
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-WORLD-005-01
   proof: &id104
@@ -5195,6 +5301,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: world_ref identity is immutable and owned by DomainForge
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-WORLD-006-01
   proof: &id105
@@ -5229,6 +5336,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: world_ref identity is immutable and owned by DomainForge
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-WORLD-007-01
   proof: &id106
@@ -5294,6 +5402,7 @@ requirements:
     entity_source: .sea/interaction/interaction-model.sea
     invariant: world_ref identity is immutable and owned by DomainForge
     invariant_source: family
+    additional_invariants: []
   acceptance:
   - AC-WORLD-008-01
   proof: &id107

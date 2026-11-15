@@ -21,6 +21,8 @@ export interface NoteRecord {
   readonly day: string;
   readonly case_ref: string | null;
   readonly head_rev: number;
+  /** The person marked this note as readable by agents. Missing means no. */
+  readonly shared_with_agents?: boolean;
 }
 
 export interface NoteRevision {
@@ -46,6 +48,8 @@ export interface NoteView {
   readonly cases: readonly string[];
   readonly tags: readonly string[];
   readonly links: readonly NoteLink[];
+  /** True only when the person marked the note as shared with agents. */
+  readonly shared_with_agents?: boolean;
 }
 
 export interface Who {
@@ -98,9 +102,9 @@ export async function saveNote(store: DurableStore, options: SaveNoteOptions): P
     noteVersion = row.version;
     rev = head.head_rev + 1;
     previousTags = ((await store.getRecord(NOTE_REVISION_COLLECTION, revisionKey(head.note_id, head.head_rev)))?.value as unknown as NoteRevision | undefined)?.tags ?? [];
-    note = { ...head, case_ref: head.case_ref ?? checked.case_ref, head_rev: rev };
+    note = { ...head, case_ref: head.case_ref ?? checked.case_ref, head_rev: rev, shared_with_agents: checked.shared_with_agents ?? head.shared_with_agents ?? false };
   } else {
-    note = { note_id: `note:${randomUUID()}`, tenant: who.tenant, operator: who.operator, created_at: at, day: dayInZone(options.now, options.timeZone), case_ref: checked.case_ref, head_rev: 1 };
+    note = { note_id: `note:${randomUUID()}`, tenant: who.tenant, operator: who.operator, created_at: at, day: dayInZone(options.now, options.timeZone), case_ref: checked.case_ref, head_rev: 1, shared_with_agents: checked.shared_with_agents ?? false };
   }
   records.push({ collection: NOTE_COLLECTION, id: noteKey(note.note_id), expectedVersion: noteVersion, value: asJson(note) });
   const revision: NoteRevision = { note_id: note.note_id, rev, body: checked.body, author: who.operator, at, links: checked.links, tags: checked.tags };
@@ -151,6 +155,7 @@ function viewOf(note: NoteRecord, revision: NoteRevision, cases: readonly string
     cases,
     tags: revision.tags,
     links: revision.links,
+    shared_with_agents: note.shared_with_agents === true,
   };
 }
 

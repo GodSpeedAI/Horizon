@@ -11,13 +11,23 @@ Ask, then wait. Say where each answer went. You cannot answer or confirm for the
 - If you no longer need an answer, withdraw the question with a reason (`ask.withdraw`).
 - Anything the person's side does (`human.answer`, `human.pin`, `human.close`, `human.open`) is refused at this door.
 
+## Pairing and the desk's writes
+
+When Horizon starts it shows a pairing code on the terminal: "To open the desk, enter this pairing code: XXXX-XXXX. It works once and expires in 10 minutes." Horizon writes it to the controlling terminal (`/dev/tty`). Where there is no terminal (a service, a pipe), it writes the same line to standard output, followed by "(not a terminal: printed to output)". A browser opens the desk by typing that code on the "Pair this browser" screen. Every read of the desk, not only the writes, needs the session: an unpaired browser gets "Pair this browser first." The code works once. The browser then holds a session cookie (HttpOnly, SameSite=Strict) for 12 hours, or until Horizon restarts or the browser logs out (`POST /desk/pair/logout`). Every write the desk makes sends that cookie.
+
+- The desk page carries no secret. Reading `/desk` gives a program nothing it can write with.
+- Pairing gives agents nothing new. The `x-horizon-source: page-agent` header is a label, not a grant: it does not open a read to an unpaired caller, and it keeps the limits above on a paired one. The agent door (`/agent/panels`) keeps its own keys and never takes a session.
+- Limit, stated plainly: the code is shown on the terminal, so anyone who can read that terminal can pair. A local program with terminal access can pair. This is a boundary against other callers, not a sandbox.
+
 ## How to call it
 
 The door is on the desk's own address (for example `http://127.0.0.1:<port>`). Every call needs the agent key:
 
     Authorization: Bearer <key>
 
-The key is in the setup's secrets folder, in `agent.key`: `~/.horizon/setups/<setup>/secrets/agent.key`. (Without a setup it is `.cognate/agent.key`; `HORIZON_AGENT_KEY_FILE` names another file.) Horizon creates the key once and keeps it, so it stays the same across restarts. The file is private to you (mode 0600). Only you can read it. Read it in your script; never print it, log it or paste it into a panel. Clearing the setup removes the file with the rest of the setup's folder, and the next start creates a new key. A call with no key or a wrong key gets 401 and changes nothing. The page-agent header is not a key and is refused here.
+Every agent has its own key. The setup's default agent uses `agent.key` in the setup's secrets folder: `~/.horizon/setups/<setup>/secrets/agent.key`. (Without a setup it is `.cognate/agent.key`; `HORIZON_AGENT_KEY_FILE` names another file.) Horizon creates that key once and keeps it, so it stays the same across restarts. The file is private to you (mode 0600). Only you can read it. Read it in your script; never print it, log it or paste it in.
+
+To add another agent, run `bun run scripts/agent-key.ts add <name>`. The key is printed once, to the terminal, with the agent's key id. Horizon keeps only a hash of each key, in `agents.json` beside `agent.key`, so a lost key cannot be read back: add the agent again under another name. Each question records the key that put it up. Only that key reads its answers, and only that key can say where an answer went or take the question back. A display name is a label; it never changes who owns a question.
 
 Optional header `x-horizon-agent-name: <your name>` (60 characters at most). The Conversation shows it on your entries.
 

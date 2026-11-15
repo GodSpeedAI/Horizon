@@ -124,21 +124,23 @@ describe("a human step waiting for a person", () => {
     expect(completed).toHaveLength(0);
   });
 
-  test("mark done sends one human_task_complete with the typed reason", async () => {
+  test("mark done needs its typed reason and is refused before it reaches the case keeper", async () => {
     stepActive = true;
     overviewDigest = "sha256:o3";
     const card = (await app.state()).decide.cards.find((c: any) => c.id.startsWith("human:"));
     const noReason = await send({ card_id: card.id, choice: "accept", preview_code: card.preview.code, records: card.preview.records, reason: " " });
     expect(noReason.status).toBe(400);
     expect(completed).toHaveLength(0);
-    const ok = await send({ card_id: card.id, choice: "accept", preview_code: card.preview.code, records: card.preview.records, reason: "Reviewed the draft and released it" });
-    expect(ok.status).toBe(200);
-    expect(completed).toHaveLength(1);
-    expect(completed[0]).toMatchObject({ verb: "human_task_complete", case_id: CASE, item_id: "signoff_release", justification: "Reviewed the draft and released it", request_id: `horizon:human:${CASE}:signoff_release` });
-    // It is done, so it is no longer waiting and a second press does nothing.
-    expect((await app.state()).decide.cards).toEqual([]);
-    expect((await send({ card_id: card.id, choice: "accept", preview_code: card.preview.code, records: card.preview.records, reason: "again" })).status).toBe(404);
-    expect(completed).toHaveLength(1);
+    // Completing a human step is a P2 effect and the row has no pending record or authority at
+    // this freeze (R5-01): the route refuses it, and the typed reason never reaches the keeper.
+    const refused = await send({ card_id: card.id, choice: "accept", preview_code: card.preview.code, records: card.preview.records, reason: "Reviewed the draft and released it" });
+    expect(refused.status).toBe(403);
+    expect(refused.body.outcome).toBe("refused");
+    expect(completed).toHaveLength(0);
+    // The card still waits, so a second press is refused again rather than reported as gone.
+    expect((await send({ card_id: card.id, choice: "accept", preview_code: card.preview.code, records: card.preview.records, reason: "again" })).status).toBe(403);
+    expect(completed).toHaveLength(0);
+    expect((await app.state()).decide.cards.map((c: any) => c.id)).toContain(card.id);
   });
 });
 

@@ -92,6 +92,8 @@ async function boot() {
     showOnly("home");
     pill("live", "Live");
     openStream();
+    void checkEnrolment();
+    if (enrolmentPoll === null) enrolmentPoll = setInterval(() => { void checkEnrolment(); }, 3000);
   } catch {
     pill("offline", "Offline");
     notice("Cannot reach the desktop. Retrying.", "error");
@@ -121,6 +123,47 @@ async function signIn() {
     await boot();
   } catch {
     notice("The passkey prompt was closed. Use your passkey to continue.", "error");
+  }
+}
+
+// A new phone waits for this one's authorization. The card shows what would be authorized, and the passkey prompt
+// on this phone is the only way to sign it: the page cannot produce the signature.
+let enrolmentPoll = null;
+async function checkEnrolment() {
+  const response = await fetch("/m/api/pair/pending", { credentials: "same-origin", headers: { accept: "application/json" } });
+  if (!response.ok) return;
+  const data = await response.json().catch(() => ({}));
+  const card = $("enrolment");
+  if (!data.pending) { if (card.dataset.pending) { card.dataset.pending = ""; card.textContent = ""; } return; }
+  if (card.dataset.pending === data.pending.pending_id) return;
+  card.dataset.pending = data.pending.pending_id;
+  card.textContent = "";
+  const title = document.createElement("p");
+  title.textContent = "A new phone (" + data.pending.label + ") asks to replace this one. Authorize it with your passkey here. It stops waiting at " + new Date(data.pending.expires_at).toLocaleTimeString() + ".";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "primary";
+  button.textContent = "Authorize the new phone";
+  button.addEventListener("click", () => { void authorizeEnrolment(data, button); });
+  card.append(title, button);
+}
+
+async function authorizeEnrolment(data, button) {
+  button.disabled = true;
+  try {
+    const options = data.options;
+    const credential = await navigator.credentials.get({ publicKey: { challenge: dec(options.challenge), rpId: options.rpId, allowCredentials: options.allowCredentials.map((item) => ({ type: item.type, id: dec(item.id) })), userVerification: "required", timeout: options.timeout } });
+    const result = await post("/m/api/pair/authorize", { pending_id: data.pending.pending_id, credential: credentialJSON(credential) });
+    if (result.status === 200) {
+      $("enrolment").textContent = "Authorized. The new phone can finish signing in now.";
+      notice("", "");
+    } else {
+      notice(messageFor(result.data, "The authorization was refused. Nothing was authorized."), "error");
+    }
+  } catch {
+    notice("The passkey prompt was closed. Nothing was authorized.", "error");
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -320,6 +363,7 @@ export function phonePage(nonce: string): string {
 <section id="off" hidden><h2>Remote control is off</h2><p id="off-text" class="muted"></p></section>
 <section id="home" hidden>
 <p id="status" class="muted"></p>
+<div id="enrolment" class="card"></div>
 <div id="case"></div>
 <div id="decisions"></div>
 <div id="moves"></div>
@@ -375,6 +419,7 @@ async function create(redeemed) {
       timeout: options.timeout,
     } });
     const finished = await post("/m/api/pair/finish", { ticket: redeemed.ticket, credential: credentialJSON(credential) });
+    if (finished.status === 202) return waitForOperator(finished.data.pending_id);
     if (finished.status !== 200) return say(messageFor(finished.data, "The passkey could not be registered."), "error");
     location.replace("/m");
   } catch {
@@ -387,6 +432,19 @@ async function create(redeemed) {
     $("app").append(retry);
     retry.focus();
   }
+}
+
+// The passkey is registered but no controller has authorized it yet: the phone that is already paired must
+// authorize it with its own passkey. Ask again every two seconds until it is authorized, or the window ends.
+async function waitForOperator(pendingId) {
+  say("Waiting for your paired phone to authorize this one.");
+  for (let attempt = 0; attempt < 150; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const awaited = await post("/m/api/pair/await", { pending_id: pendingId });
+    if (awaited.status === 200) return location.replace("/m");
+    if (awaited.status !== 202) return say(messageFor(awaited.data, "The authorization is no longer valid. Refresh the QR on your desktop and scan again."), "error");
+  }
+  say("Your paired phone did not authorize this one in time. Refresh the QR on your desktop and scan again.", "error");
 }
 
 pair();

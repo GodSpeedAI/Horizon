@@ -1,0 +1,13 @@
+1. **Blocker — [design-final.md:574](design_draft.md:574): incompatible caller schemas.** Local agents may have null delegation at line 573, but their descriptors require it. Human P3 operations have null execution, while `EffectFence` requires execution/attempt references. Bootstrap console callers have no discriminator. **Correction:** define explicit human-session, agent-execution, and local-console variants; permit null delegation for local P0/P1 agents; distinguish caller identity from target execution/grant; define human-effect fence nullability and per-operation case/frame nullability.
+
+2. **Blocker — [design-final.md:378](design_draft.md:378): incomplete Stage 0B binding.** The pending descriptor omits world/case/frame, policy digest, delegation, and authenticated session bindings required by the confirmation contract. **Correction:** persist the complete applicable `OperationDescriptor`, requester/session, pending ID, immutable `case_authority`, and launch generation. Bind these into the receipt and recheck them during atomic redemption.
+
+3. **Blocker — [design-final.md:380](design_draft.md:380): restart recovery contradicts the state machine.** Restart leaves records `confirmed` and requires fresh confirmation, but lines 378–379 prohibit reopening or reconfirming them. **Correction:** expire outstanding records from the previous launch; create a replacement pending record with a fresh nonce/code and `supersedes` reference. Test successful fresh confirmation after restart and rejection of every old receipt.
+
+4. **Major — [design-final.md:583](design_draft.md:583): aliases lack operation-specific constraints.** The shared schemas accept `remote.stop` with `action:"start"` and `approval.reject` with `resolution:"approved"`. **Correction:** derive these fields from `operation_id`, reject inconsistent supplied values, and add mismatch tests. Replace `expert_config.config:json` with explicit schemas for installation, configuration, answering, and removal.
+
+5. **Major — [design-final.md:642](design_draft.md:642): `run.start` has an unresolved assurance policy.** Its predicate depends on “the target row,” but its parameters at line 610 contain no target operation or specified plan-to-target resolution. **Correction:** define deterministic resolution from the pinned plan to reviewed operation rows, bind the resolved operations and predicates into the descriptor, validate their parameter schemas, and refuse missing or conflicting mappings as Px.
+
+Automatic approval review rejected private-content indexing; direct local reads completed the review.
+
+**CHANGES REQUIRED**

@@ -1,0 +1,24 @@
+{
+ "ok": true,
+ "baseline": "world:godspeed-fde-sop@sha256:78eddd4e7e4771caa1c37e8e5fa095c5baa899daccea8fac1f6e969f8f37287b",
+ "current": "world:godspeed-fde-sop@sha256:c0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ff",
+ "history": [
+  {
+   "pin_id": "pin-0001",
+   "kind": "promoted",
+   "from_world_ref": "world:godspeed-fde-sop@sha256:78eddd4e7e4771caa1c37e8e5fa095c5baa899daccea8fac1f6e969f8f37287b",
+   "to_world_ref": "world:godspeed-fde-sop@sha256:c0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ff",
+   "bound_digest": "sha256:abababababababababababababababababababababababababababababababab",
+   "proposal_id": "proposal:1",
+   "matrix_id": "matrix:1",
+   "proposer": "agent:proposer",
+   "requester": "agent:proposer",
+   "approver": "op-alice",
+   "approval_id": "approval-0001",
+   "operation_id": "op-0007",
+   "transition_ref": "01JTRANSITION0000000000000A",
+   "supersedes_pin": null
+  }
+ ],
+ "attempts": []
+}

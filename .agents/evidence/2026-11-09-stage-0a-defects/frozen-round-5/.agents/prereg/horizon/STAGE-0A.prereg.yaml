@@ -1,0 +1,140 @@
+preregistration:
+  id: HORIZON-PREREG-STAGE-0A-1
+  task: STAGE-0A-1
+  title: Freeze the closed operation catalog, policy constants, parameter schemas and platform-claim matrix
+  recorded_at: "2026-11-09"
+  recorded_before_artifacts: true
+
+  claim: >-
+    A closed operation catalog, a frozen policy file, frozen parameter schemas, and a
+    platform-claim matrix can be committed as machine-checked contracts before any identity code
+    exists, so that every later stage resolves an operation through one reviewed row and an
+    unlisted or unmapped write fails closed as Px instead of defaulting to something weaker.
+
+  upstream_pins:
+    spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+    plan: { id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml }
+    design: { file: design_draft.md, sha256: "2c4a41825d86dc3a8aca951f2e673449b217a8b3e10e06a8ceea2b239073e330", sections: "11, 13, 14, Appendix A" }
+    authority_report: { file: .agents/reports/2026-11-08-unified-human-agent-identity-authority.md, sha256: "d302b5ae3133fbd4bc79a7113fb4c8332fefdd2caa3218f2901f5240790246e1" }
+    zod: { version: "3.25.76", provenance: "already a direct dependency of this repository" }
+    yaml_parser: { name: "Bun.YAML", version: "runtime-provided (Bun 1.4.0)" }
+    plan_task: { id: "T23", file: .agents/plans/horizon.plan.yaml, version: "1.1.0", relationship: "Stage 0A unit 1 of plan task T23 (unified human and agent identity, delegation and authority)" }
+    task_preregistration: { file: .agents/prereg/horizon/T23.prereg.yaml, id: HORIZON-PREREG-T23-0A, relationship: "the task-level preregistration that registers this unit's Stage 0A expectations and the later stages" }
+
+  # This unit settles no specification requirement. It freezes contracts that later stages and
+  # requirements will lean on. No status entry may claim REQ-CMP-001 or REQ-SEC-006 as settled
+  # because this file exists.
+  settles: []
+
+  positive_expectations:
+    - id: PE-01
+      expectation: >-
+        The catalog resolves to exactly 63 operations in five class groups (P0 15, P1 18, P2 23,
+        P3 5, PX 2), each row carrying a class, a binding state, and the fields a gate needs.
+    - id: PE-02
+      expectation: >-
+        Every governed operation (P2/P3) names a parameter schema that exists in the frozen
+        parameter file, names an authority writer from the closed writer set, and demands human
+        evidence stronger than A0 or A1.
+    - id: PE-03
+      expectation: >-
+        Every POST route found in src/app.ts is accounted for exactly once as a mapped operation
+        route, a recorded catalog gap, or a declared non-operation route.
+    - id: PE-04
+      expectation: >-
+        The policy file carries the owner-frozen constants: credential 15m, offline 5m, A3
+        challenge 2m, pairing 5m, pending approval 10m, P2/P1 grant 8h, P3 grant 1h, delegation
+        depth 2, clock tolerance 60s, and P3 grants require an explicit numeric budget.
+    - id: PE-05
+      expectation: >-
+        The platform-claim matrix states the measured Jetson limits (Landlock absent, ENOSYS,
+        newuidmap missing) as unsupported Isolated rather than as an aspiration, and refuses to
+        claim S2 on a single-host desktop.
+    - id: PE-06
+      expectation: >-
+        The catalog is loadable and queryable from source with a real YAML parser and a strict
+        schema, and an unknown operation ID classifies as Px with no authority writer and no
+        expiry.
+
+  negative_expectations:
+    - id: NE-01
+      expectation: >-
+        An unlisted operation ID must never resolve to a row with a writer, an expiry, or a
+        writable flag. A fallback that treats an unknown ID as a local read fails the check.
+    - id: NE-02
+      expectation: >-
+        A governed operation must never be satisfiable by local_read_policy or
+        cognate_local_policy, nor by A0/A1 evidence. Introducing such a row fails the check.
+    - id: NE-03
+      expectation: >-
+        A human-session row must never expire by a grant alone. A row whose expiry names only a
+        grant fails the check.
+    - id: NE-04
+      expectation: >-
+        A dispatcher must never carry its own authority, expiry, or a non-PX class.
+    - id: NE-05
+      expectation: >-
+        P0/P1 must never be offline-denied and P2/P3 must never be offline-allowed.
+    - id: NE-06
+      expectation: >-
+        A stale or malformed manifest must fail loudly at load. A duplicate operation ID, an
+        unknown class group, or an unrecognized key is a hard error, never a silent drop.
+
+  falsifier: >-
+    Any of the negative expectations above reproducing on the committed files, or a POST write
+    route in src/app.ts that the check cannot account for, falsifies this claim.
+
+  known_confounds:
+    - >-
+      The route scan reads literal `pathname === "..." && request.method === "POST"` comparisons
+      in src/app.ts only. A route registered through a table, a variable, or a second server file
+      is invisible to this check and would need its own inventory.
+    - >-
+      Class assignment for P1 rows is inherited from the class default, so a P1 row that is
+      really a governed write would be miscategorized by inheritance rather than by omission.
+      The catalog gaps record the cases found by reading the router, not every case that exists.
+    - >-
+      `catalog_gaps` is a defect register. Its presence means the catalog is not yet a complete
+      binding of the code, not that the gaps are acceptable.
+    - >-
+      The design draft these contracts derive from carries post-review corrections that were
+      never independently reviewed; the corrections are assigned to these fixtures instead.
+
+  evidence_plan:
+    command: "bun test test/identity-contract.test.ts"
+    typecheck: "./node_modules/.bin/tsc --noEmit"
+    artifacts:
+      - contracts/identity/v1/operations.yaml
+      - contracts/identity/v1/policy.yaml
+      - contracts/identity/v1/params.yaml
+      - contracts/identity/v1/platform-claims.yaml
+      - src/contracts/identity/manifest.ts
+      - test/identity-contract.test.ts
+
+  redesign_trigger: >-
+    If accounting for the true write surface requires changing the catalog's class taxonomy, or
+    if the agent door cannot be given a catalog row without a new class, stop and revise the
+    catalog in the design document before extending this manifest.
+
+  confirmation_condition: >-
+    A fresh reader who has not seen this work runs the recorded command and the typecheck, sees
+    them pass, and independently confirms that every POST route in the router is accounted for
+    and that no governed row is a downgrade. Self-attestation is not confirmation.
+
+  notes: >-
+    This unit is not a task in .agents/plans/horizon.plan.yaml and creates no plan binding. It is
+    the first implementable unit of the identity and authority design's Stage 0A, recorded here so
+    the work is governed rather than improvised. Binding it to a plan task or to a specification
+    revision is an owner decision, not an implementation choice.
+    Update recorded 2026-11-09 (appended, not rewritten; every expectation above is preserved exactly
+    as first recorded, and the checks that ran against the 63-row catalog are preserved in
+    .agents/evidence/2026-11-09-stage-0a/): the owner authorized reconciling the catalog against
+    implemented behaviour and registered the identity work as plan task T23 in HORIZON-PLAN-001
+    (plan version 1.1.0). T23 settles REQ-SEC-006; this unit still settles no requirement on its
+    own. The committed catalog is now 73 rows (P0 17, P1 26, P2 23, P3 5, PX 2), with ten added
+    rows, one removed read binding, one corrected binding, one route alias, and handler-level
+    semantic dispatch on three routes. The census expectation above therefore no longer describes
+    the committed catalog; it is kept as the record of what the Stage 0A unit actually checked, and
+    the superseding expectations are registered in T23.prereg.yaml. The reconciliation, the
+    additions and removals, the classification changes and the recorded defects are listed in
+    .agents/evidence/2026-11-09-stage-0a/README.md.

@@ -1,0 +1,944 @@
+{
+  "records_version": "horizon.identity.records/1",
+  "contract_id": "horizon.identity.records",
+  "contract_version": "1.0.0",
+  "frozen_at": "2026-11-09",
+  "authority": {
+    "design": "design_draft.md Appendix A (record schemas) and sections 7, 14",
+    "spec": {
+      "id": "HORIZON-001",
+      "version": "1.2.0",
+      "sha256": "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435"
+    },
+    "note": "A JSON descriptor rather than YAML so the same bytes are read by the TypeScript contract and an independent Python checker with no new dependency. The descriptor decides field names, types, and nullability; cross-field rules are listed in `constraints` and implemented once per language."
+  },
+  "encoding": {
+    "uint64": "JSON string of canonical decimal digits, no sign, no leading zero, at most 2^64-1. Never a JSON number.",
+    "decimal": "JSON string of canonical decimal digits with an optional fraction, never a JSON number and never a float.",
+    "timestamp": "RFC 3339 UTC with a literal Z suffix and no offset: YYYY-MM-DDTHH:MM:SS[.fraction]Z.",
+    "base64url": "Unpadded base64url over A-Z a-z 0-9 - _ , at least 16 characters.",
+    "digest": "sha256:<64 lowercase hex characters>.",
+    "jwk": "A public JWK: kty in EC, RSA, OKP. Private members d, p, q, dp, dq, qi, oth are refused.",
+    "money": "An object with amount (decimal), unit (string), and an optional remaining (decimal). A value without a unit is refused.",
+    "enum": "A JSON string from the declared list."
+  },
+  "envelope": [
+    {
+      "name": "schema_version",
+      "type": "string"
+    },
+    {
+      "name": "tenant_ref",
+      "type": "string"
+    },
+    {
+      "name": "trust_domain_ref",
+      "type": "string"
+    },
+    {
+      "name": "issued_at",
+      "type": "timestamp"
+    },
+    {
+      "name": "issuer_ref",
+      "type": "string"
+    }
+  ],
+  "records": {
+    "Credential": {
+      "signed": true,
+      "identity": "An agent execution's short-lived credential, issued by the local issuer. It carries no human authority and no human is ever issued one.",
+      "nullability": "delegation_ref is required and may be null only for a local P0/P1 execution; it is non-null for governed execution. attempt_ref may be null for a credential that outlives one attempt.",
+      "fields": [
+        {
+          "name": "iss",
+          "type": "string"
+        },
+        {
+          "name": "sub",
+          "type": "string"
+        },
+        {
+          "name": "aud",
+          "type": "string"
+        },
+        {
+          "name": "jti",
+          "type": "string"
+        },
+        {
+          "name": "iat",
+          "type": "uint64"
+        },
+        {
+          "name": "nbf",
+          "type": "uint64"
+        },
+        {
+          "name": "exp",
+          "type": "uint64"
+        },
+        {
+          "name": "execution_ref",
+          "type": "string"
+        },
+        {
+          "name": "attempt_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "holder_jwk",
+          "type": "jwk"
+        },
+        {
+          "name": "delegation_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "authority_epoch",
+          "type": "uint64"
+        },
+        {
+          "name": "issuer_generation",
+          "type": "uint64"
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "OperationDescriptor": {
+      "signed": true,
+      "identity": "What a caller asks to do, with the caller's identity taken from the authenticated session rather than from the request's own words.",
+      "nullability": "execution_ref and delegation_ref are required for agent_execution except that a local P0/P1 execution may have a null delegation; both are null for human_session and local_console. caller_ref is the session, execution, or console principal, never the target execution.",
+      "fields": [
+        {
+          "name": "operation_id",
+          "type": "string"
+        },
+        {
+          "name": "caller_kind",
+          "type": "string",
+          "enum": [
+            "human_session",
+            "agent_execution",
+            "local_console"
+          ]
+        },
+        {
+          "name": "caller_ref",
+          "type": "string"
+        },
+        {
+          "name": "parameters",
+          "type": "object"
+        },
+        {
+          "name": "params_schema_ref",
+          "type": "string"
+        },
+        {
+          "name": "nonce",
+          "type": "base64url"
+        },
+        {
+          "name": "issued_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "resource_refs",
+          "type": "string_array"
+        },
+        {
+          "name": "expected_revision",
+          "type": "uint64",
+          "nullable": true
+        },
+        {
+          "name": "world_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "case_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "frame_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "execution_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "delegation_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "policy_digest",
+          "type": "digest"
+        },
+        {
+          "name": "idempotency_key",
+          "type": "string"
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "DelegationGrant": {
+      "signed": true,
+      "identity": "A bounded grant from a person (root) or from a live parent grant (child). It never expands authority and is never issued for a human session.",
+      "nullability": "parent_ref and execution_ref are null for a root grant; a child grant requires a live parent and may bind an execution.",
+      "fields": [
+        {
+          "name": "grant_ref",
+          "type": "string"
+        },
+        {
+          "name": "parent_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "delegator_ref",
+          "type": "string"
+        },
+        {
+          "name": "agent_ref",
+          "type": "string"
+        },
+        {
+          "name": "execution_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "audience",
+          "type": "string"
+        },
+        {
+          "name": "operations",
+          "type": "string_array"
+        },
+        {
+          "name": "resource_selectors",
+          "type": "string_array"
+        },
+        {
+          "name": "data_labels",
+          "type": "string_array"
+        },
+        {
+          "name": "budget",
+          "type": "money"
+        },
+        {
+          "name": "not_before",
+          "type": "timestamp"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "depth_remaining",
+          "type": "uint64"
+        },
+        {
+          "name": "redelegate",
+          "type": "boolean"
+        },
+        {
+          "name": "offline",
+          "type": "boolean"
+        },
+        {
+          "name": "human_evidence",
+          "type": "string"
+        },
+        {
+          "name": "authority_epoch",
+          "type": "uint64"
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "AuthorityDecision": {
+      "signed": true,
+      "identity": "The authority writer's answer for one operation digest, one set of resources, and one amount.",
+      "nullability": "grant_ref is null only for a root grant.create or for an entitlement-backed human P2/P3, in which case entitlement_ref is non-null and current. approver_ref is null only for an autonomous policy decision; a human-reserved decision requires it.",
+      "fields": [
+        {
+          "name": "decision_ref",
+          "type": "string"
+        },
+        {
+          "name": "grant_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "entitlement_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "operation_digest",
+          "type": "digest"
+        },
+        {
+          "name": "resource_refs",
+          "type": "string_array"
+        },
+        {
+          "name": "amount",
+          "type": "money",
+          "nullable": true
+        },
+        {
+          "name": "decision",
+          "type": "string",
+          "enum": [
+            "permitted",
+            "refused"
+          ]
+        },
+        {
+          "name": "policy_digest",
+          "type": "digest"
+        },
+        {
+          "name": "authority_epoch",
+          "type": "uint64"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "approver_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "reservation_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "Approval": {
+      "signed": true,
+      "identity": "A human-reserved decision bound to one operation digest and one single-use nonce.",
+      "nullability": "approver_ref must differ from requester_ref and executor_ref. executor_ref is null for a human-only decision. The nonce is single use.",
+      "fields": [
+        {
+          "name": "approval_ref",
+          "type": "string"
+        },
+        {
+          "name": "operation_digest",
+          "type": "digest"
+        },
+        {
+          "name": "requester_ref",
+          "type": "string"
+        },
+        {
+          "name": "executor_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "approver_ref",
+          "type": "string"
+        },
+        {
+          "name": "tenant_ref",
+          "type": "string"
+        },
+        {
+          "name": "policy_digest",
+          "type": "digest"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "nonce",
+          "type": "base64url"
+        },
+        {
+          "name": "state",
+          "type": "string",
+          "enum": [
+            "pending",
+            "consumed",
+            "rejected",
+            "expired"
+          ]
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "EffectFence": {
+      "signed": true,
+      "identity": "The immutable right to dispatch one effect once. It is the last record checked before an effect is written.",
+      "nullability": "grant_ref is null for an entitlement-backed human P2/P3, in which case entitlement_ref is required. Exactly one of the two is present. execution_ref and attempt_ref are null for a human or console caller. supersedes_ref is null only for the first attempt.",
+      "fields": [
+        {
+          "name": "fence_ref",
+          "type": "string"
+        },
+        {
+          "name": "caller_ref",
+          "type": "string"
+        },
+        {
+          "name": "decision_ref",
+          "type": "string"
+        },
+        {
+          "name": "grant_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "entitlement_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "execution_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "attempt_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "resource_refs",
+          "type": "string_array"
+        },
+        {
+          "name": "amount",
+          "type": "money"
+        },
+        {
+          "name": "operation_digest",
+          "type": "digest"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "authority_epoch",
+          "type": "uint64"
+        },
+        {
+          "name": "dispatch_epoch",
+          "type": "uint64"
+        },
+        {
+          "name": "supersedes_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "A3Receipt": {
+      "signed": true,
+      "identity": "What the verifier reports about one human authentication. It holds no raw assertion: the assertion is never stored, only its digest.",
+      "nullability": "uv must be true for A3-UV. A3-T records protected terminal presence instead and is confined to Stage 0B local containment.",
+      "fields": [
+        {
+          "name": "verifier_ref",
+          "type": "string"
+        },
+        {
+          "name": "key_id",
+          "type": "string"
+        },
+        {
+          "name": "device_ref",
+          "type": "string"
+        },
+        {
+          "name": "principal_ref",
+          "type": "string"
+        },
+        {
+          "name": "tenant_ref",
+          "type": "string"
+        },
+        {
+          "name": "trust_domain_ref",
+          "type": "string"
+        },
+        {
+          "name": "operation_digest",
+          "type": "digest"
+        },
+        {
+          "name": "challenge_digest",
+          "type": "digest"
+        },
+        {
+          "name": "policy_digest",
+          "type": "digest"
+        },
+        {
+          "name": "up",
+          "type": "boolean"
+        },
+        {
+          "name": "uv",
+          "type": "boolean"
+        },
+        {
+          "name": "sign_count",
+          "type": "uint64"
+        },
+        {
+          "name": "assurance_predicate",
+          "type": "string",
+          "enum": [
+            "A3-UV",
+            "A3-T",
+            "protected_terminal_presence"
+          ]
+        },
+        {
+          "name": "verified_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "EvidenceRecord": {
+      "signed": true,
+      "identity": "One producer's observation about one operation digest. It carries no credential and no private content.",
+      "nullability": "supersedes_ref is null for a first record and names the record this one replaces otherwise.",
+      "fields": [
+        {
+          "name": "producer",
+          "type": "string"
+        },
+        {
+          "name": "producer_record_id",
+          "type": "string"
+        },
+        {
+          "name": "trace_id",
+          "type": "string"
+        },
+        {
+          "name": "operation_digest",
+          "type": "digest"
+        },
+        {
+          "name": "refs",
+          "type": "string_array"
+        },
+        {
+          "name": "assurance_predicate",
+          "type": "string"
+        },
+        {
+          "name": "authority_epoch",
+          "type": "uint64"
+        },
+        {
+          "name": "issuer_generation",
+          "type": "uint64"
+        },
+        {
+          "name": "outcome",
+          "type": "string",
+          "enum": [
+            "observed",
+            "failed",
+            "refused"
+          ]
+        },
+        {
+          "name": "content_hash",
+          "type": "digest"
+        },
+        {
+          "name": "supersedes_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    },
+    "Refusal": {
+      "signed": false,
+      "identity": "What a boundary reports when it will not perform an operation. It is an outcome, not an authority record, so it is not signed; it is also the only record a caller may receive without one.",
+      "nullability": "effect reports whether anything happened (none, uncertain, committed). missing_or_expired names what was absent. repair may be null only when no lawful repair exists.",
+      "fields": [
+        {
+          "name": "code",
+          "type": "string"
+        },
+        {
+          "name": "boundary",
+          "type": "string"
+        },
+        {
+          "name": "operation_id",
+          "type": "string"
+        },
+        {
+          "name": "effect",
+          "type": "string",
+          "enum": [
+            "none",
+            "uncertain",
+            "committed"
+          ]
+        },
+        {
+          "name": "missing_or_expired",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "repair",
+          "type": "string",
+          "nullable": true
+        }
+      ]
+    },
+    "PendingOperation": {
+      "signed": true,
+      "identity": "The immutable pending descriptor for one governed operation: what was asked, by whom, under which authority, and the state of its one confirmation. It is written before the effect and read by the confirmation step and by the handler that applies the effect.",
+      "nullability": "created_at is the descriptor's creation time and expires_at its expiry. confirmer_ref, presence_evidence and local_receipt are null while the state is pending: the confirmation step writes them, never the caller. case_authority is local or governed and is immutable for this record; a replacement record must carry the same one. execution_ref and delegation_ref are null for a human or console caller. The confirmation_code is single use and the local receipt binds the confirming actor.",
+      "fields": [
+        {
+          "name": "pending_id",
+          "type": "string"
+        },
+        {
+          "name": "operation_id",
+          "type": "string"
+        },
+        {
+          "name": "caller_kind",
+          "type": "string",
+          "enum": [
+            "human_session",
+            "agent_execution",
+            "local_console"
+          ]
+        },
+        {
+          "name": "requester_ref",
+          "type": "string"
+        },
+        {
+          "name": "params_schema_ref",
+          "type": "string"
+        },
+        {
+          "name": "parameters",
+          "type": "object"
+        },
+        {
+          "name": "nonce",
+          "type": "base64url"
+        },
+        {
+          "name": "operation_digest",
+          "type": "digest"
+        },
+        {
+          "name": "resource_refs",
+          "type": "string_array"
+        },
+        {
+          "name": "expected_revision",
+          "type": "uint64",
+          "nullable": true
+        },
+        {
+          "name": "world_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "case_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "frame_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "case_authority",
+          "type": "string",
+          "enum": [
+            "local",
+            "governed"
+          ]
+        },
+        {
+          "name": "policy_digest",
+          "type": "digest"
+        },
+        {
+          "name": "execution_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "delegation_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "session_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "confirmer_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "presence_evidence",
+          "type": "object",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "confirmation_code",
+          "type": "base64url"
+        },
+        {
+          "name": "launch_generation",
+          "type": "string"
+        },
+        {
+          "name": "state",
+          "type": "string",
+          "enum": [
+            "pending",
+            "confirmed",
+            "dispatching",
+            "applied",
+            "uncertain",
+            "expired"
+          ]
+        },
+        {
+          "name": "effect_class",
+          "type": "string",
+          "enum": [
+            "db_local",
+            "external"
+          ]
+        },
+        {
+          "name": "effect_idempotency_key",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "supersedes_ref",
+          "type": "string",
+          "nullable": true
+        },
+        {
+          "name": "local_receipt",
+          "type": "object",
+          "nullable": true
+        },
+        {
+          "name": "signature",
+          "type": "base64url"
+        }
+      ]
+    }
+  },
+  "constraints": {
+    "human_has_no_grant": {
+      "applies_to": [
+        "OperationDescriptor"
+      ],
+      "rule": "A human_session caller has no grant and no delegation head. delegation_ref is null, and a grant_ref carried in the parameters is refused rather than ignored. No grant is fabricated, defaulted, or synthesized to satisfy a shared schema. The entitlement-backed P2/P3 case is covered by fence_authority_exactly_one."
+    },
+    "human_has_no_credential": {
+      "applies_to": [
+        "OperationDescriptor"
+      ],
+      "rule": "A human_session caller has no credential, so execution_ref and attempt_ref are null."
+    },
+    "agent_needs_execution": {
+      "applies_to": [
+        "OperationDescriptor"
+      ],
+      "rule": "An agent_execution caller names the execution it runs as."
+    },
+    "console_has_no_execution": {
+      "applies_to": [
+        "OperationDescriptor"
+      ],
+      "rule": "A local_console caller has no execution and no delegation."
+    },
+    "caller_is_not_target": {
+      "applies_to": [
+        "EffectFence"
+      ],
+      "rule": "The fence's caller_ref is the session, execution, or console principal that asked; execution_ref is the execution that will perform the effect. A fence whose caller_ref equals its execution_ref is a caller claiming to be the execution it targets, and is refused. On a descriptor the caller_ref may legitimately be the executing principal, so substitution there is caught by the caller_kind rules instead."
+    },
+    "governed_agent_needs_delegation": {
+      "applies_to": [
+        "OperationDescriptor"
+      ],
+      "rule": "A governed (P2/P3) agent execution is authorized by a live delegation, so delegation_ref is non-null. A local P0/P1 agent execution may omit it."
+    },
+    "params_schema_mismatch": {
+      "applies_to": [
+        "OperationDescriptor"
+      ],
+      "rule": "The descriptor's params_schema_ref is the schema the catalog row names for that operation. Naming a weaker schema is a classification downgrade through the parameters, and is refused."
+    },
+    "alias_fixes_action": {
+      "applies_to": [
+        "OperationDescriptor"
+      ],
+      "rule": "Where the operation ID fixes an action or resolution, a parameter that disagrees with it is refused. The operation ID, not the payload, decides what is performed."
+    },
+    "dispatcher_target_listed": {
+      "applies_to": [
+        "OperationDescriptor"
+      ],
+      "rule": "A dispatch carries no authority of its own: every target it names (target_operation, or each entry of resolved_operations for a plan) must be a listed catalog row, and a dispatch naming no target at all is Px. An unlisted or unresolvable target makes the whole descriptor Px."
+    },
+    "separation_of_duty": {
+      "applies_to": [
+        "Approval"
+      ],
+      "rule": "The approver is distinct from the requester and from the executor. A P3 grant may authorize an execution but never authorizes that execution to approve its own commitment."
+    },
+    "child_subset_of_parent": {
+      "applies_to": [
+        "DelegationGrant"
+      ],
+      "rule": "A child grant is a strict subset of its live parent: operations, resources, budget, expiry, depth, audience, and the redelegate and offline permissions may only narrow. An absent child field grants nothing; it is not inherited."
+    },
+    "fence_authority_exactly_one": {
+      "applies_to": [
+        "EffectFence",
+        "AuthorityDecision"
+      ],
+      "rule": "An effect is fenced either by a grant or by a current human entitlement, never by both and never by neither. An authority decision names exactly one of the two; a decision naming neither was not made by an authority."
+    },
+    "a3_uv_requires_uv": {
+      "applies_to": [
+        "A3Receipt"
+      ],
+      "rule": "An A3-UV receipt reports user verification. A receipt that claims A3-UV with uv false is refused."
+    },
+    "nonce_not_reused": {
+      "applies_to": [
+        "Approval",
+        "OperationDescriptor"
+      ],
+      "rule": "A nonce is single use. A record whose nonce already appears among the supplied previous nonces is refused."
+    },
+    "supersedes_chain": {
+      "applies_to": [
+        "EffectFence",
+        "EvidenceRecord"
+      ],
+      "rule": "supersedes_ref is null only for a first attempt or a first record. When the supplied context names a previous reference, the new record must supersede exactly that one."
+    },
+    "pending_confirmation_not_caller_supplied": {
+      "applies_to": [
+        "PendingOperation"
+      ],
+      "rule": "confirmer_ref, presence_evidence and local_receipt are written by the confirmation step, never by the caller. A pending record carries none of them; a confirmed, dispatching, applied or uncertain record carries all three. A record that claims a confirmation it does not have, or that names a confirmer before it was confirmed, is refused."
+    },
+    "pending_case_authority_immutable": {
+      "applies_to": [
+        "PendingOperation"
+      ],
+      "rule": "case_authority is immutable for a pending record. A replacement record, named by supersedes_ref, carries the same case_authority and the same operation_id as the record it replaces; a replacement that widens the authority of the original is refused."
+    },
+    "pending_governed_needs_governed_authority": {
+      "applies_to": [
+        "PendingOperation"
+      ],
+      "rule": "A row whose authority comes from outside the local continuation \u2014 every P3 row, and any row whose authority writer is SEA-Forge or the issuer root \u2014 acts on a governed case and requires case_authority governed. A local pending record may not stand in for a governed decision, and an interim local receipt may not enable the row."
+    },
+    "pending_case_authority_matches_case": {
+      "applies_to": [
+        "PendingOperation"
+      ],
+      "rule": "A row whose authority writer is case_record.authority takes its authority from the case the operation acts on: local means the Cognate continuation, governed means SEA-Forge. The pending record states that authority in case_authority, and it must equal the case record's authority; a pending record that claims a different one is refused."
+    }
+  },
+  "not_enforceable_from_one_record": {
+    "grant_liveness": "Whether a named grant or entitlement is live at dispatch needs the authority store; Stage 3 states the check and Stage 5 measures it.",
+    "epoch_monotonicity": "Whether authority_epoch has been superseded needs the epoch history; Stage 3 states the check and Stage 5 measures it, so a single record cannot prove it is current.",
+    "revocation_latency": "Admission after revocation is a measured property (U4.B); Stage 3 states the check and Stage 5 measures it, so it is not a record field.",
+    "pending_expiry": "Whether a pending record is still inside its window needs the clock and the store; the expiry is checked when the record is confirmed and again when it is redeemed, so one record cannot prove it is current. Stage 3 states the check for the production path and Stage 5 measures it.",
+    "pending_code_single_use": "Whether a confirmation code was already spent needs the store's state history; the record's own state and the transition rules are what make the code single use. Stage 3 states the transition rule and Stage 5 measures the at-most-once property."
+  }
+}

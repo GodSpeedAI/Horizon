@@ -1,0 +1,50 @@
+{
+ "episode_ref": "episode:case1:step1:1@sha256:686d631e5054b1132fa9616b3f91845c90f119768998dd431aff0bdf8bbe48f3",
+ "body": {
+  "case_id": "case1",
+  "plan_item_id": "step1",
+  "n": 1,
+  "world_ref": "world:sop@sha256:092e4f8488fc781c45d889a837e69b22fd148d3261c7a0cf73574de5ffcc77f5",
+  "kind": "evaluated",
+  "executor_provenance": "program",
+  "criteria": {
+   "intention": "i",
+   "expected_change": "c",
+   "invariants": [],
+   "predicted_irrelevancies": [],
+   "success_region": "s",
+   "failure_region": "f",
+   "falsifiers": [
+    "x"
+   ]
+  },
+  "comparison_profile": {
+   "id": "profile:s1",
+   "sha256": "ab079da4e1064eea25455252caa7c0c584dad2dd12a18ec092a53395acc21f5b"
+  },
+  "decision_maker": {
+   "principal": "p",
+   "role": "r"
+  },
+  "evidence_sources": [
+   {
+    "source_id": "src-sf",
+    "system": "sea-forge",
+    "purpose": "p"
+   },
+   {
+    "source_id": "src-ghost",
+    "system": "ghost-system",
+    "purpose": "p"
+   }
+  ],
+  "coverage_manifest": [
+   {
+    "emitter": "sea-forge",
+    "event_kinds": [
+     "move"
+    ]
+   }
+  ]
+ }
+}

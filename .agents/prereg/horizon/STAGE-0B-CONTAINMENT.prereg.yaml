@@ -1,0 +1,227 @@
+preregistration:
+  id: HORIZON-PREREG-STAGE-0B-CONTAINMENT
+  task: STAGE-0B-CONTAINMENT
+  title: "Contain Horizon's reserved human writes behind an immutable pending descriptor and a local terminal confirmation"
+  recorded_at: "2026-11-11"
+  recorded_before_artifacts: false
+  claim: >-
+    A reserved human write (the workspace label, the desk panel P2 operations, and the lesson
+    decision) does not run when it is requested. It writes a pending descriptor that names the
+    exact operation, its parameters and its operator, and it answers that it is waiting. The
+    descriptor holds only a keyed digest of the confirmation code, never the code. The code is
+    shown on the Horizon terminal, and it is typed on the controlling terminal through
+    `horizon confirm --pending <id>`. The typed code confirms exactly the descriptor it was shown
+    for, and the operation then runs once. A wrong code, an expired descriptor, a request with no
+    terminal, and a confirmation presented to a different operation, parameter set or operator
+    each leave the operation unrun and write no effect. This unit does not claim a device
+    delegation, a human session, or any Stage 0A requirement beyond the containment it adds.
+  upstream_pins:
+    spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+    plan: { id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23", line: 1725, reference: "contain Horizon's reserved operations with an immutable pending descriptor and a local terminal confirmation (A3-T)" }
+    design: { file: design_draft.md, sha256: "39cc13490f09b3009ae69804c349ec884a16661b8d150b3e58d676e207f45047", lines: 972, sections: "12" }
+    prior_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-REMEDIATION-4.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-REMEDIATION-4, relationship: "the Stage 0A unit this containment follows" }
+  # This unit settles no specification requirement. It adds a local confirmation to reserved
+  # human writes. The Stage 0A requirements remain open until the sixth independent review rules.
+  settles: []
+  falsifier: >-
+    Any negative expectation reproducing on the committed files falsifies this claim: a reserved
+    write that runs without a confirmation, a descriptor that stores the code or any value from
+    which the code can be read back, a confirmation that applies to a different operation, a
+    parameter set or an operator, a second application of one confirmation, or an expired or
+    wrong-code confirmation that changes the operation's state.
+  known_confounds:
+    - >-
+      The test preload installs a confirmation sink that confirms for the suite, so the suite's
+      other route tests exercise the operations after confirmation. The waiting state is proved in
+      tests that remove the sink for their run, and the sink is restored afterwards.
+    - >-
+      `horizon confirm` opens the desk's writable store. While a desk process holds the store
+      lock, the command is refused by that lock, so a confirmation can be typed only when no desk
+      is running. Stage 0B does not redesign this. It is recorded as an incomplete item in the
+      report, not claimed as working in a running desk.
+    - >-
+      The confirmation code is six decimal digits. Its protection is the terminal channel, the
+      expiry of two minutes and the single application, not the code's entropy alone.
+    - >-
+      The route tests show the waiting response for the workspace label. The desk panel and the
+      lesson decision are gated in the same way, and their gate is proved by the unit tests of the
+      gate, not by a route test of each.
+  positive_expectations:
+    - id: PE-53
+      expectation: >-
+        A reserved operation requested without a confirmation writes no operational record, and the
+        request is answered as waiting with the pending descriptor's id.
+    - id: PE-54
+      expectation: >-
+        The confirmation code is shown on the Horizon terminal and is never stored. The stored
+        descriptor carries only a keyed digest of the code.
+    - id: PE-55
+      expectation: >-
+        A typed code that matches the descriptor confirms exactly that operation. The operation then
+        runs once, and a repeat request starts a new waiting descriptor rather than running again.
+    - id: PE-56
+      expectation: >-
+        The `horizon confirm` command renders the operation it is asked to confirm, its operator and
+        its expiry on the terminal before it asks for the code, and confirms through the terminal it
+        is given.
+    - id: PE-57
+      expectation: >-
+        A second request for the same operation while its descriptor still waits reuses that
+        descriptor rather than writing another one.
+    - id: PE-58
+      expectation: >-
+        A label request without a confirmation is answered with a 409 waiting response, and the label
+        is not saved.
+    - id: PE-59
+      expectation: >-
+        The waiting response for a label never carries the confirmation code.
+    - id: PE-60
+      expectation: >-
+        Starting remote control creates no device, credential or grant, and an unpaired phone cannot
+        read the desk or request options to sign in.
+    - id: PE-61
+      expectation: >-
+        A passkey registration that verifies is held as a pending enrolment. It creates no active
+        device, sets no session cookie and signs nothing in until the active controller authorizes it
+        with its own user-verified passkey.
+    - id: PE-62
+      expectation: >-
+        The controller's proof authorizes the pending enrolment once, and the authorization records the
+        controller that signed it and the pending id. The commit then creates the active credential.
+    - id: PE-63
+      expectation: >-
+        Starting remote control again while a request waits grants no authority and leaves the waiting
+        request as it was.
+    - id: PE-64
+      expectation: >-
+        Stopping remote control before authorization voids the waiting enrolment; after a restart
+        nothing authorizes or commits it.
+    - id: PE-65
+      expectation: >-
+        Stopping after authorization but before the commit ends the confirmed enrolment, and it creates
+        no device after a restart.
+    - id: PE-66
+      expectation: >-
+        Refreshing after authorization ends the confirmed enrolment, and the prior controller's cookie is
+        refused after a restart.
+    - id: PE-67
+      expectation: >-
+        Stopping remote control ends an authorized phone's credential at once: its old cookie is refused
+        once the listener returns.
+    - id: PE-68
+      expectation: >-
+        An invitation redeems once, so a second phone cannot open a second request from it.
+    - id: PE-69
+      expectation: >-
+        A refresh voids the open invitation, so its secret no longer redeems.
+    - id: PE-70
+      expectation: >-
+        Every P3 row in the catalog names a requester, an approver and an executor; the approver is
+        distinct from the requester and from the executor, and the separation executor is the row's executor.
+    - id: PE-71
+      expectation: >-
+        A confirmed enrolment that is not yet committed is ended by a stop, and its commit afterwards
+        creates nothing.
+  negative_expectations:
+    - id: NE-41
+      expectation: >-
+        A wrong code confirms nothing: the descriptor stays pending and the operation does not run.
+    - id: NE-42
+      expectation: >-
+        An expired descriptor cannot be confirmed. It is marked expired, and a later request does not
+        run the operation under it.
+    - id: NE-43
+      expectation: >-
+        A confirmed descriptor is consumed exactly once when two requests race for it, and only one
+        request runs the operation.
+    - id: NE-44
+      expectation: >-
+        Without a terminal, nothing is written: no descriptor, no code and no operation.
+    - id: NE-45
+      expectation: >-
+        A confirmation for one operation, one parameter set or one operator is never consumed by
+        another. The original descriptor stays confirmed and unused.
+    - id: NE-46
+      expectation: >-
+        Repeating an unconfirmed label request still answers waiting and never reports success.
+    - id: NE-47
+      expectation: >-
+        A verified invitation redemption alone enrols no device and grants no session.
+    - id: NE-48
+      expectation: >-
+        The phone's own retries before the controller authorizes never sign it in.
+    - id: NE-49
+      expectation: >-
+        With no active controller, a phone's request is refused and nothing is held.
+    - id: NE-50
+      expectation: >-
+        A replayed authorization is refused and creates no second device.
+    - id: NE-51
+      expectation: >-
+        Simultaneous commits after one authorization commit exactly one device.
+    - id: NE-52
+      expectation: >-
+        A controller proof without user verification confirms nothing and creates nothing.
+    - id: NE-53
+      expectation: >-
+        The waiting phone cannot authorize its own enrolment with its passkey.
+    - id: NE-54
+      expectation: >-
+        A P3 row whose approver is its own requester is refused by the catalog.
+    - id: NE-55
+      expectation: >-
+        A P3 row whose approver is its executor is refused by the catalog.
+    - id: NE-56
+      expectation: >-
+        A P3 row that states separation of duty as a bare boolean is refused by the catalog schema.
+    - id: NE-57
+      expectation: >-
+        A failure in the identity writer after confirmation is fail-closed: no device, no session, and
+        the consumed authorization cannot be reused.
+    - id: NE-58
+      expectation: >-
+        A confirmed enrolment committed after its window is refused as expired and creates no device.
+    - id: NE-59
+      expectation: >-
+        An authorization that races a stop lands before or after the stop, and never commits after the
+        commit has been refused.
+    - id: NE-60
+      expectation: >-
+        An abandoned enrolment is never confirmed, even when the proof arrives after the abandon.
+    - id: NE-61
+      expectation: >-
+        A newer request ends an older one, which cannot be authorized or committed.
+    - id: NE-62
+      expectation: >-
+        A controller enrolled by another route after authorization makes the confirmed enrolment stale at
+        commit, and it creates no device.
+    - id: NE-63
+      expectation: >-
+        A proof over another request's challenge is refused.
+    - id: NE-65
+      expectation: >-
+        A stale enrolment cannot restore access once the controller has been refreshed away.
+    - id: NE-68
+      expectation: >-
+        Only the enrolment commit writes a device credential, and the identity service is its only writer.
+    - id: NE-69
+      expectation: >-
+        A confirmation with no approval recorded by a current controller is refused at commit.
+    - id: NE-70
+      expectation: >-
+        The digest binds the permissions, so an altered stored grant is refused at commit and creates nothing.
+    - id: NE-71
+      expectation: >-
+        A failure after the identity service enrols the phone leaves no partially authorized device.
+    - id: NE-72
+      expectation: >-
+        The commit audit names the requester, the human authorizer, the decision and the issuer as separate roles.
+    - id: NE-73
+      expectation: >-
+        Production wires no P3 authority, so device enrolment is refused with authority_unavailable before anything is held.
+    - id: NE-74
+      expectation: >-
+        With no P3 authority decided, the enrolment authority holds no request and records no decision.
+    - id: NE-75
+      expectation: >-
+        A confirmed, approved enrolment without a P3 decision for its digest is refused as undecided at commit.

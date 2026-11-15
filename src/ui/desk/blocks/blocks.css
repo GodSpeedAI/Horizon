@@ -36,3 +36,4 @@
 .hb-option { display:block; margin:.2rem 0; } .hb-field { display:block; margin:.35rem 0; } .hb-field label, label.hb-field { display:block; font-size:.85rem; } .hb-row { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin:.4rem 0; }
 .hb-form select { max-width:100%; font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--edge); border-radius:.35rem; padding:.3rem .4rem; }
 @media (prefers-reduced-motion: reduce) { .hb *, .hb-ask * { transition:none !important; animation:none !important; scroll-behavior:auto !important; } }
+.hb-controls { align-items:flex-start; gap:.5rem 1rem; } .hb-control { display:flex; flex-direction:column; gap:.2rem; max-width:15rem; align-items:flex-start; } .hb-hint { font-size:.8rem; opacity:.8; }

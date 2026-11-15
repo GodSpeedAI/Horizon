@@ -1,0 +1,241 @@
+preregistration:
+  id: HORIZON-PREREG-STAGE-0A-REMEDIATION-2
+  task: STAGE-0A-REMEDIATION-2
+  title: "Close the third independent review's ten findings, and pin the design the fourth review reads"
+  recorded_at: "2026-11-10"
+  recorded_before_artifacts: false
+  claim: >-
+    The contract set, the live handlers and the normative design now say one thing about the
+    paths the third review found unsafe. The live remote router is catalogued and its approval
+    commands are structurally absent rather than merely gated; the desk's decision route is a
+    dispatcher that resolves its operation from the card the server fetched, so a P3 approval can
+    no longer travel a P2 row; a deployment-bound reference is refused on the plain intent path
+    with its own reason; the pending record names exactly one caller channel; a parameter that
+    names a delegation is registered, and the register says whether it is the caller's authority
+    or the operation's target; the parameter contracts and the generated design table agree with
+    the handlers field for field; the evidence record carries two separate outcomes; the
+    entitlement path fails closed while the owner has published nothing; the pending record's
+    replay and terminal-state rules are complete; and the liveness probe is separate from the
+    diagnostics read. This file pins the SHA-256 of the design the fourth independent review
+    will read, so that the verdict binds a known set of bytes.
+  upstream_pins:
+    spec: { id: HORIZON-001, version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+    plan: { id: HORIZON-PLAN-001, file: .agents/plans/horizon.plan.yaml, version: "1.1.0", task: "T23" }
+    design: { file: design_draft.md, sha256: "e2eb3299eabfbe931d86183c7d09b9477550ab7ba3e0850d3fabf9abe17b74b0", lines: 900, sections: "2, 6, 7, 9.1, 11, 12, Appendix A, Review Record" }
+    task_preregistration: { file: .agents/prereg/horizon/T23.prereg.yaml, id: HORIZON-PREREG-T23-0A, relationship: "the task-level preregistration that registers the Stage 0A expectations; this unit is one of its Stage 0A units" }
+    unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-1, relationship: "the first Stage 0A unit" }
+    defect_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-DEFECTS.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-DEFECTS, relationship: "the unit that closed the two recorded identity defects" }
+    remediation_unit_preregistration: { file: .agents/prereg/horizon/STAGE-0A-REMEDIATION.prereg.yaml, id: HORIZON-PREREG-STAGE-0A-REMEDIATION, relationship: "the unit that closed the second independent review's findings" }
+    prior_review: { file: .agents/evidence/2026-11-09-stage-0a-defects/independent-review-round-3.md, verdict: "REJECT", findings: 10, disposition: .agents/evidence/2026-11-09-stage-0a-defects/review-round-3-disposition.md }
+  # This unit settles no specification requirement. It closes the third independent review's
+  # findings against the Stage 0A contract set. No status entry may claim REQ-SEC-006 as settled
+  # because this file exists; the fourth independent review, not this unit, is what can settle
+  # Stage 0A.
+  settles: []
+  positive_expectations:
+    - id: PE-24
+      expectation: >-
+        The live remote router is catalogued and its approval path is structurally absent. Every
+        route the phone's server performs has a row in the operation catalog — the pairing
+        ceremonies, the two signed-in reads, the sign-out, the device enrollment and the command
+        dispatcher — and `POST /m/api/command` is a dispatcher whose operation is resolved from
+        the catalog's dispatch table rather than from a switch in the handler. The phone's
+        approval commands resolve to the approval rows and are refused with
+        `no_protected_confirmation_path`, and the phone's server holds no approval resolver at
+        all, so the path cannot be reached by wiring it back in without a contract change.
+    - id: PE-25
+      expectation: >-
+        The desk's decision route is a dispatcher whose operation is resolved from the card the
+        server fetched, never from the body. The catalog lists every (card kind, choice) pair the
+        route can perform, and each pair selects a row with its own class, authority writer and
+        parameter schema: an escalation's accept and reject select the two P3 approval rows, a
+        lesson selects the P2 decision row, a case task selects the case keeper's own rows, a
+        human step selects the completion row, and an acceptance card selects one of the two
+        settlement rows. A pair the catalog does not list is Px and is refused before any effect
+        runs.
+    - id: PE-26
+      expectation: >-
+        A deployment-bound operation is refused on the plain intent path with a reason of its own.
+        The catalog states that every deployment binding has a minimum class of P2, that the
+        binding keeps its own authority and evidence, and that the plain intent path cannot
+        honour them because it carries no pending record, no confirmation and no authority
+        writer. The live classification returns that reference as refused, at both the request
+        boundary and the last gate before a capability runs.
+    - id: PE-27
+      expectation: >-
+        A pending record names exactly one caller channel. A human session's pending record
+        carries a session reference and no execution and no delegation; an agent execution's
+        carries its execution and no session; a local console's carries none of the three. The
+        rule is one explicit constraint in the record contract's own `applies_to`, so a consumer
+        that follows the frozen contract applies it to the pending record.
+    - id: PE-28
+      expectation: >-
+        A parameter that names a delegation is registered, and the register says what it means.
+        The record contract carries a vocabulary of the parameter names that name a delegation
+        and one entry per schema and field, saying whether the reference is the caller's
+        `authority`, the operation's `target`, or `forbidden` to that caller kind. The grant a
+        revocation revokes is the operation's target, so a human session may name it; the grant
+        an agent spends on `run.start` is that execution's own authority, so the record must hold
+        that same reference; and a local console may never be the authority for one. `sponsor_ref`
+        is not in the vocabulary, and the register says why.
+    - id: PE-29
+      expectation: >-
+        The parameter contracts and the design's generated table agree with the handlers field for
+        field. Arrays, optionality and nullability are three separate facts and are encoded
+        separately and recursively; a nested field's own optionality and nullability are carried
+        into the generated design table rather than dropped; and a build check compares every
+        live-bound row's schema with the source that reads it, so a wire name that drifts, a
+        field the handler reads that the schema does not name, and a live-bound row with no
+        binding in the check each fail the build.
+    - id: PE-30
+      expectation: >-
+        The evidence record carries two separate outcomes. `observation_outcome` says what the
+        producer's observation was — observed, failed or refused — and `effect_outcome` says what
+        the observed effect became — none, uncertain or committed. The two are distinct fields
+        with distinct enums, so an observation can succeed while the effect it observed is still
+        uncertain, and the design's promised commitment proof is derivable from the record.
+    - id: PE-31
+      expectation: >-
+        The entitlement path fails closed while the owner has published no entitlement artifact.
+        The external-interface contract names the facts an entitlement must carry — its reference,
+        the subject it was issued to, its issuer, its issuer's key, its signature, the operation
+        digest, the resource scope, the amount, the authority epoch, the expiry and the
+        revocation state — and names the subject each fact binds to per record kind, so no fact
+        points at a field that does not exist. While the interface is unpublished, every record
+        that names an entitlement is refused whatever facts it is handed.
+    - id: PE-32
+      expectation: >-
+        The pending record's replay and terminal-state rules are complete. The nonce rule and the
+        supersession rule both apply to `PendingOperation`, so a pending record's nonce is not
+        reusable and its supersession chain is checked like any other record's. An expired
+        pending record carries no confirmation evidence, because an expired window is not a
+        confirmation; the rule is explicit about that rather than silent.
+    - id: PE-33
+      expectation: >-
+        The liveness probe and the diagnostics read are two operations. `GET /health` is the one
+        anonymous public liveness read and answers the same thing to every caller, paired or not.
+        `GET /diagnostics` is a separate, paired operation that reports the deployment in detail,
+        and the catalog names both routes and both schemas.
+  negative_expectations:
+    - id: NE-22
+      expectation: >-
+        The phone must never be able to answer an escalation. An approve or reject command is
+        refused with a 403 and the reason `no_protected_confirmation_path`, and the refusal is
+        audited. A mutation that puts the approval resolver back into the phone's server, or that
+        lets the command past the containment check, fails the check rather than passing quietly.
+    - id: NE-23
+      expectation: >-
+        The desk's decision route must never downgrade a P3 approval to a P2 row. A card kind and
+        choice the catalog does not list is refused as Px before any effect runs, and a mutation
+        that maps the escalation pair to the lesson row fails the check.
+    - id: NE-24
+      expectation: >-
+        A deployment-bound operation must never run on the plain intent path. The reference is
+        refused before any capability is invoked and before any record is appended, and a mutation
+        that treats a deployment binding as an allowed local operation fails the check.
+    - id: NE-25
+      expectation: >-
+        A pending record that names two caller channels is refused, whatever the pair: a human
+        with a session and an execution, an agent with an execution and a session, and a console
+        with any of the three. A human pending record with no session at all is refused too,
+        because a channel nobody can check is not a channel.
+    - id: NE-26
+      expectation: >-
+        A delegation reference the register does not cover is never treated as harmless. A schema
+        and field the register does not list is forbidden to every caller kind, and the vocabulary
+        means a reference smuggled under a schema that forgot to register it is still seen. A
+        mutation that removes the vocabulary, or that treats an unlisted pair as a target, fails
+        the check.
+    - id: NE-27
+      expectation: >-
+        The evidence record must never carry one outcome meaning two things. The two outcomes are
+        separate fields, and a record that carries the old single `outcome` field is refused for
+        carrying a field the contract does not declare.
+    - id: NE-28
+      expectation: >-
+        The entitlement path must never accept an artifact nobody published. A record that names
+        an entitlement and is handed self-asserted facts — including an issuer and a key
+        identifier — is refused, because an artifact nobody has published cannot be
+        authenticated. The path never falls back to a grant, a session or a policy decision.
+    - id: NE-29
+      expectation: >-
+        The liveness probe must never become a second way in to the deployment. A paired caller
+        receives exactly the same body as an unpaired one, and the diagnostics read is refused to
+        an unpaired caller with nothing of the deployment in the refusal.
+    - id: NE-30
+      expectation: >-
+        A pending record must never be replayed and an expired one must never carry a
+        confirmation. A record whose nonce was already used is refused, and an expired pending
+        record that still carries confirmation evidence is refused.
+  falsifier: >-
+    Any of the negative expectations reproducing on the committed files falsifies this claim: a
+    phone that can answer an escalation, a desk decision that downgrades a P3 approval to a P2
+    row, a deployment-bound operation that runs on the plain intent path, a pending record that
+    names two caller channels, a delegation reference the register does not cover that is
+    accepted, a parameter schema or design table that drifts from its handler, an evidence record
+    whose two outcomes are conflated, an entitlement-backed record that an unpublished artifact
+    satisfied, a liveness probe that carries the deployment, or a pending record that is replayed
+    or that carries a confirmation after expiry. So does a design whose hash this file does not
+    pin.
+  known_confounds:
+    - >-
+      This unit was authorized in session by the owner and its implementation was written under
+      that instruction, so this file is a record of the acceptance criteria, not a claim of
+      prospective registration. Its expectations are the third independent review's findings
+      restated as testable claims.
+    - >-
+      The phone's approval path is contained by refusal, not by the protected confirmation the
+      desk's own escalation path still lacks. The desk keeps its current escalation authority
+      checks, and the gap between them and the contract's pending/A3-UV requirement is declared
+      in the catalog's live-enforcement table as Stage 0B work rather than claimed as settled.
+    - >-
+      SEA-Forge has published no entitlement artifact, so the interface is specified rather than
+      pinned: the fact names are Horizon's requirement on the owner's payload, not a schema the
+      owner has agreed to, and the adapter that maps one to the other is Stage 3 work. Until the
+      owner publishes it, the entitlement-backed human path is unavailable by design, and the
+      contract says so instead of pretending the artifact exists.
+    - >-
+      The parameter contract's types are checked against the live handlers, not against the
+      domain. A check proves the contract and the handler agree about what crosses the boundary;
+      whether the type is the right type for the domain is the reviewer's semantic reading.
+  evidence_plan:
+    command: "just gate-t23"
+    typecheck: "./node_modules/.bin/tsc --noEmit"
+    artifacts:
+      - contracts/identity/v1/a3-mechanism.yaml
+      - contracts/identity/v1/external-interfaces.json
+      - contracts/identity/v1/operations.yaml
+      - contracts/identity/v1/params.yaml
+      - contracts/identity/v1/records.json
+      - contracts/identity/v1/fixtures/record-cases.json
+      - src/contracts/identity/manifest.ts
+      - src/contracts/identity/params.ts
+      - src/contracts/identity/records.ts
+      - src/app.ts
+      - src/remote/server.ts
+      - design_draft.md
+      - test/identity-remediation-2.test.ts
+      - scripts/check-delegation-register.ts
+      - scripts/check-design-contract-consistency.ts
+      - scripts/check-param-schema-binding.ts
+      - scripts/check-stage0a-remediation-2-prereg-coverage.ts
+      - .agents/evidence/2026-11-09-stage-0a-defects/
+  redesign_trigger: >-
+    If closing a finding needs a caller kind, a predicate or a record kind the runtime cannot
+    produce, stop and revise the identity contract rather than weakening the refusal, widening
+    the vocabulary or adding a label that names an actor. If the phone's approval path can only be
+    closed by giving it the protected confirmation, that is Stage 0B work and not this unit's.
+  confirmation_condition: >-
+    A fresh critic reads a frozen, hash-pinned copy of the whole contract set, verifies the
+    manifest before reading any content, and confirms each finding's correction against the
+    contract bytes rather than against this file's account of them. Self-attestation is not
+    confirmation, and neither is a passing check whose assertions were not read.
+  notes: >-
+    Recorded after the implementation, on purpose: the owner authorized the unit in session. The
+    expectation ids continue the earlier series so the files never claim the same id; PE-24 to
+    PE-33 and NE-22 to NE-30 were free when this unit was recorded. The earlier preregistrations
+    are left as recorded — including the one that pins a design hash the working tree has since
+    moved past — because a recorded preregistration is not rewritten; this file carries the
+    current pin and the findings the third review raised. The design pin in this file is checked
+    against the frozen copy the fourth review reads, not against the moving working tree: a
+    verdict binds the bytes it read, and the bytes it read are kept.

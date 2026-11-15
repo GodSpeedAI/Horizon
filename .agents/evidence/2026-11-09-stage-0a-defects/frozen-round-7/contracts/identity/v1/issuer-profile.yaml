@@ -1,0 +1,363 @@
+issuer_profile_version: "horizon.identity.issuer-profile/1"
+contract_id: "horizon.identity.issuer-profile"
+contract_version: "1.0.0"
+frozen_at: "2026-11-09"
+authority:
+  design: "design_draft.md section 3 (trust boundaries and issuer topology), section 5 (lifecycle), section 13 (platform guarantees), section 14 (U1.A, U1.B, U5.A)"
+  owner_decision: >-
+    U1.A — the issuer is a protected service with exclusive custody and an enrollment/issuance
+    authorization model. First choice is an existing protected host service; second is a
+    dedicated Cognate broker under a separate service account; third is a remote organizational
+    issuer. It never accepts a caller-supplied principal, role, or actor, and never exposes key
+    material.
+  spec: { id: "HORIZON-001", version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+  note: >-
+    This file freezes the issuer contract only. It does not claim that any platform has passed
+    qualification: `platform-claims.yaml` carries the claim matrix and the qualification lanes
+    below are the tests that produce those claims.
+
+# ---------------------------------------------------------------------------
+# 1. Ownership split
+# ---------------------------------------------------------------------------
+ownership:
+  identity_issuer:
+    owner: "Cognate"
+    scope:
+      - "Enrolling a principal and its agent instance."
+      - "Issuing execution and attempt credentials to an enrolled agent."
+      - "Propagating the execution context through local invocation, continuations, protocol messages and nested agents."
+      - "Maintaining issuer_generation and advancing it on identity revocation, enrollment replacement, or trust-root rotation."
+      - "Rotating the trust root, replacing a lost holder key, and recovering an enrollment."
+    not_scope:
+      - "Granting delegated authority over a consequential operation."
+      - "Deciding whether a human may approve a reserved operation."
+      - "Storing or interpreting developmental evidence."
+  delegation_authority:
+    owner: "SEA-Forge"
+    scope:
+      - "Bounded delegation, consequential operation authorization, approvals, separation of duty, and governed revocation."
+      - "Maintaining authority_epoch and advancing it on grant revocation, approval cancellation, or policy invalidation."
+    not_scope:
+      - "Issuing credentials."
+      - "Establishing a human principal; the issuer does not become the human identity provider."
+    relationship_to_issuer: >-
+      The two are not interchangeable. A credential names both the issuer generation and the
+      authority epoch it was issued against, and either invalidation refuses admission.
+  consumers:
+    - "Horizon"
+    - "Cognate Workbench"
+    - "Gauntlet"
+    - "RealityTrace"
+  consumer_rule: >-
+    A consumer verifies identity and consumes authority outcomes. It never creates a competing
+    identity or approval system, and never mints an identity of its own.
+
+# ---------------------------------------------------------------------------
+# 2. The issuer security property and the custody profiles
+# ---------------------------------------------------------------------------
+issuer_security_property:
+  name: "exclusive_custody"
+  statement: >-
+    Only a trusted component can use or replace signing material. The agent cannot read,
+    export, replace, signal, or inject into it.
+  disqualifiers:
+    - "A key file readable by the agent's OS account fails the property, even with restrictive permissions."
+    - "Machine-scoped DPAPI alone fails the property, because other local users may decrypt it."
+    - "A signer that can be asked to mint an arbitrary principal is an issuance oracle and fails qualification."
+  fallback_rule: >-
+    If custody cannot be established, the host runs without agent authority. The application
+    never silently falls back to a local file or a user-owned process when the configured issuer
+    is unavailable, and never downgrades to a weaker identity claim.
+
+custody_profiles:
+  - id: existing_protected_host_service
+    preference: 1
+    use: "v1 first choice"
+    examples: ["SEA-Forge's protected local service when installed", "another already-isolated host service"]
+    custody_requirement: >-
+      Service-specific OS peer identity on a protected socket or pipe; the issuer signing key is
+      in a separate key domain from the authority decision key.
+    claim: "S1 after custody and authorization qualification; S2 only with out-of-boundary authority and confirmation"
+    new_daemon: false
+    when_chosen: >-
+      Chosen when a protected host service on the target platform actually satisfies the custody
+      requirement. A service that only appears protected, or that runs under the agent's own
+      account, does not qualify.
+  - id: dedicated_cognate_authority_broker
+    preference: 2
+    use: "local-first hosts without a qualified existing service"
+    custody_requirement: >-
+      Separate service account, OS service manager, protected IPC, key ACL restricted to that
+      account; a TPM, CNG or Keychain key where available, otherwise a service-only key file with
+      no agent-account access.
+    claim: "S1 after custody and authorization qualification; never S2 by itself"
+    new_daemon: true
+    when_chosen: >-
+      Chosen only when no existing service meets the custody requirement. A new daemon is not the
+      default and is justified only by the trust boundary.
+  - id: organizational_remote_issuer
+    preference: 3
+    use: "managed or multi-user deployments"
+    custody_requirement: "Remote trust root, device enrolment, audience-bound proofs, separate authority deployment."
+    claim: "S1 or S2 according to deployment review"
+    new_daemon: false
+    when_chosen: "Chosen when the deployment is managed or multi-user and a local host cannot meet the custody requirement."
+profile_selection_rule: >-
+  The implementation selects the first profile that meets custody on the target platform, in the
+  order listed. The selection is recorded with its qualification evidence; it is never inferred.
+
+# ---------------------------------------------------------------------------
+# 3. Enrollment
+# ---------------------------------------------------------------------------
+enrollment:
+  principal_enrollment:
+    subject: "one agent instance"
+    registered_material:
+      key: "P-256 public key"
+      principal: "explicit principal id"
+      agent_instance: "explicit agent instance id"
+      sponsor_proof: "a human or SEA-Forge sponsor proof, independent of the agent's own claim"
+    rule: >-
+      An agent instance is enrolled once. The enrollment fixes the public key, the principal, the
+      agent instance and the sponsor. Later requests reference the enrollment; they never
+      re-register it.
+    enrollment_authority: "human or SEA-Forge authorization that is independent of the agent's claim"
+    replay_rule: "An enrollment signature already consumed is refused; enrollment is not replayable."
+    ephemeral_agents: >-
+      An ad hoc agent receives an ephemeral agent instance that cannot outlive its enrollment
+      window. It is still enrolled; it simply holds no durable identity.
+  human_principals:
+    established_by: "OIDC, a passkey, or a local account — whichever the deployment uses"
+    issuer_role: >-
+      The issuer does not become the human identity provider. It attests the binding from a
+      verified human session or grant to an agent execution.
+    credential_rule: "A human is never issued an agent credential."
+
+# ---------------------------------------------------------------------------
+# 4. Authorized issuance
+# ---------------------------------------------------------------------------
+issuance:
+  request_carries:
+    - "the enrollment signature"
+    - "the execution descriptor"
+    - "the holder key"
+    - "the audience"
+    - "the requested initiator"
+  issuer_resolves_from:
+    - "the enrollment"
+    - "the verified human session or grant reference"
+  caller_supplied_identity_is_refused: >-
+    The issuer resolves the executor and initiator from the enrollment and the verified
+    human-session or grant reference. It never accepts a caller-supplied principal, role, or
+    actor.
+  refusals:
+    - "a request to issue a human credential"
+    - "a request for an unregistered agent"
+    - "a request for an execution outside the enrolled agent"
+    - "a request whose holder key differs from the enrollment"
+    - "a request that names a principal, role, or actor the caller supplied"
+  credential_properties:
+    audience_specific: true
+    holder_bound: "possession of the bytes alone is insufficient"
+    max_ttl_seconds: 900
+    ttl_source: "policy.yaml durations_seconds.credential_max_ttl"
+    carries: ["execution_ref", "holder_jwk", "authority_epoch", "issuer_generation"]
+    carries_no_human_authority: true
+  renewal:
+    path: "the trusted issuer"
+    preserves: "the execution identity"
+    rechecks: ["the grant", "the revocation state"]
+    limits:
+      - "Renewal may shorten or refuse."
+      - "Renewal cannot widen scope, extend the grant, or create a new delegation."
+  issuance_authorization_rule: >-
+    Custody alone is not authorization. The issuer holds the key and still decides whether the
+    request is allowed; a protected signer that will mint any principal on request is an
+    issuance oracle.
+
+# ---------------------------------------------------------------------------
+# 5. Holder binding, key rotation, recovery, revocation
+# ---------------------------------------------------------------------------
+holder_binding:
+  rule: >-
+    A credential is bound to the holder key registered at enrollment. An attempt whose holder key
+    differs from the enrollment is refused.
+  possession_alone_is_insufficient: true
+  attempt_model:
+    execution: "each logical execution receives a distinct execution id, even when the agent instance is reused"
+    attempt: "each process start receives a new attempt id"
+    retry: "a retry preserves the execution id and creates a new attempt id; it never inherits the prior attempt's liveness or budget consumption"
+
+key_rotation:
+  trust_root_rotation:
+    invalidation: "Rotating the trust root invalidates prior generations through explicit policy, not by silently trusting a new key."
+    issuer_generation_advances: true
+  holder_key_rotation:
+    requires: "a new enrollment for the same principal and agent instance, authorized by a human or SEA-Forge"
+    effect: "the old holder key stops being accepted once the new enrollment is live"
+  credential_renewal_is_not_rotation: >-
+    Renewing a credential preserves execution identity and may only narrow or refuse. It never
+    widens scope, extends the grant, or creates a delegation.
+
+recovery:
+  enrollment_recovery_requires:
+    - "a human or SEA-Forge authorization independent of the agent's claim"
+  enrollment_recovery_is_not_authority: >-
+    Recovery restores an enrollment. It never approves an operation, creates a grant, or
+    authenticates a browser session.
+  holder_key_replacement_requires: "a new enrollment authorized independently of the agent"
+  without_a_valid_anchor: "reserved actions stay blocked"
+
+revocation:
+  three_guarantees:
+    - guarantee: "Stop admission"
+      required_participation: "SEA-Forge authority_epoch for grants and issuer generation for identity"
+      honest_statement: "No new grant, lease, approval consumption, or attempt after the applicable epoch advances; the issuer and authority are not interchangeable."
+    - guarantee: "Prevent dispatch"
+      required_participation: "the local broker dispatch_epoch, the process supervisor, and the channel holder"
+      honest_statement: "Queued work is cancelled, stale fences are rejected, channels close or reauthenticate, and new process dispatch is denied."
+    - guarantee: "Prevent external commitment"
+      required_participation: "the downstream resource or its broker checks revocation-aware authority at commit"
+      honest_statement: "A not-yet-started call is prevented; an in-flight call may become uncertain. Without resource participation, prevention cannot be promised."
+  cascade: "Revocation cascades to child grants, active executions where policy requires, open channels, and queued attempts."
+  once_known: "Once revocation is known, expired or revoked credentials get no grace period."
+  before_known: "Before revocation is known, a disconnected low-risk execution may use only its bounded offline window; reconciliation happens before any further governed work."
+  issuer_partition: "An issuer partition cannot admit work after the broker has acknowledged SEA-Forge's higher epoch; a broker that has not acknowledged reports the guarantee as pending rather than complete."
+
+restart_and_liveness:
+  restart_creates_no_authority: >-
+    A restart does not resume authority. The new process obtains a new attempt identity, reloads
+    the persisted execution, grant, and revocation records, and proves the current attempt to the
+    issuer. The issuer and the local broker mark the previous attempt superseded and reject its
+    credential before the new attempt may act.
+  issuer_unavailable: "If the issuer is unavailable, no new agent attempt starts."
+  uncertain_execution: "An execution that was uncertain at interruption is reconciled rather than replayed as a fresh effect."
+  clock_jumps: "Sleep, suspend, and clock jumps are elapsed-time uncertainty: the process revalidates the earliest credential, grant, and freshness deadline before any new effect."
+  clock_rollback: "A detected rollback never refreshes authority."
+
+# ---------------------------------------------------------------------------
+# 6. Platform qualification lanes
+# ---------------------------------------------------------------------------
+qualification_lanes:
+  common_tests:
+    - id: Q-CUSTODY-01
+      test: "An agent-account process attempts to read the issuer signing key."
+      pass: "The attempt fails and the key material is never returned."
+    - id: Q-CUSTODY-02
+      test: "An agent-account process attempts to write, replace, or signal the issuer."
+      pass: "The attempt fails; the issuer continues under its own service identity."
+    - id: Q-CUSTODY-03
+      test: "The issuer key is exported or copied."
+      pass: "The attempt fails; the key is non-exportable or ACL-restricted to the service account."
+    - id: Q-CUSTODY-04
+      test: "The agent OS account reads the key file or key store directly."
+      pass: "The attempt fails even when file permissions are restrictive."
+    - id: Q-ISSUE-01
+      test: "A request names a forged principal, role, or actor."
+      pass: "The issuer refuses; the principal comes from the enrollment, never from the request."
+    - id: Q-ISSUE-02
+      test: "A request presents the wrong holder key."
+      pass: "The issuer refuses to issue."
+    - id: Q-ISSUE-03
+      test: "An enrollment signature is replayed."
+      pass: "The issuer refuses the replay."
+    - id: Q-ISSUE-04
+      test: "The service is asked to mint a principal that was never enrolled."
+      pass: "The issuer refuses; a signer that would mint it fails qualification as an issuance oracle."
+    - id: Q-RESTART-01
+      test: "The issuer is unavailable at process start."
+      pass: "No new agent attempt starts; the failure is reported, not worked around."
+    - id: Q-ROTATE-01
+      test: "The trust root rotates and the service restarts."
+      pass: "Prior generations are invalidated by explicit policy; no silent re-trust."
+    - id: Q-ROTATE-02
+      test: "The holder key is rotated through a new authorized enrollment."
+      pass: "The new key is accepted and the old key stops being accepted."
+  lanes:
+    - platform: windows_x64
+      preferred_mechanism: "Service SID + named pipe with client-SID check; non-exportable CNG key with a DPAPI-NG service-only descriptor"
+      additional_tests:
+        - id: Q-WIN-01
+          test: "A named-pipe client with a different SID connects."
+          pass: "The connection is refused on the client-SID check."
+        - id: Q-WIN-02
+          test: "A remote client connects to the named pipe."
+          pass: "The remote client is rejected."
+        - id: Q-WIN-03
+          test: "The DPAPI-NG descriptor is decrypted under another local user."
+          pass: "Decryption fails; machine-scoped DPAPI alone does not qualify."
+      isolation_supported: false
+    - platform: macos_x64_arm64
+      preferred_mechanism: "LaunchDaemon under a dedicated _horizon account, XPC service with a code-signing requirement, System Keychain item ACL-restricted to that service"
+      additional_tests:
+        - id: Q-MAC-01
+          test: "An unsigned or differently signed XPC client connects."
+          pass: "The connection is refused on the code-signing requirement."
+        - id: Q-MAC-02
+          test: "Another user account reads the Keychain item."
+          pass: "The read fails; the ACL restricts the item to the service."
+      isolation_supported: false
+      note: "App Sandbox is not per-workload identity."
+    - platform: linux_x86_64
+      preferred_mechanism: "systemd service under a dedicated account, Unix socket with SO_PEERCRED, a TPM2 or keyring key where available, otherwise a service-only key file"
+      additional_tests:
+        - id: Q-LINUX-01
+          test: "A process from another uid connects to the Unix socket."
+          pass: "The connection is refused or the peer credential is not the service account."
+        - id: Q-LINUX-02
+          test: "The agent account reads the service-only key file."
+          pass: "The read fails."
+        - id: Q-LINUX-03
+          test: "The service is restarted and the key store is reloaded."
+          pass: "The service comes back under the same identity and generation, with no silent re-trust."
+      isolation_supported: conditional
+      isolation_condition: "Isolated only where the measured Landlock, user-namespace, and mapping prerequisites pass."
+    - platform: linux_arm64_jetson
+      preferred_mechanism: "the same contract as Linux, measured on the host"
+      additional_tests:
+        - id: Q-JETSON-01
+          test: "The measured Landlock, user-namespace, and mapping prerequisites are checked on the host."
+          pass: "The result is recorded; a host below the floor records isolation_unavailable and does not spawn an isolation-required operation."
+      identity_claim: "Identity and attribution plus non-isolated bounded work after probes."
+      isolation_supported: false
+      known_observation: >-
+        On the inspected Ubuntu 22.04 5.15.185-tegra host, Landlock is absent from the active LSM
+        list and the create-ruleset syscall returns ENOSYS, and newuidmap is missing.
+    - platform: browser_only_no_issuer
+      preferred_mechanism: "none"
+      identity_claim: "P0/P1 local human work only"
+      agent_authority: "none; reserved actions refuse"
+      additional_tests:
+        - id: Q-NOISSUER-01
+          test: "The host has no qualified issuer service."
+          pass: "New agent identity issuance is refused rather than downgraded; unrelated local P0/P1 human work continues."
+  timebox:
+    note: "U1.B is timeboxed to 2 engineer-days per native lane, 8 in total. Exceeding the timebox does not reopen the design choice: the named fallback applies and the affected claim is withheld."
+  failure_rule: >-
+    A failed lane selects the fallback custody profile or withholds agent authority. It never
+    downgrades the claim silently and never leaves unrelated P0/P1 human work disabled.
+
+# ---------------------------------------------------------------------------
+# 7. What this contract does not claim
+# ---------------------------------------------------------------------------
+not_claimed:
+  - "That any platform has passed qualification; the lanes above are the tests, and the results live in evidence."
+  - "S2 protection. S2 requires the issuer and the SEA-Forge authority outside the hostile desktop boundary and A3 on a separate trusted device."
+  - "Workload isolation. An Isolated request on an unsupported host fails closed with isolation_unavailable."
+  - "That a human session proves a human personally initiated a particular action."
+  - "That the issuer is a human identity provider."
+
+refusals_are_first_class:
+  note: >-
+    A refusal names what was missing and what would repair it, through the Refusal record in
+    records.json. A missing issuer, an unqualified custody profile, or a lost enrollment disables
+    only the affected authority.
+  codes:
+    - "issuer_unavailable"
+    - "custody_not_established"
+    - "principal_not_enrolled"
+    - "holder_key_mismatch"
+    - "enrollment_replayed"
+    - "caller_supplied_identity_refused"
+    - "trust_generation_superseded"
+    - "isolation_unavailable"

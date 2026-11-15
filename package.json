@@ -10,6 +10,7 @@
     "check": "bun run scripts/check.ts",
     "build:desk": "bun run scripts/build-desk.ts",
     "test": "bun test && uv run --project research pytest -q",
+    "parity:fde": "bash scripts/fde-parity.sh",
     "boundaries": "bun run scripts/check-boundaries.ts",
     "verify": "bun run scripts/check-single-cognate.ts && bun run check && bun test && bun run scripts/check-boundaries.ts && bun run scripts/teeth-inv2-mutation.ts && uv run --project research pytest -q && python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --require-freeze && python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py . --ledger requirements/ledger.yaml"
   },
@@ -29,6 +30,7 @@
     "@godspeedai/cognate-realitytrace": "0.9.2",
     "@godspeedai/cognate-runtime-api": "0.9.2",
     "@godspeedai/cognate-runtime-bun": "0.9.2",
+    "@godspeedai/cognate-store-sqlite": "0.9.2",
     "@mcp-b/webmcp-polyfill": "5.1.0",
     "@opentui/core": "0.5.12",
     "@opentui/react": "0.5.12",

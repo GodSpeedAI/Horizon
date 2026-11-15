@@ -1,0 +1,190 @@
+a3_mechanism_version: "horizon.identity.a3-mechanism/1"
+contract_id: "horizon.identity.a3-mechanism"
+contract_version: "1.0.0"
+frozen_at: "2026-11-09"
+authority:
+  design: "design_draft.md section 7 (human confirmation and reserved decisions), section 15 (S1 acceptance criteria), section 16 (Q4 A3)"
+  owner_decision: >-
+    U3.A — v1 human-reserved confirmation is A3-UV through the paired phone remote, with an
+    authority-sourced canonical operation and a trusted-verifier receipt. Recovery is a
+    single-use offline recovery code plus new-device enrollment at the local console; recovery
+    cannot approve or create authority. Stage 0B uses the local A3-T terminal path only.
+  spec: { id: "HORIZON-001", version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+  note: >-
+    This file freezes the mechanism contract only. It does not claim that the phone path or the
+    terminal path has been qualified; Q4 at Stage 3 records those results.
+
+# ---------------------------------------------------------------------------
+# 1. Assurance levels are predicates, not an ordering
+# ---------------------------------------------------------------------------
+assurance_levels:
+  evaluation_rule: >-
+    Assurance is evaluated by the predicate identifier, not by ordinal comparison. A service that
+    receives an unknown predicate, a weaker predicate than the operation requires, or a predicate
+    whose evidence cannot be verified fails closed.
+  levels:
+    - id: A0
+      predicate: "an authenticated durable session or workload connection; caller identity only"
+      valid_use: "P0 with no shared effect; never an external commitment"
+    - id: A1
+      predicate: "an authenticated execution, attempt, audience, holder key, and current local or SEA-Forge bounds"
+      valid_use: "P0/P1 within the execution's scoped grant or local scope; autonomous work"
+    - id: A2
+      predicate: "fresh WebAuthn UP+UV bound to a server-created pending operation on a review path proven outside the current agent's control"
+      valid_use: "operations where policy establishes a trusted review path; never a human-reserved decision under S1"
+      limit: "A2 does not become A3 by being displayed on a page."
+    - id: A3
+      predicate: "the canonical operation fetched directly from the protected authority and reviewed on a separately authenticated surface outside the selected threat, then bound to fresh verification"
+      valid_use: "human-reserved decisions"
+      variants:
+        - id: A3-UV
+          predicate: "A3 plus WebAuthn UP+UV, a domain-separated challenge, and a trusted-verifier receipt"
+          valid_use: "preferred human-reserved confirmation"
+        - id: A3-T
+          predicate: "A3 plus protected-terminal presence, recorded as protected_terminal_presence; never WebAuthn or UV"
+          valid_use: "only where policy explicitly accepts the weaker class and the terminal is outside agent control"
+  separated_claims:
+    note: >-
+      Authentication, presence, user verification, operation binding, intent, and authorization
+      are separate claims. The contract records them separately and never lets one stand in for
+      another.
+    claims: ["authentication", "presence", "user_verification", "operation_binding", "intent", "authorization"]
+
+# ---------------------------------------------------------------------------
+# 2. The v1 mechanism
+# ---------------------------------------------------------------------------
+mechanisms:
+  - id: a3_uv_paired_phone
+    role: "v1 production path for new human-reserved decisions"
+    stage: 3
+    path:
+      - "The phone fetches the canonical pending operation from the authority."
+      - "The phone renders it in the phone client, not in agent-authored HTML."
+      - "The phone obtains WebAuthn UP+UV."
+      - "The phone submits the assertion only to the A3 endpoint, authenticated by the paired device session."
+    verifier:
+      runs_in: "the issuer/authority trust domain"
+      signs: "a receipt containing the verified challenge digest, operation digest, device, principal, tenant, trust domain, policy digest, and verifier key ID"
+      stores: "the receipt, never the raw assertion"
+    record: "A3Receipt (contracts/identity/v1/records.json)"
+  - id: a3_t_local_terminal
+    role: "Stage 0B interim confirmation"
+    stage: "0B"
+    scope: "the local S1 containment scope only"
+    path:
+      - "The pending record is read from the local store."
+      - "It is rendered in a terminal the browser agent cannot control."
+      - "It is confirmed once, with a short expiry."
+    predicate: "A3-T"
+    limits:
+      - "It is not offered on an S2 deployment."
+      - "It is not a substitute for the v1 A3-UV path."
+      - "It is retired as the production path when A3-UV is available."
+    record: "A3Receipt with assurance_predicate protected_terminal_presence"
+
+# ---------------------------------------------------------------------------
+# 3. The challenge binding
+# ---------------------------------------------------------------------------
+challenge_binding:
+  rule: >-
+    The A3 challenge binds the authenticated human, tenant, trust domain, device or session,
+    requesting execution, operation ID, exact parameters, targets, resource revisions,
+    world/frame, delegation head, policy digest, approval or continuation ID, nonce, and expiry.
+  consumption: "Consumption rechecks all of them."
+  constants:
+    a3_challenge_ttl_seconds: 120
+    pending_approval_ttl_seconds: 600
+    pairing_ttl_seconds: 300
+    source: "policy.yaml durations_seconds"
+
+# ---------------------------------------------------------------------------
+# 4. What cannot create an approval
+# ---------------------------------------------------------------------------
+refused_paths:
+  - "A page session."
+  - "A relayed challenge."
+  - "A browser WebAuthn assertion presented as A3-UV."
+  - "A phone session with no operation-bound pending record."
+  - "An agent-authored rendering of the operation."
+  - "A recovery code."
+  - "A recovery code replay."
+  - "A caller-supplied operation, principal, tenant, or policy digest."
+  - "An assurance predicate the verifier does not recognize."
+  - "An assurance predicate weaker than the operation requires."
+  - "An expired or replayed nonce."
+unknown_predicate_rule: "An unknown predicate fails closed; it is never treated as the nearest known level."
+
+# ---------------------------------------------------------------------------
+# 5. Pairing and recovery
+# ---------------------------------------------------------------------------
+pairing:
+  initial_pairing: "local-console only"
+  replacement_paths:
+    - "the recovery code plus the local console plus a fresh passkey"
+    - "a different already-paired device through A3-UV"
+  recovery_codes:
+    count_semantics: "one or more single-use recovery codes"
+    storage: "stored offline by the human"
+    replay: "a consumed code is refused"
+  recovery_limits:
+    - "Recovery can never approve an operation."
+    - "Recovery can never create a grant."
+    - "Recovery can never authenticate a browser session."
+  bootstrap_limits:
+    - "Without a valid anchor, reserved actions stay blocked."
+    - "A browser session, an agent, or an administrator cannot bootstrap replacement authority."
+
+# ---------------------------------------------------------------------------
+# 6. Honest limits of each profile
+# ---------------------------------------------------------------------------
+profile_limits:
+  S1:
+    statement: >-
+      Under S1, a page WebAuthn assertion can authenticate a session but cannot prove that the
+      human reviewed the true operation, because the page is agent-controlled.
+    consequence: "a page ceremony is at most A2 and cannot authorize a human-reserved operation"
+    deployment_claim: "No S1 deployment may claim protection against an S2 adversary."
+  S2:
+    statement: >-
+      Under S2, the confirmation device must be separate from the hostile desktop, and the local
+      authority itself must be outside that boundary. A local terminal or native window on the
+      same desktop is not an independent surface.
+    consequence: "A3 requires a separate trusted device."
+    deployment_claim: "A local single-host desktop is never S2, even if the issuer runs as a service."
+  synced_passkeys: >-
+    Synced passkeys and attestation: none are labelled at their actual assurance; they are not
+    evidence of hardware isolation.
+
+# ---------------------------------------------------------------------------
+# 7. When no qualified channel exists
+# ---------------------------------------------------------------------------
+no_qualified_channel:
+  rule: >-
+    If no qualified A3 channel exists, human-reserved P2 and P3 actions are refused with a
+    truthful repair path. Ordinary collaboration and work already authorized by a valid bounded
+    grant continue.
+  not_a_mutation_ban: "The refusal is not a generic mutation ban."
+  repair_path: "The refusal names the missing channel and what would qualify it."
+
+# ---------------------------------------------------------------------------
+# 8. Qualification gate Q4
+# ---------------------------------------------------------------------------
+qualification:
+  gate: Q4
+  when: "Stage 3"
+  cases:
+    - "a page assertion"
+    - "a relayed challenge"
+    - "the wrong tenant, operation, or revision"
+    - "expiry"
+    - "replay"
+    - "a lost device"
+    - "the recovery code"
+    - "local P2"
+  pass_threshold:
+    - "Zero page or relay approvals."
+    - "The exact phone A3 and local P2 succeed."
+    - "Recovery only enrolls."
+  known_confound: >-
+    This contract freezes the mechanism and its refusals. It proves nothing about a live phone,
+    a live terminal, or a live verifier; Q4 produces that evidence.

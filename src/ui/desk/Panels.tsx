@@ -5,7 +5,7 @@
  * places it where it was put up. A card with no open question folds to its title and summary. Every piece of text is drawn as text.
  */
 import { answerEcho, WAITING_FOR_AGENT } from "./conversation-model.ts";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { BlockGuard, Question, drawBlock, type BlockCtx } from "./blocks/index.tsx";
 import { CtxContext } from "./blocks/ctx.tsx";
 import { MAX_OPEN_PANELS, hasOpenAsk, type Panel, type PanelBlock } from "./panels-model.ts";
@@ -13,7 +13,7 @@ import { MAX_OPEN_PANELS, hasOpenAsk, type Panel, type PanelBlock } from "./pane
 export { MAX_OPEN_PANELS };
 
 export interface PanelsIo {
-  readonly answer: (input: { panel: string; ask: string; outcome: "answered" | "deferred" | "cancelled"; value?: string | readonly string[]; note?: string }) => Promise<{ readonly ok: boolean; readonly message: string }>;
+  readonly answer: (input: { panel: string; ask: string; outcome: "answered" | "deferred" | "cancelled"; value?: string | readonly string[]; note?: string; version: string; owner_rev: number }) => Promise<{ readonly ok: boolean; readonly message: string }>;
   readonly pin: (id: string, pinned: boolean) => Promise<void>;
   readonly close: (id: string) => Promise<void>;
   readonly stopWaiting: (step: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
@@ -58,7 +58,17 @@ export function echoesOf(panel: Panel): string[] {
     if (b.kind !== "question" || b.answered === null || (b.withdrawn ?? null) !== null) continue;
     const say = answerEcho({ ...(b.input === undefined ? {} : { input: b.input }), options: b.options }, b.answered.outcome as "answered", b.answered.value);
     const routed = typeof b.answered.routed_as === "string" && b.answered.routed_as.trim() !== "" ? b.answered.routed_as.trim() : null;
-    out.push(`${say} ${routed !== null ? `The agent took it to: ${routed}` : `${WAITING_FOR_AGENT}.`}`);
+    out.push(`${say} ${routed !== null ? `The agent says it took it to: ${routed}` : `${WAITING_FOR_AGENT}.`}`);
+  }
+  return out;
+}
+
+/** Answers the person put off before the agent asked again, oldest first, one sentence each. */
+export function historyOf(panel: Panel): string[] {
+  const out: string[] = [];
+  for (const b of panel.blocks) {
+    if (b.kind !== "question") continue;
+    for (const e of b.earlier ?? []) out.push(`Earlier: ${answerEcho({ ...(b.input === undefined ? {} : { input: b.input }), options: b.options }, e.outcome as "deferred", e.value)}`);
   }
   return out;
 }
@@ -82,12 +92,17 @@ export interface PanelCardProps {
 
 export function PanelCard({ panel, io, presenting = false, onAction = () => undefined, onSubmit = () => undefined, openRef = () => undefined }: PanelCardProps): ReactNode {
   const needsYou = hasOpenAsk(panel);
+  // What came back from the last answer: a refusal, or a warning that it was sent but not recorded. It stays on the card.
+  const [outcome, setOutcome] = useState<{ readonly ok: boolean; readonly message: string } | null>(null);
   const ctx: BlockCtx = {
     presenting,
     onAnswer: (askId, outcome, value, note) => {
       const ask = panel.blocks.find((b) => b.kind === "question" && b.id === askId);
       const listed = ask?.kind === "question" && ask.input === "multiselect";
-      void io.answer({ panel: panel.id, ask: askId, outcome, ...(value === undefined ? {} : { value: listed ? value.split(",").filter((v) => v !== "") : value }), ...(note === undefined ? {} : { note }) });
+      setOutcome(null);
+      void io
+        .answer({ panel: panel.id, ask: askId, outcome, version: ask?.kind === "question" ? (ask.version ?? "") : "", owner_rev: ask?.kind === "question" ? (ask.owner_rev ?? 0) : 0, ...(value === undefined ? {} : { value: listed ? value.split(",").filter((v) => v !== "") : value }), ...(note === undefined ? {} : { note }) })
+        .then(setOutcome, () => setOutcome({ ok: false, message: "The answer could not be sent. Nothing was changed. Try again." }));
     },
     onSubmit,
     onAction,
@@ -105,6 +120,13 @@ export function PanelCard({ panel, io, presenting = false, onAction = () => unde
       {panel.blocks.map((block) => (
         <Item key={block.id} panel={panel} item={block} io={io} ctx={ctx} />
       ))}
+      {historyOf(panel).length > 0 ? (
+        <ul className="muted" aria-label="Earlier answers" data-earlier>
+          {historyOf(panel).map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
+        </ul>
+      ) : null}
       {panel.notes.length > 0 ? (
         <ul className="agent-notes" aria-label="Notes from the agent">
           {panel.notes.map((n, i) => (
@@ -145,6 +167,11 @@ export function PanelCard({ panel, io, presenting = false, onAction = () => unde
           {body}
         </details>
       )}
+      {outcome !== null && outcome.message !== "" ? (
+        <p className={outcome.ok ? "muted" : "error"} role={outcome.ok ? "status" : "alert"} data-answer-outcome={outcome.ok ? "ok" : "refused"}>
+          {outcome.message}
+        </p>
+      ) : null}
     </article>
   );
 }

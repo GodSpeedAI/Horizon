@@ -1,0 +1,53 @@
+claims_version: "horizon.identity.platform-claims/1"
+contract_id: "horizon.identity.platform-claims"
+contract_version: "1.0.0"
+frozen_at: "2026-11-09"
+authority:
+  design: "design_draft.md section 13 (U5.A)"
+  owner_decision: "U5.A — the v1 claim matrix; Stage 6 native lanes record the measurement"
+  rule: >-
+    Unsupported isolation or custody disables only the affected authority, never local reads or
+    unrelated P0/P1 work. Portable identity does not imply portable isolation.
+
+profiles:
+  S1:
+    requires: ["qualified issuer service", "A3-UV for new human-reserved decisions after stage 3"]
+    stage0b: "the local A3-T terminal path is the interim confirmation, limited to the local containment scope, and is retired as the production path when A3-UV is available"
+  S2:
+    requires: ["issuer and SEA-Forge authority outside the hostile desktop boundary", "A3 on a separate trusted device"]
+    rule: "A local single-host desktop is never S2, even if the issuer runs as a service."
+
+platforms:
+  - platform: windows_x64
+    s1_mechanism: "Service SID + named pipe with client-SID check; non-exportable CNG key with DPAPI-NG service-only descriptor"
+    s1_claim: "identity and issuance after custody and authorization probes"
+    unsupported: ["Jail", "Isolated", "local S2"]
+    fail_closed_when: "no qualified service custody"
+  - platform: macos_x64_arm64
+    s1_mechanism: "LaunchDaemon under _horizon, XPC code-signing requirement, System Keychain ACL"
+    s1_claim: "identity and issuance after custody and authorization probes"
+    unsupported: ["Isolated", "local S2"]
+    notes: "App Sandbox is not per-workload identity."
+  - platform: linux_x86_64
+    s1_mechanism: "systemd dedicated account, Unix socket SO_PEERCRED, TPM2/keyring or service-only key"
+    s1_claim: "identity and issuance after custody and authorization probes"
+    unsupported: ["local S2"]
+    conditional: "Isolated only where the measured Landlock, user-namespace, and mapping prerequisites pass"
+  - platform: linux_arm64_jetson
+    s1_mechanism: "same contract as Linux, measured on the host"
+    s1_claim: "identity and attribution plus non-isolated bounded work after probes"
+    unsupported: ["Isolated", "local S2"]
+    measured_observation: >-
+      On the inspected Ubuntu 22.04 5.15.185-tegra host, Landlock is absent from the active LSM
+      list and the create-ruleset syscall returns ENOSYS, and newuidmap is missing.
+  - platform: browser_only_no_issuer
+    s1_mechanism: "none"
+    s1_claim: "P0/P1 local human work only"
+    unsupported: ["agent identity", "P3 authority"]
+    notes: "Reserved actions refuse."
+
+isolation_rule: >-
+  An Isolated request on an unsupported host fails closed with isolation_unavailable. Identity,
+  attribution, P0/P1 work, and non-isolated P3 work that policy permits continue. Windows and
+  macOS never inherit Linux isolation. WSL and Tauri inherit host limitations unless separately
+  measured.

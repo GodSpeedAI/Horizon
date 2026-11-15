@@ -1,0 +1,106 @@
+bun run scripts/check.ts
+check: ok (local_operator, 127.0.0.1:4319, horizon)
+bun run scripts/check-boundaries.ts
+boundaries: ok (.)
+python3 scripts/check-idm-integrity.py
+check-idm-integrity: OK (12 requirement references, 0 tolerated as recorded debt, 12 invariant ids unique)
+bun test
+bun test v1.4.0 (34cbb9a40)
+
+test/gateway-installer.test.ts:
+skipped: setfattr missing or user xattrs unsupported on this filesystem
+
+ 1136 pass
+ 16 skip
+ 0 fail
+ 6339 expect() calls
+Ran 1152 tests across 120 files. [73.55s]
+uv run --project research pytest -q
+....                                                                     [100%]
+4 passed in 0.05s
+python3 .agents/skills/project-topology-architect/scripts/validate-requirement-ledger.py requirements/ledger.yaml --project-root . --require-freeze
+ledger: 0 error(s) in ledger.yaml
+  ok: 105 requirements, 105 acceptance contracts
+./scripts/check-ledger-freeze.sh
+python3 .agents/skills/project-topology-architect/scripts/validate-wayfinder.py . --ledger requirements/ledger.yaml
+wayfinder: 0 error(s)
+./scripts/check-ledger-freeze.sh
+bun run scripts/teeth-t05-boundaries.ts
+ok   NE-B0 real tree passes (232 files, 8 in the authority)
+ok   NE-B1 second schema version outside the authority
+ok   NE-B2 second block vocabulary outside the authority
+ok   NE-B2c a block-kind record is a vocabulary copy
+ok   NE-B2d a record keyed by the block-kind type is the claim; keyed by string is not
+ok   NE-B2b one or two named kinds are still a selection, not a scrape
+ok   NE-B3 second source-expression pattern outside the authority
+ok   NE-B4 route importing the binder directly
+ok   NE-B5 authority importing Cognate
+ok   NE-B6 authority emitting dynamic code
+ok   NE-B7 renderer outside the authority
+ok   NE-B8 competing authority store
+ok   NE-B9 prose in comments and messages is not flagged
+ok   NE-B9b a real sink beside prose is still caught
+ok   NE-B10 NOTICE absent is rejected, not assumed present
+ok   NE-B11 a donor dropped from NOTICE is drift
+ok   NE-B12 an extra donor in NOTICE is drift
+ok   NE-B13 a donor section without a license is not a record
+ok   NE-B14 NOTICE describing Horizon without its declared license is rejected
+ok   NE-B15 a declared license with no LICENSE file is rejected
+ok   NE-B16 a manifest with no license field is not a silent pass
+teeth-t05: ok (21 checks)
+bun run scripts/teeth.ts
+blocked missing-cognate-dependency: exit=1
+STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
+blocked in-memory-runtime: exit=1
+22 |   throw new RuntimeBoundaryError(`RUNTIME: ${message}`);
+RuntimeBoundaryError: RUNTIME: local_operator forbids an in-memory runtime; a durable SQLite store is required
+blocked competing-product-model: exit=1
+BOUNDARY: competing canonical model/authority store at product-model/process.yaml
+blocked duplicate-semantic-authority: exit=1
+BOUNDARY: duplicate semantic authority at other/model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+baseline canonical-closure-control: exit=0
+blocked duplicate-canonical-subtree: exit=1
+BOUNDARY: duplicate semantic authority at .sea/alternative/interaction-model.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked false-world-ref: exit=1
+19 |   throw new SemanticAdapterError(`SEMANTIC: ${message}`);
+SemanticAdapterError: SEMANTIC: world identity mismatch: expected world:horizon@sha256:0000000000000000000000000000000000000000000000000000000000000000, observed world:horizon@sha256:0a10c20d22ee11a184165005a553390e7a45ce0b858773e2220e442eb0cf9d2b
+baseline isolated-tree-real-runtime: exit=0, passed=9
+blocked fake-runtime-substitution: exit=1, failing=7
+  fails: structural walking skeleton > source world -> frame -> typed intent -> Cognate run -> projection, durable across reopen
+  fails: structural walking skeleton > HORIZON_OPERATOR_REF names the operator the cockpit header and approvals use, and an invalid one refuses startup
+  fails: structural walking skeleton > a spoofed observer is refused, the committed observer is the configured operator, and the attempt is auditable
+  fails: structural walking skeleton > an intent id commits exactly once: the same intent again returns the first record, a different one is duplicate_intent
+blocked missing-cognate-dependency-metadata: exit=1
+STRUCTURAL: missing required Cognate dependency @godspeedai/cognate-domainforge; a mock runtime is not a substitute
+BOUNDARY: duplicate semantic authority at domain/research-artifacts.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+BOUNDARY: duplicate semantic authority at domain/product-integration-contract.sea; the canonical model is the import closure of .sea/interaction/interaction-model.sea
+blocked missing-cognate-dependency-e2e: exit=1, failing=1
+
+teeth: all attacks blocked
+bash scripts/teeth-ledger-freeze.sh
+BASELINE clean tree verifies
+BLOCKED  frozen ledger edited after freeze -> FAIL: ledger content does not match its freeze_hash (hand edit after freeze?)
+BLOCKED  frozen ledger reverted to candidate -> FAIL: ledger freeze_hash is not frozen: 'candidate'
+BLOCKED  wayfinder body hand-edited -> FAIL: committed wayfinder body is not the projection its generator produces (hand edit?)
+BLOCKED  wayfinder unfrozen -> FAIL: wayfinder validation failed
+BLOCKED  hashed input drifted (ledger policy) -> FAIL: wayfinder validation failed
+BLOCKED  ledger row removed after freeze (ledger structure / projection) -> FAIL: requirement ledger validation failed
+
+teeth: 6 blocked, 0 missed
+python3 scripts/teeth-domainforge-gate.py
+null: exit=0 exit=0 Validation succeeded: 0 violations total
+dangling: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: dangling .sea accepted with no violation
+duplicate: exit=0 exit=0 Validation succeeded: 0 violations total
+BLIND SPOT CONFIRMED: duplicate .sea accepted with no violation
+control: exit=1 exit=1 Error: Parse failed for /tmp/tmp6rq7lja8/.sea/interaction/interaction-model.sea: resolved closure failed graph co
+
+tooth: gate discriminates (control fails, and the two blind spots are proven)
+python3 scripts/teeth-idm-integrity.py
+null: exit=0 exit=0 check-idm-integrity: OK (12 requirement references, 0 tolerated as recorded debt, 12 invariant ids uniq
+dangling: exit=1 exit=1 - .sea/interaction/interaction-model.sea:inv_intent_idempotent requirement_ref 'REQ-DOES-NOT-EXIST-999'
+duplicate: exit=1 exit=1 - invariant_id 'INV-07' is declared 2 times: ../../../../tmp/tmp3wraixx5/.sea/interaction/interaction-m
+
+tooth: referential integrity is enforced (dangling and duplicate both fail)
+verify: ok (active frozen artifacts: requirements/ledger.yaml + .wayfinder/answer-key.md)
+exit=0

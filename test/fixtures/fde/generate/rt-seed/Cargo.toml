@@ -1,0 +1,14 @@
+# Throwaway generator helper: appends the `evidence.recorded` ledger rows that the
+# real `realitytrace observed ingest` resolves events against. Everything else in
+# the fixture set comes from the real `realitytrace` binary. See ../README.md.
+[package]
+name = "rt-seed"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+sxr-ledger = { path = "../../../../../../fde-sxr-integration/sxr-ledger" }
+serde_json = "1"
+
+[workspace]

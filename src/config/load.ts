@@ -298,6 +298,24 @@ export function configFromDocument(document: unknown): HorizonConfig {
   };
 }
 
+const LAUNCH_SECRET = /^[0-9a-f]{64}$/;
+
+/**
+ * A read-only open takes the running desk's launch secret as it is. It never creates or rotates the file: a missing or invalid one is
+ * refused, so the surface cannot replace the secret a running desk was started with.
+ */
+function readLaunchSecret(path: string): string {
+  const full = resolve(path);
+  let kept = "";
+  try {
+    kept = readFileSync(full, "utf8").trim();
+  } catch {
+    kept = "";
+  }
+  if (!LAUNCH_SECRET.test(kept)) bounded(`no per-launch secret at ${full} to read; start the desk once so it writes one, then surface again`);
+  return kept;
+}
+
 function writeLaunchSecret(path: string): string {
   const secret = randomBytes(32).toString("hex");
   const full = resolve(path);
@@ -348,7 +366,11 @@ export function assertAgentPrincipal(config: HorizonConfig, caller: { readonly a
   }
 }
 
-export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.toml"): LoadedConfig {
+/**
+ * Loads the config and the launch secret. With `readOnly`, the launch secret must already exist and is only read: a read-only open never
+ * writes the secret file.
+ */
+export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.toml", options: { readonly readOnly?: boolean } = {}): LoadedConfig {
   const setup = readSetup();
   let document: unknown;
   try {
@@ -364,24 +386,31 @@ export function loadConfig(path = process.env.HORIZON_CONFIG ?? "config/horizon.
     : { ...config.identity, operator_ref: assertOperatorRef(operatorEnv, "HORIZON_OPERATOR_REF") };
   const withStore = { ...(store ? { ...config, runtime_store: store } : config), identity: identityWithOperator };
   const secretPath = process.env.HORIZON_SECRET_FILE ?? withStore.secrets.path;
-  const launchSecret = writeLaunchSecret(secretPath);
+  const launchSecret = options.readOnly === true ? readLaunchSecret(secretPath) : writeLaunchSecret(secretPath);
   const agentKeyPath = resolve(agentKeyFileOf(setup));
-  const agentKey = agentKeyAt(agentKeyPath);
+  const agentKey = agentKeyAt(agentKeyPath, options.readOnly === true);
   return {
     config: withStore,
     operator: {
       principal: operatorPrincipal(withStore),
       tenant: setupTenant(setup, hostname()),
+      configuredRef: config.identity.operator_ref,
     },
     launchSecret,
     secretPath: resolve(secretPath),
     agentKey,
     agentKeyPath,
+    agentRegistryPath: join(dirname(agentKeyPath), "agents.json"),
     ...(setup === undefined ? {} : { setup }),
   };
 }
 
 const AGENT_KEY = /^[0-9a-f]{64}$/;
+
+/** Where the agents' registry lives for the active setup: `agents.json` beside `agent.key`. Used by `scripts/agent-key.ts`. */
+export function agentRegistryPath(): string {
+  return join(dirname(resolve(agentKeyFileOf(parseSetup(process.env)))), "agents.json");
+}
 
 /**
  * Where the agent door's key lives: `HORIZON_AGENT_KEY_FILE`, else the active setup's `secrets/agent.key`
@@ -396,9 +425,10 @@ function agentKeyFileOf(setup: SetupName | undefined): string {
 
 /**
  * The agent door's key. It is kept across starts: an existing valid key (64 hex characters) is read
- * and never rewritten. A missing or invalid file gets a new key, written once with mode 0600.
+ * and never rewritten. A missing or invalid file gets a new key, written once with mode 0600. Read-only (a read-only open
+ * beside a running desk): the key must already exist and be valid; it is never created or rotated, and the file is never written.
  */
-function agentKeyAt(path: string): string {
+function agentKeyAt(path: string, readOnly: boolean): string {
   if (existsSync(path)) {
     let kept = "";
     try {
@@ -408,6 +438,7 @@ function agentKeyAt(path: string): string {
     }
     if (AGENT_KEY.test(kept)) return kept;
   }
+  if (readOnly) bounded(`no valid agent key at ${resolve(path)} to read; start the desk once so it writes one, then open read-only again`);
   const key = randomBytes(32).toString("hex");
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${key}\n`, { encoding: "utf8", mode: 0o600 });

@@ -18,6 +18,13 @@ export interface ToolDescriptor {
   invoke(input: unknown): Promise<{ content: { type: "text"; text: string }[] }>;
 }
 
+export const INSPECT_WITHHELD = "What was decided, recorded and observed is not shown to agents. The person can open this row on the desk.";
+
+/** What desk_inspect returns for a row: the row as the desk served it to an agent, and nothing nested under it. */
+export function inspectForAgent(row: object): { readonly row: object; readonly details: string } {
+  return { row, details: INSPECT_WITHHELD };
+}
+
 // Agents propose, people decide. No offered tool may carry one of these words in its name.
 export const NEVER_OFFERED = ["confirm", "send", "mark_done", "hold", "approve", "answer", "settle", "discard"];
 

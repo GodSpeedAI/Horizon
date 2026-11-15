@@ -1,0 +1,69 @@
+policy_version: "horizon.identity.policy/1"
+contract_id: "horizon.identity.policy"
+contract_version: "1.0.0"
+frozen_at: "2026-11-09"
+authority:
+  design: "design_draft.md section 14 (U4.A) and section 7"
+  owner_decision: "U4.A — frozen at Stage 0A; may be tightened by measurement, never loosened without owner approval"
+  spec: { id: "HORIZON-001", version: "1.2.0", sha256: "7b06f6b813462e08432b6e020e9266bdec625b2fee7140d4f2f52a774f9fa435" }
+
+# Durations are whole seconds. Nothing here is a production measurement; these are the v1
+# contract constants that measured values may tighten.
+durations_seconds:
+  credential_max_ttl: 900
+  attempt_ttl: 300
+  offline_window: 300
+  a3_challenge_ttl: 120
+  pairing_ttl: 300
+  pending_approval_ttl: 600
+  p2p1_grant_max_ttl: 28800
+  p3_grant_max_ttl: 3600
+  clock_tolerance: 60
+
+limits:
+  delegation_depth_max: 2
+  nonce_bytes: 16
+  pending_expiry_default_p2: 600
+  pending_expiry_default_p3_export: 900
+  pending_expiry_device_pair: 300
+  pending_expiry_trust_rotate: 1800
+  offline_window_applies_to_classes: [P0, P1]
+
+required:
+  p3_grant_requires_numeric_budget: true
+  p2_p3_offline_allowed: false
+  humans_have_no_credential: true
+  humans_have_no_grant: true
+  delegation_never_expands_authority: true
+  child_grant_is_subset_of_parent: true
+  agent_identity_never_derived_from_request: true
+
+# A field absent from a child grant grants nothing; it is not inherited from the parent.
+absent_child_grant_field_means:
+  operations: empty
+  resources: empty
+  budget: zero
+  expires_at: never
+  depth_remaining: zero
+  audience: empty
+  data_labels: empty
+  redelegate: false
+  offline: false
+
+# The five-minute offline window is the only offline authority in v1, and it never extends a
+# grant or a credential.
+offline_rule: >-
+  P0/P1 work already authenticated locally may continue for no more than the offline window and
+  never past its grant or credential. P2/P3 work is refused offline; a queued P2/P3 request has no
+  standing and is re-described on reconnect.
+
+measured_not_frozen:
+  note: "U4.B targets are measured after implementation and are not part of this contract."
+  renewal_p99_local_ms: 250
+  renewal_p99_remote_ms: 1000
+  revocation_admission_p99_local_ms: 2000
+  revocation_admission_p99_remote_ms: 10000
+  dispatch_rejection_p99_ms: 5000
+  channel_closure_p99_ms: 10000
+  resource_commit_decision_p99_ms: 5000
+  samples_per_lane: 1000

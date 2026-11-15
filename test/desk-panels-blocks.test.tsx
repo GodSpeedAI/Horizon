@@ -1,5 +1,6 @@
 /** @jsxImportSource react */
 /** Agent panels keep their validated blocks and draw them all (stage 8 step 6): kept, drawn, presented, offered as a catalogue. */
+import { reducerRevision } from "./support/answer-revision.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { startDeskApp, type DeskApp } from "./support/desk-app.ts";
@@ -41,7 +42,7 @@ describe("a panel keeps the blocks that passed the grammar", () => {
     expect(ask.block?.type).toBe("ask");
     const id = ask.id;
     const first = (CATALOGUE.ask.example as { options?: { option_id: string }[] }).options?.[0]?.option_id;
-    state = reduceHuman(state, { op: "human.answer", panel: "q", ask: id, outcome: first === undefined ? "deferred" : "answered", ...(first === undefined ? {} : { value: first }) }).state;
+    state = reduceHuman(state, { op: "human.answer", panel: "q", ask: id, outcome: first === undefined ? "deferred" : "answered", ...(first === undefined ? {} : { value: first }), ...reducerRevision(state, "q", id) }).state;
     const html = renderToStaticMarkup(<PanelCard panel={state.open[0]!} io={io} />);
     expect(html).toMatch(/You answered|not yet/);
   });

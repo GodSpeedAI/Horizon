@@ -1,0 +1,5 @@
+**Major — governed human callers remain inconsistent.** [design-final.md:176](design_draft.md:176) permits only human P2, while line 177 assigns every P3 commitment to an agent. Yet lines 644–648 explicitly permit human P3 approvals and exports. [AuthorityDecision:576](design_draft.md:576) requires a delegation grant except for root creation, although human descriptors have null delegation. [EffectFence:578](design_draft.md:578) also requires `grant_ref`, leaving entitlement-authorized root creation without an explicit fence variant. Implementers must invent an authority binding or fabricate agent context.
+
+**Exact correction:** Expand the governed-human branch to the catalogued human P2/P3 operations. Define entitlement-backed human decisions and fences: require a current SEA-Forge `entitlement_ref`, bind the authenticated caller, exact operation, bounds, budget reservation and epochs; set `grant_ref`, `execution_ref` and `attempt_ref` to null. Retain delegation-backed agent decisions and fences separately. Apply this entitlement variant explicitly to root `grant.create`; preserve each row’s A3 and separation-of-duty requirements.
+
+CHANGES REQUIRED

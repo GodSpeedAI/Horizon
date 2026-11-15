@@ -51,6 +51,19 @@ export class Pairing {
     return this.refresh(now);
   }
 
+  /**
+   * A new invitation under the current generation, for another phone. It grants no authority and revokes nothing:
+   * the controller still authorizes whatever it enrols. Only a refresh moves the generation.
+   */
+  invite(now: number): { readonly secret: string; readonly expiresAt: number; readonly generation: number } | null {
+    if (!this.enabled) return null;
+    this.secret = b64url(randomBytes(32));
+    this.verifier = verifierOf(this.secret);
+    this.expiresAt = now + PAIRING_TTL_MS;
+    this.dead = null;
+    return { secret: this.secret, expiresAt: this.expiresAt, generation: this.generation };
+  }
+
   /** A new link and a new generation: every prior link, credential and session stops working. */
   refresh(now: number): { readonly secret: string; readonly expiresAt: number; readonly generation: number } {
     this.generation += 1;

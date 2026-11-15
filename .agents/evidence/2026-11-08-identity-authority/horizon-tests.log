@@ -1,0 +1,56 @@
+bun test v1.4.0 (34cbb9a40)
+
+test/remote-webauthn.test.ts:
+(pass) CBOR subset decoder > round-trips the value kinds WebAuthn uses [4.77ms]
+(pass) CBOR subset decoder > reports the end offset of an item inside a larger buffer [0.32ms]
+(pass) CBOR subset decoder > refuses indefinite lengths, tags, floats, duplicate keys and trailing bytes [0.29ms]
+(pass) registration (software authenticator) > a valid attestation none registration verifies and yields a COSE ES256 key [2.96ms]
+(pass) registration (software authenticator) > refuses a wrong origin, a stale challenge, a wrong RP ID and a wrong type [1.26ms]
+(pass) registration (software authenticator) > refuses a passkey that did not verify the user (UV clear) and one without presence (UP clear) [0.58ms]
+(pass) registration (software authenticator) > refuses any attestation format other than none, and a credential id that does not match [0.43ms]
+(pass) assertion (software authenticator) > a valid assertion verifies and advances the sign count [1.62ms]
+(pass) assertion (software authenticator) > refuses a wrong origin, a wrong RP ID hash, a UV-clear assertion and a replayed challenge [1.67ms]
+(pass) assertion (software authenticator) > refuses a bad signature and a sign-count regression (a cloned passkey) [1.35ms]
+(pass) assertion (software authenticator) > options carry the required user verification and the challenge as base64url [0.22ms]
+
+test/desk-write-token.test.ts:
+(pass) the person's writes need a paired session > a write with no session is refused with plain words, on every human route [15.11ms]
+(pass) the person's writes need a paired session > a made-up session cookie is refused [8.15ms]
+(pass) the person's writes need a paired session > a paired client's write gets through to the route [7.28ms]
+(pass) the person's writes need a paired session > the agent header alone is refused, and a session does not turn an agent into the person [1.73ms]
+(pass) the person's writes need a paired session > the agent door keeps its own key and does not take the session [1.57ms]
+
+test/remote-sessions.test.ts:
+(pass) an unpaired phone, forged actors, and the mapped actor > unpaired phone: no sign-in options, no session, no commit [9.76ms]
+(pass) an unpaired phone, forged actors, and the mapped actor > a pairing link enrols a passkey for the existing operator only: it creates no operator and grants no role [5.13ms]
+(pass) an unpaired phone, forged actors, and the mapped actor > a forged actor in the body is refused, a forged header is ignored, and the mapped actor is the one SEA-Forge hears [46.99ms]
+(pass) an unpaired phone, forged actors, and the mapped actor > a revoked session cannot read or commit [5.09ms]
+(pass) an unpaired phone, forged actors, and the mapped actor > a revoked device cannot authenticate [4.16ms]
+(pass) an unpaired phone, forged actors, and the mapped actor > replacing the device revokes the old one and its session; the old passkey is refused [9.69ms]
+(pass) an unpaired phone, forged actors, and the mapped actor > an expired session cannot commit [4.33ms]
+(pass) double submission and concurrent commits write one commit > the same command id submitted twice at once is one commit and one answer [14.11ms]
+(pass) double submission and concurrent commits write one commit > two different commands on one frame, sent together, commit once: the second finds the surface moved [16.06ms]
+(pass) an operator's own escalation > the requester cannot approve their own escalation: refused before SEA-Forge is asked, and nothing commits [21.13ms]
+(pass) an operator with no mapping, and the gateway identity > an unconfigured operator cannot commit, and nothing is written or sent [2.26ms]
+(pass) an operator with no mapping, and the gateway identity > the authority itself refuses an unmapped session operator and never falls back to the server operator [0.26ms]
+(pass) an operator with no mapping, and the gateway identity > the gateway service identity cannot be used as the operator [3.59ms]
+(pass) an operator with no mapping, and the gateway identity > the identity store receives the three hyphenated collection names [0.43ms]
+(pass) an operator with no mapping, and the gateway identity > startup validation: the operator must exist and be active, and the actor must be a delegation target [0.66ms]
+
+test/remote-pairing.test.ts:
+(pass) pairing link > expires after five minutes and is refused as expired, not as invalid [0.16ms]
+(pass) pairing link > is single use: two concurrent redemptions, only one succeeds and the other says used [0.04ms]
+(pass) pairing link > a wrong or malformed secret is invalid and never consumes the real link [0.05ms]
+(pass) pairing link > refresh revokes every prior link and bumps the generation; stop turns remote control off [0.06ms]
+(pass) pairing link > a restart floor keeps the new generation above any stored device generation [0.02ms]
+(pass) challenges > a challenge is single use, bound to its kind and to the generation [0.04ms]
+(pass) challenges > a challenge expires after two minutes and does not survive a refresh [0.05ms]
+(pass) sessions > a session is durable, resolves to its operator, and a bumped operator generation drops it [0.68ms]
+(pass) sessions > a session expires after twelve hours [0.27ms]
+(pass) sessions > the cookie is __Host-, HttpOnly, Secure, SameSite=Strict and path-scoped; clearing expires it [0.06ms]
+(pass) remote settings > the public URL is an origin only, HTTPS or localhost; the port defaults to 4320 [0.17ms]
+
+ 42 pass
+ 0 fail
+ 198 expect() calls
+Ran 42 tests across 4 files. [1.77s]

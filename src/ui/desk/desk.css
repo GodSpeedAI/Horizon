@@ -187,8 +187,8 @@ li[data-cursor="true"]::before { content:"Current item"; position:absolute; widt
 .cv-line:hover { background:var(--cg-hover) !important; }
 .cv-line[aria-current="true"] { border-color:var(--cg-accent) !important; }
 .cv-mark { display:inline-flex; align-items:center; gap:.35rem; font:600 .72rem var(--cg-mono); color:var(--cg-muted); white-space:nowrap; }
-.cv-mark[data-status="done"] .cv-dot { background:var(--cg-success); } .cv-mark[data-status="waiting"] .cv-dot { background:var(--cg-warn); } .cv-mark[data-status="refused"] .cv-dot { background:var(--cg-danger); }
-.cv-mark[data-status="unseen"] { font-style:italic; } .cv-mark[data-status="unseen"] .cv-dot { background:transparent; border:1.5px dashed var(--cg-muted); box-sizing:border-box; }
+.cv-mark[data-status="done"] .cv-dot { background:var(--cg-success); } .cv-mark[data-status="waiting"] .cv-dot, .cv-mark[data-status="partial"] .cv-dot { background:var(--cg-warn); } .cv-mark[data-status="refused"] .cv-dot { background:var(--cg-danger); }
+.cv-mark[data-status="unseen"], .cv-mark[data-status="claimed"] { font-style:italic; } .cv-mark[data-status="unseen"] .cv-dot, .cv-mark[data-status="claimed"] .cv-dot { background:transparent; border:1.5px dashed var(--cg-muted); box-sizing:border-box; }
 .cv-words { flex:1 1 14rem; min-width:0; overflow-wrap:anywhere; font-weight:600; }
 .cv-badge { border:1px solid var(--cg-border-strong); border-radius:999px; padding:0 .55rem; font:600 .72rem var(--cg-mono); color:var(--cg-muted); }
 .cv-badge[data-source="you"] { color:var(--cg-accent); border-color:var(--cg-accent); }
@@ -207,3 +207,13 @@ li[data-cursor="true"]::before { content:"Current item"; position:absolute; widt
 .chip-unseen { display:inline-block; border:1px dashed var(--edge); border-radius:.7rem; padding:0 .5rem; font-style:italic; color:var(--muted); }
 .cv-view .notice, .cv-view .empty, .cv-view .error { max-width:50rem; }
 @media (max-width:60rem) { .cv-view { overflow:visible; min-height:0; } .cv-rows-wrap { overflow:visible; } .cv-open, .cv-line, .cv-view button { min-height:44px; } }
+
+.cv-stages { list-style:none; margin:.1rem 0 .2rem .4rem; padding:0; display:grid; gap:.15rem; font-size:.85rem; }
+.cv-stage-name { font-weight:600; } .cv-stage[data-stage-status="refused"] .cv-stage-word { color:var(--cg-danger, var(--cg-warn)); font-weight:600; }
+.cv-stage[data-stage-status="unseen"] { font-style:italic; } .cv-stage button { margin-left:.5rem; }
+.commit-facts { border:1px solid var(--cg-border, currentColor); border-radius:8px; padding:.5rem .7rem; margin:.6rem 0; font-size:.9rem; } .commit-facts p { margin:.15rem 0; overflow-wrap:anywhere; }
+
+.pair { max-width:32rem; margin:2rem auto; padding:0 1rem; font:16px/1.5 system-ui, sans-serif; }
+.pair form { display:grid; gap:.5rem; margin-top:1rem; }
+.pair input { font:inherit; font-size:1.25rem; letter-spacing:.15em; padding:.5rem .6rem; text-transform:uppercase; }
+.pair button { font:inherit; padding:.5rem .8rem; justify-self:start; }
