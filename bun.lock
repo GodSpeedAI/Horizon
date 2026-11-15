@@ -41,6 +41,7 @@
   "overrides": {
     "@godspeedai/cognate-events": "0.9.2",
     "@godspeedai/cognate-runtime-api": "0.9.2",
+    "@godspeedai/domainforge": "0.22.2",
   },
   "packages": {
     "@ag-ui/core": ["@ag-ui/core@1.0.0", "", { "peerDependencies": { "zod": "^3.25.18 || ^4.0.0" }, "optionalPeers": ["zod"] }, "sha512-yCRhsQvb4+lmGMrDsi4TOJxqKpm/kb3H64wwL+Z90jNVrkhy17RErfzsNgybfbjNKLM0nenEDYDVJsZHJJSigQ=="],
@@ -123,7 +124,17 @@
 
     "@godspeedai/cognate-ui-astryx": ["@godspeedai/cognate-ui-astryx@0.9.2", "", { "dependencies": { "@astryxdesign/core": "0.6.3", "@astryxdesign/theme-neutral": "0.6.3", "@godspeedai/cognate-client": "^0.9.2", "@godspeedai/cognate-events": "^0.9.2", "@godspeedai/cognate-react": "^0.9.2", "@godspeedai/cognate-runtime-api": "^0.9.2" }, "peerDependencies": { "react": "19.3.0", "react-dom": "19.3.0" } }, "sha512-nmRiXtO3iFx+aBMsvu8qx9vkQ+IPmkqeWzTdI9SziYnnb0367j5SD9/4vjRfldCshPD8qMNqLPAS57WjgGIpmQ=="],
 
-    "@godspeedai/domainforge": ["@godspeedai/domainforge@0.22.0", "", {}, "sha512-YBbMQYcD4/MNi2yVc2Ma/g4Oi/Woq+amNdWwo1XUUCN5PE2GvIsAS+bCsjllt+MuNuL9q/e/MbnjEpMbZ2B+gw=="],
+    "@godspeedai/domainforge": ["@godspeedai/domainforge@0.22.2", "", { "optionalDependencies": { "@godspeedai/domainforge-darwin-arm64": "0.22.2", "@godspeedai/domainforge-darwin-x64": "0.22.2", "@godspeedai/domainforge-linux-arm64-gnu": "0.22.2", "@godspeedai/domainforge-linux-x64-gnu": "0.22.2", "@godspeedai/domainforge-win32-x64-msvc": "0.22.2" } }, "sha512-btUAD8KUIevCHBHPZmJQC44do+5LXNXctH/fjFFdtxhChiV+gBcoBA6IbNLaWbg2ZBlX/0l44M644xXR+XonDw=="],
+
+    "@godspeedai/domainforge-darwin-arm64": ["@godspeedai/domainforge-darwin-arm64@0.22.2", "", { "os": "darwin", "cpu": "arm64" }, "sha512-f5a5mYoB46F1r5gZp31jMhFVJITqlh47cIk14gO4EJpRjlO74+l8qKJG2Jr/rQiNzZuZt2bj7tk5n6yuDwEhxg=="],
+
+    "@godspeedai/domainforge-darwin-x64": ["@godspeedai/domainforge-darwin-x64@0.22.2", "", { "os": "darwin", "cpu": "x64" }, "sha512-TFLOrAPv1REY8Dwk9baPItfaK0rmYal8aQiwRA2V/rVWDUec98xXZGc1VKtjToCrI1MeOFiIHuaN7Gqm6F7T3A=="],
+
+    "@godspeedai/domainforge-linux-arm64-gnu": ["@godspeedai/domainforge-linux-arm64-gnu@0.22.2", "", { "os": "linux", "cpu": "arm64" }, "sha512-bJqFgUhDfVezfdjqL9/SmryoA+4plvbjx4NrXlUiQFszcJ5IQEsuyvIzTKieG0WDT1ecto/oLjY1z7EE59WeBg=="],
+
+    "@godspeedai/domainforge-linux-x64-gnu": ["@godspeedai/domainforge-linux-x64-gnu@0.22.2", "", { "os": "linux", "cpu": "x64" }, "sha512-jdAY4dX21ewh3ET4rRmvNOsSZNtMqeFTagFuYR7wP6yQ11tLj/SyQ1kcElP0agi1ofVl60gJgO65cbtKV07xkg=="],
+
+    "@godspeedai/domainforge-win32-x64-msvc": ["@godspeedai/domainforge-win32-x64-msvc@0.22.2", "", { "os": "win32", "cpu": "x64" }, "sha512-bqfTZWCaniEWBgDSpBHpZ8DK0cFGPw18RbekXt0asUlIdS6auarIUi5B9oAx6EcYVfjxZH2O53QcFKCi51qgdw=="],
 
     "@mcp-b/webmcp-polyfill": ["@mcp-b/webmcp-polyfill@5.1.0", "", { "dependencies": { "@mcp-b/webmcp-types": "5.1.0", "@standard-schema/spec": "^1.1.0" } }, "sha512-KL09hniFssPY8HBO3qzurWPqm+1JYRwV3wx6x2XSySgo+6BL1XHGsHGIoAO7U9zzigv7TA5keNBoZ+3P1jq18g=="],
 

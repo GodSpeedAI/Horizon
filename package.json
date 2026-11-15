@@ -41,7 +41,8 @@
   },
   "overrides": {
     "@godspeedai/cognate-events": "0.9.2",
-    "@godspeedai/cognate-runtime-api": "0.9.2"
+    "@godspeedai/cognate-runtime-api": "0.9.2",
+    "@godspeedai/domainforge": "0.22.2"
   },
   "description": "Observer-relative navigation environment walking skeleton",
   "devDependencies": {
