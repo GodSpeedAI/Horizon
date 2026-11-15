@@ -1,0 +1,103 @@
+name: CI
+
+# Runs Horizon's existing gates unchanged: `just verify`, the desk build and the typecheck.
+# External binaries are fetched from their GitHub Releases and verified against the release
+# SHA256SUMS (fail closed); nothing is built from source and no Docker is used.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # No packageManager/.bun-version in the repo; the lockfile and gates were produced with this Bun.
+  BUN_VERSION: "1.4.0"
+  DOMAINFORGE_VERSION: "0.22.0"
+  REALITYTRACE_VERSION: "0.5.0"
+
+jobs:
+  verify:
+    name: verify (just verify, build:desk, typecheck)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Setup just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      - name: Setup Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install repository dependencies
+        run: |
+          python3 -m pip install pyyaml
+          bun install --frozen-lockfile
+          uv sync --project research --all-groups
+
+      - name: Fetch verified external binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          fetch() { # repo tag asset-prefix version binary-name outvar
+            local repo=$1 tag=$2 prefix=$3 ver=$4 bin=$5 var=$6
+            local asset="${prefix}-${ver}-x86_64-unknown-linux-gnu.tar.gz"
+            local dir="$RUNNER_TEMP/dl-$bin"
+            mkdir -p "$dir"
+            gh release download "$tag" -R "$repo" -D "$dir" -p "$asset" -p SHA256SUMS
+            (cd "$dir" && grep -F " $asset" SHA256SUMS | sha256sum -c -)
+            mkdir -p "$RUNNER_TEMP/bin-$bin"
+            tar -xzf "$dir/$asset" -C "$RUNNER_TEMP/bin-$bin"
+            local found
+            found=$(find "$RUNNER_TEMP/bin-$bin" -type f -name "$bin" | head -n1)
+            test -n "$found"
+            chmod +x "$found"
+            echo "$var=$found" >> "$GITHUB_ENV"
+            echo "$bin: $("$found" --version)"
+          }
+          fetch GodSpeedAI/DomainForge "v${DOMAINFORGE_VERSION}" domainforge "$DOMAINFORGE_VERSION" domainforge DOMAINFORGE_BIN
+          fetch GodSpeedAI/RealityTrace "realitytrace-v${REALITYTRACE_VERSION}" realitytrace "$REALITYTRACE_VERSION" realitytrace REALITYTRACE_BIN
+
+      - name: Toolchain check
+        run: just check-toolchain
+
+      - name: just verify
+        run: just verify
+
+      - name: Build desk
+        run: bun run build:desk
+
+      - name: Typecheck
+        run: bun x tsc --noEmit -p .
+
+      - name: Record gates not run in CI
+        if: always()
+        run: |
+          {
+            echo "### Gates not run in CI (NOT_RUN)"
+            echo "- Live tests that need SEA_FORGE_SERVER_BIN (test/J02-live, J02r2-live) skip themselves: no SEA-Forge server binary is provisioned here."
+            echo "- Live tests that need HORIZON_BWRAP (test/realitytrace-obligation) skip themselves: no bubblewrap sandbox is configured here."
+            echo "- Per-task gates (gate-tNN) and gateway/seed recipes are not part of \`just verify\` and are not run."
+          } >> "$GITHUB_STEP_SUMMARY"
