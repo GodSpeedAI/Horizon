@@ -73,6 +73,9 @@ if (import.meta.main) {
     mkdirSync(binaries, { recursive: true });
     copyFileSync(binary, join(binaries, `horizon-server-${triple}${target.exe}`));
     stageResources(join(root, ".tmp", "desktop", "horizon-resources"));
+    // Linux bundles carry the server as a resource: linuxdeploy cannot inspect a compiled Bun executable (see tauri.linux.conf.json).
+    mkdirSync(join(root, ".tmp", "desktop", "server"), { recursive: true });
+    copyFileSync(binary, join(root, ".tmp", "desktop", "server", `horizon-server${target.exe}`));
     console.log(`staged src-tauri/binaries/horizon-server-${triple}${target.exe} and .tmp/desktop/horizon-resources`);
   }
 }

@@ -106,9 +106,15 @@ fn spec_for(app: &tauri::AppHandle) -> Result<SidecarSpec, String> {
     let program = match std::env::var_os(SERVER_OVERRIDE) {
         Some(path) => PathBuf::from(path),
         None => {
+            // Beside the executable where the bundle puts an externalBin; in the resource folder on Linux.
+            let name = if cfg!(windows) { "horizon-server.exe" } else { "horizon-server" };
             let exe = std::env::current_exe().map_err(|e| format!("cannot locate this application: {e}"))?;
-            let dir = exe.parent().ok_or("cannot locate this application's folder")?;
-            dir.join(if cfg!(windows) { "horizon-server.exe" } else { "horizon-server" })
+            let beside = exe.parent().ok_or("cannot locate this application's folder")?.join(name);
+            let in_resources = app.path().resource_dir().ok().map(|dir| dir.join("server").join(name));
+            match in_resources {
+                Some(path) if !beside.is_file() && path.is_file() => path,
+                _ => beside,
+            }
         }
     };
     if !program.is_file() {

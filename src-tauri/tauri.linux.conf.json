@@ -1,0 +1,9 @@
+{
+  "bundle": {
+    "externalBin": [],
+    "resources": {
+      "../.tmp/desktop/horizon-resources": "horizon-resources",
+      "../.tmp/desktop/server": "server"
+    }
+  }
+}
