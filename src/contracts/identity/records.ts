@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { resourcePath } from "../../runtime/resource-root.ts";
 import { loadParamSchemas, validateAgainstSchema, wireName, type ParamFieldSpec, type ParamSchemaSpec } from "./params.ts";
 
 /**
@@ -130,7 +131,7 @@ const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const PRIVATE_JWK = ["d", "p", "q", "dp", "dq", "qi", "oth"];
 
 function defaultPath(): string {
-  return new URL("../../../contracts/identity/v1/records.json", import.meta.url).pathname;
+  return resourcePath("contracts", "identity", "v1", "records.json");
 }
 
 let cached: RecordsContract | null = null;
@@ -174,7 +175,7 @@ export interface ExternalInterfacesContract {
 /** The interface the human entitlement path rests on. Its owner publishes it; Horizon names it. */
 export const ENTITLEMENT_INTERFACE_ID = "sea_forge.human_entitlement";
 function defaultExternalInterfacesPath(): string {
-  return new URL("../../../contracts/identity/v1/external-interfaces.json", import.meta.url).pathname;
+  return resourcePath("contracts", "identity", "v1", "external-interfaces.json");
 }
 let externalInterfacesCached: ExternalInterfacesContract | null = null;
 export function loadExternalInterfaces(path = defaultExternalInterfacesPath()): ExternalInterfacesContract {

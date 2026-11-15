@@ -37,3 +37,8 @@ tmp/
 # Agent door keys (written 0600 by Horizon; never commit)
 .cognate/agent.key
 *.key
+
+# Desktop shell (Tauri) build output and staged sidecar inputs
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/
