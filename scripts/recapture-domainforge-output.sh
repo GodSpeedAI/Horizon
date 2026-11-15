@@ -8,12 +8,12 @@ DF_ABS="$(cd "$(dirname "$DF")" && pwd)/$(basename "$DF")"
 OUT="${1:-.sea/interaction/validation/domainforge-output.txt}"
 
 {
-  echo '# DomainForge 0.21.2 — T01 IDM validation output (verbatim)'
+  echo '# DomainForge 0.22.0 — T01 IDM validation output (verbatim)'
   echo '# Re-captured at T04 after the INV-08 requirement_ref correction'
   echo '# (REQ-NAV-001 -> REQ-INT-003); no entity or invariant semantics changed.'
   echo
   echo '## validate --application'
-  echo '# T01 gate-01 validate --application (pinned 0.21.2)'
+  echo '# T01 gate-01 validate --application (pinned 0.22.0)'
   echo '$ $DOMAINFORGE_BIN --version'
   "$DF_ABS" --version
   echo "\$ $DF_ABS validate .sea/interaction/interaction-model.sea --application --format human"
