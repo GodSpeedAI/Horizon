@@ -13,6 +13,18 @@ setup:
 check:
     bun run scripts/check.ts
 
+# Desktop (Tauri v2) shell. `desktop-sidecar` compiles the server for this host and stages it where Tauri bundles it.
+# `desktop-build` then builds the installer bundles; CI (desktop.yml) does the same per platform.
+desktop-sidecar:
+    bun run build:sidecar
+
+desktop-build: desktop-sidecar
+    bun x @tauri-apps/cli@2.12.4 build
+
+desktop-supervisor-test:
+    cargo test --manifest-path src-tauri/Cargo.toml -p horizon-supervisor
+
+
 # Refuse to start a 1.0.1 build against a store holding contract_version 2 state (SPEC-CR-002 Rollback).
 rollback-guard store:
     bun run scripts/rollback-guard.ts {{store}}
