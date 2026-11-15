@@ -50,7 +50,7 @@ Test fixtures generate equivalent TOML documents (`test/support/config.ts`).
 
 | Variable | Used by | Purpose |
 | --- | --- | --- |
-| `DOMAINFORGE_BIN` | `justfile` (`domainforge_bin`) | path to the pinned DomainForge CLI; must be version **0.21.2** (`just check-toolchain`) |
+| `DOMAINFORGE_BIN` | `justfile` (`domainforge_bin`) | path to the pinned DomainForge CLI; must be version **0.22.0** (`just check-toolchain`) |
 
 ---
 
@@ -74,7 +74,7 @@ Global:
 | `teeth` | base teeth battery: `teeth-t05-boundaries`, `scripts/teeth.ts`, `teeth-ledger-freeze.sh`, `teeth-domainforge-gate.py`, `teeth-idm-integrity.py` |
 | `verify` | `check boundaries idm-integrity test ledger wayfinder teeth` — the global gate |
 | `status` | tail of `.agents/CURRENT_STATUS.jsonl` (the handoff snapshot) |
-| `check-toolchain` | DomainForge binary present + exactly 0.21.2 |
+| `check-toolchain` | DomainForge binary present + exactly 0.22.0 |
 | `freeze-t04` | `scripts/freeze-formation.sh` |
 
 Task gates (T01–T10 implemented; T11–T22 are registered placeholders that print
