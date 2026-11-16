@@ -1,0 +1,55 @@
+name: Release PR
+
+# release-please keeps one standing release PR (version bump + CHANGELOG) up to date from conventional commits on main.
+# Merging that PR creates the `horizon-v<version>` tag and a GitHub Release flagged PRERELEASE with the changelog. That
+# release carries no installers: release-desktop.yml (triggered by the tag push) builds, qualifies and attaches them,
+# and only promote-release.yml can make it "latest".
+#
+# A release PR or tag created with GITHUB_TOKEN triggers no workflows. Set the RELEASE_PLEASE_TOKEN secret (a PAT or app
+# token with contents + pull-requests write) so CI runs on the release PR and the tag push starts release-desktop.yml.
+# Without it the token falls back to GITHUB_TOKEN: a maintainer must run CI on the release PR by hand, and this workflow
+# dispatches release-desktop.yml itself (workflow_dispatch is exempt from the GITHUB_TOKEN rule). See docs/how-to/release.md.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: release-please
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write   # dispatch release-desktop.yml when the tag push cannot trigger it
+    steps:
+      - name: Run release-please
+        id: rp
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: .github/release-please-config.json
+          manifest-file: .github/release-please-manifest.json
+
+      - name: Start the release pipeline when the tag push cannot
+        if: steps.rp.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HAVE_PAT: ${{ secrets.RELEASE_PLEASE_TOKEN != '' }}
+          TAG: ${{ steps.rp.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          if [ "$HAVE_PAT" = "true" ]; then
+            echo "RELEASE_PLEASE_TOKEN is set: the tag push triggers release-desktop.yml"
+          else
+            gh workflow run release-desktop.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"
+            echo "dispatched release-desktop.yml from $TAG"
+          fi
