@@ -69,7 +69,7 @@ const issuerProfileSchema = z
     contract_id: z.string().min(1),
     contract_version: z.string().min(1),
     frozen_at: z.string().min(1),
-    authority: z.record(z.unknown()),
+    authority: z.record(z.string(), z.unknown()),
     ownership: z
       .object({
         identity_issuer: z.object({ owner: z.string(), scope: z.array(z.string()), not_scope: z.array(z.string()) }),
@@ -100,7 +100,7 @@ const issuerProfileSchema = z
         principal_enrollment: z
           .object({
             subject: z.string(),
-            registered_material: z.record(z.string()),
+            registered_material: z.record(z.string(), z.string()),
             rule: z.string(),
             enrollment_authority: z.string(),
             replay_rule: z.string(),
@@ -122,26 +122,26 @@ const issuerProfileSchema = z
         issuer_resolves_from: z.array(z.string()).min(1),
         caller_supplied_identity_is_refused: z.string().min(1),
         refusals: z.array(z.string()).min(1),
-        credential_properties: z.record(z.unknown()),
-        renewal: z.record(z.unknown()),
+        credential_properties: z.record(z.string(), z.unknown()),
+        renewal: z.record(z.string(), z.unknown()),
         issuance_authorization_rule: z.string().min(1),
       })
       .strict(),
-    holder_binding: z.record(z.unknown()),
-    key_rotation: z.record(z.unknown()),
-    recovery: z.record(z.unknown()),
-    revocation: z.record(z.unknown()),
-    restart_and_liveness: z.record(z.unknown()),
+    holder_binding: z.record(z.string(), z.unknown()),
+    key_rotation: z.record(z.string(), z.unknown()),
+    recovery: z.record(z.string(), z.unknown()),
+    revocation: z.record(z.string(), z.unknown()),
+    restart_and_liveness: z.record(z.string(), z.unknown()),
     qualification_lanes: z
       .object({
         common_tests: z.array(qualificationTestSchema).min(1),
         lanes: z.array(laneSchema).min(1),
-        timebox: z.record(z.unknown()),
+        timebox: z.record(z.string(), z.unknown()),
         failure_rule: z.string().min(1),
       })
       .strict(),
     not_claimed: z.array(z.string()).min(1),
-    refusals_are_first_class: z.record(z.unknown()),
+    refusals_are_first_class: z.record(z.string(), z.unknown()),
   })
   .strict();
 
@@ -172,7 +172,7 @@ const assuranceRequirementSchema = z
     kind: z.string().min(1),
     requires: z.array(z.string().min(1)).optional(),
     any_of: z.array(z.string().min(1)).min(1).optional(),
-    requires_by_caller: z.record(z.array(z.string().min(1))).optional(),
+    requires_by_caller: z.record(z.string(), z.array(z.string().min(1))).optional(),
     claims: z.array(z.string().min(1)),
     note: z.string().optional(),
   })
@@ -186,12 +186,12 @@ const a3MechanismSchema = z
     contract_id: z.string().min(1),
     contract_version: z.string().min(1),
     frozen_at: z.string().min(1),
-    authority: z.record(z.unknown()),
+    authority: z.record(z.string(), z.unknown()),
     assurance_levels: z
       .object({
         evaluation_rule: z.string().min(1),
         levels: z.array(assuranceLevelSchema).min(1),
-        separated_claims: z.record(z.unknown()),
+        separated_claims: z.record(z.string(), z.unknown()),
       })
       .strict(),
     mechanisms: z
@@ -205,13 +205,13 @@ const a3MechanismSchema = z
             predicate: z.string().optional(),
             scope: z.string().optional(),
             limits: z.array(z.string()).optional(),
-            verifier: z.record(z.unknown()).optional(),
+            verifier: z.record(z.string(), z.unknown()).optional(),
             record: z.string().optional(),
           })
           .strict(),
       )
       .min(1),
-    challenge_binding: z.record(z.unknown()),
+    challenge_binding: z.record(z.string(), z.unknown()),
     refused_paths: z.array(z.string()).min(1),
     unknown_predicate_rule: z.string().min(1),
     /**
@@ -221,10 +221,10 @@ const a3MechanismSchema = z
      * known one.
      */
     assurance_requirements: z.array(assuranceRequirementSchema).min(1),
-    pairing: z.record(z.unknown()),
-    profile_limits: z.record(z.unknown()),
-    no_qualified_channel: z.record(z.unknown()),
-    qualification: z.record(z.unknown()),
+    pairing: z.record(z.string(), z.unknown()),
+    profile_limits: z.record(z.string(), z.unknown()),
+    no_qualified_channel: z.record(z.string(), z.unknown()),
+    qualification: z.record(z.string(), z.unknown()),
   })
   .strict();
 
