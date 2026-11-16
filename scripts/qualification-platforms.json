@@ -1,0 +1,89 @@
+{
+  "comment": "Platforms Horizon claims for the desktop app. A platform is QUALIFIED only when every required step PASSed in its record (docs/how-to/qualify-desktop-install.md). 'upgrade' is NOT_RUN everywhere until a previous release exists and is never required. The Jetson row is satisfied only by a record made on real hardware.",
+  "platforms": [
+    {
+      "id": "windows-x64",
+      "label": "Windows x64",
+      "family": "windows",
+      "claimed": true,
+      "required_steps": [
+        "checksums",
+        "msi_install",
+        "msi_installed_smoke",
+        "msi_uninstall",
+        "nsis_install",
+        "nsis_installed_smoke",
+        "nsis_uninstall"
+      ]
+    },
+    {
+      "id": "linux-x64",
+      "label": "Linux x64 (Ubuntu 22.04)",
+      "family": "linux",
+      "claimed": true,
+      "required_steps": [
+        "checksums",
+        "deb_install",
+        "deb_installed_smoke",
+        "deb_installed_gui",
+        "deb_uninstall",
+        "appimage_extract",
+        "appimage_extracted_smoke"
+      ]
+    },
+    {
+      "id": "linux-arm64",
+      "label": "Linux arm64 (generic, hosted ubuntu-22.04-arm)",
+      "family": "linux",
+      "claimed": true,
+      "required_steps": [
+        "checksums",
+        "deb_install",
+        "deb_installed_smoke",
+        "deb_installed_gui",
+        "deb_uninstall",
+        "appimage_extract",
+        "appimage_extracted_smoke"
+      ]
+    },
+    {
+      "id": "linux-arm64-jetson",
+      "label": "NVIDIA Jetson (Ubuntu 22.04 arm64, real hardware only)",
+      "family": "linux",
+      "claimed": true,
+      "required_steps": [
+        "checksums",
+        "deb_install",
+        "deb_installed_smoke",
+        "deb_installed_gui",
+        "deb_uninstall",
+        "appimage_extract",
+        "appimage_extracted_smoke"
+      ]
+    },
+    {
+      "id": "macos-arm64",
+      "label": "macOS arm64",
+      "family": "macos",
+      "claimed": true,
+      "required_steps": [
+        "checksums",
+        "dmg_install",
+        "app_installed_smoke",
+        "app_uninstall"
+      ]
+    },
+    {
+      "id": "macos-x64",
+      "label": "macOS Intel x64",
+      "family": "macos",
+      "claimed": true,
+      "required_steps": [
+        "checksums",
+        "dmg_install",
+        "app_installed_smoke",
+        "app_uninstall"
+      ]
+    }
+  ]
+}
