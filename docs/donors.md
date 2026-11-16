@@ -35,7 +35,7 @@ names a donor that this file does not, or the reverse.
 ## DomainForge
 
 - Source: `GodSpeedAI/DomainForge`, TypeScript binding `@godspeedai/domainforge` `0.22.2`
-  (forced by the `overrides` entry in `package.json`; `cognate-domainforge` 0.9.2 pins 0.22.0, which ships
-  no native bindings outside linux-x64), Apache-2.0.
+  (resolved through `@godspeedai/cognate-domainforge` 0.10.0, which depends on 0.22.2 itself; no
+  `overrides` entry is needed), Apache-2.0.
 - Used only through `@godspeedai/cognate-domainforge` for semantic projection and identity
   verification.
