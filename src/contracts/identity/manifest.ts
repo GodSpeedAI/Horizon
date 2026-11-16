@@ -238,7 +238,7 @@ const dispatchSchema = z
     route: z.string(),
     action_field: z.string(),
     selector: z.enum(["action_value", "declared_effect"]).optional(),
-    actions: z.record(z.string()),
+    actions: z.record(z.string(), z.string()),
     /**
      * The name of the qualifier the handler resolves and hands to the resolver. It is never read
      * from the request: the desk resolves the card's kind from the card it fetched, and the phone
@@ -273,6 +273,7 @@ const dispatchSchema = z
      */
     action_values: z
       .record(
+        z.string(),
         z.object({
           values: z.array(z.union([z.string(), z.boolean()])),
           requires_non_empty_query: z.boolean().optional(),
@@ -383,7 +384,7 @@ const enforcementSchema = z
 const liveEnforcementSchema = z
   .object({
     version: z.number(),
-    paths: z.record(z.object({ authority: z.string(), evidence: z.string(), note: z.string().optional() }).strict()),
+    paths: z.record(z.string(), z.object({ authority: z.string(), evidence: z.string(), note: z.string().optional() }).strict()),
     rows: z.array(enforcementSchema),
   })
   .strict();
@@ -413,12 +414,12 @@ const manifestSchema = z
     contract_id: z.string(),
     contract_version: z.string(),
     frozen_at: z.string(),
-    authority: z.record(z.unknown()),
+    authority: z.record(z.string(), z.unknown()),
     classes: z.array(z.enum(IDENTITY_CLASSES)),
-    authority_writers: z.record(z.string()),
+    authority_writers: z.record(z.string(), z.string()),
     budget_units: z.array(z.string()).optional(),
-    class_defaults: z.record(rowSchema.partial()),
-    operations: z.record(z.array(rowSchema)),
+    class_defaults: z.record(z.string(), rowSchema.partial()),
+    operations: z.record(z.string(), z.array(rowSchema)),
     deployment_operations: deploymentOperationsSchema.optional(),
     dispatch: z.array(dispatchSchema),
     route_aliases: z.array(aliasSchema),
@@ -426,7 +427,7 @@ const manifestSchema = z
     binding_defects: z.array(defectSchema),
     catalog_gaps: z.array(z.object({ route: z.string(), code_ops: z.array(z.string()).optional(), reason: z.string() })),
     non_operation_routes: z.array(z.object({ route: z.string(), reason: z.string() })),
-    refusal_codes: z.record(z.string()),
+    refusal_codes: z.record(z.string(), z.string()),
   })
   .strict();
 
