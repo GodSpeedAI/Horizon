@@ -778,11 +778,12 @@
       });
     }
 
-    // Render answer card
-    const scopeComparison = (currentOp === "diff") ? ` · Comp: ${document.getElementById("param_checkpoint")?.value}` : '';
+    // Render answer card (values are escaped: some come from form inputs)
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const scopeComparison = (currentOp === "diff") ? ` · Comp: ${esc(document.getElementById("param_checkpoint")?.value)}` : '';
     container.innerHTML = `
       <div class="answer-header">
-        <div class="answer-title">Operation: ${currentOp.toUpperCase()}</div>
+        <div class="answer-title">Operation: ${esc(currentOp.toUpperCase())}</div>
         <div class="scope-badge">Frame: frame_019a3b4c@rev1 ${scopeComparison}</div>
       </div>
       <table class="values-table">
@@ -797,10 +798,10 @@
         <tbody>
           ${values.map(v => `
             <tr>
-              <td class="val-key">${v.key}</td>
-              <td class="val-val">${v.val}</td>
-              <td><span class="pill-label pill-${v.cls}">${v.cls}</span></td>
-              <td class="val-src">${v.src} ${v.missing ? `<div style="color: var(--amber); font-size: 10px;">Missing: ${v.missing}</div>` : ''}</td>
+              <td class="val-key">${esc(v.key)}</td>
+              <td class="val-val">${esc(v.val)}</td>
+              <td><span class="pill-label pill-${esc(v.cls)}">${esc(v.cls)}</span></td>
+              <td class="val-src">${esc(v.src)} ${v.missing ? `<div style="color: var(--amber); font-size: 10px;">Missing: ${esc(v.missing)}</div>` : ''}</td>
             </tr>
           `).join('')}
         </tbody>
