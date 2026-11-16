@@ -30,6 +30,23 @@ on:
       - "package.json"
       - "bun.lock"
       - ".github/workflows/desktop.yml"
+  # A main push seeds the Rust cache (rust-cache saves only on main); pull requests and release tags only restore it.
+  push:
+    branches: [main]
+    paths:
+      - "src-tauri/**"
+      - "src/main.ts"
+      - "src/desktop.ts"
+      - "src/runtime/resource-root.ts"
+      - "src/ui/desk/**"
+      - "scripts/build-sidecar.ts"
+      - "scripts/smoke-sidecar.ts"
+      - "scripts/build-desk.ts"
+      - "config/**"
+      - "contracts/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/desktop.yml"
   workflow_dispatch:
   # release-desktop.yml calls this workflow at the release tag's commit (WP-68). `ref` is that commit; it is empty for the
   # triggers above, which build the triggering commit.
@@ -124,6 +141,7 @@ jobs:
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: src-tauri
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Build the sidecar (compiled server and its resources)
         run: bun run build:sidecar --target ${{ matrix.triple }}
