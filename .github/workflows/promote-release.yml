@@ -1,0 +1,103 @@
+name: Promote release (qualification)
+
+# Promotion of a PUBLISHED horizon-v* prerelease (WP-68). Builds are not byte-reproducible and the Jetson can only be
+# qualified on real hardware, so that evidence is produced AFTER publication, against the release's own assets:
+#
+#   1. release-desktop.yml publishes the release as a prerelease with the hosted records and SHA256SUMS.linux-arm64;
+#   2. the owner downloads the arm64 assets on the Jetson, runs scripts/qualify-desktop.py with
+#      --platform linux-arm64-jetson --commit <tag commit> (docs/how-to/release.md), and uploads the record:
+#        gh release upload <tag> qualification-linux-arm64-jetson.json
+#   3. this workflow (Actions -> Promote release -> Use workflow from: the TAG) re-validates EVERY record asset:
+#      platform known, commit == the tag commit, real_hardware true for the Jetson, a QUALIFIED verdict backed by its
+#      required steps, and the record's artifacts exactly the release's own assets for that platform (SHA256SUMS.<platform>). It regenerates qualification.json, QUALIFICATION.md and the readiness
+#      block of the notes, and flips prerelease -> latest ONLY IF every claimed platform is QUALIFIED and the release
+#      carries the provenance marker written by release-desktop.yml.
+#
+# There are no inputs: the release is the one named by the tag the workflow was started from. It never creates tags,
+# builds, or moves assets; it only replaces qualification.json / QUALIFICATION.md, edits the notes, and the release flags.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Same group as release-desktop.yml: promotion never reads records while a publication rerun replaces assets.
+  group: release-desktop-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: promote (validate records, regenerate notes, flip prerelease)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Require a horizon-v* tag
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF_TYPE}" = tag || { echo "::error::start this workflow from a horizon-v* tag"; exit 1; }
+          case "$TAG" in horizon-v*) ;; *) echo "::error::tag $TAG does not match horizon-v*"; exit 1 ;; esac
+
+      - name: Checkout the tag (qualification tooling)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download the release's own records, SHA256SUMS and notes
+        run: |
+          set -euo pipefail
+          mkdir -p records out
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir records --pattern 'qualification-*.json'
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir . --pattern 'SHA256SUMS.*'
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > old-notes.md
+          ls records
+
+      - name: Validate the records and regenerate the readiness block
+        id: agg
+        run: |
+          set -euo pipefail
+          tag_sha=$(git rev-parse "${TAG}^{commit}")
+          test "$(git rev-parse HEAD)" = "$tag_sha" || { echo "::error::checkout is not the tag commit"; exit 1; }
+          attested=false
+          grep -q '<!-- provenance:attested -->' old-notes.md && attested=true
+          grep -q '<!-- readiness:begin -->' old-notes.md && grep -q '<!-- readiness:end -->' old-notes.md \
+            || { echo "::error::the release notes carry no readiness markers; this release predates qualification and cannot be promoted"; exit 1; }
+          python3 -I scripts/release-qualification.py promote \
+            --platforms scripts/qualification-platforms.json --records records --sums-dir . \
+            --commit "$tag_sha" --tag "$TAG" --out-json out/qualification.json --out-md out/QUALIFICATION.md > /dev/null
+          python3 -I scripts/release-qualification.py notes --json out/qualification.json --attested false > out/block.md
+          python3 -I - <<'PY'
+          import re
+          old = open("old-notes.md", encoding="utf-8").read()
+          block = open("out/block.md", encoding="utf-8").read().rstrip("\n")
+          new = re.sub(r"<!-- readiness:begin -->.*?<!-- readiness:end -->", lambda m: block, old, count=1, flags=re.S)
+          open("out/notes.md", "w", encoding="utf-8").write(new)
+          PY
+          ready=$(python3 -I -c 'import json;print("true" if json.load(open("out/qualification.json"))["release_ready"] else "false")')
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
+          echo "attested=$attested" >> "$GITHUB_OUTPUT"
+          cp out/QUALIFICATION.md "$GITHUB_STEP_SUMMARY"
+
+      - name: Update the release (notes, records; latest only if fully qualified)
+        env:
+          READY: ${{ steps.agg.outputs.ready }}
+          ATTESTED: ${{ steps.agg.outputs.attested }}
+        run: |
+          set -euo pipefail
+          # Take "latest" away first: a failed upload must not leave a latest release with stale or missing evidence.
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease --latest=false
+          gh release upload "$TAG" out/qualification.json out/QUALIFICATION.md --clobber --repo "$GITHUB_REPOSITORY"
+          if [ "$READY" = "true" ] && [ "$ATTESTED" = "true" ]; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file out/notes.md --prerelease=false --latest
+            echo "promoted: every claimed platform is QUALIFIED and the release is attested"
+          else
+            # Missing evidence also DEMOTES: a release that is not fully qualified is never left latest.
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file out/notes.md --prerelease --latest=false
+            echo "::notice::not promoted (ready=$READY attested=$ATTESTED): the release stays a prerelease"
+          fi

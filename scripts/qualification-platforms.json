@@ -48,6 +48,7 @@
     },
     {
       "id": "linux-arm64-jetson",
+      "build_platform": "linux-arm64",
       "label": "NVIDIA Jetson (Ubuntu 22.04 arm64, real hardware only)",
       "family": "linux",
       "claimed": true,

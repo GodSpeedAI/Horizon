@@ -92,7 +92,7 @@ Everything this workflow produces is an **unqualified CI build**:
 
 - not signed (macOS bundles are ad-hoc signed because Apple Silicon requires a signature to run; Windows has no signing configured);
 - install-qualified only as far as the `qualify` job records show (install, installed-server smoke, uninstall per platform; see [qualify the desktop install](how-to/qualify-desktop-install.md)); upgrade is NOT_RUN because no previous release exists, and the desktop window is launched only on Linux under Xvfb;
-- not published, tagged or attached to a release;
+- not published or attached to a release by the CI build itself: only `release-desktop.yml` publishes, from a `horizon-v*` tag, and labels the release a prerelease until every claimed platform (including the Jetson) is QUALIFIED (see [cut a release](how-to/release.md));
 - Jetson and other real-hardware targets are not covered.
 
-An unqualified artifact must not be presented as a release.
+An unqualified artifact must not be presented as a release. Releases and their promotion are described in [cut a release](how-to/release.md).

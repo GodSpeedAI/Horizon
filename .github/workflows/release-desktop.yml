@@ -1,0 +1,222 @@
+name: Release (desktop)
+
+# Publication stage of the Horizon release pipeline for horizon-v* tags (WP-68). Three stages, kept in separate workflows:
+#
+#   CI (ci.yml)  ·  qualification (desktop.yml, called here at the tag's commit)  ·  publication (this file, then promote-release.yml)
+#
+#   validate -> desktop (reusable desktop.yml: build + install-qualify every platform at the tag commit)
+#            -> publish (hard `needs` on the qualification result; GitHub Release + build provenance)
+#
+# Rules:
+# - The tag MUST name the package.json version (horizon-v<x.y.z>). Tags are never created or moved here: release-please
+#   creates them (release-please.yml); this workflow only builds an existing tag and attaches assets to the release named after it.
+# - Every qualification record must name the tag commit exactly, and every released file must be byte-identical to what its
+#   record qualified (scripts/release-qualification.py assemble). Otherwise nothing is published.
+# - A job failure in the build or qualify stage (a platform with a FAIL step is a red job) blocks publication: no release is
+#   created from a failing qualification. Publication proceeds only when every built platform produced a record.
+# - The release is a PRERELEASE and NOT "latest" unless every platform claimed in scripts/qualification-platforms.json is
+#   QUALIFIED. The Jetson row can only be satisfied by a real-hardware record added AFTER publication, so a first release is
+#   always a prerelease; promote-release.yml attaches that evidence and only then may mark it latest.
+# - Assets of a platform that is not QUALIFIED keep the "unqualified" label in their names.
+# - Re-running publish is idempotent (assets upload with --clobber; an existing release, such as the one release-please
+#   creates, is reused). Start a re-run from the tag: Actions -> Release (desktop) -> Use workflow from: the tag. There is no
+#   free-form tag input: every job builds the triggering commit, never a caller-named ref.
+#
+# Supply-chain note: every third-party action is pinned to a full commit SHA.
+
+on:
+  push:
+    tags:
+      - "horizon-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never cancelled mid-run; one pipeline per tag, so a dispatch and a push for the same tag cannot publish concurrently.
+  group: release-desktop-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: validate (tag == package.json version)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.ident.outputs.tag }}
+      version: ${{ steps.verify.outputs.version }}
+      tag_sha: ${{ steps.verify.outputs.tag_sha }}
+    steps:
+      - name: Resolve the release tag
+        id: ident
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF_TYPE}" = tag || { echo "::error::run this workflow from a horizon-v* tag (Use workflow from: <tag>), not a branch"; exit 1; }
+          case "$GITHUB_REF_NAME" in
+            horizon-v*) ;;
+            *) echo "::error::tag '$GITHUB_REF_NAME' does not match horizon-v*"; exit 1 ;;
+          esac
+          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout the tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Refuse version drift
+        id: verify
+        shell: bash
+        env:
+          TAG: ${{ steps.ident.outputs.tag }}
+        run: |
+          set -euo pipefail
+          version=$(python3 -I -c 'import json;print(json.load(open("package.json"))["version"])')
+          test "$TAG" = "horizon-v${version}" || { echo "::error::tag $TAG is not horizon-v${version} (package.json version)"; exit 1; }
+          # Peel to the COMMIT: an annotated tag's object SHA is not the commit that is built.
+          tag_sha=$(git rev-parse "${TAG}^{commit}")
+          test "$(git rev-parse HEAD)" = "$tag_sha" || { echo "::error::checked-out HEAD is not ${TAG}^{commit}"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag_sha=$tag_sha" >> "$GITHUB_OUTPUT"
+          echo "validated: $TAG -> version $version at commit $tag_sha"
+
+  desktop:
+    name: build and qualify (desktop.yml at the tag commit)
+    needs: validate
+    permissions:
+      contents: read
+    uses: ./.github/workflows/desktop.yml
+    with:
+      ref: ${{ needs.validate.outputs.tag_sha }}
+
+  publish:
+    name: publish (GitHub Release + provenance)
+    needs: [validate, desktop]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ needs.validate.outputs.tag }}
+      VERSION: ${{ needs.validate.outputs.version }}
+      TAG_SHA: ${{ needs.validate.outputs.tag_sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout the tag commit (qualification tooling)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download the built bundles (one directory per platform)
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: horizon-unqualified-*
+          path: dist
+
+      - name: Download the qualification records
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: horizon-qualification-*
+          path: records
+
+      - name: Verify every record names the tag commit, then assemble the release assets
+        id: qual
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TAG_SHA" || { echo "::error::checkout is not the tag commit"; exit 1; }
+          python3 -I scripts/release-qualification.py assemble \
+            --platforms scripts/qualification-platforms.json --dist dist --records records \
+            --commit "$TAG_SHA" --tag "$TAG" --out out > /dev/null
+          ready=$(python3 -I -c 'import json;print("true" if json.load(open("out/qualification.json"))["release_ready"] else "false")')
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
+          echo "release_ready=$ready"
+          cp out/QUALIFICATION.md "$GITHUB_STEP_SUMMARY"
+          ls out
+
+      - name: Attach build provenance (this run built the tag commit)
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: |
+            out/*.deb
+            out/*.AppImage
+            out/*.msi
+            out/*.exe
+            out/*.dmg
+            out/*.tar.gz
+
+      - name: Verify the provenance just created (before the release is touched)
+        run: |
+          set -euo pipefail
+          for f in out/*.deb out/*.AppImage out/*.msi out/*.exe out/*.dmg out/*.tar.gz; do
+            gh attestation verify "$f" --repo "$GITHUB_REPOSITORY" > /dev/null
+            echo "OK provenance $(basename "$f")"
+          done
+
+      - name: Assemble the release notes
+        run: |
+          set -euo pipefail
+          python3 -I scripts/release-qualification.py notes --json out/qualification.json --attested true > out/block.md
+          {
+            echo "Horizon ${VERSION}: desktop installers and headless server, built from commit \`${TAG_SHA}\`."
+            echo
+            cat out/block.md
+            echo
+            echo "Full records: \`qualification.json\`, \`QUALIFICATION.md\` and one \`qualification-<platform>.json\` per platform. How to read them and how real-hardware (Jetson) evidence is added: [docs/how-to/release.md](https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/docs/how-to/release.md)."
+            echo
+            echo "## Verify before installing"
+            echo
+            echo "    sha256sum -c SHA256SUMS --ignore-missing        # Linux / Windows (Git Bash, WSL)"
+            echo "    shasum -a 256 -c SHA256SUMS --ignore-missing    # macOS"
+            echo "    gh attestation verify <asset> --repo ${GITHUB_REPOSITORY}"
+            echo
+            echo "## Unsigned"
+            echo
+            echo "Windows has no Authenticode signing and macOS bundles are ad-hoc signed only (not notarized). Assets of a platform that is not QUALIFIED keep \"unqualified\" in their names."
+          } > notes.md
+          # An existing release (release-please creates one with the changelog) keeps its changelog: only the readiness block is replaced.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > old-notes.md
+            python3 -I - <<'PY'
+          import re
+          old = open("old-notes.md", encoding="utf-8").read()
+          new = open("notes.md", encoding="utf-8").read()
+          merged = old.rstrip("\n") + "\n\n---\n\n" + new
+          if "<!-- readiness:begin -->" in old:
+              merged = old[: old.index("<!-- readiness:begin -->")].rstrip("\n") + "\n\n" + new
+          open("notes.md", "w", encoding="utf-8").write(merged)
+          PY
+          fi
+
+      - name: Publish the GitHub Release (create, or upload --clobber if it exists)
+        env:
+          READY: ${{ steps.qual.outputs.ready }}
+        run: |
+          set -euo pipefail
+          # Prerelease and not-latest unless every claimed platform is QUALIFIED. The tag is never created here (--verify-tag).
+          if [ "$READY" = "true" ]; then flags=(--prerelease=false --latest); else flags=(--prerelease --latest=false); fi
+          assets=(out/*.deb out/*.AppImage out/*.msi out/*.exe out/*.dmg out/*.tar.gz out/SHA256SUMS out/SHA256SUMS.* out/qualification*.json out/QUALIFICATION.md)
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "release $TAG already exists; uploading assets with --clobber and refreshing the notes"
+            # Take "latest" away first: a failed upload must not leave a latest release with changed or missing assets.
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease --latest=false
+            gh release upload "$TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file notes.md "${flags[@]}"
+          else
+            gh release create "$TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "Horizon ${VERSION}" --notes-file notes.md "${flags[@]}"
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets,tagName,isPrerelease \
+            --jq '"release " + .tagName + " prerelease=" + (.isPrerelease|tostring) + " assets: " + ([.assets[].name] | join(", "))'
+
+      - name: Failure-recovery notice
+        if: failure()
+        run: |
+          {
+            echo "## Desktop release publish failed"
+            echo
+            echo "Never move or re-point the \`${TAG}\` tag. Re-run this workflow from the tag (idempotent: assets upload with --clobber, an existing release is reused)."
+            echo "If a platform job failed, fix it on main and cut a NEW release; a tag whose commit cannot be qualified is not published."
+          } >> "$GITHUB_STEP_SUMMARY"

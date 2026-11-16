@@ -31,6 +31,15 @@ on:
       - "bun.lock"
       - ".github/workflows/desktop.yml"
   workflow_dispatch:
+  # release-desktop.yml calls this workflow at the release tag's commit (WP-68). `ref` is that commit; it is empty for the
+  # triggers above, which build the triggering commit.
+  workflow_call:
+    inputs:
+      ref:
+        description: "Commit SHA to build and qualify (default: the triggering commit)"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -87,6 +96,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -222,9 +233,11 @@ jobs:
       run:
         shell: bash
     steps:
-      # The triggering commit's own scripts qualify the artifact that same commit built; nothing is selected by input.
+      # The checked-out commit's own scripts qualify the artifact that same commit built (`ref` only names that commit for a caller).
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -246,7 +259,7 @@ jobs:
       - name: Qualify the installed bundles
         run: |
           py=python3; [ "$RUNNER_OS" = "Windows" ] && py=python
-          "$py" -I scripts/qualify-desktop.py --platform "${{ matrix.name }}" --dist dist --commit "$GITHUB_SHA" \
+          "$py" -I scripts/qualify-desktop.py --platform "${{ matrix.name }}" --dist dist --commit "$(git rev-parse HEAD)" \
             --out "qualification/${{ matrix.name }}.json" --runner-image "${{ matrix.runner }}"
 
       - name: Summary
