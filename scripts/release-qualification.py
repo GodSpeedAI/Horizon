@@ -72,8 +72,16 @@ def load_records(directory):
     return records, errors
 
 
-def validate_record(rec, platforms, commit, sums=None):
-    """Return a list of problems with one record (empty = acceptable evidence for this commit)."""
+def build_platform(cfg):
+    """The platform whose build a record qualifies: real-hardware rows qualify another platform's released assets."""
+    return cfg.get("build_platform", cfg["id"])
+
+
+def validate_record(rec, platforms, commit, expected=None):
+    """Return a list of problems with one record (empty = acceptable evidence for this commit).
+
+    expected: {released name: sha256} of the assets the record's platform must have qualified (None skips the artifact check).
+    """
     problems = []
     where = rec["_path"]
     cfg = next((p for p in platforms if p["id"] == rec.get("platform")), None)
@@ -83,17 +91,20 @@ def validate_record(rec, platforms, commit, sums=None):
         problems.append(f"{where}: record commit {rec.get('commit')!r} is not the release commit {commit}")
     if cfg["id"].endswith("-jetson") and rec.get("host", {}).get("real_hardware") is not True:
         problems.append(f"{where}: {cfg['id']} needs host.real_hardware == true")
-    if sums is not None:
-        listed = {released_name(k): v for k, v in sums.items()}
-        arts = rec.get("artifacts") or []
-        if not arts:
+    by = {s.get("name"): s.get("status") for s in rec.get("steps", [])}
+    if rec.get("status") == "QUALIFIED":
+        bad = [r for r in cfg.get("required_steps", []) if by.get(r) != "PASS"]
+        if bad or "FAIL" in by.values():
+            problems.append(f"{where}: status QUALIFIED but required steps {bad or '[]'} did not PASS or a step FAILed")
+    if expected is not None:
+        got = {released_name(a.get("name", "")): str(a.get("sha256", "")).lower() for a in rec.get("artifacts") or []}
+        if not got:
             problems.append(f"{where}: record lists no artifacts")
-        for a in arts:
-            want = listed.get(released_name(a.get("name", "")))
-            if want is None:
-                problems.append(f"{where}: artifact {a.get('name')} is not in the release SHA256SUMS")
-            elif want != str(a.get("sha256", "")).lower():
-                problems.append(f"{where}: artifact {a.get('name')} sha256 differs from the release SHA256SUMS")
+        for name in sorted(set(got) ^ set(expected)):
+            problems.append(f"{where}: artifact {name} is {'not part of' if name in got else 'missing from'} the {build_platform(cfg)} release assets")
+        for name in sorted(set(got) & set(expected)):
+            if got[name] != expected[name]:
+                problems.append(f"{where}: artifact {name} sha256 differs from the release")
     return problems
 
 
@@ -169,7 +180,7 @@ def cmd_assemble(a):
     summary = summarize(platforms, records, a.tag, a.commit)
     status = {r["id"]: r["status"] for r in summary["platforms"]}
     os.makedirs(a.out, exist_ok=True)
-    all_sums = []
+    all_sums, per_platform = [], {}
     for p in platforms:
         src = os.path.join(a.dist, f"horizon-unqualified-{p['id']}")
         if not os.path.isdir(src):
@@ -195,11 +206,17 @@ def cmd_assemble(a):
                 continue
             shutil.copyfile(path, os.path.join(a.out, final))
             plat_sums.append(f"{digest}  {final}")
+            per_platform.setdefault(p["id"], {})[released_name(final)] = digest
         open(os.path.join(a.out, f"SHA256SUMS.{p['id']}"), "w", encoding="utf-8").write("\n".join(plat_sums) + "\n")
         all_sums += plat_sums
-        shutil.copyfile(rec["_path"], os.path.join(a.out, f"qualification-{p['id']}.json"))
+    # Every accepted record is kept, including real-hardware ones that have no build directory of their own.
+    for pid, rec in records.items():
+        cfg = next((p for p in platforms if p["id"] == pid), None)
+        if cfg is not None:
+            problems += validate_record(rec, platforms, a.commit, per_platform.get(build_platform(cfg), {}))
+        shutil.copyfile(rec["_path"], os.path.join(a.out, f"qualification-{pid}.json"))
     if problems:
-        die(problems)
+        die(sorted(set(problems)))
     open(os.path.join(a.out, "SHA256SUMS"), "w", encoding="utf-8").write("\n".join(sorted(all_sums, key=lambda l: l.split("  ", 1)[1])) + "\n")
     write_summary(summary, os.path.join(a.out, "qualification.json"), os.path.join(a.out, "QUALIFICATION.md"))
     print(json.dumps({"release_ready": summary["release_ready"]}))
@@ -208,9 +225,16 @@ def cmd_assemble(a):
 def cmd_promote(a):
     platforms = load_platforms(a.platforms)
     records, problems = load_records(a.records)
-    sums = parse_sums(a.sums)
     for rec in records.values():
-        problems += validate_record(rec, platforms, a.commit, sums)
+        cfg = next((p for p in platforms if p["id"] == rec.get("platform")), None)
+        expected = None
+        if cfg is not None:
+            sums_file = os.path.join(a.sums_dir, f"SHA256SUMS.{build_platform(cfg)}")
+            if not os.path.isfile(sums_file):
+                problems.append(f"{rec['_path']}: the release has no {os.path.basename(sums_file)}")
+                continue
+            expected = {released_name(k): v for k, v in parse_sums(sums_file).items()}
+        problems += validate_record(rec, platforms, a.commit, expected)
     if problems:
         die(problems)
     summary = summarize(platforms, records, a.tag, a.commit)
@@ -236,7 +260,7 @@ def main():
     s = sub.add_parser("promote")
     s.add_argument("--platforms", required=True)
     s.add_argument("--records", required=True)
-    s.add_argument("--sums", required=True)
+    s.add_argument("--sums-dir", required=True, help="directory holding the release's SHA256SUMS.<platform> files")
     s.add_argument("--commit", required=True)
     s.add_argument("--tag", required=True)
     s.add_argument("--out-json", required=True)

@@ -12,7 +12,7 @@ const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
 const platformsFile = (dir: string, ids: string[]) => {
   const p = join(dir, "platforms.json");
-  writeFileSync(p, JSON.stringify({ platforms: ids.map((id) => ({ id, label: id, claimed: true, required_steps: ["checksums"] })) }));
+  writeFileSync(p, JSON.stringify({ platforms: ids.map((id) => ({ id, label: id, claimed: true, required_steps: ["checksums"], ...(id.endsWith("-jetson") ? { build_platform: "linux-x64" } : {}) })) }));
   return p;
 };
 const record = (platform: string, files: Record<string, string>, over: Record<string, unknown> = {}) => ({
@@ -70,6 +70,19 @@ describe("assemble", () => {
   });
 });
 
+describe("assemble with hardware evidence", () => {
+  test("a Jetson record is checked against the assembled assets and kept in the output", () => {
+    const f = fixture();
+    const jf = { "horizon-desktop_Horizon_0.1.0_amd64.deb": "deb", "horizon-headless-x86_64-unknown-linux-gnu.tar.gz": "tgz" };
+    writeFileSync(join(f.dir, "records", "jetson.json"), JSON.stringify(record("linux-arm64-jetson", jf)));
+    expect(assemble(f).exitCode).toBe(0);
+    expect(readdirSync(join(f.dir, "out"))).toContain("qualification-linux-arm64-jetson.json");
+    expect(JSON.parse(readFileSync(join(f.dir, "out", "qualification.json"), "utf8")).release_ready).toBe(true);
+    writeFileSync(join(f.dir, "records", "jetson.json"), JSON.stringify(record("linux-arm64-jetson", { ...jf, "horizon-desktop_Horizon_0.1.0_amd64.deb": "evil" })));
+    expect(assemble(f).exitCode).toBe(1);
+  });
+});
+
 describe("promote", () => {
   function released() {
     const f = fixture();
@@ -79,13 +92,13 @@ describe("promote", () => {
     mkdirSync(rel);
     // The release assets as published: the hosted record and the combined sums.
     writeFileSync(join(rel, "qualification-linux-x64.json"), readFileSync(join(out, "qualification-linux-x64.json")));
-    writeFileSync(join(rel, "SHA256SUMS"), readFileSync(join(out, "SHA256SUMS")));
+    writeFileSync(join(rel, "SHA256SUMS.linux-x64"), readFileSync(join(out, "SHA256SUMS.linux-x64")));
     // Jetson evidence, made against the released (renamed) arm64 assets.
-    const jf = { "horizon-desktop_Horizon_0.1.0_amd64.deb": "deb" };
+    const jf = { "horizon-desktop_Horizon_0.1.0_amd64.deb": "deb", "horizon-headless-x86_64-unknown-linux-gnu.tar.gz": "tgz" };
     return { f, rel, jf };
   }
   const promote = (r: ReturnType<typeof released>, commit = SHA) =>
-    py("promote", "--platforms", r.f.platforms, "--records", r.rel, "--sums", join(r.rel, "SHA256SUMS"), "--commit", commit, "--tag", TAG,
+    py("promote", "--platforms", r.f.platforms, "--records", r.rel, "--sums-dir", r.rel, "--commit", commit, "--tag", TAG,
       "--out-json", join(r.f.dir, "p.json"), "--out-md", join(r.f.dir, "p.md"));
 
   test("without the Jetson record the release stays not ready", () => {
@@ -106,7 +119,9 @@ describe("promote", () => {
     for (const [over, files, commit] of [
       [{ host: { real_hardware: false } }, undefined, SHA],
       [{ commit: "c".repeat(40) }, undefined, SHA],
-      [{}, { "horizon-desktop_Horizon_0.1.0_amd64.deb": "other bytes" }, SHA],
+      [{}, { "horizon-desktop_Horizon_0.1.0_amd64.deb": "other bytes", "horizon-headless-x86_64-unknown-linux-gnu.tar.gz": "tgz" }, SHA],
+      [{}, { "horizon-desktop_Horizon_0.1.0_amd64.deb": "deb" }, SHA], // does not cover the platform's assets
+      [{ status: "QUALIFIED", steps: [{ name: "checksums", status: "NOT_RUN", reason: "" }] }, undefined, SHA], // verdict not backed by steps
     ] as const) {
       const r = released();
       writeFileSync(join(r.rel, "qualification-linux-arm64-jetson.json"), JSON.stringify(record("linux-arm64-jetson", files ?? r.jf, over)));

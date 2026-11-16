@@ -200,6 +200,8 @@ jobs:
           assets=(out/*.deb out/*.AppImage out/*.msi out/*.exe out/*.dmg out/*.tar.gz out/SHA256SUMS out/SHA256SUMS.* out/qualification*.json out/QUALIFICATION.md)
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             echo "release $TAG already exists; uploading assets with --clobber and refreshing the notes"
+            # Take "latest" away first: a failed upload must not leave a latest release with changed or missing assets.
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease --latest=false
             gh release upload "$TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file notes.md "${flags[@]}"
           else

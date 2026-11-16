@@ -36,8 +36,8 @@ Each step is `PASS`, `FAIL` or `NOT_RUN` with a reason. The record's `status` is
 - `NOT QUALIFIED`: any step failed.
 
 Records also carry the commit, artifact sha256 values with whether each matched `SHA256SUMS`, OS, architecture and runner image.
-The script exits non-zero on any `FAIL` (a red job); `NOT_RUN` is recorded, not hidden. Artifacts stay named `unqualified` until `release-desktop.yml` consumes `QUALIFIED` records for a tag ([cut a release](release.md)); this
-workflow itself publishes nothing. Real-hardware (Jetson) evidence for a published release is added with the steps in [cut a release](release.md).
+The script exits non-zero on any `FAIL` (a red job); `NOT_RUN` is recorded, not hidden. Artifacts stay named `unqualified` until `release-desktop.yml` consumes `QUALIFIED` records for a tag ([cut a release](release.md)); `desktop.yml`
+itself publishes nothing. Real-hardware (Jetson) evidence for a published release is added with the steps in [cut a release](release.md).
 
 ## Run it yourself (Jetson, Ubuntu 22.04 arm64)
 

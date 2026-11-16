@@ -16,7 +16,7 @@
       "extra-files": [
         { "type": "json", "path": "src-tauri/tauri.conf.json", "jsonpath": "$.version" },
         { "type": "toml", "path": "src-tauri/Cargo.toml", "jsonpath": "$.package.version" },
-        { "type": "toml", "path": "src-tauri/Cargo.lock", "jsonpath": "$.package[?(@.name=='horizon-desktop')].version" }
+        { "type": "toml", "path": "src-tauri/Cargo.lock", "jsonpath": "$.package[?(@.name.value=='horizon-desktop')].version" }
       ],
       "changelog-types": [
         { "type": "feat", "section": "Features" },

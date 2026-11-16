@@ -39,6 +39,15 @@ jobs:
           config-file: .github/release-please-config.json
           manifest-file: .github/release-please-manifest.json
 
+      - name: Hold the new release back (prerelease, not latest) until it is qualified
+        if: steps.rp.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rp.outputs.tag_name }}
+        run: |
+          # release-please's own prerelease setting only applies to 0.x or suffixed versions, so state it explicitly.
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease --latest=false
+
       - name: Start the release pipeline when the tag push cannot
         if: steps.rp.outputs.release_created == 'true'
         env:

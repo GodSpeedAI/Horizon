@@ -8,8 +8,8 @@ name: Promote release (qualification)
 #      --platform linux-arm64-jetson --commit <tag commit> (docs/how-to/release.md), and uploads the record:
 #        gh release upload <tag> qualification-linux-arm64-jetson.json
 #   3. this workflow (Actions -> Promote release -> Use workflow from: the TAG) re-validates EVERY record asset:
-#      schema/platform known, commit == the tag commit, real_hardware true for the Jetson, and each record's artifact
-#      sha256 equals the release's own SHA256SUMS. It regenerates qualification.json, QUALIFICATION.md and the readiness
+#      platform known, commit == the tag commit, real_hardware true for the Jetson, a QUALIFIED verdict backed by its
+#      required steps, and the record's artifacts exactly the release's own assets for that platform (SHA256SUMS.<platform>). It regenerates qualification.json, QUALIFICATION.md and the readiness
 #      block of the notes, and flips prerelease -> latest ONLY IF every claimed platform is QUALIFIED and the release
 #      carries the provenance marker written by release-desktop.yml.
 #
@@ -23,7 +23,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: promote-release-${{ github.ref_name }}
+  # Same group as release-desktop.yml: promotion never reads records while a publication rerun replaces assets.
+  group: release-desktop-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -53,7 +54,7 @@ jobs:
           set -euo pipefail
           mkdir -p records out
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir records --pattern 'qualification-*.json'
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir . --pattern SHA256SUMS
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir . --pattern 'SHA256SUMS.*'
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > old-notes.md
           ls records
 
@@ -68,7 +69,7 @@ jobs:
           grep -q '<!-- readiness:begin -->' old-notes.md && grep -q '<!-- readiness:end -->' old-notes.md \
             || { echo "::error::the release notes carry no readiness markers; this release predates qualification and cannot be promoted"; exit 1; }
           python3 -I scripts/release-qualification.py promote \
-            --platforms scripts/qualification-platforms.json --records records --sums SHA256SUMS \
+            --platforms scripts/qualification-platforms.json --records records --sums-dir . \
             --commit "$tag_sha" --tag "$TAG" --out-json out/qualification.json --out-md out/QUALIFICATION.md > /dev/null
           python3 -I scripts/release-qualification.py notes --json out/qualification.json --attested false > out/block.md
           python3 -I - <<'PY'
@@ -89,11 +90,14 @@ jobs:
           ATTESTED: ${{ steps.agg.outputs.attested }}
         run: |
           set -euo pipefail
+          # Take "latest" away first: a failed upload must not leave a latest release with stale or missing evidence.
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease --latest=false
           gh release upload "$TAG" out/qualification.json out/QUALIFICATION.md --clobber --repo "$GITHUB_REPOSITORY"
           if [ "$READY" = "true" ] && [ "$ATTESTED" = "true" ]; then
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file out/notes.md --prerelease=false --latest
             echo "promoted: every claimed platform is QUALIFIED and the release is attested"
           else
-            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file out/notes.md
+            # Missing evidence also DEMOTES: a release that is not fully qualified is never left latest.
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file out/notes.md --prerelease --latest=false
             echo "::notice::not promoted (ready=$READY attested=$ATTESTED): the release stays a prerelease"
           fi

@@ -53,7 +53,8 @@ gh release upload "$TAG" qualification-linux-arm64-jetson.json --repo GodSpeedAI
 ```
 
 Then run Actions, **Promote release**, with **Use workflow from: the tag**. It re-validates every record asset (known platform,
-`commit` equals the tag commit, `real_hardware` true for the Jetson, artifact sha256 values equal the release `SHA256SUMS`),
+`commit` equals the tag commit, `real_hardware` true for the Jetson, a QUALIFIED verdict backed by its required steps, and the record's
+artifacts are exactly the release's `linux-arm64` assets with matching sha256),
 regenerates `QUALIFICATION.md` and the notes, and marks the release **latest** only if every claimed platform is QUALIFIED and the
 release carries its provenance marker. Otherwise it stays a prerelease and the run says why. A record for another commit, a
 non-hardware record or mismatched bytes fails the run and changes nothing.
