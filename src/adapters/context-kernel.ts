@@ -133,7 +133,7 @@ const WireResult = z.object({
   excerpt: z.string().optional(),
   citation: z.object({ anchor: z.string().nullable().optional(), uri: z.string().min(1) }),
   score: z.number().nullable().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 const WireEnvelope = z.object({
   results: z.array(WireResult),

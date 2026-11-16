@@ -63,7 +63,7 @@ export const OperationalObjectV1 = z
     semantic_ref: SemanticRef,
     label: z.string().min(1),
     /** Flat, deliberately simple: a typed field bag, not a second ontology. */
-    fields: z.record(z.union([z.string(), z.number(), z.boolean()])),
+    fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
     provenance: ProvenanceV1,
   })
   .strict();
