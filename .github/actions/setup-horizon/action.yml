@@ -1,0 +1,107 @@
+name: Setup Horizon
+description: Toolchains, dependencies, the verified external binaries and (optionally) Chromium, with caches for the downloads.
+
+inputs:
+  bun-version:
+    description: Bun version
+    required: true
+  domainforge-version:
+    description: DomainForge release version
+    required: true
+  realitytrace-version:
+    description: RealityTrace release version
+    required: true
+  github-token:
+    description: Token for `gh release download`
+    required: true
+  chromium:
+    description: "Install Chromium for the browser parity tests ('true' or 'false')"
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      with:
+        bun-version: ${{ inputs.bun-version }}
+
+    - name: Setup just
+      uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+
+    - name: Setup uv
+      uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+    - name: Setup Python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: "3.12"
+
+    - name: Install repository dependencies
+      shell: bash
+      run: |
+        python3 -m pip install pyyaml
+        bun install --frozen-lockfile
+        uv sync --project research --all-groups
+
+    - name: Cache Chromium
+      if: inputs.chromium == 'true'
+      id: chromium-cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+
+    - name: Install Chromium for the browser parity tests
+      if: inputs.chromium == 'true'
+      shell: bash
+      env:
+        CACHE_HIT: ${{ steps.chromium-cache.outputs.cache-hit }}
+      run: |
+        # The browser download is cached; the system packages it needs are not, so they are installed every run.
+        if [ "$CACHE_HIT" = "true" ]; then
+          bun x playwright-core install-deps chromium
+        else
+          bun x playwright-core install --with-deps chromium
+        fi
+
+    - name: Cache verified external binaries
+      id: bin-cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ${{ runner.temp }}/bin-domainforge
+          ${{ runner.temp }}/bin-realitytrace
+        key: horizon-bins-${{ runner.os }}-df${{ inputs.domainforge-version }}-rt${{ inputs.realitytrace-version }}
+
+    - name: Fetch verified external binaries
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        CACHE_HIT: ${{ steps.bin-cache.outputs.cache-hit }}
+        DOMAINFORGE_VERSION: ${{ inputs.domainforge-version }}
+        REALITYTRACE_VERSION: ${{ inputs.realitytrace-version }}
+      run: |
+        set -euo pipefail
+        fetch() { # repo tag asset-prefix version binary-name outvar
+          local repo=$1 tag=$2 prefix=$3 ver=$4 bin=$5 var=$6
+          local asset="${prefix}-${ver}-x86_64-unknown-linux-gnu.tar.gz"
+          if [ "$CACHE_HIT" != "true" ]; then
+            # Download, verify against the release SHA256SUMS (fail closed), then unpack. Only a verified binary is ever cached.
+            local dir="$RUNNER_TEMP/dl-$bin"
+            mkdir -p "$dir"
+            gh release download "$tag" -R "$repo" -D "$dir" -p "$asset" -p SHA256SUMS
+            (cd "$dir" && grep -F " $asset" SHA256SUMS | sha256sum -c -)
+            mkdir -p "$RUNNER_TEMP/bin-$bin"
+            tar -xzf "$dir/$asset" -C "$RUNNER_TEMP/bin-$bin"
+          fi
+          local found
+          found=$(find "$RUNNER_TEMP/bin-$bin" -type f -name "$bin" | head -n1)
+          test -n "$found"
+          chmod +x "$found"
+          echo "$var=$found" >> "$GITHUB_ENV"
+          echo "$bin: $("$found" --version)"
+        }
+        fetch GodSpeedAI/DomainForge "v${DOMAINFORGE_VERSION}" domainforge "$DOMAINFORGE_VERSION" domainforge DOMAINFORGE_BIN
+        fetch GodSpeedAI/RealityTrace "realitytrace-v${REALITYTRACE_VERSION}" realitytrace "$REALITYTRACE_VERSION" realitytrace REALITYTRACE_BIN

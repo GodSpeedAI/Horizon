@@ -51,8 +51,12 @@ witness-claims:
 contract-modals:
     python3 scripts/measure-contract-modals.py --ledger requirements/ledger.yaml --baseline scripts/witness-claims-baseline.txt
 
-test:
+test: test-bun test-py
+
+test-bun:
     bun test
+
+test-py:
     uv run --project research pytest -q
 
 ledger:
@@ -128,6 +132,11 @@ status:
 # the baseline checks AND the adversarial teeth. It reads the ACTIVE frozen artifact set.
 verify: check boundaries idm-integrity test ledger wayfinder teeth
     @echo "verify: ok (active frozen artifacts: requirements/ledger.yaml + .wayfinder/answer-key.md)"
+
+# CI runs `verify` as two parallel parts: the bun suite in shards (`bun run scripts/ci-test-shard.ts <i> <n>`)
+# and everything else here. Together they are exactly `verify`; the aggregate job fails if either part does.
+verify-static: check boundaries idm-integrity test-py ledger wayfinder teeth
+    @echo "verify-static: ok (everything in verify except the bun suite)"
 
 check-toolchain:
     @test -x "{{domainforge_bin}}" || (echo "domainforge missing: set DOMAINFORGE_BIN to the 0.22.0 binary" && exit 1)
