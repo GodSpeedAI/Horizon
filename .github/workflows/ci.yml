@@ -1,8 +1,12 @@
 name: CI
 
-# Runs Horizon's existing gates unchanged: `just verify`, the desk build and the typecheck.
-# External binaries are fetched from their GitHub Releases and verified against the release
-# SHA256SUMS (fail closed); nothing is built from source and no Docker is used.
+# Runs Horizon's existing gates unchanged: `just verify` (as `verify-static` plus the bun suite in shards), the desk build and
+# the typecheck. External binaries are fetched from their GitHub Releases and verified against the release SHA256SUMS
+# (fail closed); nothing is built from source and no Docker is used. Downloads (verified binaries, Chromium) are cached.
+#
+# The `verify (just verify, build:desk, typecheck)` job is the aggregate: it passes only when every part passed (or the change
+# is documentation-only). Nothing is skipped by a path filter, so a check is never missing from a pull request; a
+# documentation-only change short-circuits inside the jobs instead.
 
 on:
   pull_request:
@@ -22,10 +26,43 @@ env:
   BUN_VERSION: "1.4.0"
   DOMAINFORGE_VERSION: "0.22.0"
   REALITYTRACE_VERSION: "0.5.0"
+  TEST_SHARDS: 4
 
 jobs:
-  verify:
-    name: verify (just verify, build:desk, typecheck)
+  changes:
+    name: changes
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      docs_only: ${{ steps.scope.outputs.docs_only }}
+    steps:
+      - name: Classify the change
+        id: scope
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          docs_only=false
+          if [ "$EVENT" = "pull_request" ]; then
+            files=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --paginate -q '.[] | .filename, (.previous_filename // empty)')
+            # Documentation-only: every touched path is a report or note under .agents/reports/ (nothing in the gates reads them).
+            # docs/ is NOT in this list: the boundary checks read docs/donors.md and the tests quote docs/IGNITION.md.
+            if [ -n "$files" ] && ! printf '%s\n' "$files" | grep -v -E '^\.agents/reports/.*\.(md|png)$' | grep -q .; then
+              docs_only=true
+            fi
+          fi
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+          echo "docs_only=$docs_only"
+
+  static:
+    name: static (check, boundaries, pytest, ledger, teeth, build:desk, typecheck)
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
@@ -34,60 +71,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: Setup
+        uses: ./.github/actions/setup-horizon
         with:
           bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Setup just
-        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-
-      - name: Setup Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.12"
-
-      - name: Install repository dependencies
-        run: |
-          python3 -m pip install pyyaml
-          bun install --frozen-lockfile
-          uv sync --project research --all-groups
-
-      - name: Install Chromium for the browser parity tests
-        run: bun x playwright-core install --with-deps chromium
-
-      - name: Fetch verified external binaries
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          fetch() { # repo tag asset-prefix version binary-name outvar
-            local repo=$1 tag=$2 prefix=$3 ver=$4 bin=$5 var=$6
-            local asset="${prefix}-${ver}-x86_64-unknown-linux-gnu.tar.gz"
-            local dir="$RUNNER_TEMP/dl-$bin"
-            mkdir -p "$dir"
-            gh release download "$tag" -R "$repo" -D "$dir" -p "$asset" -p SHA256SUMS
-            (cd "$dir" && grep -F " $asset" SHA256SUMS | sha256sum -c -)
-            mkdir -p "$RUNNER_TEMP/bin-$bin"
-            tar -xzf "$dir/$asset" -C "$RUNNER_TEMP/bin-$bin"
-            local found
-            found=$(find "$RUNNER_TEMP/bin-$bin" -type f -name "$bin" | head -n1)
-            test -n "$found"
-            chmod +x "$found"
-            echo "$var=$found" >> "$GITHUB_ENV"
-            echo "$bin: $("$found" --version)"
-          }
-          fetch GodSpeedAI/DomainForge "v${DOMAINFORGE_VERSION}" domainforge "$DOMAINFORGE_VERSION" domainforge DOMAINFORGE_BIN
-          fetch GodSpeedAI/RealityTrace "realitytrace-v${REALITYTRACE_VERSION}" realitytrace "$REALITYTRACE_VERSION" realitytrace REALITYTRACE_BIN
+          domainforge-version: ${{ env.DOMAINFORGE_VERSION }}
+          realitytrace-version: ${{ env.REALITYTRACE_VERSION }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Toolchain check
         run: just check-toolchain
 
-      - name: just verify
-        run: just verify
+      - name: just verify-static
+        run: just verify-static
 
       - name: Build desk
         run: bun run build:desk
@@ -95,9 +91,87 @@ jobs:
       - name: Typecheck
         run: bun x tsc --noEmit -p .
 
-      - name: Record gates not run in CI
+  test:
+    name: test (shard ${{ matrix.shard }})
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup
+        uses: ./.github/actions/setup-horizon
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+          domainforge-version: ${{ env.DOMAINFORGE_VERSION }}
+          realitytrace-version: ${{ env.REALITYTRACE_VERSION }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          chromium: "true"
+
+      - name: bun test (shard ${{ matrix.shard }} of ${{ env.TEST_SHARDS }})
+        run: >-
+          bun run scripts/ci-test-shard.ts ${{ matrix.shard }} ${{ env.TEST_SHARDS }} --
+          --reporter=junit --reporter-outfile=${{ runner.temp }}/junit-${{ matrix.shard }}.xml
+
+      - name: Per-file timings
         if: always()
         run: |
+          f="$RUNNER_TEMP/junit-${{ matrix.shard }}.xml"
+          test -f "$f" || exit 0
+          {
+            echo "### bun test shard ${{ matrix.shard }}: slowest files"
+            echo '| file | seconds |'
+            echo '|---|---|'
+            python3 - "$f" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          rows = []
+          for suite in ET.parse(sys.argv[1]).getroot().iter("testsuite"):
+              rows.append((float(suite.get("time") or 0), suite.get("name") or "?"))
+          for t, n in sorted(rows, reverse=True)[:10]:
+              print(f"| {n} | {t:.1f} |")
+          PY
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload timings
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bun-test-timings-${{ matrix.shard }}
+          path: ${{ runner.temp }}/junit-${{ matrix.shard }}.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+  verify:
+    name: verify (just verify, build:desk, typecheck)
+    needs: [changes, static, test]
+    if: always()
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Aggregate
+        env:
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          CHANGES: ${{ needs.changes.result }}
+          STATIC: ${{ needs.static.result }}
+          TEST: ${{ needs.test.result }}
+        run: |
+          set -euo pipefail
+          echo "changes=$CHANGES static=$STATIC test=$TEST docs_only=$DOCS_ONLY"
+          test "$CHANGES" = success
+          if [ "$DOCS_ONLY" = "true" ]; then
+            echo "### Documentation-only change: gates not run (only .agents/reports notes changed)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          test "$STATIC" = success
+          test "$TEST" = success
           {
             echo "### Gates not run in CI (NOT_RUN)"
             echo "- Live tests that need SEA_FORGE_SERVER_BIN (test/J02-live, J02r2-live) skip themselves: no SEA-Forge server binary is provisioned here."
