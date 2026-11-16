@@ -45,11 +45,34 @@ jobs:
         uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: /language:${{ matrix.language }}
-          # The repository is public, so code scanning is available: results are uploaded, which
-          # the "Protect Main" ruleset's CodeQL rule requires. The SARIF is also kept as an artifact
-          # and gated below, so findings fail the job even before the ruleset sees them.
-          upload: always
+          # Uploaded by the "Upload to code scanning" step below, after the advisory paths are dropped.
+          upload: never
           output: sarif-results
+
+      # The repository is public, so code scanning is available, and the "Protect Main" ruleset's CodeQL
+      # rule needs results for every PR. That rule has no path filter, so findings under the advisory
+      # paths (test/, scripts/) are removed before upload: they stay advisory, reported by the gate below
+      # and kept in the SARIF artifact, instead of blocking merges through the ruleset.
+      - name: Drop advisory paths from the code-scanning upload
+        run: |
+          python3 - <<'PY'
+          import glob, json, os
+          ADVISORY = ("test/", "scripts/")
+          os.makedirs("sarif-upload", exist_ok=True)
+          for f in glob.glob("sarif-results/**/*.sarif", recursive=True):
+              doc = json.load(open(f))
+              for run in doc.get("runs", []):
+                  run["results"] = [r for r in run.get("results", [])
+                                    if not r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"].startswith(ADVISORY)]
+              json.dump(doc, open(os.path.join("sarif-upload", os.path.basename(f)), "w"))
+          PY
+
+      - name: Upload to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: sarif-upload
+          category: /language:${{ matrix.language }}
 
       - name: Fail on CodeQL findings
         env:
