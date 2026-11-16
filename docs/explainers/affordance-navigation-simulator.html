@@ -887,17 +887,18 @@
       spendableElem.textContent = "✕ Not Spendable";
     }
 
-    // Render blockers box
+    // Render blockers box (values are escaped: they come from editable scenario inputs)
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
     const container = document.getElementById("blockersContainer");
     if (ordered.length === 0) {
       container.innerHTML = '<div style="color: var(--emerald); font-size: 12px; font-family: var(--mono);">✓ Zero blockers. Path meets all affordance gates and is spendable.</div>';
     } else {
       container.innerHTML = ordered.map(b => `
         <div class="blocker-item">
-          <span class="blocker-sev sev-${b.severity}">${b.severity}</span>
+          <span class="blocker-sev sev-${esc(b.severity)}">${esc(b.severity)}</span>
           <div class="blocker-text">
-            <strong>${b.gate}:</strong> ${b.reason}
-            ${b.prerequisite_ref ? `<div class="blocker-prereq">↳ Prerequisite: ${b.prerequisite_ref}</div>` : ''}
+            <strong>${esc(b.gate)}:</strong> ${esc(b.reason)}
+            ${b.prerequisite_ref ? `<div class="blocker-prereq">↳ Prerequisite: ${esc(b.prerequisite_ref)}</div>` : ''}
           </div>
         </div>
       `).join('');
@@ -928,12 +929,13 @@
   }
 
   function logConsole(msg, type = "ok") {
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
     const log = document.getElementById("intentLog");
     const d = new Date();
     const ts = d.toTimeString().split(' ')[0];
     const line = document.createElement("div");
     line.className = "log-line";
-    line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-${type}">${msg}</span>`;
+    line.innerHTML = `<span class="log-ts">${esc(ts)}</span><span class="log-${esc(type)}">${esc(msg)}</span>`;
     log.appendChild(line);
     log.scrollTop = log.scrollHeight;
   }
