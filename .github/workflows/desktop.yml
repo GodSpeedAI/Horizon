@@ -1,8 +1,13 @@
 name: Desktop
 
 # CI builds of the Tauri desktop app and the headless server, per platform. These are NOT releases:
-# nothing is published, tagged or signed, and every artifact is named `unqualified` because no install
-# qualification (WP-67) has been run on it.
+# nothing is published, tagged or signed. Artifacts stay named `unqualified` until a release workflow consumes
+# QUALIFIED records; this workflow only produces the records.
+#
+# WP-67: the `qualify` job installs each platform's bundles on a clean runner (checksums, install, smoke of the INSTALLED
+# server and resources, uninstall) with scripts/qualify-desktop.py and uploads `horizon-qualification-<platform>` records.
+# A platform is QUALIFIED only when every required step PASSed (scripts/qualification-platforms.json). Upgrade is NOT_RUN:
+# there is no previous release. See docs/how-to/qualify-desktop-install.md.
 #
 # `runnable`: the server loads DomainForge through the npm package @godspeedai/domainforge (0.22.2, forced in package.json
 # `overrides`), whose native bindings ship as per-platform packages for every leg below. A leg whose smoke may not pass
@@ -198,3 +203,73 @@ jobs:
           path: out/
           if-no-files-found: error
           retention-days: 14
+
+  qualify:
+    name: qualify ${{ matrix.name }}
+    needs: build
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows-x64, runner: windows-latest }
+          - { name: linux-x64, runner: ubuntu-22.04 }
+          - { name: linux-arm64, runner: ubuntu-22.04-arm }
+          - { name: macos-arm64, runner: macos-15 }
+          - { name: macos-x64, runner: macos-15-intel }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # The triggering commit's own scripts qualify the artifact that same commit built; nothing is selected by input.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Download the built bundles
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: horizon-unqualified-${{ matrix.name }}
+          path: dist
+
+      - name: Linux packages for the installed GUI run
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb iproute2
+
+      - name: Qualify the installed bundles
+        run: |
+          py=python3; [ "$RUNNER_OS" = "Windows" ] && py=python
+          "$py" -I scripts/qualify-desktop.py --platform "${{ matrix.name }}" --dist dist --commit "$GITHUB_SHA" \
+            --out "qualification/${{ matrix.name }}.json" --runner-image "${{ matrix.runner }}"
+
+      - name: Summary
+        if: always()
+        run: |
+          py=python3; [ "$RUNNER_OS" = "Windows" ] && py=python
+          f="qualification/${{ matrix.name }}.json"
+          [ -f "$f" ] || { echo "### ${{ matrix.name }}: NO RECORD (qualification did not finish)" >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          "$py" -I - "$f" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import json, sys
+          r = json.load(open(sys.argv[1]))
+          print(f"### {r['platform']}: {r['status']}")
+          print(f"commit `{r['commit']}`, runner `{r['host']['runner_image']}`, {r['host']['system']} {r['host']['machine']}")
+          print("\n| step | status | reason |\n|---|---|---|")
+          for s in r["steps"]:
+              print(f"| {s['name']} | {s['status']} | {s['reason'][:140]} |")
+          PY
+
+      - name: Upload the qualification record
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: horizon-qualification-${{ matrix.name }}
+          path: qualification/
+          if-no-files-found: warn
+          retention-days: 30

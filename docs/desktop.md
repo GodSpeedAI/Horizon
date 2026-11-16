@@ -91,7 +91,7 @@ start, health, open a session with the one-time code, read the desk, stop.
 Everything this workflow produces is an **unqualified CI build**:
 
 - not signed (macOS bundles are ad-hoc signed because Apple Silicon requires a signature to run; Windows has no signing configured);
-- not installed, upgraded or uninstalled on a clean machine (WP-67), and the desktop window itself is not exercised by CI;
+- install-qualified only as far as the `qualify` job records show (install, installed-server smoke, uninstall per platform; see [qualify the desktop install](how-to/qualify-desktop-install.md)); upgrade is NOT_RUN because no previous release exists, and the desktop window is launched only on Linux under Xvfb;
 - not published, tagged or attached to a release;
 - Jetson and other real-hardware targets are not covered.
 
