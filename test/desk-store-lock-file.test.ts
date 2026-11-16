@@ -1,5 +1,5 @@
 /**
- * The process-level store lock file (`<store>.lock`), held by the kernel through a `flock` child. Two starts in separate processes cannot
+ * The process-level store lock file (`<store>.lock`), held by the kernel through a per-platform holder child (flock, perl or PowerShell). Two starts in separate processes cannot
  * both hold it; a holder that dies (SIGKILL) releases it; contenders never displace a live holder. The store-record lock is a second
  * check and refuses a second holder in the same process.
  */
@@ -8,7 +8,7 @@ import type { Subprocess } from "bun";
 import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { acquireDeskLock, acquireStoreLockFile, DeskAlreadyRunning, FlockMissing, releaseDeskLock, releaseStoreLockFile, storeLockPath } from "../src/capabilities/desk-lock.ts";
+import { acquireDeskLock, acquireStoreLockFile, DeskAlreadyRunning, FlockMissing, lockHolderCommand, releaseDeskLock, releaseStoreLockFile, storeLockPath } from "../src/capabilities/desk-lock.ts";
 import { openSqliteStore } from "@godspeedai/cognate-store-sqlite";
 
 const dirs: string[] = [];
@@ -134,5 +134,49 @@ describe("the store lock file", () => {
       process.env.PATH = saved;
     }
     expect(existsSync(lock)).toBe(false);
+  });
+});
+
+describe("the lock holder per platform", () => {
+  test("linux runs flock, darwin runs perl, win32 runs powershell with the path in the environment", () => {
+    const p = "/tmp/x y/d.sqlite.lock";
+    expect(lockHolderCommand(p, "linux")).toEqual({ cmd: "flock", args: ["-n", p, "-c", "echo LOCKED; read _"], env: {} });
+    const mac = lockHolderCommand(p, "darwin")!;
+    expect(mac.cmd).toBe("/usr/bin/perl");
+    expect(mac.args[0]).toBe("-e");
+    expect(mac.args[1]).toContain("LOCK_NB");
+    expect(mac.args[2]).toBe(p);
+    const win = lockHolderCommand("C:\\d\\a b.lock", "win32")!;
+    expect(win.cmd).toBe("powershell.exe");
+    expect(win.args.slice(0, 3)).toEqual(["-NoProfile", "-NonInteractive", "-Command"]);
+    expect(win.args[3]).toContain("'None'");
+    expect(win.args.join(" ")).not.toContain("a b.lock");
+    expect(win.env).toEqual({ HORIZON_LOCK_PATH: "C:\\d\\a b.lock" });
+    expect(lockHolderCommand(p, "freebsd")).toBeUndefined();
+  });
+
+  test("an unsupported platform refuses with the missing-tool error", async () => {
+    const { store } = newStore();
+    await expect(acquireStoreLockFile(store, "freebsd")).rejects.toBeInstanceOf(FlockMissing);
+  });
+
+  test.skipIf(!existsSync("/usr/bin/perl"))("the darwin perl holder excludes a second start, releases, and drops on kill", async () => {
+    const { store } = newStore();
+    const first = await acquireStoreLockFile(store, "darwin");
+    await expect(acquireStoreLockFile(store, "darwin")).rejects.toBeInstanceOf(DeskAlreadyRunning);
+    await releaseStoreLockFile(first);
+    const second = await acquireStoreLockFile(store, "darwin");
+    second.holder.kill("SIGKILL");
+    await new Promise((resolve) => second.holder.once("exit", resolve));
+    const third = await acquireStoreLockFile(store, "darwin");
+    await releaseStoreLockFile(third);
+  });
+
+  test("on this platform: second acquire is refused, release then re-acquire works", async () => {
+    const { store } = newStore();
+    const first = await acquireStoreLockFile(store);
+    await expect(acquireStoreLockFile(store)).rejects.toBeInstanceOf(DeskAlreadyRunning);
+    await releaseStoreLockFile(first);
+    await releaseStoreLockFile(await acquireStoreLockFile(store));
   });
 });

@@ -8,7 +8,9 @@
  * without releasing it does not block the next start.
  */
 import { randomUUID } from "node:crypto";
-import { spawn, spawnSync, type ChildProcessByStdio } from "node:child_process";
+import { accessSync, constants } from "node:fs";
+import { delimiter, isAbsolute, join } from "node:path";
+import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
 import type { DurableStore } from "@godspeedai/cognate-events";
 
@@ -72,21 +74,32 @@ export async function releaseDeskLock(store: DurableStore, token: string): Promi
  * older schema migrates it, so a second desk must be refused before that open (R3-4). The store's own record lock (above) stays as a
  * second check.
  *
- * The lock is held by a `flock -n` child process (util-linux) on the lock file, for as long as the child's stdin stays open: its shell
- * waits on `read`. Release closes stdin, so `read` ends, flock exits, and the kernel drops the lock. If the desk dies, its end of the
- * pipe closes with it, and the kernel drops the lock the same way. Nothing is renamed, unlinked or judged by a process id to decide
- * exclusion, so there is no stale lock to recover.
+ * The lock is held by a small child process per platform, for as long as the child's stdin stays open. Linux runs `flock -n` (util-linux);
+ * its shell waits on `read`. macOS has no flock command, so it runs `/usr/bin/perl` and perl's flock(2). Windows runs PowerShell, which
+ * opens the file with FileShare.None (an exclusive open). Each prints `LOCKED` once it holds the file, and exits non-zero without it when
+ * another start holds it. Release closes stdin, so the holder exits and the OS drops the lock. If the desk dies, its end of the pipe
+ * closes with it, and the OS drops the lock the same way. Nothing is renamed, unlinked or judged by a process id to decide exclusion, so
+ * there is no stale lock to recover.
  */
 export const FLOCK_MISSING_WORDS = "Horizon needs the flock command (util-linux) to guard its database, and it is not installed. Install util-linux, then start again.";
 
+/** The words for a missing holder tool on this platform. */
+export function lockToolMissingWords(platform: NodeJS.Platform = process.platform): string {
+  if (platform === "linux") return FLOCK_MISSING_WORDS;
+  if (platform === "darwin") return "Horizon needs /usr/bin/perl to guard its database, and it is not available. Install the Xcode command line tools, then start again.";
+  if (platform === "win32") return "Horizon needs powershell.exe to guard its database, and it is not available. Make sure Windows PowerShell is on the PATH, then start again.";
+  return `Horizon cannot guard its database on this platform (${platform}): no lock holder is available.`;
+}
+
+/** Thrown when the platform's lock holder tool cannot be run. The class keeps its name; the message names the tool for the platform. */
 export class FlockMissing extends Error {
-  constructor() {
-    super(FLOCK_MISSING_WORDS);
+  constructor(platform: NodeJS.Platform = process.platform) {
+    super(lockToolMissingWords(platform));
     this.name = "FlockMissing";
   }
 }
 
-/** The held lock: the path of the lock file, and the flock child that holds it. Keep it open until the desk shuts down. */
+/** The held lock: the path of the lock file, and the holder child that holds it. Keep it open until the desk shuts down. */
 export interface StoreLockFile {
   readonly path: string;
   readonly holder: ChildProcessByStdio<Writable, Readable, null>;
@@ -96,15 +109,57 @@ export function storeLockPath(storePath: string): string {
   return `${storePath}.lock`;
 }
 
-function flockInstalled(): boolean {
-  return spawnSync("/bin/sh", ["-c", "command -v flock"], { stdio: "ignore" }).status === 0;
+export interface HolderCommand {
+  readonly cmd: string;
+  readonly args: readonly string[];
+  /** Extra environment for the holder, merged over this process's. */
+  readonly env: Readonly<Record<string, string>>;
+}
+
+const PERL_HOLDER = 'use Fcntl qw(:flock); open(my $f, ">>", $ARGV[0]) or exit 2; flock($f, LOCK_EX|LOCK_NB) or exit 1; $|=1; print "LOCKED\\n"; <STDIN>;';
+const POWERSHELL_HOLDER =
+  "try { $f = [System.IO.File]::Open($env:HORIZON_LOCK_PATH,'OpenOrCreate','ReadWrite','None') } catch { exit 1 }; [Console]::Out.WriteLine('LOCKED'); [Console]::Out.Flush(); [void][Console]::In.ReadLine()";
+
+/** The command that holds the lock file on a platform, or undefined when the platform has no holder. Pure, so it can be tested anywhere. */
+export function lockHolderCommand(path: string, platform: NodeJS.Platform = process.platform): HolderCommand | undefined {
+  switch (platform) {
+    case "linux":
+      return { cmd: "flock", args: ["-n", path, "-c", "echo LOCKED; read _"], env: {} };
+    case "darwin":
+      return { cmd: "/usr/bin/perl", args: ["-e", PERL_HOLDER, path], env: {} };
+    case "win32":
+      return { cmd: "powershell.exe", args: ["-NoProfile", "-NonInteractive", "-Command", POWERSHELL_HOLDER], env: { HORIZON_LOCK_PATH: path } };
+    default:
+      return undefined;
+  }
+}
+
+/** Finds a command on this process's current PATH (the runtime may have cached the PATH it started with). Absolute commands pass through. */
+function resolveCommand(cmd: string, platform: NodeJS.Platform): string | undefined {
+  const exts = platform === "win32" ? (process.env.PATHEXT ?? ".EXE;.CMD").split(";") : [""];
+  const dirs = isAbsolute(cmd) ? [""] : (process.env.PATH ?? "").split(delimiter).filter((d) => d !== "");
+  for (const dir of dirs) {
+    for (const ext of exts) {
+      const candidate = dir === "" ? cmd : join(dir, cmd + (cmd.toLowerCase().endsWith(ext.toLowerCase()) ? "" : ext));
+      try {
+        accessSync(candidate, constants.X_OK);
+        return candidate;
+      } catch {
+        // not here; try the next
+      }
+    }
+  }
+  return undefined;
 }
 
 /** Takes the store's lock file, or throws DeskAlreadyRunning when another start holds it. Call this before the store is opened. */
-export async function acquireStoreLockFile(storePath: string): Promise<StoreLockFile> {
-  if (!flockInstalled()) throw new FlockMissing();
+export async function acquireStoreLockFile(storePath: string, platform: NodeJS.Platform = process.platform): Promise<StoreLockFile> {
   const path = storeLockPath(storePath);
-  const holder = spawn("flock", ["-n", path, "-c", "echo LOCKED; read _"], { stdio: ["pipe", "pipe", "ignore"] });
+  const command = lockHolderCommand(path, platform);
+  if (command === undefined) throw new FlockMissing(platform);
+  const resolved = resolveCommand(command.cmd, platform);
+  if (resolved === undefined) throw new FlockMissing(platform);
+  const holder = spawn(resolved, [...command.args], { stdio: ["pipe", "pipe", "ignore"], env: { ...process.env, ...command.env }, windowsHide: true });
   // A holder that has already exited makes its stdin fail. That is not an error for the start.
   holder.stdin.on("error", () => undefined);
   return new Promise<StoreLockFile>((resolve, reject) => {
@@ -113,7 +168,8 @@ export async function acquireStoreLockFile(storePath: string): Promise<StoreLock
     holder.stdout.setEncoding("utf8");
     holder.stdout.on("data", (chunk: string) => {
       out += chunk;
-      if (!settled && out.includes("LOCKED\n")) {
+      // The line ends in \n on Linux and macOS and \r\n on Windows.
+      if (!settled && /LOCKED\r?\n/.test(out)) {
         settled = true;
         resolve({ path, holder });
       }
@@ -121,13 +177,16 @@ export async function acquireStoreLockFile(storePath: string): Promise<StoreLock
     holder.once("error", (error) => {
       if (settled) return;
       settled = true;
-      reject(error);
+      reject((error as { code?: unknown }).code === "ENOENT" ? new FlockMissing(platform) : error);
     });
-    // flock -n exits non-zero, without printing LOCKED, when another start holds the file.
+    // The holder exits non-zero, without printing LOCKED, when another start holds the file. The exit is read one turn late so that a
+    // spawn error (ENOENT) that arrives alongside it is reported as a missing tool.
     holder.once("exit", () => {
-      if (settled) return;
-      settled = true;
-      reject(new DeskAlreadyRunning());
+      setImmediate(() => {
+        if (settled) return;
+        settled = true;
+        reject(new DeskAlreadyRunning());
+      });
     });
   });
 }
