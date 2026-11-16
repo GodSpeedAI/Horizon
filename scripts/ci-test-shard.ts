@@ -2,11 +2,12 @@
  * Run one deterministic shard of the bun test suite: `bun run scripts/ci-test-shard.ts <index> <count> [-- extra bun test args]`.
  *
  * `--list` prints the shard's files instead of running them. Files are assigned largest first to the least loaded shard
- * (file size stands in for run time), so the split is stable between runs and every file runs in exactly one shard.
+ * (measured seconds from scripts/ci-test-weights.json, the file size when a file has no entry), so the split is stable between
+ * runs and every file runs in exactly one shard. Refresh the weights from the junit timings the CI test jobs upload.
  * The file set is bun test's own default discovery pattern.
  */
 import { Glob } from "bun";
-import { statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 
 const [indexArg, countArg, ...rest] = process.argv.slice(2);
 const index = Number(indexArg);
@@ -18,11 +19,12 @@ if (!Number.isInteger(index) || !Number.isInteger(count) || count < 1 || index <
 const list = rest.includes("--list");
 const passthrough = rest.includes("--") ? rest.slice(rest.indexOf("--") + 1) : [];
 
+const weights: Record<string, number> = JSON.parse(readFileSync(new URL("./ci-test-weights.json", import.meta.url), "utf8"));
 const glob = new Glob("**/*{.test,_test,.spec,_spec}.{ts,tsx,js,jsx,mjs,cjs,mts,cts}");
 const skip = /(^|\/)(node_modules|\.git|\.tmp|dist|target)\//;
 const files: { path: string; size: number }[] = [];
 for (const path of glob.scanSync({ cwd: ".", dot: false })) {
-  if (!skip.test(path)) files.push({ path, size: statSync(path).size });
+  if (!skip.test(path)) files.push({ path, size: weights[path] ?? statSync(path).size / 20_000 });
 }
 files.sort((a, b) => b.size - a.size || (a.path < b.path ? -1 : 1));
 
