@@ -4,11 +4,10 @@ name: Desktop
 # nothing is published, tagged or signed, and every artifact is named `unqualified` because no install
 # qualification (WP-67) has been run on it.
 #
-# `runnable`: the server loads DomainForge through the npm package @godspeedai/domainforge 0.22.0, which ships only the
-# linux-x64-gnu native binding (no platform packages are published). On every other target the compiled server cannot start,
-# so its smoke is run and recorded as BLOCKED rather than required to pass; the bundles are still built. The day DomainForge
-# publishes those bindings, set `runnable: "true"` for the leg. macOS bundles are ad-hoc signed only because Apple Silicon
-# refuses to run unsigned code.
+# `runnable`: the server loads DomainForge through the npm package @godspeedai/domainforge (0.22.2, forced in package.json
+# `overrides`), whose native bindings ship as per-platform packages for every leg below. A leg whose smoke may not pass
+# would be marked `runnable: "false"`: its smoke is then run and recorded as BLOCKED instead of being required. macOS bundles
+# are ad-hoc signed only because Apple Silicon refuses to run unsigned code.
 
 on:
   pull_request:
@@ -51,7 +50,7 @@ jobs:
           - name: windows-x64
             runner: windows-latest
             triple: x86_64-pc-windows-msvc
-            runnable: "false"
+            runnable: "true"
             bundles: nsis,msi
           - name: linux-x64
             runner: ubuntu-22.04
@@ -61,17 +60,17 @@ jobs:
           - name: linux-arm64
             runner: ubuntu-22.04-arm
             triple: aarch64-unknown-linux-gnu
-            runnable: "false"
+            runnable: "true"
             bundles: deb,appimage
           - name: macos-arm64
             runner: macos-15
             triple: aarch64-apple-darwin
-            runnable: "false"
+            runnable: "true"
             bundles: app,dmg
           - name: macos-x64
             runner: macos-15-intel
             triple: x86_64-apple-darwin
-            runnable: "false"
+            runnable: "true"
             bundles: app,dmg
     defaults:
       run:
