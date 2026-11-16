@@ -1,6 +1,6 @@
 // The one place the desk registers WebMCP tools. The page's standard tool surface is installed by
 // the polyfill; this file only projects the descriptors from webmcp-tools.ts onto it.
-import { initializeWebMCPPolyfill } from "@mcp-b/webmcp-polyfill";
+import { installWebMCP } from "@mcp-b/webmcp-polyfill";
 import { deskTools, type DeskAgentInvoker } from "./webmcp-tools.ts";
 
 interface ToolSpec {
@@ -25,7 +25,7 @@ export interface DeskToolsHandle {
 export function startDeskTools(
   doc: Document,
   invoker: DeskAgentInvoker,
-  init: () => void = initializeWebMCPPolyfill,
+  init: () => void = installWebMCP,
 ): DeskToolsHandle {
   const controller = new AbortController();
   const registered: string[] = [];

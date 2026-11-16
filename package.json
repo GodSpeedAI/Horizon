@@ -32,7 +32,7 @@
     "@godspeedai/cognate-runtime-api": "0.10.0",
     "@godspeedai/cognate-runtime-bun": "0.10.0",
     "@godspeedai/cognate-store-sqlite": "0.10.0",
-    "@mcp-b/webmcp-polyfill": "5.1.0",
+    "@mcp-b/webmcp-polyfill": "6.2.0",
     "@opentui/core": "0.5.12",
     "@opentui/react": "0.5.12",
     "react": "19.3.0",
