@@ -129,7 +129,8 @@ jobs:
           test "$(git rev-parse HEAD)" = "$TAG_SHA" || { echo "::error::checkout is not the tag commit"; exit 1; }
           python3 -I scripts/release-qualification.py assemble \
             --platforms scripts/qualification-platforms.json --dist dist --records records \
-            --commit "$TAG_SHA" --tag "$TAG" --out out > /dev/null
+            --commit "$TAG_SHA" --tag "$TAG" --out out > "$RUNNER_TEMP/assemble.log" \
+            || { cat "$RUNNER_TEMP/assemble.log"; exit 1; }
           ready=$(python3 -I -c 'import json;print("true" if json.load(open("out/qualification.json"))["release_ready"] else "false")')
           echo "ready=$ready" >> "$GITHUB_OUTPUT"
           echo "release_ready=$ready"

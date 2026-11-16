@@ -186,7 +186,8 @@ jobs:
           # An .app is a directory: archive it so it survives upload with its permissions.
           if [ -d "$bundle/macos" ]; then
             for app in "$bundle"/macos/*.app; do
-              [ -d "$app" ] && tar -czf "out/horizon-desktop-unqualified_$(basename "$app").tar.gz" -C "$bundle/macos" "$(basename "$app")"
+              # The target triple keeps the arm64 and x64 archives apart in a release (horizon-v0.1.1 collided).
+              [ -d "$app" ] && tar -czf "out/horizon-desktop-unqualified_$(basename "$app" .app)_${{ matrix.triple }}.app.tar.gz" -C "$bundle/macos" "$(basename "$app")"
             done
           fi
           cd out
