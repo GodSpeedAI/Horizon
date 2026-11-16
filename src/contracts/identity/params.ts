@@ -107,7 +107,7 @@ const variantSchema = z
 const schemaSchema = z
   .object({
     fields: z.array(fieldSchema).optional(),
-    variants: z.record(variantSchema).optional(),
+    variants: z.record(z.string(), variantSchema).optional(),
     discriminator: z.string().min(1).optional(),
     discriminated_by: z.string().min(1).optional(),
     rule: z.string().optional(),
@@ -123,7 +123,7 @@ const documentSchema = z
     contract_id: z.string().min(1),
     contract_version: z.string().min(1),
     frozen_at: z.string().min(1),
-    schemas: z.record(schemaSchema),
+    schemas: z.record(z.string(), schemaSchema),
   })
   .passthrough();
 
