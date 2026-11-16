@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "horizon-desktop"
-version = "0.1.1"
+version = "0.1.2"
 description = "Desktop shell for Horizon: supervises the Bun server sidecar and shows its desk."
 license = "Apache-2.0"
 edition = "2021"
