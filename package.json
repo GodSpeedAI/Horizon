@@ -49,7 +49,7 @@
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "playwright-core": "1.63.0",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "yaml": "2.9.1"
   }
 }
