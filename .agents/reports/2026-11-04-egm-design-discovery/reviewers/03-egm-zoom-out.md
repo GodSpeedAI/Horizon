@@ -1,0 +1,43 @@
+# Goldfish Review — egm-zoom-out lens (raw, as returned)
+
+Fresh-context reviewer, dispatched 2026-11-04 per `egm-brainstorm` Step 2. Unedited except for this header.
+
+---
+
+## A. Findings
+
+**BLOCKER A1 — The completion path ends at a machine with nothing real to govern.** The hypothesis's Complete list (C-1..C-6) closes internal seams: settlement gate, REQ-NAV-008..013, readiness re-run, CEP hashes, glossary, install. Not one item acquires or connects a real organizational world. Evidence: J01/J03–J06 are fixture-proven (`behavioral/journeys/*.yaml`, 01 §3); the one live test (J02) exercises governance on a real server authorizing test-world actions; the README's success criterion ("enter a real organizational world") names production orders, ERPs, pipelines — no such connector appears in any dossier; the deployed vertical is loopback-only, owner-hands (T-19). The estate's own readiness harness withholds shared_remote (identity gaps) and rates hosted NOT SUPPORTED. "Production-ready" for whom, navigating what — the hypothesis never says.
+
+**BLOCKER A2 — Keeping both product fronts is endorsed on an aspirational user distinction.** The claim: "different users and different journeys." The evidence: same owner builds both (MG-2 admits "owner's own work in both repos"); same governance vocabulary (T-8); same Cognate substrate; same SEA-Forge kernel behind hand-copied adapters (T-6); identity forking three ways (T-9); Workbench's design tokens being imported into Horizon (MG-2); and the UI spec §7 imports Workbench's session rail/transcript/approval-card anatomy into Horizon as the "Work" surface, with §4.2 listing Workbench as a "compatible donor" for sessions/continuations/tools. Both products today have exactly one user: the owner. This is one governance substrate with two masks, one mask (Workbench) possessing a real working runtime (PTY, file/shell, 5-platform packaging qualified) and the other (Horizon) possessing the mission and a fixture world. If Work lands in Horizon, what remains distinct is the *domain* (org world vs codebase) — a deployment mode or domain profile, not a second product. The hypothesis never argues this; it asserts it.
+
+**MAJOR A3 — Two execution harnesses retained on conceptual grounds, zero live consumers.** Gauntlet: not installed anywhere, no tag, PostgreSQL required, and the hypothesis itself labels it "optional engine; not required per-commit." SWE_SEED: not installed, packaging never green, load-bearing only as Workbench's settlement transport. The merge rejection rests on "different weight classes, different failure domains" — taxonomy, not demand. At portfolio level, at least one should be frozen until a live journey consumes it; Gauntlet's PostgreSQL requirement actively blocks C-6 (the hypothesis defers this as D5).
+
+**MAJOR A4 — C-2 (payment/capacity/IS7 settlement) is generality scheduled ahead of demand.** REQ-NAV-008..013 is the largest completion item and it hard-codes payment gates, capacity ledgers, and expected-outcome discrimination for a world that contains no real payments, capacities, or outcomes. Sequencing it before a first real connector repeats the T-1 pattern at spec scale: build ahead of the ledger, big-bang freeze later.
+
+**MAJOR A5 — The convergence ruler does not currently exist.** "One live whole-stack proof at pinned heads is the conformance ruler" — but by the harness's own rule the GO is invalid at every current head (T-2), cognate is off-history, and three sea-rs settlement lineages plus two Horizon worktrees hold the actual settlement work (T-4). Convergence is declared the path while the estate demonstrably cannot keep one execution ledger (T-1). M-3 fixes the record, not the behavior that broke it.
+
+**MAJOR A6 — Load-bearing vs speculative, classified honestly.** Load-bearing (proven live): DomainForge, Cognate, SEA-Forge, RealityTrace, Horizon. Speculative parallel bets: Gauntlet (A3), SWE_SEED (A3), CEP (no runtime, undefined hash algorithms, zero external adopters — standardization ahead of a second implementor), Context Kernel (spawn-per-request, marginal to the core journeys), godspeed_agent (retiring — agreed). Workbench is real but its distinctness is the open question (A2). The hypothesis audits surfaces for retirement but never audits *products*; its alternatives table only considers intra-spine merges, never front-level ones — the one level the central question asks about.
+
+**MINOR A7** — The hypothesis's theory-consistency claim leans on an *unfrozen* manifesto (v17) while its independent corroboration (the UI spec) cites v13.1 (T-EGM-3). Theory churn under a "frozen architecture" claim is drift risk, not support.
+**MINOR A8** — §6 defers exactly the hardest calls (D2 sequencing, D5 Gauntlet/install) to a register outside this document; the hypothesis is silent on its two highest-variance decisions.
+**MINOR A9** — Workbench's 5-platform packaging is the estate's only near-ship distribution asset; the hypothesis never exploits it (see C-2 below).
+
+## B. Strongest counter-argument to the whole framing
+
+The hypothesis answers "what is the simplest defensible architecture" with an architecture-preserving answer: nothing new is needed, the topology is correct, only seams remain. That is exactly what a six-month, self-reviewed, single-principal estate would conclude — the framing assumes the binding constraint is *architectural completeness*. The evidence says the binding constraints are demand-side: no real world, no second user, no distribution channel, one operator, multi-observer identity withheld by the estate's own harness. Under that reading, C-1..C-6 makes the machine more provably correct *about nothing in particular*. The genuinely simplest defensible architecture is smaller than the hypothesis admits: the four-component spine plus ONE front plus ONE real data source, everything else frozen. The hypothesis never considers that option because it treats the mission text as validated rather than as the riskiest unvalidated assumption in the portfolio.
+
+## C. Portfolio alternatives
+
+**C-1. Invert the product order — Workbench is product #1, Horizon #2.** Rationale: the only immediately available real world with real consequential work is GodSpeed's own software development; the owner is user-zero today. Sequence: tag sxr, land sea-forge 0.4.0 + MG-1, green SWE_SEED packaging, run the full governed-commit→settlement loop on the owner's daily coding. Settlement machinery finally records real, non-fixture evidence; Horizon resumes with a proven spine and an honest scope. *Cost:* low repo motion, mostly sequencing. *Contract revision:* Horizon spec amendment deferring REQ-NAV-008..013. *Consequence:* Horizon (the mission) slips; mission credibility rises.
+
+**C-2. Merge fronts on one runtime — Workbench as Horizon's session engine and packaging head start.** Land M-1/M-2 (shared identity + approval client), then make the Work surface consume Workbench's actual session runtime rather than donor patterns, and inherit Workbench's qualified 5-platform packaging for the combined product. *Deletes the entire T-6/T-7/T-8/T-9 tension class.* *Cost:* identity worktree push-safety first; approval wire reconciliation; Horizon spec must admit Work as a normative surface (revision; the UI spec currently dodges this — "not a seventh normative journey"). *Risk:* devtools and cockpit UX compromise each other; one codebase to maintain instead of two is the point.
+
+**C-3. Freeze-and-finish-one.** Freeze Workbench features at current state (works, 1,571 tests), archive Gauntlet and SWE_SEED, put all capacity into Horizon: C-1 settlement gate, J02r2, *one real organizational connector* (new work the hypothesis lacks), C-6 install. *Cost:* lowest; freezing is cheap. *Consequence:* fastest credible "finished Horizon" claim; loses daily dogfood; payment gates deferred (spec amendment, as in C-1).
+
+## D. What would change my mind
+
+- A real organizational data source exists or is contracted — a connector to live data in the 48-commit cockpit branch would collapse A1 to a Minor.
+- Evidence of two distinct actual users (anyone besides the owner running Workbench; a named pilot operator for Horizon) — would upgrade A2's "two masks" to "two products."
+- A live product-path consumer of Gauntlet or SWE_SEED — would restore A3's retention as defensible.
+- Team size greater than one principal — parallel two-front development is more defensible with people than with agents.
+- A recorded owner decision validating demand (not architecture) — any document that weighs the mission itself as an assumption rather than an axiom.
