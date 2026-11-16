@@ -3,7 +3,7 @@
 # Rule: record material, hard-to-reverse or binding choices with evidence.
 schema: horizon.decisions
 version: 1
-updated: "2026-10-21"
+updated: "2026-11-16"
 
 decisions:
   - id: DEC-T00-01
@@ -894,6 +894,26 @@ decisions:
     reversible: true
     evidence:
       - "src/domain/frame.ts"
+
+  - id: DEC-OWNER-2026-11-16-01
+    date: "2026-11-16"
+    task: none (authority design)
+    requirement: invariant 7 (independent authority); human-reserved operations
+    decision: >-
+      Owner ruling OD-1 approves the S1/A3 authority design and supersedes the A/B/C choice in
+      `.agents/reports/2026-11-08-agent-authority-decision.md`. The paired phone is the independent
+      A3-UV confirmation surface for human-reserved operations. There is no terminal confirmation for
+      routine work; P0 to P3 classification and proportional authentication stay. The A/B/C options
+      (terminal confirmation plus sandbox, narrower agent door, leave as is) are closed as superseded.
+      The 2026-11-13 "Option B" owner decision for device.pair (production refusal until an A3-UV
+      path exists) stays in force until the phone surface is built and proven; it is not an
+      acceptance of terminal presence.
+    rationale:
+      - "Owner ruling OD-1, 2026-11-16, recorded in the FDE convergence decision record 2026-11-16-owner-rulings-OD-1-to-OD-6.md."
+      - "The ruling changes no evidence classification: a row becomes proven only through its own qualifying run."
+    reversible: true
+    evidence:
+      - ".agents/reports/2026-11-08-agent-authority-decision.md"
 
 open_questions:
 

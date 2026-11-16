@@ -1,6 +1,8 @@
 # Decision needed: can an agent in the paired browser act as the person?
 
-Status: open. Not implemented. Needs your decision before the desk can claim "agents may only propose; the person decides."
+Status: SUPERSEDED on 2026-11-16 by owner ruling OD-1 (S1/A3 phone authority). The original status follows unchanged: open, not implemented, needing a decision before the desk can claim "agents may only propose; the person decides." See the closing section "Closure (2026-11-16)".
+
+(Original status line: Status: open. Not implemented.)
 
 ## 1. The problem Sol's recommendation solves
 
@@ -70,3 +72,13 @@ My read: B is the honest near-term option if the desk is only ever used with age
 3. If B or C: do you accept that a browser-controlling agent can act as you until A is in place?
 
 Until you answer, the other round-2 findings are being fixed; this item stays open and is listed as a known residual in the final report.
+
+## Closure (2026-11-16)
+
+Owner ruling OD-1 (2026-11-16) approved the S1/A3 authority design and ruled that it supersedes the A/B/C choice above. The paired phone is the independent A3-UV confirmation surface for human-reserved operations. There is no terminal confirmation for routine work, and P0 to P3 classification with proportional authentication stays.
+
+- Option A (terminal confirmation plus sandbox): superseded. Terminal confirmation is not the human-authority surface.
+- Option B (narrower, agent door as the only agent route): superseded. The agent door remains the only agent route, but it is no longer the answer to the authority question.
+- Option C (leave as is): rejected. The residual is closed by the phone surface, not documented.
+
+Sections 1 to 5 above are kept as the record of the question as it stood on 2026-11-08. The ruling is recorded in the FDE convergence decision record `2026-11-16-owner-rulings-OD-1-to-OD-6.md` and in `.agents/reports/horizon-decisions.yaml` as DEC-OWNER-2026-11-16-01.
