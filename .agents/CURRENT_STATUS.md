@@ -1,4 +1,18 @@
-# Horizon Current Status
+# Current status
+
+**Status revision:** 40
+
+**Stage:** Owner-approved GodSpeed vocabulary consolidation
+
+**Summary:** Reconciled the owning glossary against the review patch and authoritative sources. The owner approved the conceptual distinctions. Runtime, frozen specifications, and identifiers retain their existing contracts.
+
+- Cross-checked glossary targets, source links and the eleven semantic scenarios.
+
+## Active work carried forward
+
+Stage 0A remediation-4 wave and Stage 0B containment in progress (plan task T23). Checkpoint commit 61e694c holds round-6 corrections and Stage 0B.
+
+Round-6 critic (REJECT, four blocking) corrected: authority decision specified_not_published with governed mode refused at startup; facts unbound; submitIntent appends no attempt on classification refusal; design descriptor state moved to transitions. Stage 0B: label gated at route, confirm command, prereg PE-53..PE-59 / NE-41..NE-46, 11 new teeth. Full suite 1590 pass, tsc clean, 44 mutants caught.
 
 **Revision:** 38 · **Recorded:** 2026-11-11 · **Stage:** Stage 0A remediation-4 wave in progress (plan task T23). Checkpoint commit `f88cb20` holds all prior work. Remaining work is the checklist below; nothing in it is claimed complete until its evidence is recorded.
 
