@@ -11,7 +11,8 @@ import { createClient } from "@godspeedai/cognate-client";
 import { createRemoteRuntimeService } from "@godspeedai/cognate-protocol-connect";
 import { connectTransport } from "@godspeedai/cognate-protocol-connect-bun";
 import type { Json } from "@godspeedai/cognate-events";
-import type { Caller, RuntimeService } from "@godspeedai/cognate-runtime-api";
+import type { Caller, CaseContext, RuntimeService } from "@godspeedai/cognate-runtime-api";
+import { caseContextIssues } from "@godspeedai/cognate-runtime-api";
 import type { WorkshopConfig } from "../config/types.ts";
 
 export const KEY_WARNING_DAYS = 7;
@@ -150,6 +151,79 @@ async function guarded<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
 
 export const assignmentId = (caseId: string, stepId: string): string => `assign:${caseId}:${stepId}`;
 
+/** The CEP world-identity grammar (`world:<name>@sha256:<64 hex>`). A local Execution State Digest never matches it. */
+export const CEP_WORLD_REF = /^world:[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*@sha256:[0-9a-f]{64}$/;
+const SEMANTIC_REF = /^[A-Za-z0-9_.-]+::[A-Za-z0-9_.-]+$/;
+const EPISODE_REF = /^episode:[^:@\s]+:[^:@\s]+:[0-9]+@sha256:[0-9a-f]{64}$/;
+const ASSIGNMENT_REF = /^assign:[^:\s]+:[^:\s]+:[0-9]+:[0-9]+$/;
+const EXPECTATION_REF = /^(question|threshold):.+$/;
+
+/** Why an exploratory or evaluated handoff cannot be forwarded. Every code is a fixed, testable string. */
+export type HandoffRefusalCode = "world_ref_not_cep" | "evaluated_without_episode" | "invalid_provenance";
+
+/**
+ * The context Horizon derives from its own case and pinned world. `registryChecked` is true only when
+ * Horizon actually checked `worldRef` against its pinned world registry (`loadWorld` at boot); the
+ * absence of that check is recorded as `asserted`, never implied to be `verified`. `episodeRef` is the
+ * trusted Execution Episode binding, required for evaluated work.
+ */
+export interface CaseHandoff {
+  readonly worldRef: string;
+  readonly registryChecked: boolean;
+  readonly semanticRef: string;
+  readonly caseId: string;
+  readonly planItemId: string;
+  readonly role: string;
+  readonly kind: "evaluated" | "exploratory";
+  /** Horizon's own step correlation (`assign:<case>:<step>`); preserved for evidence, never a CEP identity. */
+  readonly caseStepCorrelation: string;
+  /** The operator session's attribution claim: recorded verbatim, never a refusal. */
+  readonly assertedBy: string;
+  readonly episodeRef?: string;
+  readonly assignmentId?: string;
+  readonly expectationRefs?: readonly string[];
+  readonly executorProvenance?: "program" | "live" | "injected_fault";
+}
+
+export type DerivedHandoff =
+  | { readonly kind: "ok"; readonly caseContext: CaseContext; readonly assertedBy: string; readonly worldCorroboration: "verified" | "asserted"; readonly caseStepCorrelation: string }
+  | { readonly kind: "refused"; readonly code: HandoffRefusalCode; readonly words: string };
+
+const present = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
+
+/**
+ * Build the CEP `CaseContext` Horizon forwards on `expert.converse`, refusing a typed error when
+ * evaluated work lacks its trusted Execution Episode binding, when provenance is invalid, or when a
+ * local Execution State Digest is presented as a CEP World Reference. Asserted context stays asserted.
+ */
+export function deriveCaseHandoff(input: CaseHandoff): DerivedHandoff {
+  const refuse = (code: HandoffRefusalCode, words: string): DerivedHandoff => ({ kind: "refused", code, words });
+  if (!CEP_WORLD_REF.test(String(input.worldRef))) {
+    return refuse("world_ref_not_cep", "The world reference is not a CEP world identity (`world:<name>@sha256:<64 hex>`). A local Execution State Digest cannot stand in for the registered world.");
+  }
+  if (input.kind !== "evaluated" && input.kind !== "exploratory") return refuse("invalid_provenance", "The case kind must be evaluated or exploratory.");
+  if (input.kind === "evaluated" && !present(input.episodeRef)) return refuse("evaluated_without_episode", "Evaluated work needs the trusted Execution Episode binding; the context cannot be forwarded without it.");
+  if (!present(input.assertedBy)) return refuse("invalid_provenance", "assertedBy must name who asserts the context.");
+  if (!present(input.caseStepCorrelation)) return refuse("invalid_provenance", "The Case-Step Correlation is required.");
+  if (!SEMANTIC_REF.test(String(input.semanticRef))) return refuse("invalid_provenance", "semanticRef must be namespace::name.");
+  if (input.episodeRef !== undefined && !EPISODE_REF.test(input.episodeRef)) return refuse("invalid_provenance", "The Execution Episode binding is malformed.");
+  if (input.assignmentId !== undefined && !ASSIGNMENT_REF.test(input.assignmentId)) return refuse("invalid_provenance", "The case assignment reference is malformed.");
+  if (input.expectationRefs !== undefined && (!Array.isArray(input.expectationRefs) || !input.expectationRefs.every((ref) => EXPECTATION_REF.test(ref)))) {
+    return refuse("invalid_provenance", "Expectation references must be question:/threshold: ids.");
+  }
+  const caseContext: CaseContext = {
+    worldRef: input.worldRef, semanticRef: input.semanticRef, caseId: input.caseId, planItemId: input.planItemId,
+    role: input.role, kind: input.kind,
+    ...(input.episodeRef !== undefined ? { episodeRef: input.episodeRef } : {}),
+    ...(input.assignmentId !== undefined ? { assignmentId: input.assignmentId } : {}),
+    ...(input.expectationRefs !== undefined ? { expectationRefs: input.expectationRefs } : {}),
+    ...(input.executorProvenance !== undefined ? { executorProvenance: input.executorProvenance } : {}),
+  };
+  const issues = caseContextIssues(caseContext);
+  if (issues.length) return refuse("invalid_provenance", `The case context is not well formed: ${issues.join("; ")}`);
+  return { kind: "ok", caseContext, assertedBy: input.assertedBy, worldCorroboration: input.registryChecked ? "verified" : "asserted", caseStepCorrelation: input.caseStepCorrelation };
+}
+
 export interface AssignRequest {
   readonly caseId: string;
   readonly stepId: string;
@@ -160,6 +234,12 @@ export interface AssignRequest {
   /** For a review step: the id of the assignment under review. The workshop then starts the reviewer without the author's memory. */
   readonly reviews?: string;
   readonly timeoutMs?: number;
+  /** J-HANDOFF-case-context: the validated CEP context and its provenance, forwarded on the same call. */
+  readonly caseContext?: CaseContext;
+  readonly assertedBy?: string;
+  readonly worldCorroboration?: "verified" | "asserted";
+  /** Horizon's own Case-Step Correlation, carried for evidence (never a CEP identity). */
+  readonly caseStepCorrelation?: string;
 }
 
 /**
@@ -171,7 +251,16 @@ export async function assign(access: Access, request: AssignRequest): Promise<Wo
   if (access.kind !== "ready") return { kind: "refused", words: access.words };
   const id = assignmentId(request.caseId, request.stepId);
   try {
-    const result = await guarded(access.client.invoke("expert.converse", { id, requestId: id, expertId: request.expertId, workspaceId: request.workspaceId, message: request.message, ...(request.reviews ? { reviews: request.reviews } : {}) }), request.timeoutMs ?? DEFAULT_WORKSHOP_TIMEOUT_MS);
+    const result = await guarded(access.client.invoke("expert.converse", {
+      id, requestId: id, expertId: request.expertId, workspaceId: request.workspaceId, message: request.message,
+      ...(request.reviews ? { reviews: request.reviews } : {}),
+      ...(request.caseContext ? {
+        caseContext: request.caseContext,
+        ...(request.assertedBy !== undefined ? { assertedBy: request.assertedBy } : {}),
+        ...(request.worldCorroboration !== undefined ? { worldCorroboration: request.worldCorroboration } : {}),
+        ...(request.caseStepCorrelation !== undefined ? { caseStepCorrelation: request.caseStepCorrelation } : {}),
+      } : {}),
+    } as unknown as Json), request.timeoutMs ?? DEFAULT_WORKSHOP_TIMEOUT_MS);
     const got = typeof result === "object" && result !== null && !Array.isArray(result) ? (result as { assignmentId?: unknown }).assignmentId : undefined;
     return { kind: "ok", value: { assignmentId: typeof got === "string" ? got : id } };
   } catch (error) {

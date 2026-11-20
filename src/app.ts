@@ -104,7 +104,7 @@ import { answerEcho, cleanAgentName, MAX_WAITING_PROPOSALS, TOO_MANY_PROPOSALS, 
 import { listLabels, putLabel, type RunLabel } from "./capabilities/labels.ts";
 import { CASE_COLLECTION, presentingOn, setPresenting } from "./capabilities/workspace-records.ts";
 import { NoteRefused, getNote, listCase, listDay, listDays, listTags, noteHistory, saveNote, search as searchNotes, type Who } from "./capabilities/notes.ts";
-import { assign as assignToAgent, assignmentId, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
+import { assign as assignToAgent, assignmentId, deriveCaseHandoff, keyState, workshopAccess, type Access } from "./adapters/workshop.ts";
 import { refused as attemptRefused, requestIdFor } from "./adapters/request-id.ts";
 import { checkReassign } from "./capabilities/question-rules.ts";
 import { acceptanceBlocked, AGREED_COLLECTION, agreedFingerprint, agreedFingerprintOf, agreedId, answerFor, guardIdOf, PANEL_ANSWERS_COLLECTION, answerState, listAnswers, listConflicts, NOTHING_SENT, QuestionAlreadyAnswered, planReassign, planRoute, planStopWaiting, recordAnswer, checkValue, waitsForAgent, OUTCOMES, WAITING_WORDS, type AgreedQuestion, type PanelAnswer } from "./capabilities/panel-answers.ts";
@@ -3164,7 +3164,23 @@ export async function createApplication(
     let assigned: { readonly done: boolean; readonly words: string } | null = null;
     if (wantsAgent) {
       const access = options.workshop?.() ?? workshopAccess(loaded.config.workshop, caller, clock());
-      const result = await assignToAgent(access, { caseId: target.case_id, stepId: sent.value.plan_item_id, expertId: loaded.config.workshop?.expert_id ?? "", workspaceId: loaded.config.workshop?.workspace_id ?? "", message: text, ...(reviewAsked ? { reviews: assignmentId(target.case_id, reviewStepId) } : {}) });
+      // J8: the exploratory handoff carries the CEP world identity and provenance. `world` was
+      // corroborated against the pinned world registry at boot, so the context is `verified` only
+      // when that check actually ran; otherwise it stays `asserted`.
+      const handoff = deriveCaseHandoff({
+        worldRef: world.worldRef,
+        registryChecked: world.worldRef === loaded.config.world_ref,
+        semanticRef: "horizon.interaction::CaseRecord",
+        caseId: target.case_id,
+        planItemId: sent.value.plan_item_id,
+        role: "executor",
+        kind: "exploratory",
+        caseStepCorrelation: assignmentId(target.case_id, sent.value.plan_item_id),
+        assertedBy: caller.actor.id,
+      });
+      const result = handoff.kind === "refused"
+        ? { kind: "refused" as const, words: handoff.words }
+        : await assignToAgent(access, { caseId: target.case_id, stepId: sent.value.plan_item_id, expertId: loaded.config.workshop?.expert_id ?? "", workspaceId: loaded.config.workshop?.workspace_id ?? "", message: text, ...(reviewAsked ? { reviews: assignmentId(target.case_id, reviewStepId) } : {}), caseContext: handoff.caseContext, assertedBy: handoff.assertedBy, worldCorroboration: handoff.worldCorroboration, caseStepCorrelation: handoff.caseStepCorrelation });
       assigned = result.kind === "ok" ? { done: true, words: "Given to an agent." } : { done: false, words: result.words };
     }
     const next = await nextDraft(store, caller.tenant, caller.actor.id, draftId);
