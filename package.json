@@ -34,7 +34,7 @@
     "@godspeedai/cognate-store-sqlite": "0.10.0",
     "@mcp-b/webmcp-polyfill": "6.2.0",
     "@opentui/core": "0.5.12",
-    "@opentui/react": "0.5.12",
+    "@opentui/react": "0.9.3",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "zod": "4.6.7"
