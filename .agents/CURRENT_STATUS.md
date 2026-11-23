@@ -1,12 +1,29 @@
 # Current status
 
-**Status revision:** 40
+**Status revision:** 41
 
-**Stage:** Owner-approved GodSpeed vocabulary consolidation
+**Stage:** CognitiveOS #108 Horizon package preservation checkpoint
 
-**Summary:** Reconciled the owning glossary against the review patch and authoritative sources. The owner approved the conceptual distinctions. Runtime, frozen specifications, and identifiers retain their existing contracts.
+**Summary:** Preserved the approved 0.11.0 package alignment and private identity archive refresh for review; full verification remains unresolved.
 
-- Cross-checked glossary targets, source links and the eleven semantic scenarios.
+**Verified:**
+
+- The exact draft diff and expanded private identity archive passed a redacted secret scan.
+- The refreshed identity archive matches approved SHA-256 b245ea22c1eaec83be2a4f0b8097c5ea558ef0395a0d2c364ea2bf471e61e282.
+- Earlier single-copy package checks passed for 28 Cognate packages; identity focused tests passed.
+
+**Limits:**
+
+- The prior complete verification log ends verify: ok but its shell exit status was not captured.
+- The later full verification attempt was interrupted after host-load timeouts; no fresh full passing gate is claimed.
+- The existing integration worktree remains uncommitted and was not modified by this checkpoint.
+- round-7 critic: Codex usage limit (resets Nov 12 00:53); Haiku subagent critic substituted
+- Stage 0B receipt signing and presence checks not implemented
+- horizon confirm cannot write while a desk holds the store lock
+- PE-53 and PE-59 have no mutant tooth
+- PR, merge, branch and worktree cleanup
+
+**Next:** Rerun the complete Horizon gate on a responsive host with explicit exit status, then review and reconcile this checkpoint before integration.
 
 ## Active work carried forward
 
