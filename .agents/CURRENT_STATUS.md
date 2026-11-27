@@ -8,6 +8,14 @@
 
 - Cross-checked glossary targets, source links and the eleven semantic scenarios.
 
+**Open items (revision 40):**
+
+- Round-7 critic: Codex usage limit (resets Nov 12 00:53); Haiku subagent critic substituted.
+- Stage 0B receipt signing and presence checks not implemented.
+- `horizon confirm` cannot write while a desk holds the store lock.
+- PE-53 and PE-59 have no mutant tooth.
+- PR, merge, branch and worktree cleanup.
+
 ## Active work carried forward
 
 Stage 0A remediation-4 wave and Stage 0B containment in progress (plan task T23). Checkpoint commit 61e694c holds round-6 corrections and Stage 0B.
@@ -17,6 +25,8 @@ Round-6 critic (REJECT, four blocking) corrected: authority decision specified_n
 **Revision:** 38 · **Recorded:** 2026-11-11 · **Stage:** Stage 0A remediation-4 wave in progress (plan task T23). Checkpoint commit `f88cb20` holds all prior work. Remaining work is the checklist below; nothing in it is claimed complete until its evidence is recorded.
 
 ## Remaining-work checklist (remediation-4 wave, then Stage 0B containment)
+
+> **Superseded.** This revision 38 checklist is retained for history only. The open items above (revision 40) are current. Boxes below that read NOT STARTED or unchecked are not a live to-do list: Stage 0B routing and the round-6 corrections were committed in `61e694c`, and what remains of Stage 0B is the list above.
 
 Scope: finish Stage 0A to a blind-critic ACCEPT, then Stage 0B interim containment, then PR and merge.
 

@@ -32,6 +32,16 @@ The seven verdict families assessed for every candidate operation: `visibility`,
 `src/domain/navigation.ts`). Evaluated to `available`, `blocked`, `unknown`, or `conflicted`
 (`AffordanceStatus`) — these are *distinct* states, never merged.
 
+The frozen model (`.sea/interaction/interaction-model.sea`) declares a fifth
+`AffordanceStatus` member, `possible`, and `AFFORDANCE_STATUSES` lists it. An
+evaluated assessment never carries it: `AffordanceAssessment.status` and the
+local `status` in `assessAffordance` are typed `Exclude<AffordanceStatus, "possible">`
+(`src/domain/navigation.ts:192,266-267`), so evaluation yields only the four
+verdicts above. `possible` names an operation that exists in the world but has
+not been assessed (see *Possibility ≠ affordance*); the frame lists those in
+`possible_operations`. It is a pre-assessment value, and consumers of the model
+should accept it in the type without expecting it from an assessment.
+
 **Possibility ≠ affordance**
 An operation can exist in the world yet be blocked (missing authority, evidence, or
 affordability). Horizon refuses to render a possible-but-unaffordable operation as
